@@ -1,4 +1,3 @@
-// Data Pertanyaan Khusus untuk Sasaran
 const pertanyaanKhusus = {
     "CATIN": [
         { id_input: "lila", label: "Ukuran LiLA (cm)", type: "number", step: "0.1", required: true, options: null },
