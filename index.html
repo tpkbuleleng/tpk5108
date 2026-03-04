@@ -13,7 +13,7 @@
         /* --- PENGATURAN DASAR --- */
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         body { background-color: #ffffff; color: #333333; display: flex; flex-direction: column; min-height: 100vh; overflow-x: hidden; }
-        :root { --primary-blue: #0084FF; --hover-blue: #006bce; --light-blue: #e6f3ff; --gray: #f0f0f0; --success: #28a745; --danger: #dc3545; }
+        :root { --primary-blue: #0084FF; --hover-blue: #006bce; --light-blue: #e6f3ff; --gray: #f0f0f0; --success: #28a745; --danger: #dc3545; --warning: #ffc107; }
         .hidden { display: none !important; }
         .container { padding: 20px; width: 100%; max-width: 480px; margin: 0 auto; padding-bottom: 50px; }
 
@@ -34,10 +34,11 @@
         .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--primary-blue); outline: none; }
         .form-group input[readonly] { background-color: var(--gray); color: #666; font-weight: bold;}
         
-        .btn-primary { width: 100%; padding: 14px; background-color: var(--primary-blue); color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; transition: background-color 0.3s; margin-top: 10px; display: flex; justify-content: center; align-items: center; gap: 10px;}
+        .btn-primary { width: 100%; padding: 14px; background-color: var(--primary-blue); color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; transition: background-color 0.3s; margin-top: 10px;}
         .btn-primary:hover { background-color: var(--hover-blue); }
         .btn-secondary { width: 100%; padding: 12px; background-color: transparent; color: #666; border: 2px solid #ddd; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; }
         .btn-secondary:hover { background-color: #f9f9f9; }
+        .btn-edit { background-color: var(--warning); color: #333; border: none; padding: 6px 12px; border-radius: 5px; font-size: 12px; font-weight: bold; cursor: pointer; margin-top: 8px; display: inline-block;}
 
         .dynamic-section { background-color: var(--light-blue); padding: 15px; border-radius: 8px; border: 1px dashed var(--primary-blue); margin-bottom: 15px; }
         .dynamic-section h4 { margin-bottom: 10px; color: var(--primary-blue); }
@@ -63,8 +64,8 @@
         .data-item { padding: 12px; background: white; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 10px; font-size: 14px; }
         .data-item strong { color: var(--primary-blue); font-size: 15px; }
         .status-badge { display: inline-block; padding: 3px 8px; border-radius: 10px; font-size: 11px; font-weight: bold; margin-top: 5px; }
-        .status-0 { background-color: #ffeeba; color: #856404; } /* Belum Sync */
-        .status-1 { background-color: #d4edda; color: #155724; } /* Sudah Sync */
+        .status-0 { background-color: #ffeeba; color: #856404; } 
+        .status-1 { background-color: #d4edda; color: #155724; } 
     </style>
 </head>
 <body>
@@ -99,9 +100,7 @@
         <div class="menu-grid">
             <button class="menu-btn" onclick="openScreen('registrasi-screen')">1. REGISTRASI SASARAN <span class="icon">➕</span></button>
             <button class="menu-btn" onclick="bukaMenuLapor()">2. LAPOR PENDAMPINGAN <span class="icon">📝</span></button>
-            
-            <button class="menu-btn" onclick="bukaMenuData()">3 & 4. LIHAT DATA TERSIMPAN <span class="icon">📂</span></button>
-            
+            <button class="menu-btn" onclick="bukaMenuData()">3 & 4. LIHAT/UPDATE DATA <span class="icon">📂</span></button>
             <button class="menu-btn" onclick="bukaMenuRekap()">5. LIHAT REKAP BULANAN <span class="icon">📊</span></button>
             
             <button class="menu-btn btn-sync" onclick="prosesSinkronisasi()" id="btn-sync-ui">
@@ -114,79 +113,72 @@
     </div>
 
     <div id="registrasi-screen" class="container hidden">
-        <h2 class="header-title">Registrasi Sasaran Baru</h2>
+        <h2 class="header-title" id="judul-form-sasaran">Registrasi Sasaran Baru</h2>
         <form id="form-registrasi">
             <div class="form-group">
                 <label>Kecamatan Domisili *</label>
-                <select id="reg-kecamatan" required onchange="handleJenisSasaran()">
+                <select id="reg-kecamatan" required onchange="handleJenisSasaran(false)">
                     <option value="">-- Pilih Kecamatan --</option>
-                    <option value="GRK">Gerokgak</option>
-                    <option value="SRT">Seririt</option>
-                    <option value="BSB">Busungbiu</option>
-                    <option value="BJR">Banjar</option>
-                    <option value="BLL">Buleleng</option>
-                    <option value="SKS">Sukasada</option>
-                    <option value="SWN">Sawan</option>
-                    <option value="KBT">Kubutambahan</option>
-                    <option value="TJK">Tejakula</option>
+                    <option value="GRK">Gerokgak</option><option value="SRT">Seririt</option>
+                    <option value="BSB">Busungbiu</option><option value="BJR">Banjar</option>
+                    <option value="BLL">Buleleng</option><option value="SKS">Sukasada</option>
+                    <option value="SWN">Sawan</option><option value="KBT">Kubutambahan</option><option value="TJK">Tejakula</option>
                 </select>
             </div>
-            <div class="form-group"><label>Jenis Sasaran *</label><select id="reg-jenis" required onchange="handleJenisSasaran()"><option value="">-- Pilih Jenis Sasaran --</option><option value="CATIN">CATIN</option><option value="BUMIL">BUMIL</option><option value="BUFAS">BUFAS</option><option value="BADUTA">BADUTA</option></select></div>
+            <div class="form-group"><label>Jenis Sasaran *</label><select id="reg-jenis" required onchange="handleJenisSasaran(false)"><option value="">-- Pilih Jenis Sasaran --</option><option value="CATIN">CATIN</option><option value="BUMIL">BUMIL</option><option value="BUFAS">BUFAS</option><option value="BADUTA">BADUTA</option></select></div>
             <div class="form-group"><label>ID Sasaran</label><input type="text" id="reg-id" readonly placeholder="Otomatis"></div>
             <div class="form-group"><label>NIK Sasaran (16 Digit) *</label><input type="text" id="reg-nik" required pattern="[0-9]{16}"></div>
             <div class="form-group"><label>Nama Lengkap Sasaran *</label><input type="text" id="reg-nama" required></div>
             <div id="pertanyaan-khusus" class="dynamic-section hidden"><h4 id="judul-khusus">Pertanyaan Khusus</h4><div id="konten-khusus"></div></div>
-            <button type="submit" class="btn-primary">Simpan Sasaran</button>
-            <button type="button" class="btn-secondary" onclick="kembaliKeMenu()">Batal & Kembali</button>
+            <button type="submit" class="btn-primary" id="btn-submit-sasaran">Simpan Sasaran</button>
+            <button type="button" class="btn-secondary" onclick="batalFormSasaran()">Batal & Kembali</button>
         </form>
     </div>
 
     <div id="lapor-screen" class="container hidden">
-        <h2 class="header-title">Lapor Pendampingan</h2>
+        <h2 class="header-title" id="judul-form-laporan">Lapor Pendampingan</h2>
         <form id="form-laporan">
             <div class="form-group"><label>Pilih Sasaran *</label><select id="lapor-sasaran-id" required></select></div>
             <div class="form-group"><label>Tanggal Pendampingan *</label><input type="date" id="lapor-tanggal" required></div>
-            <div class="form-group"><label>Bulan Pelaporan *</label><select id="lapor-bulan" required><option value="Januari">Januari</option><option value="Februari">Februari</option><option value="Maret">Maret</option></select></div>
+            <div class="form-group"><label>Bulan Pelaporan *</label><select id="lapor-bulan" required>
+                <option value="">-- Pilih --</option><option value="Januari">Januari</option><option value="Februari">Februari</option><option value="Maret">Maret</option><option value="April">April</option><option value="Mei">Mei</option><option value="Juni">Juni</option><option value="Juli">Juli</option><option value="Agustus">Agustus</option><option value="September">September</option><option value="Oktober">Oktober</option><option value="November">November</option><option value="Desember">Desember</option>
+            </select></div>
             <div class="dynamic-section">
                 <h4>Hasil Pemeriksaan/Pantauan</h4>
-                <div class="form-group"><label>Status Kesehatan/Risiko *</label><select id="lapor-status" required><option value="Normal">Sehat / Normal</option><option value="Beresiko">Beresiko Stunting / Sakit</option></select></div>
-                <div class="form-group"><label>Bantuan/Edukasi *</label><select id="lapor-edukasi" required><option value="KIE">Penyuluhan / KIE</option></select></div>
+                <div class="form-group"><label>Status Kesehatan/Risiko *</label><select id="lapor-status" required><option value="">-- Pilih --</option><option value="Normal">Sehat / Normal</option><option value="Beresiko">Beresiko Stunting / Sakit</option></select></div>
+                <div class="form-group"><label>Bantuan/Edukasi *</label><select id="lapor-edukasi" required><option value="">-- Pilih --</option><option value="KIE">Penyuluhan / KIE</option><option value="Rujukan">Rujukan Faskes</option><option value="Bansos">Bantuan Sosial</option></select></div>
                 <div class="form-group"><label>Catatan Kader</label><textarea id="lapor-catatan" rows="3"></textarea></div>
             </div>
-            <button type="submit" class="btn-primary">Simpan Laporan</button>
-            <button type="button" class="btn-secondary" onclick="kembaliKeMenu()">Batal & Kembali</button>
+            <button type="submit" class="btn-primary" id="btn-submit-laporan">Simpan Laporan</button>
+            <button type="button" class="btn-secondary" onclick="batalFormLaporan()">Batal & Kembali</button>
         </form>
     </div>
 
     <div id="data-screen" class="container hidden">
         <h2 class="header-title">Data Tersimpan di HP</h2>
-        
         <div class="dynamic-section">
             <h4>Daftar Sasaran</h4>
             <div id="list-sasaran">Memuat data...</div>
         </div>
-
         <div class="dynamic-section">
             <h4>Daftar Laporan</h4>
             <div id="list-laporan">Memuat data...</div>
         </div>
-
         <button type="button" class="btn-secondary" onclick="kembaliKeMenu()">Kembali ke Menu</button>
     </div>
 
     <div id="rekap-screen" class="container hidden">
         <h2 class="header-title">Rekapitulasi (Offline)</h2>
-        <div class="welcome-card" id="rekap-content">
-            Memuat rekapitulasi data Anda...
-        </div>
+        <div class="welcome-card" id="rekap-content">Memuat rekapitulasi data Anda...</div>
         <button type="button" class="btn-secondary" onclick="kembaliKeMenu()">Kembali ke Menu</button>
     </div>
 
     <script>
-        // --- REGISTRASI PWA ---
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js'); });
-        }
+        // --- VARIABEL GLOBAL UNTUK EDIT MODE ---
+        let editModeSasaranId = null;
+        let editModeLaporanId = null;
+
+        if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js'); }); }
 
         let db;
         const request = indexedDB.open("TPK_Buleleng_DB", 2); 
@@ -207,28 +199,92 @@
         function kembaliKeMenu() { openScreen('main-menu'); updateBadgeSinkronisasi(); }
         document.getElementById('login-form').addEventListener('submit', function(e) { e.preventDefault(); openScreen('main-menu'); updateBadgeSinkronisasi(); });
 
-        function handleJenisSasaran() {
+        // --- LOGIKA FORM SASARAN (SIMPAN & UPDATE) ---
+        function handleJenisSasaran(isEditMode = false) {
             const kec = document.getElementById('reg-kecamatan').value;
             const jenis = document.getElementById('reg-jenis').value;
             const idField = document.getElementById('reg-id');
             const cont = document.getElementById('pertanyaan-khusus');
             const konten = document.getElementById('konten-khusus');
 
-            if (kec && jenis) idField.value = `${jenis}-${kec}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
-            else idField.value = "";
+            // Jangan ganti ID jika sedang mode Edit
+            if (!isEditMode && !editModeSasaranId) {
+                if (kec && jenis) idField.value = `${jenis}-${kec}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+                else idField.value = "";
+            }
             
             let html = "";
             if (jenis === "CATIN") html = `<div class="form-group"><label>LiLA (cm)</label><input type="number" step="0.1" name="lila" required></div>`;
             else if (jenis === "BUMIL") html = `<div class="form-group"><label>Gravida</label><input type="number" name="gravida" required></div>`;
+            else if (jenis === "BUFAS") html = `<div class="form-group"><label>Metode KB</label><select name="metode_kb" required><option value="IUD">IUD</option><option value="Suntik">Suntik</option><option value="Pil">Pil</option><option value="Belum">Belum</option></select></div>`;
+            else if (jenis === "BADUTA") html = `<div class="form-group"><label>Berat Lahir (gr)</label><input type="number" name="berat_lahir" required></div>`;
+            
             if (html !== "") { konten.innerHTML = html; cont.classList.remove('hidden'); } else { cont.classList.add('hidden'); konten.innerHTML = ""; }
         }
 
         document.getElementById('form-registrasi').addEventListener('submit', function(e) {
             e.preventDefault(); 
-            const data = { id_sasaran: document.getElementById('reg-id').value, jenis: document.getElementById('reg-jenis').value, nama: document.getElementById('reg-nama').value, status_sinkron: 0 };
-            db.transaction(['sasaran'], 'readwrite').objectStore('sasaran').add(data).onsuccess = () => { tampilkanNotif("✅ Sasaran disimpan offline!", "notif-success"); document.getElementById('form-registrasi').reset(); kembaliKeMenu(); };
+            const data = { 
+                id_sasaran: document.getElementById('reg-id').value, 
+                kecamatan: document.getElementById('reg-kecamatan').value,
+                jenis: document.getElementById('reg-jenis').value, 
+                nik: document.getElementById('reg-nik').value,
+                nama: document.getElementById('reg-nama').value, 
+                status_sinkron: 0,
+                detail_khusus: {}
+            };
+            
+            // Ambil jawaban pertanyaan khusus
+            document.querySelectorAll('#konten-khusus input, #konten-khusus select').forEach(el => {
+                data.detail_khusus[el.name] = el.value;
+            });
+
+            const method = editModeSasaranId ? 'put' : 'add'; // Jika edit pakai PUT (timpa), jika baru pakai ADD
+            
+            db.transaction(['sasaran'], 'readwrite').objectStore('sasaran')[method](data).onsuccess = () => { 
+                tampilkanNotif(editModeSasaranId ? "✅ Sasaran berhasil diupdate!" : "✅ Sasaran disimpan offline!", "notif-success"); 
+                batalFormSasaran(); 
+            };
         });
 
+        function batalFormSasaran() {
+            document.getElementById('form-registrasi').reset();
+            document.getElementById('pertanyaan-khusus').classList.add('hidden');
+            document.getElementById('btn-submit-sasaran').innerText = "Simpan Sasaran";
+            document.getElementById('judul-form-sasaran').innerText = "Registrasi Sasaran Baru";
+            editModeSasaranId = null;
+            kembaliKeMenu();
+        }
+
+        // --- FUNGSI KLIK EDIT SASARAN ---
+        function editSasaran(id) {
+            db.transaction(['sasaran'], 'readonly').objectStore('sasaran').get(id).onsuccess = (e) => {
+                const data = e.target.result;
+                editModeSasaranId = id;
+                document.getElementById('judul-form-sasaran').innerText = "Update Data Sasaran";
+                document.getElementById('btn-submit-sasaran').innerText = "Update Data";
+                
+                document.getElementById('reg-kecamatan').value = data.kecamatan;
+                document.getElementById('reg-jenis').value = data.jenis;
+                document.getElementById('reg-id').value = data.id_sasaran;
+                document.getElementById('reg-nik').value = data.nik || "";
+                document.getElementById('reg-nama').value = data.nama;
+                
+                handleJenisSasaran(true); // Panggil form khusus tanpa ganti ID
+                
+                // Isi nilai form khusus (delay sebentar agar form muncul dulu)
+                setTimeout(() => {
+                    for(let key in data.detail_khusus) {
+                        let el = document.querySelector(`[name="${key}"]`);
+                        if(el) el.value = data.detail_khusus[key];
+                    }
+                }, 100);
+
+                openScreen('registrasi-screen');
+            };
+        }
+
+        // --- LOGIKA FORM LAPORAN (SIMPAN & UPDATE) ---
         function bukaMenuLapor() {
             const sel = document.getElementById('lapor-sasaran-id');
             db.transaction(['sasaran'], 'readonly').objectStore('sasaran').getAll().onsuccess = (e) => {
@@ -242,53 +298,96 @@
 
         document.getElementById('form-laporan').addEventListener('submit', function(e) {
             e.preventDefault();
-            const data = { id_laporan: "REP-" + Date.now(), id_sasaran: document.getElementById('lapor-sasaran-id').value, tanggal: document.getElementById('lapor-tanggal').value, status_sinkron: 0 };
-            db.transaction(['laporan'], 'readwrite').objectStore('laporan').add(data).onsuccess = () => { tampilkanNotif("✅ Laporan disimpan offline!", "notif-success"); document.getElementById('form-laporan').reset(); kembaliKeMenu(); };
+            const data = { 
+                id_laporan: editModeLaporanId ? editModeLaporanId : "REP-" + Date.now(), 
+                id_sasaran: document.getElementById('lapor-sasaran-id').value, 
+                tanggal: document.getElementById('lapor-tanggal').value, 
+                bulan: document.getElementById('lapor-bulan').value,
+                status: document.getElementById('lapor-status').value,
+                edukasi: document.getElementById('lapor-edukasi').value,
+                catatan: document.getElementById('lapor-catatan').value,
+                status_sinkron: 0 
+            };
+            
+            const method = editModeLaporanId ? 'put' : 'add';
+            db.transaction(['laporan'], 'readwrite').objectStore('laporan')[method](data).onsuccess = () => { 
+                tampilkanNotif(editModeLaporanId ? "✅ Laporan diupdate!" : "✅ Laporan disimpan offline!", "notif-success"); 
+                batalFormLaporan(); 
+            };
         });
 
-        // --- PERBAIKAN: MENU 3 & 4 (LIHAT DATA) ---
+        function batalFormLaporan() {
+            document.getElementById('form-laporan').reset();
+            document.getElementById('btn-submit-laporan').innerText = "Simpan Laporan";
+            document.getElementById('judul-form-laporan').innerText = "Lapor Pendampingan";
+            editModeLaporanId = null;
+            kembaliKeMenu();
+        }
+
+        // --- FUNGSI KLIK EDIT LAPORAN ---
+        function editLaporan(id) {
+            db.transaction(['sasaran'], 'readonly').objectStore('sasaran').getAll().onsuccess = (e) => {
+                const list = e.target.result;
+                const sel = document.getElementById('lapor-sasaran-id');
+                sel.innerHTML = '<option value="">-- Pilih Sasaran --</option>';
+                list.forEach(s => sel.innerHTML += `<option value="${s.id_sasaran}">[${s.jenis}] ${s.nama}</option>`);
+                
+                db.transaction(['laporan'], 'readonly').objectStore('laporan').get(id).onsuccess = (e2) => {
+                    const data = e2.target.result;
+                    editModeLaporanId = id;
+                    document.getElementById('judul-form-laporan').innerText = "Update Laporan";
+                    document.getElementById('btn-submit-laporan').innerText = "Update Laporan";
+                    
+                    document.getElementById('lapor-sasaran-id').value = data.id_sasaran;
+                    document.getElementById('lapor-tanggal').value = data.tanggal;
+                    document.getElementById('lapor-bulan').value = data.bulan;
+                    document.getElementById('lapor-status').value = data.status;
+                    document.getElementById('lapor-edukasi').value = data.edukasi;
+                    document.getElementById('lapor-catatan').value = data.catatan || "";
+                    
+                    openScreen('lapor-screen');
+                };
+            };
+        }
+
+        // --- MENU 3 & 4 (LIHAT & UPDATE DATA) ---
         function bukaMenuData() {
             openScreen('data-screen');
             const uiSasaran = document.getElementById('list-sasaran');
             const uiLaporan = document.getElementById('list-laporan');
             
-            // Render Sasaran
             db.transaction(['sasaran'], 'readonly').objectStore('sasaran').getAll().onsuccess = (e) => {
                 const data = e.target.result;
-                if(data.length === 0) uiSasaran.innerHTML = '<p style="color:#666;">Belum ada sasaran yang diregistrasi.</p>';
+                if(data.length === 0) uiSasaran.innerHTML = '<p style="color:#666;">Belum ada sasaran.</p>';
                 else {
                     uiSasaran.innerHTML = data.map(s => `
                         <div class="data-item">
                             <strong>${s.nama}</strong> (${s.jenis})<br>
                             ID: ${s.id_sasaran}<br>
-                            <span class="status-badge ${s.status_sinkron === 0 ? 'status-0' : 'status-1'}">
-                                ${s.status_sinkron === 0 ? '⏳ Belum Sinkron' : '✅ Sudah Sinkron'}
-                            </span>
+                            <span class="status-badge ${s.status_sinkron === 0 ? 'status-0' : 'status-1'}">${s.status_sinkron === 0 ? '⏳ Belum Sync' : '✅ Sudah Sync'}</span>
+                            <br><button onclick="editSasaran('${s.id_sasaran}')" class="btn-edit">✏️ Edit Sasaran</button>
                         </div>
                     `).join('');
                 }
             };
 
-            // Render Laporan
             db.transaction(['laporan'], 'readonly').objectStore('laporan').getAll().onsuccess = (e) => {
                 const data = e.target.result;
-                if(data.length === 0) uiLaporan.innerHTML = '<p style="color:#666;">Belum ada laporan pendampingan.</p>';
+                if(data.length === 0) uiLaporan.innerHTML = '<p style="color:#666;">Belum ada laporan.</p>';
                 else {
                     uiLaporan.innerHTML = data.map(l => `
                         <div class="data-item">
-                            ID Laporan: <strong>${l.id_laporan}</strong><br>
-                            Sasaran ID: ${l.id_sasaran}<br>
-                            Tanggal: ${l.tanggal}<br>
-                            <span class="status-badge ${l.status_sinkron === 0 ? 'status-0' : 'status-1'}">
-                                ${l.status_sinkron === 0 ? '⏳ Belum Sinkron' : '✅ Sudah Sinkron'}
-                            </span>
+                            Sasaran ID: <strong>${l.id_sasaran}</strong><br>
+                            Bulan: ${l.bulan} | Tgl: ${l.tanggal}<br>
+                            <span class="status-badge ${l.status_sinkron === 0 ? 'status-0' : 'status-1'}">${l.status_sinkron === 0 ? '⏳ Belum Sync' : '✅ Sudah Sync'}</span>
+                            <br><button onclick="editLaporan('${l.id_laporan}')" class="btn-edit">✏️ Edit Laporan</button>
                         </div>
                     `).join('');
                 }
             };
         }
 
-        // --- PERBAIKAN: MENU 5 (LIHAT REKAP) ---
+        // --- MENU 5 (LIHAT REKAP) ---
         function bukaMenuRekap() {
             openScreen('rekap-screen');
             const rekapContent = document.getElementById('rekap-content');
@@ -302,15 +401,9 @@
 
                 db.transaction(['laporan'], 'readonly').objectStore('laporan').getAll().onsuccess = (ev) => {
                     const totalLaporan = ev.target.result.length;
-
                     rekapContent.innerHTML = `
                         <h3 style="margin-bottom: 10px; color: var(--primary-blue);">Total Sasaran: ${sasaran.length} Orang</h3>
-                        <div style="margin-bottom: 15px;">
-                            • BUMIL: <b>${totalBumil}</b><br>
-                            • CATIN: <b>${totalCatin}</b><br>
-                            • BUFAS: <b>${totalBufas}</b><br>
-                            • BADUTA: <b>${totalBaduta}</b>
-                        </div>
+                        <div style="margin-bottom: 15px;">• BUMIL: <b>${totalBumil}</b><br>• CATIN: <b>${totalCatin}</b><br>• BUFAS: <b>${totalBufas}</b><br>• BADUTA: <b>${totalBaduta}</b></div>
                         <hr style="border: 1px solid #ddd; margin-bottom: 10px;">
                         <h3 style="color: var(--primary-blue);">Total Laporan: ${totalLaporan} Dokumen</h3>
                     `;
@@ -318,6 +411,7 @@
             };
         }
 
+        // --- LOGIKA SINKRONISASI ---
         function updateBadgeSinkronisasi() {
             let belumSinkron = 0;
             db.transaction(['sasaran'], 'readonly').objectStore('sasaran').getAll().onsuccess = (e) => {
@@ -325,8 +419,7 @@
                 db.transaction(['laporan'], 'readonly').objectStore('laporan').getAll().onsuccess = (ev) => {
                     belumSinkron += ev.target.result.filter(item => item.status_sinkron === 0).length;
                     const badge = document.getElementById('sync-badge');
-                    if (belumSinkron > 0) { badge.innerText = belumSinkron; badge.classList.remove('hidden'); } 
-                    else { badge.classList.add('hidden'); }
+                    if (belumSinkron > 0) { badge.innerText = belumSinkron; badge.classList.remove('hidden'); } else { badge.classList.add('hidden'); }
                 };
             };
         }
@@ -356,6 +449,11 @@
                         trxUpdate.oncomplete = () => {
                             tampilkanNotif(`✅ Berhasil menyinkronkan ${dataPayload.sasaran.length} Sasaran & ${dataPayload.laporan.length} Laporan!`, "notif-success");
                             resetTombolSync(); updateBadgeSinkronisasi();
+                            
+                            // Jika sedang berada di halaman Data, refresh list datanya
+                            if(!document.getElementById('data-screen').classList.contains('hidden')) {
+                                bukaMenuData();
+                            }
                         };
                     }, 2500); 
                 };
