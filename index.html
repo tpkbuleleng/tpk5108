@@ -29,6 +29,7 @@
         .form-group label { display: block; margin-bottom: 5px; font-weight: 600; font-size: 14px; color: #444;}
         .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 15px; }
         .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--primary-blue); outline: none; }
+        .form-group select:disabled { background-color: #f0f0f0; cursor: not-allowed; }
         .btn-primary { width: 100%; padding: 14px; background-color: var(--primary-blue); color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px;}
         .btn-secondary { width: 100%; padding: 12px; background-color: transparent; color: #666; border: 2px solid #ddd; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; }
         .btn-edit { background-color: var(--warning); color: #333; border: none; padding: 6px 12px; border-radius: 5px; font-size: 12px; font-weight: bold; cursor: pointer; margin-top: 8px; }
@@ -40,6 +41,8 @@
         .notif { padding: 15px; border-radius: 8px; text-align: center; margin-bottom: 20px; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         .notif-success { background-color: var(--success); color: white; }
         .data-item { padding: 12px; background: white; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 10px; font-size: 14px; }
+        .status-badge { display: inline-block; padding: 3px 8px; border-radius: 10px; font-size: 11px; font-weight: bold; margin-top: 5px; }
+        .status-0 { background-color: #ffeeba; color: #856404; } .status-1 { background-color: #d4edda; color: #155724; }
         .loader { border: 3px solid #f3f3f3; border-top: 3px solid white; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; display: none; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
@@ -57,7 +60,7 @@
             <h2>Login Kader</h2>
         </div>
         <form id="login-form">
-            <div class="form-group"><label>ID Kader</label><input type="text" id="id-kader" placeholder="Gunakan ID di data-kader.js (Cth: KDR-01-GRK)" required></div>
+            <div class="form-group"><label>ID Kader</label><input type="text" id="id-kader" placeholder="Cth: 812001-01001" required></div>
             <div class="form-group"><label>Password (NIK)</label><input type="password" required pattern="[0-9]{16}" placeholder="16 Digit Angka"></div>
             <button type="submit" class="btn-primary">Masuk Aplikasi</button>
         </form>
@@ -87,8 +90,8 @@
         <h2 class="header-title" id="judul-form-sasaran">Registrasi Sasaran Baru</h2>
         <form id="form-registrasi">
             <div class="form-group"><label>Kecamatan *</label><select id="reg-kecamatan" required onchange="ubahKecamatan()"><option value="">-- Pilih --</option><option value="GRK">Gerokgak</option><option value="SRT">Seririt</option><option value="BLL">Buleleng</option></select></div>
-            <div class="form-group"><label>Desa/Kelurahan *</label><select id="reg-desa" required onchange="ubahDesa()" disabled style="background:#f0f0f0;"><option value="">-- Pilih Kecamatan Dulu --</option></select></div>
-            <div class="form-group"><label>Banjar Dinas / RW *</label><select id="reg-dusun" required disabled style="background:#f0f0f0;" onchange="handleJenisSasaran(false)"><option value="">-- Pilih Desa Dulu --</option></select></div>
+            <div class="form-group"><label>Desa/Kelurahan *</label><select id="reg-desa" required onchange="ubahDesa()" disabled><option value="">-- Pilih Kecamatan Dulu --</option></select></div>
+            <div class="form-group"><label>Banjar Dinas / RW *</label><select id="reg-dusun" required disabled onchange="handleJenisSasaran(false)"><option value="">-- Pilih Desa Dulu --</option></select></div>
             
             <div class="form-group"><label>Jenis Sasaran *</label><select id="reg-jenis" required onchange="handleJenisSasaran(false)"><option value="">-- Pilih --</option><option value="CATIN">CATIN</option><option value="BUMIL">BUMIL</option><option value="BUFAS">BUFAS</option><option value="BADUTA">BADUTA</option></select></div>
             <div class="form-group"><label>ID Sasaran</label><input type="text" id="reg-id" readonly placeholder="Otomatis"></div>
@@ -106,7 +109,7 @@
         <form id="form-laporan">
             <div class="form-group"><label>Pilih Sasaran *</label><select id="lapor-sasaran-id" required></select></div>
             <div class="form-group"><label>Tanggal *</label><input type="date" id="lapor-tanggal" required></div>
-            <div class="form-group"><label>Bulan *</label><select id="lapor-bulan" required><option value="Januari">Januari</option><option value="Februari">Februari</option><option value="Maret">Maret</option></select></div>
+            <div class="form-group"><label>Bulan *</label><select id="lapor-bulan" required><option value="">-- Pilih --</option><option value="Januari">Januari</option><option value="Februari">Februari</option><option value="Maret">Maret</option></select></div>
             <div class="dynamic-section">
                 <h4>Pemeriksaan</h4>
                 <div class="form-group"><label>Status Risiko *</label><select id="lapor-status" required><option value="">-- Pilih --</option><option value="Normal">Normal</option><option value="Beresiko">Beresiko</option></select></div>
@@ -134,55 +137,32 @@
         };
         request.onsuccess = e => { db = e.target.result; updateBadgeSinkronisasi(); };
 
-        // --- LOGIKA UI DASAR & CEK LOGIN ---
         window.addEventListener('load', () => { 
             setTimeout(() => { 
                 document.getElementById('splash-screen').classList.add('hidden'); 
                 const kader = localStorage.getItem('id_kader_aktif');
-                const tim = localStorage.getItem('id_tim_aktif'); // Ambil info Tim
-                
-                if(kader && tim) { 
-                    document.getElementById('kader-info-display').innerText = `Kader: ${kader} | Tim: ${tim}`; 
-                    openScreen('main-menu'); 
-                } 
-                else { 
-                    document.getElementById('login-screen').classList.remove('hidden'); 
-                }
+                const tim = localStorage.getItem('id_tim_aktif');
+                if(kader && tim) { document.getElementById('kader-info-display').innerText = `Kader: ${kader} | Tim: ${tim}`; openScreen('main-menu'); } 
+                else { document.getElementById('login-screen').classList.remove('hidden'); }
             }, 2000); 
         });
 
-        // --- SAAT KADER KLIK TOMBOL LOGIN ---
+        function openScreen(id) { document.querySelectorAll('.container').forEach(el => el.classList.add('hidden')); document.getElementById(id).classList.remove('hidden'); window.scrollTo(0,0); }
+        function kembaliKeMenu() { openScreen('main-menu'); updateBadgeSinkronisasi(); }
+        function logoutKader() { if(confirm("Yakin ingin keluar?")) { localStorage.removeItem('id_kader_aktif'); localStorage.removeItem('id_tim_aktif'); location.reload(); } }
+
         document.getElementById('login-form').addEventListener('submit', e => { 
             e.preventDefault(); 
-            const inputId = document.getElementById('id-kader').value.toUpperCase(); // Paksa huruf besar
-            const inputNik = document.querySelectorAll('input[type="password"]')[0].value; // Ambil password (NIK)
-            
-            // CEK APAKAH ID ADA & PASSWORD COCOK DI data-kader.js
+            const inputId = document.getElementById('id-kader').value.toUpperCase(); 
+            const inputNik = document.querySelectorAll('input[type="password"]')[0].value;
             if (dataAkunKader[inputId] && dataAkunKader[inputId] === inputNik) {
-                
-                // Jika sukses, simpan ID Kader
                 localStorage.setItem('id_kader_aktif', inputId);
-                
-                // EKSTRAK KODE TIM (Ambil 8 karakter pertama, misal: TPKGRK01)
-                const kodeTim = inputId.substring(0, 8);
+                const kodeTim = inputId.substring(0, 9); // Ambil 9 karakter pertama (Tim)
                 localStorage.setItem('id_tim_aktif', kodeTim);
-                
                 document.getElementById('kader-info-display').innerText = `Kader: ${inputId} | Tim: ${kodeTim}`; 
-                openScreen('main-menu'); 
-                updateBadgeSinkronisasi(); 
-            } else { 
-                alert("❌ Login Gagal! ID Kader tidak ditemukan atau Password (NIK) salah."); 
-            }
+                openScreen('main-menu'); updateBadgeSinkronisasi(); 
+            } else { alert("❌ Login Gagal! ID Kader tidak ditemukan atau Password (NIK) salah."); }
         });
-
-        // --- FUNGSI LOGOUT (Ditambah penghapus data Tim) ---
-        function logoutKader() { 
-            if(confirm("Yakin ingin keluar?")) { 
-                localStorage.removeItem('id_kader_aktif'); 
-                localStorage.removeItem('id_tim_aktif'); 
-                location.reload(); 
-            } 
-        }
 
         // WILAYAH CASCADE
         function ubahKecamatan() {
@@ -190,9 +170,9 @@
             const desa = document.getElementById('reg-desa');
             const dusun = document.getElementById('reg-dusun');
             desa.innerHTML = '<option value="">-- Pilih Desa --</option>'; dusun.innerHTML = '<option value="">-- Pilih Desa Dulu --</option>';
-            desa.disabled = true; dusun.disabled = true; desa.style.background = '#f0f0f0'; dusun.style.background = '#f0f0f0';
+            desa.disabled = true; dusun.disabled = true;
             if (kec && dataWilayah[kec]) {
-                desa.disabled = false; desa.style.background = '#fff';
+                desa.disabled = false;
                 for (let d in dataWilayah[kec]) desa.innerHTML += `<option value="${d}">${d}</option>`;
             }
             handleJenisSasaran(false);
@@ -201,15 +181,15 @@
             const kec = document.getElementById('reg-kecamatan').value;
             const desa = document.getElementById('reg-desa').value;
             const dusun = document.getElementById('reg-dusun');
-            dusun.innerHTML = '<option value="">-- Pilih Dusun --</option>'; dusun.disabled = true; dusun.style.background = '#f0f0f0';
+            dusun.innerHTML = '<option value="">-- Pilih Dusun --</option>'; dusun.disabled = true;
             if (kec && desa && dataWilayah[kec][desa]) {
-                dusun.disabled = false; dusun.style.background = '#fff';
+                dusun.disabled = false;
                 dataWilayah[kec][desa].forEach(d => dusun.innerHTML += `<option value="${d}">${d}</option>`);
             }
             handleJenisSasaran(false);
         }
 
-        // PERTANYAAN DINAMIS
+        // PERTANYAAN DINAMIS DARI FILE EXTERNAL
         function handleJenisSasaran(isEditMode = false) {
             const kec = document.getElementById('reg-kecamatan').value;
             const jenis = document.getElementById('reg-jenis').value;
@@ -235,14 +215,15 @@
             if (html !== "") { konten.innerHTML = html; cont.classList.remove('hidden'); } else { cont.classList.add('hidden'); konten.innerHTML = ""; }
         }
 
-        // SIMPAN SASARAN
+        // SIMPAN & EDIT SASARAN
         document.getElementById('form-registrasi').addEventListener('submit', e => {
             e.preventDefault(); 
             const data = { 
-                id_kader: localStorage.getItem('id_kader_aktif'), id_sasaran: document.getElementById('reg-id').value, 
-                kecamatan: document.getElementById('reg-kecamatan').value, desa: document.getElementById('reg-desa').value, dusun: document.getElementById('reg-dusun').value,
-                jenis: document.getElementById('reg-jenis').value, nik: document.getElementById('reg-nik').value, nama: document.getElementById('reg-nama').value, 
-                status_sinkron: 0, detail_khusus: {}
+                id_kader: localStorage.getItem('id_kader_aktif'), id_tim: localStorage.getItem('id_tim_aktif'),
+                id_sasaran: document.getElementById('reg-id').value, kecamatan: document.getElementById('reg-kecamatan').value, 
+                desa: document.getElementById('reg-desa').value, dusun: document.getElementById('reg-dusun').value,
+                jenis: document.getElementById('reg-jenis').value, nik: document.getElementById('reg-nik').value, 
+                nama: document.getElementById('reg-nama').value, status_sinkron: 0, detail_khusus: {}
             };
             document.querySelectorAll('#konten-khusus input, #konten-khusus select').forEach(el => data.detail_khusus[el.name] = el.value);
             db.transaction(['sasaran'], 'readwrite').objectStore('sasaran')[editModeSasaranId ? 'put' : 'add'](data).onsuccess = () => { tampilkanNotif(editModeSasaranId ? "✅ Diupdate!" : "✅ Disimpan!", "notif-success"); batalFormSasaran(); };
@@ -250,13 +231,13 @@
 
         function batalFormSasaran() { document.getElementById('form-registrasi').reset(); document.getElementById('pertanyaan-khusus').classList.add('hidden'); document.getElementById('btn-submit-sasaran').innerText = "Simpan"; document.getElementById('judul-form-sasaran').innerText = "Registrasi Baru"; editModeSasaranId = null; ubahKecamatan(); kembaliKeMenu(); }
 
-        // EDIT SASARAN
         function editSasaran(id) {
             db.transaction(['sasaran'], 'readonly').objectStore('sasaran').get(id).onsuccess = e => {
                 const data = e.target.result; editModeSasaranId = id;
                 document.getElementById('judul-form-sasaran').innerText = "Update Sasaran"; document.getElementById('btn-submit-sasaran').innerText = "Update";
                 document.getElementById('reg-id').value = data.id_sasaran; document.getElementById('reg-nik').value = data.nik; document.getElementById('reg-nama').value = data.nama;
                 
+                // Memicu trigger dropdown bertingkat
                 document.getElementById('reg-kecamatan').value = data.kecamatan; ubahKecamatan();
                 document.getElementById('reg-desa').value = data.desa; ubahDesa();
                 document.getElementById('reg-dusun').value = data.dusun;
@@ -278,16 +259,21 @@
         }
         document.getElementById('form-laporan').addEventListener('submit', e => {
             e.preventDefault();
-            const data = { id_kader: localStorage.getItem('id_kader_aktif'), id_laporan: editModeLaporanId || "REP-" + Date.now(), id_sasaran: document.getElementById('lapor-sasaran-id').value, tanggal: document.getElementById('lapor-tanggal').value, bulan: document.getElementById('lapor-bulan').value, status: document.getElementById('lapor-status').value, edukasi: document.getElementById('lapor-edukasi').value, catatan: document.getElementById('lapor-catatan').value, status_sinkron: 0 };
+            const data = { 
+                id_kader: localStorage.getItem('id_kader_aktif'), id_tim: localStorage.getItem('id_tim_aktif'),
+                id_laporan: editModeLaporanId || "REP-" + Date.now(), id_sasaran: document.getElementById('lapor-sasaran-id').value, 
+                tanggal: document.getElementById('lapor-tanggal').value, bulan: document.getElementById('lapor-bulan').value, 
+                status: document.getElementById('lapor-status').value, edukasi: document.getElementById('lapor-edukasi').value, catatan: document.getElementById('lapor-catatan').value, status_sinkron: 0 
+            };
             db.transaction(['laporan'], 'readwrite').objectStore('laporan')[editModeLaporanId ? 'put' : 'add'](data).onsuccess = () => { tampilkanNotif(editModeLaporanId ? "✅ Laporan Diupdate!" : "✅ Laporan Disimpan!", "notif-success"); batalFormLaporan(); };
         });
-        function batalFormLaporan() { document.getElementById('form-laporan').reset(); document.getElementById('btn-submit-laporan').innerText = "Simpan"; editModeLaporanId = null; kembaliKeMenu(); }
+        function batalFormLaporan() { document.getElementById('form-laporan').reset(); document.getElementById('btn-submit-laporan').innerText = "Simpan"; document.getElementById('judul-form-laporan').innerText = "Lapor Pendampingan"; editModeLaporanId = null; kembaliKeMenu(); }
         
         function editLaporan(id) {
             db.transaction(['sasaran'], 'readonly').objectStore('sasaran').getAll().onsuccess = e => {
                 const sel = document.getElementById('lapor-sasaran-id'); sel.innerHTML = ''; e.target.result.forEach(s => sel.innerHTML += `<option value="${s.id_sasaran}">[${s.jenis}] ${s.nama}</option>`);
                 db.transaction(['laporan'], 'readonly').objectStore('laporan').get(id).onsuccess = e2 => {
-                    const data = e2.target.result; editModeLaporanId = id; document.getElementById('btn-submit-laporan').innerText = "Update";
+                    const data = e2.target.result; editModeLaporanId = id; document.getElementById('judul-form-laporan').innerText = "Update Laporan"; document.getElementById('btn-submit-laporan').innerText = "Update";
                     ['sasaran-id', 'tanggal', 'bulan', 'status', 'edukasi', 'catatan'].forEach(k => document.getElementById('lapor-'+k).value = data[k] || "");
                     openScreen('lapor-screen');
                 };
@@ -298,10 +284,10 @@
         function bukaMenuData() {
             openScreen('data-screen');
             db.transaction(['sasaran'], 'readonly').objectStore('sasaran').getAll().onsuccess = e => {
-                document.getElementById('list-sasaran').innerHTML = e.target.result.map(s => `<div class="data-item"><strong>${s.nama}</strong> (${s.jenis})<br>ID: ${s.id_sasaran}<br>${s.status_sinkron===0?'⏳ Belum Sync':'✅ Sync'}<br><button onclick="editSasaran('${s.id_sasaran}')" class="btn-edit">✏️ Edit</button></div>`).join('') || "Kosong";
+                document.getElementById('list-sasaran').innerHTML = e.target.result.map(s => `<div class="data-item"><strong>${s.nama}</strong> (${s.jenis})<br>ID: ${s.id_sasaran}<br><span class="status-badge ${s.status_sinkron===0?'status-0':'status-1'}">${s.status_sinkron===0?'⏳ Belum Sync':'✅ Sync'}</span><br><button onclick="editSasaran('${s.id_sasaran}')" class="btn-edit">✏️ Edit</button></div>`).join('') || "Kosong";
             };
             db.transaction(['laporan'], 'readonly').objectStore('laporan').getAll().onsuccess = e => {
-                document.getElementById('list-laporan').innerHTML = e.target.result.map(l => `<div class="data-item">Sasaran ID: <strong>${l.id_sasaran}</strong><br>Bulan: ${l.bulan}<br>${l.status_sinkron===0?'⏳ Belum Sync':'✅ Sync'}<br><button onclick="editLaporan('${l.id_laporan}')" class="btn-edit">✏️ Edit</button></div>`).join('') || "Kosong";
+                document.getElementById('list-laporan').innerHTML = e.target.result.map(l => `<div class="data-item">Sasaran ID: <strong>${l.id_sasaran}</strong><br>Bulan: ${l.bulan}<br><span class="status-badge ${l.status_sinkron===0?'status-0':'status-1'}">${l.status_sinkron===0?'⏳ Belum Sync':'✅ Sync'}</span><br><button onclick="editLaporan('${l.id_laporan}')" class="btn-edit">✏️ Edit</button></div>`).join('') || "Kosong";
             };
         }
         function bukaMenuRekap() {
@@ -309,7 +295,7 @@
             db.transaction(['sasaran'], 'readonly').objectStore('sasaran').getAll().onsuccess = e => {
                 const s = e.target.result; 
                 db.transaction(['laporan'], 'readonly').objectStore('laporan').getAll().onsuccess = ev => {
-                    document.getElementById('rekap-content').innerHTML = `<h3>Total Sasaran: ${s.length}</h3><p>BUMIL: ${s.filter(x=>x.jenis==='BUMIL').length} | CATIN: ${s.filter(x=>x.jenis==='CATIN').length}</p><hr><h3>Total Laporan: ${ev.target.result.length}</h3>`;
+                    document.getElementById('rekap-content').innerHTML = `<h3 style="color:var(--primary-blue);margin-bottom:10px;">Total Sasaran: ${s.length}</h3><p>BUMIL: ${s.filter(x=>x.jenis==='BUMIL').length} | CATIN: ${s.filter(x=>x.jenis==='CATIN').length}</p><hr style="margin:10px 0;"><h3 style="color:var(--primary-blue);">Total Laporan: ${ev.target.result.length}</h3>`;
                 };
             };
         }
@@ -327,26 +313,26 @@
         }
         function prosesSinkronisasi() {
             if(!navigator.onLine) return tampilkanNotif("❌ Sedang Offline!", "notif-warning");
-            document.getElementById('sync-text').innerText = "Menyinkronkan..."; document.getElementById('sync-loader').style.display = 'block';
+            document.getElementById('sync-text').innerText = "Menyinkronkan..."; document.getElementById('sync-loader').style.display = 'block'; document.getElementById('btn-sync-ui').disabled = true;
             
             let payload = { sasaran: [], laporan: [] };
             db.transaction(['sasaran'], 'readonly').objectStore('sasaran').getAll().onsuccess = e => {
                 payload.sasaran = e.target.result.filter(i => i.status_sinkron === 0);
                 db.transaction(['laporan'], 'readonly').objectStore('laporan').getAll().onsuccess = ev => {
                     payload.laporan = ev.target.result.filter(i => i.status_sinkron === 0);
-                    if(payload.sasaran.length===0 && payload.laporan.length===0) { document.getElementById('sync-text').innerText = "SINKRONISASI DATA"; document.getElementById('sync-loader').style.display = 'none'; return tampilkanNotif("Data sudah sinkron semua.", "notif-success"); }
+                    if(payload.sasaran.length===0 && payload.laporan.length===0) { resetTombolSync(); return tampilkanNotif("Data sudah sinkron semua.", "notif-success"); }
 
-                    setTimeout(() => { // Simulasi server
+                    setTimeout(() => { // Simulasi respon server sukses
                         const trx = db.transaction(['sasaran', 'laporan'], 'readwrite');
                         payload.sasaran.forEach(s => { s.status_sinkron = 1; trx.objectStore('sasaran').put(s); });
                         payload.laporan.forEach(l => { l.status_sinkron = 1; trx.objectStore('laporan').put(l); });
-                        trx.oncomplete = () => { tampilkanNotif("✅ Berhasil Sinkron!", "notif-success"); document.getElementById('sync-text').innerText = "SINKRONISASI DATA"; document.getElementById('sync-loader').style.display = 'none'; updateBadgeSinkronisasi(); if(!document.getElementById('data-screen').classList.contains('hidden')) bukaMenuData(); };
+                        trx.oncomplete = () => { tampilkanNotif("✅ Berhasil Sinkron!", "notif-success"); resetTombolSync(); updateBadgeSinkronisasi(); if(!document.getElementById('data-screen').classList.contains('hidden')) bukaMenuData(); };
                     }, 2000);
                 };
             };
         }
+        function resetTombolSync() { document.getElementById('sync-text').innerText = "6. SINKRONISASI DATA"; document.getElementById('sync-loader').style.display = 'none'; document.getElementById('btn-sync-ui').disabled = false; }
         function tampilkanNotif(msg, cls) { const n = document.getElementById('notif-box'); n.innerText = msg; n.className = `notif ${cls}`; n.classList.remove('hidden'); setTimeout(() => n.classList.add('hidden'), 3000); }
     </script>
 </body>
 </html>
-
