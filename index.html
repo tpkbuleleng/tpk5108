@@ -227,7 +227,7 @@
             
             if (dataAkunKader[inputId] && dataAkunKader[inputId].nik === inputNik) {
                 const namaKader = dataAkunKader[inputId].nama;
-                const kodeTim = inputId.substring(0, 9);
+                const kodeTim = inputId.split('-')[1].substring(0, 2); // Ambil tepat 2 digit setelah tanda "-"
                 
                 localStorage.setItem('id_kader_aktif', inputId);
                 localStorage.setItem('nama_kader_aktif', namaKader);
@@ -443,3 +443,4 @@
     </script>
 </body>
 </html>
+
