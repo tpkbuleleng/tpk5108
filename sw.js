@@ -1,4 +1,4 @@
-// UBAH NAMA VERSI INI MENJADI v2
+// UBAH NAMA VERSI INI MENJADI v3
 const CACHE_NAME = 'tpk-buleleng-v2';
 
 const urlsToCache = [
@@ -37,3 +37,4 @@ self.addEventListener('activate', event => {
     })
   );
 });
+
