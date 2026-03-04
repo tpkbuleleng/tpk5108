@@ -1,4 +1,3 @@
-// Data Master Wilayah Buleleng (Bisa Anda lengkapi nanti)
 const dataWilayah = {
     "GRK": {
         "Celukan Bawang": ["Banjar Dinas Pungkukan", "Banjar Dinas Celukan Bawang", "Banjar Dinas Berongbong"],
