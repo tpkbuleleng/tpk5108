@@ -134,26 +134,55 @@
         };
         request.onsuccess = e => { db = e.target.result; updateBadgeSinkronisasi(); };
 
+        // --- LOGIKA UI DASAR & CEK LOGIN ---
         window.addEventListener('load', () => { 
             setTimeout(() => { 
                 document.getElementById('splash-screen').classList.add('hidden'); 
                 const kader = localStorage.getItem('id_kader_aktif');
-                if(kader) { document.getElementById('kader-info-display').innerText = `ID Anda: ${kader}`; openScreen('main-menu'); } 
-                else { document.getElementById('login-screen').classList.remove('hidden'); }
+                const tim = localStorage.getItem('id_tim_aktif'); // Ambil info Tim
+                
+                if(kader && tim) { 
+                    document.getElementById('kader-info-display').innerText = `Kader: ${kader} | Tim: ${tim}`; 
+                    openScreen('main-menu'); 
+                } 
+                else { 
+                    document.getElementById('login-screen').classList.remove('hidden'); 
+                }
             }, 2000); 
         });
 
-        function openScreen(id) { document.querySelectorAll('.container').forEach(el => el.classList.add('hidden')); document.getElementById(id).classList.remove('hidden'); window.scrollTo(0,0); }
-        function kembaliKeMenu() { openScreen('main-menu'); updateBadgeSinkronisasi(); }
-        function logoutKader() { if(confirm("Yakin ingin keluar?")) { localStorage.removeItem('id_kader_aktif'); location.reload(); } }
-
+        // --- SAAT KADER KLIK TOMBOL LOGIN ---
         document.getElementById('login-form').addEventListener('submit', e => { 
             e.preventDefault(); 
-            const inputId = document.getElementById('id-kader').value.toUpperCase(); 
-            if (daftarKaderValid.includes(inputId)) {
-                localStorage.setItem('id_kader_aktif', inputId); document.getElementById('kader-info-display').innerText = `ID Anda: ${inputId}`; openScreen('main-menu'); updateBadgeSinkronisasi(); 
-            } else { alert("❌ ID Kader tidak terdaftar di data-kader.js!"); }
+            const inputId = document.getElementById('id-kader').value.toUpperCase(); // Paksa huruf besar
+            const inputNik = document.querySelectorAll('input[type="password"]')[0].value; // Ambil password (NIK)
+            
+            // CEK APAKAH ID ADA & PASSWORD COCOK DI data-kader.js
+            if (dataAkunKader[inputId] && dataAkunKader[inputId] === inputNik) {
+                
+                // Jika sukses, simpan ID Kader
+                localStorage.setItem('id_kader_aktif', inputId);
+                
+                // EKSTRAK KODE TIM (Ambil 8 karakter pertama, misal: TPKGRK01)
+                const kodeTim = inputId.substring(0, 8);
+                localStorage.setItem('id_tim_aktif', kodeTim);
+                
+                document.getElementById('kader-info-display').innerText = `Kader: ${inputId} | Tim: ${kodeTim}`; 
+                openScreen('main-menu'); 
+                updateBadgeSinkronisasi(); 
+            } else { 
+                alert("❌ Login Gagal! ID Kader tidak ditemukan atau Password (NIK) salah."); 
+            }
         });
+
+        // --- FUNGSI LOGOUT (Ditambah penghapus data Tim) ---
+        function logoutKader() { 
+            if(confirm("Yakin ingin keluar?")) { 
+                localStorage.removeItem('id_kader_aktif'); 
+                localStorage.removeItem('id_tim_aktif'); 
+                location.reload(); 
+            } 
+        }
 
         // WILAYAH CASCADE
         function ubahKecamatan() {
@@ -320,3 +349,4 @@
     </script>
 </body>
 </html>
+
