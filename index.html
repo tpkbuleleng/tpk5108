@@ -14,71 +14,116 @@
     <script src="data-pertanyaan.js"></script>
 
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, sans-serif; }
-        body { background-color: #ffffff; color: #333333; display: flex; flex-direction: column; min-height: 100vh; overflow-x: hidden; }
-        :root { --primary-blue: #0084FF; --hover-blue: #006bce; --light-blue: #e6f3ff; --success: #28a745; --danger: #dc3545; --warning: #ffc107; }
+        /* --- DESAIN MODERN --- */
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+        body { background-color: #f4f7f6; color: #333333; display: flex; flex-direction: column; min-height: 100vh; overflow-x: hidden; }
+        :root { --primary-blue: #0084FF; --hover-blue: #006bce; --light-blue: #eef7ff; --success: #28a745; --danger: #dc3545; --warning: #ffc107; --card-bg: #ffffff; }
         .hidden { display: none !important; }
-        .container { padding: 20px; width: 100%; max-width: 480px; margin: 0 auto; padding-bottom: 50px; }
+        
+        /* Container Form Card */
+        .container { padding: 20px; width: 100%; max-width: 480px; margin: 20px auto; padding-bottom: 50px; background: var(--card-bg); border-radius: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
         #splash-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: #fff; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 9999; transition: opacity 0.5s; }
-        .splash-logo { width: 30vw; max-width: 150px; margin-bottom: 15px; animation: pulse 1.5s infinite; }
-        .splash-text { font-size: 6vw; font-weight: bold; color: var(--primary-blue); text-align: center; animation: pulse 1.5s infinite; }
-        @keyframes pulse { 0% { transform: scale(0.95); opacity: 0.8; } 50% { transform: scale(1.05); opacity: 1; } 100% { transform: scale(0.95); opacity: 0.8; } }
-        .login-logo { width: 80px; height: auto; display: block; margin: 0 auto 15px; }
-        .header-title { text-align: center; margin-bottom: 20px; color: var(--primary-blue); font-size: 22px; margin-top: 10px;}
-        .form-group { margin-bottom: 15px; }
-        .form-group label { display: block; margin-bottom: 5px; font-weight: 600; font-size: 14px; color: #444;}
-        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 15px; }
-        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--primary-blue); outline: none; }
-        .form-group select:disabled { background-color: #f0f0f0; cursor: not-allowed; }
-        .btn-primary { width: 100%; padding: 14px; background-color: var(--primary-blue); color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px;}
-        .btn-secondary { width: 100%; padding: 12px; background-color: transparent; color: #666; border: 2px solid #ddd; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; }
-        .btn-edit { background-color: var(--warning); color: #333; border: none; padding: 6px 12px; border-radius: 5px; font-size: 12px; font-weight: bold; cursor: pointer; margin-top: 8px; }
-        .dynamic-section { background-color: var(--light-blue); padding: 15px; border-radius: 8px; border: 1px dashed var(--primary-blue); margin-bottom: 15px; }
-        .welcome-card { background-color: var(--light-blue); border-left: 5px solid var(--primary-blue); padding: 15px; border-radius: 8px; margin-bottom: 25px; margin-top: 20px; }
-        .menu-grid { display: grid; gap: 15px; }
-        .menu-btn { background-color: #fff; border: 2px solid var(--primary-blue); color: var(--primary-blue); padding: 15px; border-radius: 8px; font-size: 14px; font-weight: bold; text-align: left; cursor: pointer; display: flex; justify-content: space-between; align-items: center;}
-        .badge { background-color: var(--danger); color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; margin-left: auto; margin-right: 10px;}
-        .notif { padding: 15px; border-radius: 8px; text-align: center; margin-bottom: 20px; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .splash-logo { width: 30vw; max-width: 140px; margin-bottom: 15px; animation: pulse 1.5s infinite; }
+        .splash-text { font-size: 5.5vw; font-weight: 800; color: var(--primary-blue); text-align: center; }
+        .version-text { font-size: 14px; color: #888; margin-top: 10px; font-weight: 500; letter-spacing: 1px; }
+        @media (min-width: 600px) { .splash-text { font-size: 32px; } }
+        @keyframes pulse { 0% { transform: scale(0.95); opacity: 0.9; } 50% { transform: scale(1.02); opacity: 1; } 100% { transform: scale(0.95); opacity: 0.9; } }
+        
+        .login-logo { width: 75px; height: auto; display: block; margin: 0 auto 15px; }
+        .header-title { text-align: center; margin-bottom: 25px; color: var(--primary-blue); font-size: 22px; font-weight: 700; }
+        
+        /* Form Inputs Modern */
+        .form-group { margin-bottom: 16px; }
+        .form-group label { display: block; margin-bottom: 6px; font-weight: 600; font-size: 13px; color: #555; letter-spacing: 0.3px;}
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 14px; border: 1.5px solid #e1e5ea; border-radius: 10px; font-size: 15px; background-color: #f9fafb; transition: all 0.3s; }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--primary-blue); background-color: #fff; outline: none; box-shadow: 0 0 0 3px rgba(0, 132, 255, 0.1); }
+        .form-group select:disabled { background-color: #e9ecef; color: #6c757d; cursor: not-allowed; border-color: #e1e5ea; }
+        .form-group input[readonly] { background-color: #e9ecef; color: #495057; font-weight: 600; }
+        
+        /* Tombol Modern */
+        .btn-primary { width: 100%; padding: 15px; background-color: var(--primary-blue); color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; transition: background 0.3s, transform 0.1s;}
+        .btn-primary:hover { background-color: var(--hover-blue); }
+        .btn-primary:active { transform: scale(0.98); }
+        .btn-secondary { width: 100%; padding: 14px; background-color: #fff; color: #555; border: 1.5px solid #ddd; border-radius: 10px; font-size: 15px; font-weight: bold; cursor: pointer; margin-top: 10px; transition: all 0.2s; }
+        .btn-secondary:hover { background-color: #f4f7f6; border-color: #ccc; }
+        
+        .dynamic-section { background-color: var(--light-blue); padding: 18px; border-radius: 12px; border: 1.5px dashed #b3d7ff; margin-bottom: 20px; }
+        .dynamic-section h4 { margin-bottom: 12px; color: var(--primary-blue); font-size: 15px; }
+
+        /* Welcome Card & Menu */
+        #main-menu.container { background: transparent; box-shadow: none; padding: 10px 20px; }
+        .welcome-card { background-color: var(--card-bg); border-left: 5px solid var(--primary-blue); padding: 20px; border-radius: 12px; margin-bottom: 25px; margin-top: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.04);}
+        .welcome-card h3 { color: #333; margin-bottom: 5px; font-size: 16px; font-weight: 600;}
+        .welcome-card p { font-size: 14px; color: #555; line-height: 1.5;}
+        
+        .menu-grid { display: grid; gap: 12px; }
+        .menu-btn { background-color: var(--card-bg); border: 1.5px solid #e1e5ea; color: #333; padding: 16px; border-radius: 12px; font-size: 14px; font-weight: 700; text-align: left; cursor: pointer; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.02); transition: all 0.2s;}
+        .menu-btn:hover { border-color: var(--primary-blue); color: var(--primary-blue); transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0, 132, 255, 0.1);}
+        .menu-btn.btn-sync { background-color: var(--primary-blue); color: white; border: none; }
+        .menu-btn.btn-sync:hover { background-color: var(--hover-blue); }
+        .badge { background-color: var(--danger); color: white; padding: 3px 9px; border-radius: 20px; font-size: 12px; font-weight: bold; margin-left: auto; margin-right: 10px;}
+        
+        .notif { padding: 15px; border-radius: 10px; text-align: center; margin-bottom: 20px; font-weight: bold; font-size: 14px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         .notif-success { background-color: var(--success); color: white; }
-        .data-item { padding: 12px; background: white; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 10px; font-size: 14px; }
-        .status-badge { display: inline-block; padding: 3px 8px; border-radius: 10px; font-size: 11px; font-weight: bold; margin-top: 5px; }
-        .status-0 { background-color: #ffeeba; color: #856404; } .status-1 { background-color: #d4edda; color: #155724; }
-        .loader { border: 3px solid #f3f3f3; border-top: 3px solid white; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; display: none; }
+        .notif-warning { background-color: var(--warning); color: #333; }
+        
+        /* --- LIST MODE (MODE DAFTAR MODERN) --- */
+        .list-mode-item { background: #fff; border: 1px solid #eee; border-radius: 12px; padding: 15px; margin-bottom: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+        .list-title { font-size: 15px; font-weight: 700; color: #222; margin-bottom: 4px; display: flex; align-items: center; gap: 8px;}
+        .list-subtitle { font-size: 13px; color: #666; margin-bottom: 2px; font-family: monospace; letter-spacing: 0.5px;}
+        .list-text { font-size: 13px; color: #555; margin-bottom: 10px; }
+        .list-actions { display: flex; justify-content: space-between; align-items: center; border-top: 1px dashed #eee; padding-top: 10px; margin-top: 5px;}
+        
+        .badge-jenis { background: #eef7ff; color: var(--primary-blue); padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 800; }
+        .status-0 { color: #b8860b; font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 4px;}
+        .status-1 { color: #28a745; font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 4px;}
+        .btn-edit-small { background: #f8f9fa; color: #333; border: 1px solid #ddd; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; transition: 0.2s;}
+        .btn-edit-small:hover { background: #e2e6ea; }
+
+        .loader { border: 3px solid rgba(255,255,255,0.3); border-top: 3px solid white; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; display: none; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
 
     <div id="splash-screen">
-        <img src="TPK BLL26.png" class="splash-logo">
+        <img src="TPK BLL26.png" class="splash-logo" alt="Logo">
         <h1 class="splash-text">TPK KABUPATEN BULELENG</h1>
-    </div>
+        <p class="version-text">Versi 1.0.1</p> </div>
 
     <div id="login-screen" class="container hidden">
-        <div class="header-title" style="margin-top:50px;">
-            <img src="TPK BLL26.png" class="login-logo">
-            <h2>Login Kader</h2>
+        <div class="header-title" style="margin-top:20px;">
+            <img src="TPK BLL26.png" class="login-logo" alt="Logo">
+            Aplikasi Entry TPK
         </div>
         <form id="login-form">
-            <div class="form-group"><label>ID Kader</label><input type="text" id="id-kader" placeholder="Cth: 812001-01001" required></div>
-            <div class="form-group"><label>Password (NIK)</label><input type="password" required pattern="[0-9]{16}" placeholder="16 Digit Angka"></div>
+            <div class="form-group">
+                <label>ID Kader</label>
+                <input type="text" id="id-kader" placeholder="Cth: 812001-01001" required>
+            </div>
+            <div class="form-group">
+                <label>Password (NIK)</label>
+                <input type="password" required pattern="[0-9]{16}" maxlength="16" minlength="16" oninput="this.value = this.value.replace(/[^0-9]/g, '');" placeholder="Masukkan 16 Digit Angka">
+            </div>
             <button type="submit" class="btn-primary">Masuk Aplikasi</button>
         </form>
     </div>
 
     <div id="main-menu" class="container hidden">
         <div id="notif-box" class="notif hidden"></div>
+        
         <div class="welcome-card">
             <h3>Selamat Datang,</h3>
-            <p id="kader-info-display" style="font-weight:bold;"></p>
-            <button onclick="logoutKader()" style="margin-top:10px; padding:5px 10px; background:#dc3545; color:white; border:none; border-radius:5px;">Keluar / Logout</button>
+            <p id="kader-info-display"></p>
+            <button onclick="logoutKader()" style="margin-top:12px; padding:6px 12px; background:#ffebee; color:#dc3545; border:1px solid #ffcdd2; border-radius:6px; cursor:pointer; font-weight:600; font-size:12px; transition: 0.2s;">Keluar / Logout</button>
         </div>
+        
         <div class="menu-grid">
             <button class="menu-btn" onclick="openScreen('registrasi-screen')">1. REGISTRASI SASARAN <span>➕</span></button>
             <button class="menu-btn" onclick="bukaMenuLapor()">2. LAPOR PENDAMPINGAN <span>📝</span></button>
             <button class="menu-btn" onclick="bukaMenuData()">3 & 4. LIHAT/UPDATE DATA <span>📂</span></button>
             <button class="menu-btn" onclick="bukaMenuRekap()">5. REKAPITULASI DATA <span>📊</span></button>
-            <button class="menu-btn" onclick="prosesSinkronisasi()" style="background:#e6f3ff;">
+            <button class="menu-btn btn-sync" onclick="prosesSinkronisasi()" id="btn-sync-ui">
                 <span id="sync-text">6. SINKRONISASI DATA</span>
                 <span class="badge hidden" id="sync-badge">0</span>
                 <div class="loader" id="sync-loader"></div>
@@ -89,14 +134,16 @@
     <div id="registrasi-screen" class="container hidden">
         <h2 class="header-title" id="judul-form-sasaran">Registrasi Sasaran Baru</h2>
         <form id="form-registrasi">
-            <div class="form-group"><label>Kecamatan *</label><select id="reg-kecamatan" required onchange="ubahKecamatan()"><option value="">-- Pilih --</option><option value="GRK">Gerokgak</option><option value="SRT">Seririt</option><option value="BLL">Buleleng</option></select></div>
+            <div class="form-group"><label>Kecamatan *</label><select id="reg-kecamatan" required onchange="ubahKecamatan()"><option value="">-- Pilih --</option><option value="GRK">Gerokgak</option><option value="SRT">Seririt</option><option value="BSB">Busungbiu</option><option value="BJR">Banjar</option><option value="BLL">Buleleng</option><option value="SKS">Sukasada</option><option value="SWN">Sawan</option><option value="KBT">Kubutambahan</option><option value="TJK">Tejakula</option></select></div>
             <div class="form-group"><label>Desa/Kelurahan *</label><select id="reg-desa" required onchange="ubahDesa()" disabled><option value="">-- Pilih Kecamatan Dulu --</option></select></div>
             <div class="form-group"><label>Banjar Dinas / RW *</label><select id="reg-dusun" required disabled onchange="handleJenisSasaran(false)"><option value="">-- Pilih Desa Dulu --</option></select></div>
             
             <div class="form-group"><label>Jenis Sasaran *</label><select id="reg-jenis" required onchange="handleJenisSasaran(false)"><option value="">-- Pilih --</option><option value="CATIN">CATIN</option><option value="BUMIL">BUMIL</option><option value="BUFAS">BUFAS</option><option value="BADUTA">BADUTA</option></select></div>
-            <div class="form-group"><label>ID Sasaran</label><input type="text" id="reg-id" readonly placeholder="Otomatis"></div>
-            <div class="form-group"><label>NIK Sasaran (16 Digit) *</label><input type="text" id="reg-nik" required pattern="[0-9]{16}"></div>
+            <div class="form-group"><label>ID Sasaran</label><input type="text" id="reg-id" readonly placeholder="Terisi Otomatis"></div>
+            
+            <div class="form-group"><label>NIK Sasaran (16 Digit) *</label><input type="text" id="reg-nik" required pattern="[0-9]{16}" maxlength="16" minlength="16" oninput="this.value = this.value.replace(/[^0-9]/g, '');"></div>
             <div class="form-group"><label>Nama Lengkap Sasaran *</label><input type="text" id="reg-nama" required></div>
+            
             <div id="pertanyaan-khusus" class="dynamic-section hidden"><h4 id="judul-khusus">Pertanyaan Khusus</h4><div id="konten-khusus"></div></div>
             
             <button type="submit" class="btn-primary" id="btn-submit-sasaran">Simpan Sasaran</button>
@@ -109,20 +156,37 @@
         <form id="form-laporan">
             <div class="form-group"><label>Pilih Sasaran *</label><select id="lapor-sasaran-id" required></select></div>
             <div class="form-group"><label>Tanggal *</label><input type="date" id="lapor-tanggal" required></div>
-            <div class="form-group"><label>Bulan *</label><select id="lapor-bulan" required><option value="">-- Pilih --</option><option value="Januari">Januari</option><option value="Februari">Februari</option><option value="Maret">Maret</option></select></div>
+            <div class="form-group"><label>Bulan Pelaporan *</label><select id="lapor-bulan" required><option value="">-- Pilih --</option><option value="Januari">Januari</option><option value="Februari">Februari</option><option value="Maret">Maret</option><option value="April">April</option><option value="Mei">Mei</option><option value="Juni">Juni</option><option value="Juli">Juli</option><option value="Agustus">Agustus</option><option value="September">September</option><option value="Oktober">Oktober</option><option value="November">November</option><option value="Desember">Desember</option></select></div>
+            
             <div class="dynamic-section">
-                <h4>Pemeriksaan</h4>
-                <div class="form-group"><label>Status Risiko *</label><select id="lapor-status" required><option value="">-- Pilih --</option><option value="Normal">Normal</option><option value="Beresiko">Beresiko</option></select></div>
-                <div class="form-group"><label>Edukasi *</label><select id="lapor-edukasi" required><option value="">-- Pilih --</option><option value="KIE">KIE</option><option value="Rujukan">Rujukan</option></select></div>
-                <div class="form-group"><label>Catatan</label><textarea id="lapor-catatan"></textarea></div>
+                <h4>Hasil Pemeriksaan</h4>
+                <div class="form-group"><label>Status Risiko *</label><select id="lapor-status" required><option value="">-- Pilih --</option><option value="Normal">Sehat / Normal</option><option value="Beresiko">Beresiko Stunting / Sakit</option></select></div>
+                <div class="form-group"><label>Edukasi / Bantuan *</label><select id="lapor-edukasi" required><option value="">-- Pilih --</option><option value="KIE">Penyuluhan / KIE</option><option value="Rujukan">Rujukan Faskes</option><option value="Bansos">Fasilitasi Bansos</option></select></div>
+                <div class="form-group"><label>Catatan Kader</label><textarea id="lapor-catatan" rows="3" placeholder="Opsional..."></textarea></div>
             </div>
             <button type="submit" class="btn-primary" id="btn-submit-laporan">Simpan Laporan</button>
             <button type="button" class="btn-secondary" onclick="batalFormLaporan()">Batal & Kembali</button>
         </form>
     </div>
 
-    <div id="data-screen" class="container hidden"><h2 class="header-title">Data Tersimpan</h2><div class="dynamic-section"><h4>Sasaran</h4><div id="list-sasaran"></div></div><div class="dynamic-section"><h4>Laporan</h4><div id="list-laporan"></div></div><button class="btn-secondary" onclick="kembaliKeMenu()">Kembali</button></div>
-    <div id="rekap-screen" class="container hidden"><h2 class="header-title">Rekapitulasi</h2><div class="welcome-card" id="rekap-content"></div><button class="btn-secondary" onclick="kembaliKeMenu()">Kembali</button></div>
+    <div id="data-screen" class="container hidden">
+        <h2 class="header-title">Data Tersimpan</h2>
+        <div style="margin-bottom: 20px;">
+            <h3 style="font-size: 16px; margin-bottom: 10px; color: #444;">Daftar Sasaran</h3>
+            <div id="list-sasaran"></div>
+        </div>
+        <div>
+            <h3 style="font-size: 16px; margin-bottom: 10px; color: #444;">Daftar Laporan</h3>
+            <div id="list-laporan"></div>
+        </div>
+        <button class="btn-secondary" onclick="kembaliKeMenu()">Kembali ke Menu</button>
+    </div>
+
+    <div id="rekap-screen" class="container hidden">
+        <h2 class="header-title">Rekapitulasi</h2>
+        <div class="welcome-card" id="rekap-content" style="border-left-color: var(--success);"></div>
+        <button class="btn-secondary" onclick="kembaliKeMenu()">Kembali ke Menu</button>
+    </div>
 
     <script>
         let editModeSasaranId = null, editModeLaporanId = null, db;
@@ -142,24 +206,34 @@
                 document.getElementById('splash-screen').classList.add('hidden'); 
                 const kader = localStorage.getItem('id_kader_aktif');
                 const tim = localStorage.getItem('id_tim_aktif');
-                if(kader && tim) { document.getElementById('kader-info-display').innerText = `Kader: ${kader} | Tim: ${tim}`; openScreen('main-menu'); } 
+                const nama = localStorage.getItem('nama_kader_aktif'); // NAMA KADER
+                if(kader && tim && nama) { 
+                    document.getElementById('kader-info-display').innerHTML = `<span style="font-size: 16px; color: var(--primary-blue); font-weight:800;">${nama}</span><br>ID: ${kader} &nbsp;|&nbsp; Tim: ${tim}`; 
+                    openScreen('main-menu'); 
+                } 
                 else { document.getElementById('login-screen').classList.remove('hidden'); }
             }, 2000); 
         });
 
         function openScreen(id) { document.querySelectorAll('.container').forEach(el => el.classList.add('hidden')); document.getElementById(id).classList.remove('hidden'); window.scrollTo(0,0); }
         function kembaliKeMenu() { openScreen('main-menu'); updateBadgeSinkronisasi(); }
-        function logoutKader() { if(confirm("Yakin ingin keluar?")) { localStorage.removeItem('id_kader_aktif'); localStorage.removeItem('id_tim_aktif'); location.reload(); } }
+        function logoutKader() { if(confirm("Yakin ingin keluar dari akun ini?")) { localStorage.clear(); location.reload(); } }
 
+        // LOGIN DENGAN NAMA KADER (Gabungan)
         document.getElementById('login-form').addEventListener('submit', e => { 
             e.preventDefault(); 
             const inputId = document.getElementById('id-kader').value.toUpperCase(); 
             const inputNik = document.querySelectorAll('input[type="password"]')[0].value;
-            if (dataAkunKader[inputId] && dataAkunKader[inputId] === inputNik) {
+            
+            if (dataAkunKader[inputId] && dataAkunKader[inputId].nik === inputNik) {
+                const namaKader = dataAkunKader[inputId].nama;
+                const kodeTim = inputId.substring(0, 9);
+                
                 localStorage.setItem('id_kader_aktif', inputId);
-                const kodeTim = inputId.substring(0, 9); // Ambil 9 karakter pertama (Tim)
+                localStorage.setItem('nama_kader_aktif', namaKader);
                 localStorage.setItem('id_tim_aktif', kodeTim);
-                document.getElementById('kader-info-display').innerText = `Kader: ${inputId} | Tim: ${kodeTim}`; 
+                
+                document.getElementById('kader-info-display').innerHTML = `<span style="font-size: 16px; color: var(--primary-blue); font-weight:800;">${namaKader}</span><br>ID: ${inputId} &nbsp;|&nbsp; Tim: ${kodeTim}`; 
                 openScreen('main-menu'); updateBadgeSinkronisasi(); 
             } else { alert("❌ Login Gagal! ID Kader tidak ditemukan atau Password (NIK) salah."); }
         });
@@ -169,7 +243,7 @@
             const kec = document.getElementById('reg-kecamatan').value;
             const desa = document.getElementById('reg-desa');
             const dusun = document.getElementById('reg-dusun');
-            desa.innerHTML = '<option value="">-- Pilih Desa --</option>'; dusun.innerHTML = '<option value="">-- Pilih Desa Dulu --</option>';
+            desa.innerHTML = '<option value="">-- Pilih Desa/Kelurahan --</option>'; dusun.innerHTML = '<option value="">-- Pilih Desa Dulu --</option>';
             desa.disabled = true; dusun.disabled = true;
             if (kec && dataWilayah[kec]) {
                 desa.disabled = false;
@@ -181,7 +255,7 @@
             const kec = document.getElementById('reg-kecamatan').value;
             const desa = document.getElementById('reg-desa').value;
             const dusun = document.getElementById('reg-dusun');
-            dusun.innerHTML = '<option value="">-- Pilih Dusun --</option>'; dusun.disabled = true;
+            dusun.innerHTML = '<option value="">-- Pilih Banjar/RW --</option>'; dusun.disabled = true;
             if (kec && desa && dataWilayah[kec][desa]) {
                 dusun.disabled = false;
                 dataWilayah[kec][desa].forEach(d => dusun.innerHTML += `<option value="${d}">${d}</option>`);
@@ -189,7 +263,7 @@
             handleJenisSasaran(false);
         }
 
-        // PERTANYAAN DINAMIS DARI FILE EXTERNAL
+        // PERTANYAAN DINAMIS DARI EXTERNAL
         function handleJenisSasaran(isEditMode = false) {
             const kec = document.getElementById('reg-kecamatan').value;
             const jenis = document.getElementById('reg-jenis').value;
@@ -202,7 +276,7 @@
             let html = "";
             if (jenis && pertanyaanKhusus[jenis]) {
                 pertanyaanKhusus[jenis].forEach(tanya => {
-                    let req = tanya.required ? "required" : ""; let bintang = tanya.required ? " *" : "";
+                    let req = tanya.required ? "required" : ""; let bintang = tanya.required ? " *" : " (Ops)";
                     html += `<div class="form-group"><label>${tanya.label}${bintang}</label>`;
                     if (tanya.type === "select") {
                         html += `<select name="${tanya.id_input}" ${req}><option value="">-- Pilih --</option>`;
@@ -226,18 +300,17 @@
                 nama: document.getElementById('reg-nama').value, status_sinkron: 0, detail_khusus: {}
             };
             document.querySelectorAll('#konten-khusus input, #konten-khusus select').forEach(el => data.detail_khusus[el.name] = el.value);
-            db.transaction(['sasaran'], 'readwrite').objectStore('sasaran')[editModeSasaranId ? 'put' : 'add'](data).onsuccess = () => { tampilkanNotif(editModeSasaranId ? "✅ Diupdate!" : "✅ Disimpan!", "notif-success"); batalFormSasaran(); };
+            db.transaction(['sasaran'], 'readwrite').objectStore('sasaran')[editModeSasaranId ? 'put' : 'add'](data).onsuccess = () => { tampilkanNotif(editModeSasaranId ? "✅ Sasaran Diupdate!" : "✅ Sasaran Disimpan!", "notif-success"); batalFormSasaran(); };
         });
 
-        function batalFormSasaran() { document.getElementById('form-registrasi').reset(); document.getElementById('pertanyaan-khusus').classList.add('hidden'); document.getElementById('btn-submit-sasaran').innerText = "Simpan"; document.getElementById('judul-form-sasaran').innerText = "Registrasi Baru"; editModeSasaranId = null; ubahKecamatan(); kembaliKeMenu(); }
+        function batalFormSasaran() { document.getElementById('form-registrasi').reset(); document.getElementById('pertanyaan-khusus').classList.add('hidden'); document.getElementById('btn-submit-sasaran').innerText = "Simpan Sasaran"; document.getElementById('judul-form-sasaran').innerText = "Registrasi Sasaran Baru"; editModeSasaranId = null; ubahKecamatan(); kembaliKeMenu(); }
 
         function editSasaran(id) {
             db.transaction(['sasaran'], 'readonly').objectStore('sasaran').get(id).onsuccess = e => {
                 const data = e.target.result; editModeSasaranId = id;
-                document.getElementById('judul-form-sasaran').innerText = "Update Sasaran"; document.getElementById('btn-submit-sasaran').innerText = "Update";
+                document.getElementById('judul-form-sasaran').innerText = "Update Sasaran"; document.getElementById('btn-submit-sasaran').innerText = "Update Data";
                 document.getElementById('reg-id').value = data.id_sasaran; document.getElementById('reg-nik').value = data.nik; document.getElementById('reg-nama').value = data.nama;
                 
-                // Memicu trigger dropdown bertingkat
                 document.getElementById('reg-kecamatan').value = data.kecamatan; ubahKecamatan();
                 document.getElementById('reg-desa').value = data.desa; ubahDesa();
                 document.getElementById('reg-dusun').value = data.dusun;
@@ -252,7 +325,7 @@
         function bukaMenuLapor() {
             const sel = document.getElementById('lapor-sasaran-id');
             db.transaction(['sasaran'], 'readonly').objectStore('sasaran').getAll().onsuccess = e => {
-                const list = e.target.result; if(list.length === 0) return alert("Belum ada sasaran.");
+                const list = e.target.result; if(list.length === 0) return alert("Belum ada sasaran teregistrasi.");
                 sel.innerHTML = '<option value="">-- Pilih Sasaran --</option>'; list.forEach(s => sel.innerHTML += `<option value="${s.id_sasaran}">[${s.jenis}] ${s.nama}</option>`);
                 openScreen('lapor-screen');
             };
@@ -267,35 +340,68 @@
             };
             db.transaction(['laporan'], 'readwrite').objectStore('laporan')[editModeLaporanId ? 'put' : 'add'](data).onsuccess = () => { tampilkanNotif(editModeLaporanId ? "✅ Laporan Diupdate!" : "✅ Laporan Disimpan!", "notif-success"); batalFormLaporan(); };
         });
-        function batalFormLaporan() { document.getElementById('form-laporan').reset(); document.getElementById('btn-submit-laporan').innerText = "Simpan"; document.getElementById('judul-form-laporan').innerText = "Lapor Pendampingan"; editModeLaporanId = null; kembaliKeMenu(); }
+        function batalFormLaporan() { document.getElementById('form-laporan').reset(); document.getElementById('btn-submit-laporan').innerText = "Simpan Laporan"; document.getElementById('judul-form-laporan').innerText = "Lapor Pendampingan"; editModeLaporanId = null; kembaliKeMenu(); }
         
         function editLaporan(id) {
             db.transaction(['sasaran'], 'readonly').objectStore('sasaran').getAll().onsuccess = e => {
                 const sel = document.getElementById('lapor-sasaran-id'); sel.innerHTML = ''; e.target.result.forEach(s => sel.innerHTML += `<option value="${s.id_sasaran}">[${s.jenis}] ${s.nama}</option>`);
                 db.transaction(['laporan'], 'readonly').objectStore('laporan').get(id).onsuccess = e2 => {
-                    const data = e2.target.result; editModeLaporanId = id; document.getElementById('judul-form-laporan').innerText = "Update Laporan"; document.getElementById('btn-submit-laporan').innerText = "Update";
+                    const data = e2.target.result; editModeLaporanId = id; document.getElementById('judul-form-laporan').innerText = "Update Laporan"; document.getElementById('btn-submit-laporan').innerText = "Update Data";
                     ['sasaran-id', 'tanggal', 'bulan', 'status', 'edukasi', 'catatan'].forEach(k => document.getElementById('lapor-'+k).value = data[k] || "");
                     openScreen('lapor-screen');
                 };
             };
         }
 
-        // TAMPILKAN DATA & REKAP
+        // --- PERBAIKAN 4: TAMPILAN MODE DAFTAR (LIST VIEW) TANPA LABEL ---
         function bukaMenuData() {
             openScreen('data-screen');
+            
+            // Render Daftar Sasaran
             db.transaction(['sasaran'], 'readonly').objectStore('sasaran').getAll().onsuccess = e => {
-                document.getElementById('list-sasaran').innerHTML = e.target.result.map(s => `<div class="data-item"><strong>${s.nama}</strong> (${s.jenis})<br>ID: ${s.id_sasaran}<br><span class="status-badge ${s.status_sinkron===0?'status-0':'status-1'}">${s.status_sinkron===0?'⏳ Belum Sync':'✅ Sync'}</span><br><button onclick="editSasaran('${s.id_sasaran}')" class="btn-edit">✏️ Edit</button></div>`).join('') || "Kosong";
+                const listHtml = e.target.result.map(s => `
+                    <div class="list-mode-item">
+                        <div class="list-title"><span class="badge-jenis">${s.jenis}</span> ${s.nama}</div>
+                        <div class="list-subtitle">${s.id_sasaran}</div>
+                        <div class="list-text">${s.dusun}</div>
+                        <div class="list-actions">
+                            <span class="${s.status_sinkron === 0 ? 'status-0' : 'status-1'}">${s.status_sinkron === 0 ? '⏳ Belum Sync' : '✅ Sudah Sync'}</span>
+                            <button onclick="editSasaran('${s.id_sasaran}')" class="btn-edit-small">✏️ Edit</button>
+                        </div>
+                    </div>
+                `).join('');
+                document.getElementById('list-sasaran').innerHTML = listHtml || "<p style='color:#777; font-size:14px; text-align:center;'>Belum ada sasaran tersimpan.</p>";
             };
+
+            // Render Daftar Laporan
             db.transaction(['laporan'], 'readonly').objectStore('laporan').getAll().onsuccess = e => {
-                document.getElementById('list-laporan').innerHTML = e.target.result.map(l => `<div class="data-item">Sasaran ID: <strong>${l.id_sasaran}</strong><br>Bulan: ${l.bulan}<br><span class="status-badge ${l.status_sinkron===0?'status-0':'status-1'}">${l.status_sinkron===0?'⏳ Belum Sync':'✅ Sync'}</span><br><button onclick="editLaporan('${l.id_laporan}')" class="btn-edit">✏️ Edit</button></div>`).join('') || "Kosong";
+                const listHtml = e.target.result.map(l => `
+                    <div class="list-mode-item">
+                        <div class="list-title"><span class="badge-jenis">LAPORAN</span> ${l.bulan}</div>
+                        <div class="list-subtitle">${l.id_sasaran}</div>
+                        <div class="list-text">${l.tanggal}</div>
+                        <div class="list-actions">
+                            <span class="${l.status_sinkron === 0 ? 'status-0' : 'status-1'}">${l.status_sinkron === 0 ? '⏳ Belum Sync' : '✅ Sudah Sync'}</span>
+                            <button onclick="editLaporan('${l.id_laporan}')" class="btn-edit-small">✏️ Edit</button>
+                        </div>
+                    </div>
+                `).join('');
+                document.getElementById('list-laporan').innerHTML = listHtml || "<p style='color:#777; font-size:14px; text-align:center;'>Belum ada laporan tersimpan.</p>";
             };
         }
+
         function bukaMenuRekap() {
             openScreen('rekap-screen');
             db.transaction(['sasaran'], 'readonly').objectStore('sasaran').getAll().onsuccess = e => {
                 const s = e.target.result; 
                 db.transaction(['laporan'], 'readonly').objectStore('laporan').getAll().onsuccess = ev => {
-                    document.getElementById('rekap-content').innerHTML = `<h3 style="color:var(--primary-blue);margin-bottom:10px;">Total Sasaran: ${s.length}</h3><p>BUMIL: ${s.filter(x=>x.jenis==='BUMIL').length} | CATIN: ${s.filter(x=>x.jenis==='CATIN').length}</p><hr style="margin:10px 0;"><h3 style="color:var(--primary-blue);">Total Laporan: ${ev.target.result.length}</h3>`;
+                    document.getElementById('rekap-content').innerHTML = `
+                        <h3 style="color:var(--primary-blue); font-size:18px;">Total Sasaran: ${s.length} Orang</h3>
+                        <p style="margin-top:8px;">BUMIL: <b>${s.filter(x=>x.jenis==='BUMIL').length}</b> | CATIN: <b>${s.filter(x=>x.jenis==='CATIN').length}</b><br>
+                        BUFAS: <b>${s.filter(x=>x.jenis==='BUFAS').length}</b> | BADUTA: <b>${s.filter(x=>x.jenis==='BADUTA').length}</b></p>
+                        <hr style="margin:15px 0; border:0.5px solid #eee;">
+                        <h3 style="color:var(--primary-blue); font-size:18px;">Total Laporan: ${ev.target.result.length} Dokumen</h3>
+                    `;
                 };
             };
         }
@@ -311,8 +417,9 @@
                 };
             };
         }
+        
         function prosesSinkronisasi() {
-            if(!navigator.onLine) return tampilkanNotif("❌ Sedang Offline!", "notif-warning");
+            if(!navigator.onLine) return tampilkanNotif("❌ Anda sedang Offline. Cari sinyal internet dulu!", "notif-warning");
             document.getElementById('sync-text').innerText = "Menyinkronkan..."; document.getElementById('sync-loader').style.display = 'block'; document.getElementById('btn-sync-ui').disabled = true;
             
             let payload = { sasaran: [], laporan: [] };
@@ -322,7 +429,7 @@
                     payload.laporan = ev.target.result.filter(i => i.status_sinkron === 0);
                     if(payload.sasaran.length===0 && payload.laporan.length===0) { resetTombolSync(); return tampilkanNotif("Data sudah sinkron semua.", "notif-success"); }
 
-                    setTimeout(() => { // Simulasi respon server sukses
+                    setTimeout(() => { 
                         const trx = db.transaction(['sasaran', 'laporan'], 'readwrite');
                         payload.sasaran.forEach(s => { s.status_sinkron = 1; trx.objectStore('sasaran').put(s); });
                         payload.laporan.forEach(l => { l.status_sinkron = 1; trx.objectStore('laporan').put(l); });
@@ -332,7 +439,7 @@
             };
         }
         function resetTombolSync() { document.getElementById('sync-text').innerText = "6. SINKRONISASI DATA"; document.getElementById('sync-loader').style.display = 'none'; document.getElementById('btn-sync-ui').disabled = false; }
-        function tampilkanNotif(msg, cls) { const n = document.getElementById('notif-box'); n.innerText = msg; n.className = `notif ${cls}`; n.classList.remove('hidden'); setTimeout(() => n.classList.add('hidden'), 3000); }
+        function tampilkanNotif(msg, cls) { const n = document.getElementById('notif-box'); n.innerText = msg; n.className = `notif ${cls}`; n.classList.remove('hidden'); setTimeout(() => n.classList.add('hidden'), 3500); }
     </script>
 </body>
 </html>
