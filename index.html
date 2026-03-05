@@ -26,20 +26,21 @@
         .splash-logo { width: 30vw; max-width: 140px; margin-bottom: 15px; animation: pulse 1.5s infinite; }
         .splash-text { font-size: 5.5vw; font-weight: 800; color: var(--primary-blue); text-align: center; }
         .version-text { font-size: 14px; color: #888; margin-top: 10px; font-weight: 500; letter-spacing: 1px; }
-        @media (min-width: 600px) { .splash-text { font-size: 32px; } }
         @keyframes pulse { 0% { transform: scale(0.95); opacity: 0.9; } 50% { transform: scale(1.02); opacity: 1; } 100% { transform: scale(0.95); opacity: 0.9; } }
         
         .login-logo { width: 75px; height: auto; display: block; margin: 0 auto 15px; }
-        .header-title { text-align: center; margin-bottom: 25px; color: var(--primary-blue); font-size: 22px; font-weight: 700; }
+        .header-title { text-align: center; margin-bottom: 25px; color: var(--primary-blue); font-size: 22px; font-weight: 700; line-height: 1.3;}
         
         /* Form Inputs Modern */
-        .form-group { margin-bottom: 16px; }
+        .form-group { margin-bottom: 16px; position: relative; }
         .form-group label { display: block; margin-bottom: 6px; font-weight: 600; font-size: 13px; color: #555; letter-spacing: 0.3px;}
         .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 14px; border: 1.5px solid #e1e5ea; border-radius: 10px; font-size: 15px; background-color: #f9fafb; transition: all 0.3s; }
         .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--primary-blue); background-color: #fff; outline: none; box-shadow: 0 0 0 3px rgba(0, 132, 255, 0.1); }
         .form-group select:disabled { background-color: #e9ecef; color: #6c757d; cursor: not-allowed; border-color: #e1e5ea; }
         .form-group input[readonly] { background-color: #e9ecef; color: #495057; font-weight: 600; }
         
+        .toggle-pwd { position: absolute; right: 15px; top: 38px; cursor: pointer; font-size: 18px; user-select: none; }
+
         /* Tombol Modern */
         .btn-primary { width: 100%; padding: 15px; background-color: var(--primary-blue); color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; transition: background 0.3s, transform 0.1s;}
         .btn-primary:hover { background-color: var(--hover-blue); }
@@ -67,7 +68,11 @@
         .notif-success { background-color: var(--success); color: white; }
         .notif-warning { background-color: var(--warning); color: #333; }
         
-        /* --- LIST MODE (MODE DAFTAR MODERN) --- */
+        /* --- LIST MODE & BLOK WARNA (PERBAIKAN) --- */
+        .block-header { background-color: var(--primary-blue); color: white; padding: 14px 15px; border-radius: 12px 12px 0 0; display: flex; justify-content: space-between; align-items: center; font-weight: bold; font-size: 15px; }
+        .block-filter { padding: 5px 8px; border-radius: 6px; border: none; font-size: 13px; font-weight: bold; color: var(--primary-blue); background: white; outline: none; cursor:pointer; }
+        .block-content { background: white; border: 1px solid #e1e5ea; border-top: none; border-radius: 0 0 12px 12px; padding: 15px; max-height: 50vh; overflow-y: auto; margin-bottom: 25px;}
+
         .list-mode-item { background: #fff; border: 1px solid #eee; border-radius: 12px; padding: 15px; margin-bottom: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
         .list-title { font-size: 15px; font-weight: 700; color: #222; margin-bottom: 4px; display: flex; align-items: center; gap: 8px;}
         .list-subtitle { font-size: 13px; color: #666; margin-bottom: 2px; font-family: monospace; letter-spacing: 0.5px;}
@@ -89,12 +94,13 @@
     <div id="splash-screen">
         <img src="TPK BLL26.png" class="splash-logo" alt="Logo">
         <h1 class="splash-text">TPK KABUPATEN BULELENG</h1>
-        <p class="version-text">Versi 1.0.1</p> </div>
+        <p class="version-text">Versi 1.0.2</p>
+    </div>
 
     <div id="login-screen" class="container hidden">
         <div class="header-title" style="margin-top:20px;">
             <img src="TPK BLL26.png" class="login-logo" alt="Logo">
-            Aplikasi Entry TPK
+            Laporan TPK<br><span style="font-size: 18px; color: #666;">Kabupaten Buleleng</span>
         </div>
         <form id="login-form">
             <div class="form-group">
@@ -102,8 +108,9 @@
                 <input type="text" id="id-kader" placeholder="Cth: 812001-01001" required>
             </div>
             <div class="form-group">
-                <label>Password (NIK)</label>
-                <input type="password" required pattern="[0-9]{16}" maxlength="16" minlength="16" oninput="this.value = this.value.replace(/[^0-9]/g, '');" placeholder="Masukkan 16 Digit Angka">
+                <label>Password</label>
+                <input type="password" id="login-password" required pattern="[0-9]{16}" maxlength="16" minlength="16" oninput="this.value = this.value.replace(/[^0-9]/g, '');" placeholder="Masukkan Password yang diberikan PKB/PLKB" style="padding-right: 40px;">
+                <span class="toggle-pwd" id="toggle-pwd-icon" onclick="togglePassword()">👁️</span>
             </div>
             <button type="submit" class="btn-primary">Masuk Aplikasi</button>
         </form>
@@ -154,8 +161,20 @@
     <div id="lapor-screen" class="container hidden">
         <h2 class="header-title" id="judul-form-laporan">Lapor Pendampingan</h2>
         <form id="form-laporan">
-            <div class="form-group"><label>Pilih Sasaran *</label><select id="lapor-sasaran-id" required></select></div>
-            <div class="form-group"><label>Tanggal *</label><input type="date" id="lapor-tanggal" required></div>
+            <div class="form-group">
+                <label>Jenis Sasaran *</label>
+                <select id="lapor-jenis" required onchange="filterSasaranLapor()">
+                    <option value="">-- Pilih Jenis --</option><option value="CATIN">CATIN</option><option value="BUMIL">BUMIL</option><option value="BUFAS">BUFAS</option><option value="BADUTA">BADUTA</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Pilih Sasaran *</label>
+                <select id="lapor-sasaran-id" required disabled>
+                    <option value="">-- Pilih Jenis Sasaran Dulu --</option>
+                </select>
+            </div>
+            
+            <div class="form-group"><label>Tanggal Pendampingan *</label><input type="date" id="lapor-tanggal" required></div>
             <div class="form-group"><label>Bulan Pelaporan *</label><select id="lapor-bulan" required><option value="">-- Pilih --</option><option value="Januari">Januari</option><option value="Februari">Februari</option><option value="Maret">Maret</option><option value="April">April</option><option value="Mei">Mei</option><option value="Juni">Juni</option><option value="Juli">Juli</option><option value="Agustus">Agustus</option><option value="September">September</option><option value="Oktober">Oktober</option><option value="November">November</option><option value="Desember">Desember</option></select></div>
             
             <div class="dynamic-section">
@@ -169,17 +188,30 @@
         </form>
     </div>
 
-    <div id="data-screen" class="container hidden">
-        <h2 class="header-title">Data Tersimpan</h2>
-        <div style="margin-bottom: 20px;">
-            <h3 style="font-size: 16px; margin-bottom: 10px; color: #444;">Daftar Sasaran</h3>
-            <div id="list-sasaran"></div>
-        </div>
+    <div id="data-screen" class="container hidden" style="background: transparent; box-shadow: none; padding: 0;">
+        <h2 class="header-title" style="margin-top: 10px;">Data Tersimpan</h2>
+        
         <div>
-            <h3 style="font-size: 16px; margin-bottom: 10px; color: #444;">Daftar Laporan</h3>
-            <div id="list-laporan"></div>
+            <div class="block-header">
+                Daftar Sasaran
+                <select id="filter-sasaran" class="block-filter" onchange="renderDataSasaran()">
+                    <option value="ALL">Semua Jenis</option><option value="CATIN">CATIN</option><option value="BUMIL">BUMIL</option><option value="BUFAS">BUFAS</option><option value="BADUTA">BADUTA</option>
+                </select>
+            </div>
+            <div class="block-content" id="list-sasaran">Memuat...</div>
         </div>
-        <button class="btn-secondary" onclick="kembaliKeMenu()">Kembali ke Menu</button>
+
+        <div>
+            <div class="block-header">
+                Daftar Laporan
+                <select id="filter-laporan" class="block-filter" onchange="renderDataLaporan()">
+                    <option value="ALL">Semua Jenis</option><option value="CATIN">CATIN</option><option value="BUMIL">BUMIL</option><option value="BUFAS">BUFAS</option><option value="BADUTA">BADUTA</option>
+                </select>
+            </div>
+            <div class="block-content" id="list-laporan">Memuat...</div>
+        </div>
+        
+        <button class="btn-secondary" style="background: white;" onclick="kembaliKeMenu()">Kembali ke Menu</button>
     </div>
 
     <div id="rekap-screen" class="container hidden">
@@ -206,70 +238,67 @@
                 document.getElementById('splash-screen').classList.add('hidden'); 
                 const kader = localStorage.getItem('id_kader_aktif');
                 const tim = localStorage.getItem('id_tim_aktif');
-                const nama = localStorage.getItem('nama_kader_aktif'); // NAMA KADER
+                const nama = localStorage.getItem('nama_kader_aktif');
+                
                 if(kader && tim && nama) { 
-                    document.getElementById('kader-info-display').innerHTML = `<span style="font-size: 16px; color: var(--primary-blue); font-weight:800;">${nama}</span><br>ID: ${kader} &nbsp;|&nbsp; Tim: ${tim}`; 
+                    // NAMA TANPA LABEL ID & TIM (HANYA ANGKA)
+                    document.getElementById('kader-info-display').innerHTML = `<span style="font-size: 16px; color: var(--primary-blue); font-weight:800;">${nama}</span><br>${kader} &nbsp;|&nbsp; Tim: ${tim}`; 
                     openScreen('main-menu'); 
                 } 
                 else { document.getElementById('login-screen').classList.remove('hidden'); }
             }, 2000); 
         });
 
+        // TOGGLE LIHAT PASSWORD
+        function togglePassword() {
+            const pwdInput = document.getElementById('login-password');
+            const icon = document.getElementById('toggle-pwd-icon');
+            if (pwdInput.type === 'password') { pwdInput.type = 'text'; icon.innerText = '🙈'; } 
+            else { pwdInput.type = 'password'; icon.innerText = '👁️'; }
+        }
+
         function openScreen(id) { document.querySelectorAll('.container').forEach(el => el.classList.add('hidden')); document.getElementById(id).classList.remove('hidden'); window.scrollTo(0,0); }
         function kembaliKeMenu() { openScreen('main-menu'); updateBadgeSinkronisasi(); }
         function logoutKader() { if(confirm("Yakin ingin keluar dari akun ini?")) { localStorage.clear(); location.reload(); } }
 
-        // LOGIN DENGAN NAMA KADER (Gabungan)
+        // LOGIN
         document.getElementById('login-form').addEventListener('submit', e => { 
             e.preventDefault(); 
             const inputId = document.getElementById('id-kader').value.toUpperCase(); 
-            const inputNik = document.querySelectorAll('input[type="password"]')[0].value;
+            const inputNik = document.getElementById('login-password').value;
             
             if (dataAkunKader[inputId] && dataAkunKader[inputId].nik === inputNik) {
                 const namaKader = dataAkunKader[inputId].nama;
-                const kodeTim = inputId.split('-')[1].substring(0, 2); // Ambil tepat 2 digit setelah tanda "-"
+                const kodeTim = inputId.split('-')[1].substring(0, 2); // POTONG JADI 2 DIGIT (01)
                 
                 localStorage.setItem('id_kader_aktif', inputId);
                 localStorage.setItem('nama_kader_aktif', namaKader);
                 localStorage.setItem('id_tim_aktif', kodeTim);
                 
-                document.getElementById('kader-info-display').innerHTML = `<span style="font-size: 16px; color: var(--primary-blue); font-weight:800;">${namaKader}</span><br>ID: ${inputId} &nbsp;|&nbsp; Tim: ${kodeTim}`; 
+                document.getElementById('kader-info-display').innerHTML = `<span style="font-size: 16px; color: var(--primary-blue); font-weight:800;">${namaKader}</span><br>${inputId} &nbsp;|&nbsp; Tim: ${kodeTim}`; 
                 openScreen('main-menu'); updateBadgeSinkronisasi(); 
-            } else { alert("❌ Login Gagal! ID Kader tidak ditemukan atau Password (NIK) salah."); }
+            } else { alert("❌ Login Gagal! ID Kader tidak ditemukan atau Password salah."); }
         });
 
         // WILAYAH CASCADE
         function ubahKecamatan() {
-            const kec = document.getElementById('reg-kecamatan').value;
-            const desa = document.getElementById('reg-desa');
-            const dusun = document.getElementById('reg-dusun');
+            const kec = document.getElementById('reg-kecamatan').value; const desa = document.getElementById('reg-desa'); const dusun = document.getElementById('reg-dusun');
             desa.innerHTML = '<option value="">-- Pilih Desa/Kelurahan --</option>'; dusun.innerHTML = '<option value="">-- Pilih Desa Dulu --</option>';
             desa.disabled = true; dusun.disabled = true;
-            if (kec && dataWilayah[kec]) {
-                desa.disabled = false;
-                for (let d in dataWilayah[kec]) desa.innerHTML += `<option value="${d}">${d}</option>`;
-            }
+            if (kec && dataWilayah[kec]) { desa.disabled = false; for (let d in dataWilayah[kec]) desa.innerHTML += `<option value="${d}">${d}</option>`; }
             handleJenisSasaran(false);
         }
         function ubahDesa() {
-            const kec = document.getElementById('reg-kecamatan').value;
-            const desa = document.getElementById('reg-desa').value;
-            const dusun = document.getElementById('reg-dusun');
+            const kec = document.getElementById('reg-kecamatan').value; const desa = document.getElementById('reg-desa').value; const dusun = document.getElementById('reg-dusun');
             dusun.innerHTML = '<option value="">-- Pilih Banjar/RW --</option>'; dusun.disabled = true;
-            if (kec && desa && dataWilayah[kec][desa]) {
-                dusun.disabled = false;
-                dataWilayah[kec][desa].forEach(d => dusun.innerHTML += `<option value="${d}">${d}</option>`);
-            }
+            if (kec && desa && dataWilayah[kec][desa]) { dusun.disabled = false; dataWilayah[kec][desa].forEach(d => dusun.innerHTML += `<option value="${d}">${d}</option>`); }
             handleJenisSasaran(false);
         }
 
-        // PERTANYAAN DINAMIS DARI EXTERNAL
+        // PERTANYAAN DINAMIS
         function handleJenisSasaran(isEditMode = false) {
-            const kec = document.getElementById('reg-kecamatan').value;
-            const jenis = document.getElementById('reg-jenis').value;
-            const idField = document.getElementById('reg-id');
-            const cont = document.getElementById('pertanyaan-khusus');
-            const konten = document.getElementById('konten-khusus');
+            const kec = document.getElementById('reg-kecamatan').value; const jenis = document.getElementById('reg-jenis').value;
+            const idField = document.getElementById('reg-id'); const cont = document.getElementById('pertanyaan-khusus'); const konten = document.getElementById('konten-khusus');
 
             if (!isEditMode && !editModeSasaranId) idField.value = (kec && jenis) ? `${jenis}-${kec}-${Math.random().toString(36).substring(2, 6).toUpperCase()}` : "";
             
@@ -278,12 +307,8 @@
                 pertanyaanKhusus[jenis].forEach(tanya => {
                     let req = tanya.required ? "required" : ""; let bintang = tanya.required ? " *" : " (Ops)";
                     html += `<div class="form-group"><label>${tanya.label}${bintang}</label>`;
-                    if (tanya.type === "select") {
-                        html += `<select name="${tanya.id_input}" ${req}><option value="">-- Pilih --</option>`;
-                        tanya.options.forEach(opt => html += `<option value="${opt}">${opt}</option>`); html += `</select></div>`;
-                    } else {
-                        html += `<input type="${tanya.type}" name="${tanya.id_input}" ${tanya.step ? `step="${tanya.step}"`:""} ${req}></div>`;
-                    }
+                    if (tanya.type === "select") { html += `<select name="${tanya.id_input}" ${req}><option value="">-- Pilih --</option>`; tanya.options.forEach(opt => html += `<option value="${opt}">${opt}</option>`); html += `</select></div>`; } 
+                    else { html += `<input type="${tanya.type}" name="${tanya.id_input}" ${tanya.step ? `step="${tanya.step}"`:""} ${req}></div>`; }
                 });
             }
             if (html !== "") { konten.innerHTML = html; cont.classList.remove('hidden'); } else { cont.classList.add('hidden'); konten.innerHTML = ""; }
@@ -321,86 +346,130 @@
             };
         }
 
-        // SIMPAN & EDIT LAPORAN
+        // --- FILTER JENIS DI MENU LAPORAN ---
         function bukaMenuLapor() {
+            document.getElementById('lapor-jenis').value = '';
+            document.getElementById('lapor-sasaran-id').innerHTML = '<option value="">-- Pilih Jenis Sasaran Dulu --</option>';
+            document.getElementById('lapor-sasaran-id').disabled = true;
+            openScreen('lapor-screen');
+        }
+
+        function filterSasaranLapor() {
+            const jenis = document.getElementById('lapor-jenis').value;
             const sel = document.getElementById('lapor-sasaran-id');
+            if(!jenis) { sel.innerHTML = '<option value="">-- Pilih Jenis Sasaran Dulu --</option>'; sel.disabled = true; return; }
+            
             db.transaction(['sasaran'], 'readonly').objectStore('sasaran').getAll().onsuccess = e => {
-                const list = e.target.result; if(list.length === 0) return alert("Belum ada sasaran teregistrasi.");
-                sel.innerHTML = '<option value="">-- Pilih Sasaran --</option>'; list.forEach(s => sel.innerHTML += `<option value="${s.id_sasaran}">[${s.jenis}] ${s.nama}</option>`);
-                openScreen('lapor-screen');
+                const list = e.target.result.filter(s => s.jenis === jenis);
+                sel.disabled = false;
+                if(list.length === 0) { sel.innerHTML = '<option value="">-- Tidak ada sasaran jenis ini --</option>'; } 
+                else { sel.innerHTML = '<option value="">-- Pilih Sasaran --</option>'; list.forEach(s => sel.innerHTML += `<option value="${s.id_sasaran}">${s.nama}</option>`); }
             };
         }
+
         document.getElementById('form-laporan').addEventListener('submit', e => {
             e.preventDefault();
             const data = { 
                 id_kader: localStorage.getItem('id_kader_aktif'), id_tim: localStorage.getItem('id_tim_aktif'),
-                id_laporan: editModeLaporanId || "REP-" + Date.now(), id_sasaran: document.getElementById('lapor-sasaran-id').value, 
+                id_laporan: editModeLaporanId || "REP-" + Date.now(), 
+                jenis: document.getElementById('lapor-jenis').value, // Simpan Jenis Laporan
+                id_sasaran: document.getElementById('lapor-sasaran-id').value, 
                 tanggal: document.getElementById('lapor-tanggal').value, bulan: document.getElementById('lapor-bulan').value, 
                 status: document.getElementById('lapor-status').value, edukasi: document.getElementById('lapor-edukasi').value, catatan: document.getElementById('lapor-catatan').value, status_sinkron: 0 
             };
             db.transaction(['laporan'], 'readwrite').objectStore('laporan')[editModeLaporanId ? 'put' : 'add'](data).onsuccess = () => { tampilkanNotif(editModeLaporanId ? "✅ Laporan Diupdate!" : "✅ Laporan Disimpan!", "notif-success"); batalFormLaporan(); };
         });
-        function batalFormLaporan() { document.getElementById('form-laporan').reset(); document.getElementById('btn-submit-laporan').innerText = "Simpan Laporan"; document.getElementById('judul-form-laporan').innerText = "Lapor Pendampingan"; editModeLaporanId = null; kembaliKeMenu(); }
+        function batalFormLaporan() { document.getElementById('form-laporan').reset(); document.getElementById('btn-submit-laporan').innerText = "Simpan Laporan"; document.getElementById('judul-form-laporan').innerText = "Lapor Pendampingan"; editModeLaporanId = null; filterSasaranLapor(); kembaliKeMenu(); }
         
         function editLaporan(id) {
-            db.transaction(['sasaran'], 'readonly').objectStore('sasaran').getAll().onsuccess = e => {
-                const sel = document.getElementById('lapor-sasaran-id'); sel.innerHTML = ''; e.target.result.forEach(s => sel.innerHTML += `<option value="${s.id_sasaran}">[${s.jenis}] ${s.nama}</option>`);
-                db.transaction(['laporan'], 'readonly').objectStore('laporan').get(id).onsuccess = e2 => {
-                    const data = e2.target.result; editModeLaporanId = id; document.getElementById('judul-form-laporan').innerText = "Update Laporan"; document.getElementById('btn-submit-laporan').innerText = "Update Data";
-                    ['sasaran-id', 'tanggal', 'bulan', 'status', 'edukasi', 'catatan'].forEach(k => document.getElementById('lapor-'+k).value = data[k] || "");
+            db.transaction(['laporan'], 'readonly').objectStore('laporan').get(id).onsuccess = e => {
+                const data = e.target.result; editModeLaporanId = id; 
+                document.getElementById('judul-form-laporan').innerText = "Update Laporan"; document.getElementById('btn-submit-laporan').innerText = "Update Data";
+                
+                // Cari dari database sasaran untuk mengisi dropdown dengan jenis yg sama
+                db.transaction(['sasaran'], 'readonly').objectStore('sasaran').getAll().onsuccess = es => {
+                    const objSasaran = es.target.result.find(s => s.id_sasaran === data.id_sasaran);
+                    const jenis = objSasaran ? objSasaran.jenis : (data.jenis || "");
+                    
+                    document.getElementById('lapor-jenis').value = jenis;
+                    const sel = document.getElementById('lapor-sasaran-id');
+                    sel.disabled = false; sel.innerHTML = '<option value="">-- Pilih Sasaran --</option>';
+                    es.target.result.filter(s => s.jenis === jenis).forEach(s => sel.innerHTML += `<option value="${s.id_sasaran}">${s.nama}</option>`);
+                    
+                    document.getElementById('lapor-sasaran-id').value = data.id_sasaran;
+                    document.getElementById('lapor-tanggal').value = data.tanggal || ""; document.getElementById('lapor-bulan').value = data.bulan || "";
+                    document.getElementById('lapor-status').value = data.status || ""; document.getElementById('lapor-edukasi').value = data.edukasi || ""; document.getElementById('lapor-catatan').value = data.catatan || "";
                     openScreen('lapor-screen');
                 };
             };
         }
 
-        // --- PERBAIKAN 4: TAMPILAN MODE DAFTAR (LIST VIEW) TANPA LABEL ---
+        // --- FILTER DROPDOWN DI MENU DATA TERSIMPAN ---
         function bukaMenuData() {
             openScreen('data-screen');
-            
-            // Render Daftar Sasaran
+            document.getElementById('filter-sasaran').value = 'ALL';
+            document.getElementById('filter-laporan').value = 'ALL';
+            renderDataSasaran(); renderDataLaporan();
+        }
+
+        function renderDataSasaran() {
+            const filter = document.getElementById('filter-sasaran').value;
             db.transaction(['sasaran'], 'readonly').objectStore('sasaran').getAll().onsuccess = e => {
-                const listHtml = e.target.result.map(s => `
+                let list = e.target.result;
+                if(filter !== 'ALL') list = list.filter(s => s.jenis === filter);
+                
+                document.getElementById('list-sasaran').innerHTML = list.map(s => `
                     <div class="list-mode-item">
                         <div class="list-title"><span class="badge-jenis">${s.jenis}</span> ${s.nama}</div>
                         <div class="list-subtitle">${s.id_sasaran}</div>
                         <div class="list-text">${s.dusun}</div>
-                        <div class="list-actions">
-                            <span class="${s.status_sinkron === 0 ? 'status-0' : 'status-1'}">${s.status_sinkron === 0 ? '⏳ Belum Sync' : '✅ Sudah Sync'}</span>
-                            <button onclick="editSasaran('${s.id_sasaran}')" class="btn-edit-small">✏️ Edit</button>
-                        </div>
-                    </div>
-                `).join('');
-                document.getElementById('list-sasaran').innerHTML = listHtml || "<p style='color:#777; font-size:14px; text-align:center;'>Belum ada sasaran tersimpan.</p>";
-            };
-
-            // Render Daftar Laporan
-            db.transaction(['laporan'], 'readonly').objectStore('laporan').getAll().onsuccess = e => {
-                const listHtml = e.target.result.map(l => `
-                    <div class="list-mode-item">
-                        <div class="list-title"><span class="badge-jenis">LAPORAN</span> ${l.bulan}</div>
-                        <div class="list-subtitle">${l.id_sasaran}</div>
-                        <div class="list-text">${l.tanggal}</div>
-                        <div class="list-actions">
-                            <span class="${l.status_sinkron === 0 ? 'status-0' : 'status-1'}">${l.status_sinkron === 0 ? '⏳ Belum Sync' : '✅ Sudah Sync'}</span>
-                            <button onclick="editLaporan('${l.id_laporan}')" class="btn-edit-small">✏️ Edit</button>
-                        </div>
-                    </div>
-                `).join('');
-                document.getElementById('list-laporan').innerHTML = listHtml || "<p style='color:#777; font-size:14px; text-align:center;'>Belum ada laporan tersimpan.</p>";
+                        <div class="list-actions"><span class="${s.status_sinkron === 0 ? 'status-0' : 'status-1'}">${s.status_sinkron === 0 ? '⏳ Belum Sync' : '✅ Sudah Sync'}</span><button onclick="editSasaran('${s.id_sasaran}')" class="btn-edit-small">✏️ Edit</button></div>
+                    </div>`).join('') || "<p style='color:#777; font-size:14px; text-align:center;'>Tidak ada data sasaran.</p>";
             };
         }
 
+        function renderDataLaporan() {
+            const filter = document.getElementById('filter-laporan').value;
+            // Lookup sasaran array untuk mengetahui jenis laporan (jika ada laporan lama yg tidak punya jenis)
+            db.transaction(['sasaran'], 'readonly').objectStore('sasaran').getAll().onsuccess = es => {
+                const sDict = {}; es.target.result.forEach(s => sDict[s.id_sasaran] = s.jenis);
+                
+                db.transaction(['laporan'], 'readonly').objectStore('laporan').getAll().onsuccess = el => {
+                    let list = el.target.result;
+                    // Beri label jenis pada tiap laporan
+                    list.forEach(l => l.jenis = l.jenis || sDict[l.id_sasaran] || 'UNKN');
+                    if(filter !== 'ALL') list = list.filter(l => l.jenis === filter);
+                    
+                    document.getElementById('list-laporan').innerHTML = list.map(l => `
+                        <div class="list-mode-item">
+                            <div class="list-title"><span class="badge-jenis">${l.jenis}</span> ${l.bulan}</div>
+                            <div class="list-subtitle">${l.id_sasaran}</div>
+                            <div class="list-text">Tgl: ${l.tanggal}</div>
+                            <div class="list-actions"><span class="${l.status_sinkron === 0 ? 'status-0' : 'status-1'}">${l.status_sinkron === 0 ? '⏳ Belum Sync' : '✅ Sudah Sync'}</span><button onclick="editLaporan('${l.id_laporan}')" class="btn-edit-small">✏️ Edit</button></div>
+                        </div>`).join('') || "<p style='color:#777; font-size:14px; text-align:center;'>Tidak ada data laporan.</p>";
+                };
+            };
+        }
+
+        // --- REKAPITULASI SASARAN & LAPORAN ---
         function bukaMenuRekap() {
             openScreen('rekap-screen');
             db.transaction(['sasaran'], 'readonly').objectStore('sasaran').getAll().onsuccess = e => {
                 const s = e.target.result; 
+                const sDict = {}; s.forEach(x => sDict[x.id_sasaran] = x.jenis); // Mapping jenis sasaran
+
                 db.transaction(['laporan'], 'readonly').objectStore('laporan').getAll().onsuccess = ev => {
+                    const l = ev.target.result;
+                    l.forEach(x => x.jenis = x.jenis || sDict[x.id_sasaran] || 'UNKNOWN'); // Tempelkan jenis ke laporan
+
                     document.getElementById('rekap-content').innerHTML = `
-                        <h3 style="color:var(--primary-blue); font-size:18px;">Total Sasaran: ${s.length} Orang</h3>
-                        <p style="margin-top:8px;">BUMIL: <b>${s.filter(x=>x.jenis==='BUMIL').length}</b> | CATIN: <b>${s.filter(x=>x.jenis==='CATIN').length}</b><br>
-                        BUFAS: <b>${s.filter(x=>x.jenis==='BUFAS').length}</b> | BADUTA: <b>${s.filter(x=>x.jenis==='BADUTA').length}</b></p>
-                        <hr style="margin:15px 0; border:0.5px solid #eee;">
-                        <h3 style="color:var(--primary-blue); font-size:18px;">Total Laporan: ${ev.target.result.length} Dokumen</h3>
+                        <h3 style="color:var(--primary-blue); font-size:17px;">Total Sasaran: ${s.length} Orang</h3>
+                        <p style="margin-top:6px; font-size:13px; color:#555; line-height:1.6;">BUMIL: <b>${s.filter(x=>x.jenis==='BUMIL').length}</b> &nbsp;|&nbsp; CATIN: <b>${s.filter(x=>x.jenis==='CATIN').length}</b><br>BUFAS: <b>${s.filter(x=>x.jenis==='BUFAS').length}</b> &nbsp;|&nbsp; BADUTA: <b>${s.filter(x=>x.jenis==='BADUTA').length}</b></p>
+                        
+                        <hr style="margin:18px 0; border:0.5px solid #e1e5ea;">
+                        
+                        <h3 style="color:var(--primary-blue); font-size:17px;">Total Laporan: ${l.length} Dokumen</h3>
+                        <p style="margin-top:6px; font-size:13px; color:#555; line-height:1.6;">BUMIL: <b>${l.filter(x=>x.jenis==='BUMIL').length}</b> &nbsp;|&nbsp; CATIN: <b>${l.filter(x=>x.jenis==='CATIN').length}</b><br>BUFAS: <b>${l.filter(x=>x.jenis==='BUFAS').length}</b> &nbsp;|&nbsp; BADUTA: <b>${l.filter(x=>x.jenis==='BADUTA').length}</b></p>
                     `;
                 };
             };
@@ -433,7 +502,7 @@
                         const trx = db.transaction(['sasaran', 'laporan'], 'readwrite');
                         payload.sasaran.forEach(s => { s.status_sinkron = 1; trx.objectStore('sasaran').put(s); });
                         payload.laporan.forEach(l => { l.status_sinkron = 1; trx.objectStore('laporan').put(l); });
-                        trx.oncomplete = () => { tampilkanNotif("✅ Berhasil Sinkron!", "notif-success"); resetTombolSync(); updateBadgeSinkronisasi(); if(!document.getElementById('data-screen').classList.contains('hidden')) bukaMenuData(); };
+                        trx.oncomplete = () => { tampilkanNotif("✅ Berhasil Sinkron!", "notif-success"); resetTombolSync(); updateBadgeSinkronisasi(); if(!document.getElementById('data-screen').classList.contains('hidden')) { renderDataSasaran(); renderDataLaporan(); } };
                     }, 2000);
                 };
             };
@@ -443,4 +512,3 @@
     </script>
 </body>
 </html>
-
