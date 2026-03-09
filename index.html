@@ -389,18 +389,54 @@
         
         function prosesSinkronisasi() {
             if(!navigator.onLine) return tampilkanNotif("❌ Anda sedang Offline. Cari sinyal internet dulu!", "notif-warning");
-            document.getElementById('sync-text').innerText = "Menyinkronkan..."; document.getElementById('sync-loader').style.display = 'block'; document.getElementById('btn-sync-ui').disabled = true;
+            document.getElementById('sync-text').innerText = "Menyinkronkan..."; 
+            document.getElementById('sync-loader').style.display = 'block'; 
+            document.getElementById('btn-sync-ui').disabled = true;
+            
             let payload = { sasaran: [], laporan: [] };
-            db.transaction(['sasaran'], 'readonly').objectStore('sasaran').getAll().onsuccess = e => { payload.sasaran = e.target.result.filter(i => i.status_sinkron === 0);
-                db.transaction(['laporan'], 'readonly').objectStore('laporan').getAll().onsuccess = ev => { payload.laporan = ev.target.result.filter(i => i.status_sinkron === 0);
-                    if(payload.sasaran.length===0 && payload.laporan.length===0) { resetTombolSync(); return tampilkanNotif("Data sudah sinkron semua.", "notif-success"); }
+            
+            db.transaction(['sasaran'], 'readonly').objectStore('sasaran').getAll().onsuccess = e => { 
+                payload.sasaran = e.target.result.filter(i => i.status_sinkron === 0);
+                db.transaction(['laporan'], 'readonly').objectStore('laporan').getAll().onsuccess = ev => { 
+                    payload.laporan = ev.target.result.filter(i => i.status_sinkron === 0);
+                    
+                    if(payload.sasaran.length === 0 && payload.laporan.length === 0) { 
+                        resetTombolSync(); 
+                        return tampilkanNotif("Semua data sudah tersinkron.", "notif-success"); 
+                    }
 
-                    setTimeout(() => { // TAHAP 8 NANTI INI DIGANTI FETCH GOOGLE APPS SCRIPT
-                        const trx = db.transaction(['sasaran', 'laporan'], 'readwrite');
-                        payload.sasaran.forEach(s => { s.status_sinkron = 1; trx.objectStore('sasaran').put(s); });
-                        payload.laporan.forEach(l => { l.status_sinkron = 1; trx.objectStore('laporan').put(l); });
-                        trx.oncomplete = () => { tampilkanNotif("✅ Berhasil Sinkron!", "notif-success"); resetTombolSync(); updateBadgeSinkronisasi(); if(!document.getElementById('data-screen').classList.contains('hidden')) { renderDataSasaran(); renderDataLaporan(); } };
-                    }, 2000);
+                    // --- TAHAP 8: MENGIRIM DATA KE GOOGLE SHEET ---
+                    // GANTI TULISAN DI BAWAH DENGAN URL APPS SCRIPT ANDA!
+                    const URL_APPS_SCRIPT = "https://script.google.com/macros/s/AKfycbxX-Xdx-mlAF8Z3nkWsQ0S_7JFO9nB_qA-I07jA9YHFBPKl8mR4axeA768l7ybJ8GWEvQ/exec";
+
+                    fetch(URL_APPS_SCRIPT, {
+                        method: 'POST',
+                        body: JSON.stringify(payload)
+                    })
+                    .then(response => response.json())
+                    .then(result => {
+                        if(result.status === "sukses") {
+                            // Jika server menjawab sukses, ubah status di HP jadi 1 (Sudah Sync)
+                            const trx = db.transaction(['sasaran', 'laporan'], 'readwrite');
+                            payload.sasaran.forEach(s => { s.status_sinkron = 1; trx.objectStore('sasaran').put(s); });
+                            payload.laporan.forEach(l => { l.status_sinkron = 1; trx.objectStore('laporan').put(l); });
+                            
+                            trx.oncomplete = () => { 
+                                tampilkanNotif("✅ Berhasil Sinkron ke Server!", "notif-success"); 
+                                resetTombolSync(); 
+                                updateBadgeSinkronisasi(); 
+                                if(!document.getElementById('data-screen').classList.contains('hidden')) { 
+                                    renderDataSasaran(); renderDataLaporan(); 
+                                } 
+                            };
+                        } else {
+                            throw new Error(result.pesan || "Gagal menyimpan di server Google.");
+                        }
+                    })
+                    .catch(error => {
+                        tampilkanNotif("❌ Gagal Sinkron: " + error.message, "notif-warning");
+                        resetTombolSync();
+                    });
                 };
             };
         }
@@ -409,3 +445,4 @@
     </script>
 </body>
 </html>
+
