@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tpk-buleleng-v21';
+const CACHE_NAME = 'tpk-buleleng-v24';
 
 const urlsToCache = [
   './',
@@ -24,6 +24,7 @@ self.addEventListener('activate', event => {
       return Promise.all(keys.map(key => { if (key !== CACHE_NAME) return caches.delete(key); }));
   }));
 });
+
 
 
 
