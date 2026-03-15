@@ -177,8 +177,10 @@ const masukKeAplikasi = (sessionData) => {
 const renderMenuBerdasarkanRole = (role) => {
     let daftarMenu = [];
 
-    // Tentukan isi menu sesuai peran
-    if (role === 'Kader') {
+    // Gunakan .toUpperCase() untuk mitigasi perbedaan besar/kecil huruf di Excel
+    const roleUser = role.toUpperCase();
+
+    if (roleUser === 'KADER') {
         daftarMenu = [
             { id: 'dashboard', icon: '🏠', label: 'Dashboard' },
             { id: 'profil', icon: '👤', label: 'Profil Saya' },
@@ -192,7 +194,7 @@ const renderMenuBerdasarkanRole = (role) => {
             { id: 'sinkronisasi', icon: '🔄', label: 'Sinkronisasi Data' },
             { id: 'cetak', icon: '🖨️', label: 'Cetak PDF' }
         ];
-    } else if (role === 'Admin Kecamatan') {
+    } else if (roleUser === 'ADMIN_KECAMATAN') {
         daftarMenu = [
             { id: 'dashboard_kec', icon: '🏛️', label: 'Dashboard Kecamatan' },
             { id: 'rekap_sasaran_kader', icon: '📊', label: 'Rekap Sasaran per Kader' },
@@ -201,15 +203,13 @@ const renderMenuBerdasarkanRole = (role) => {
             { id: 'rekap_lapor_desa', icon: '📁', label: 'Rekap Pendampingan per Desa' },
             { id: 'reset_pass_kader', icon: '🔑', label: 'Reset Password Kader' }
         ];
-    } else if (role === 'Admin Kabupaten') {
+    } else if (roleUser === 'ADMIN_KABUPATEN') {
         daftarMenu = [
             { id: 'dashboard_kab', icon: '🏢', label: 'Dashboard Kabupaten' },
             { id: 'rekap_kecamatan', icon: '📈', label: 'Rekap per Kecamatan' },
-            { id: 'rekap_desa', icon: '📊', label: 'Rekap per Desa' },
             { id: 'monitoring', icon: '🎯', label: 'Monitoring Capaian' }
         ];
-    } else {
-        // Super Admin
+    } else if (roleUser === 'SUPER_ADMIN') {
         daftarMenu = [
             { id: 'dashboard_sys', icon: '🖥️', label: 'Dashboard Sistem' },
             { id: 'kelola_akun', icon: '👥', label: 'Kelola Akun' },
@@ -218,6 +218,8 @@ const renderMenuBerdasarkanRole = (role) => {
             { id: 'pengaturan', icon: '⚙️', label: 'Pengaturan Sistem' }
         ];
     }
+
+    // ... sisa kode penyuntikan HTML (innerHTML) tetap sama ...
 
     // Suntikkan kode HTML menu ke dalam Sidebar
     let htmlMenu = '';
