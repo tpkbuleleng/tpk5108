@@ -88,53 +88,47 @@ formLogin.addEventListener('submit', async (e) => {
     const inputPin = document.getElementById('kader-pin').value.trim();
 
     try {
-        // Cari user di tabel master_user berdasarkan ID yang diketik
         const user = await getDataById('master_user', inputId);
 
         if (!user) {
-            alert("ID Pengguna tidak terdaftar di sistem!");
+            alert("ID Pengguna tidak terdaftar!");
             return;
         }
 
-        // Validasi PIN (Pastikan di Google Sheet, PIN diformat sebagai 'Plain Text')
-        if (user.password.toString() !== inputPin) {
-            alert("PIN / Password salah!");
+        // SESUAIKAN: Menggunakan kolom password_awal_ref dari Sheet USER_LOGIN
+        const passSistem = user.password_awal_ref ? user.password_awal_ref.toString() : "";
+
+        if (passSistem !== inputPin) {
+            alert("Password / PIN salah!");
             return;
         }
 
-        // Ambil nama dari tabel master_kader jika dia Kader
-        let namaPengguna = user.username;
+        // Ambil Nama untuk Profil Sidebar
+        let namaTampil = user.username;
         let idTim = '-';
-        
-        if (user.role === 'Kader') {
-            const detailKader = await getDataById('master_kader', user.id_referensi);
-            if (detailKader) {
-                namaPengguna = detailKader.nama_kader;
-                idTim = detailKader.id_tim; // Penting untuk filter wilayah nanti
-            } else {
-                alert("Data detail kader tidak ditemukan. Namun tetap bisa login sementara.");
+
+        if (user.role_akses === 'KADER') {
+            const kader = await getDataById('master_kader', user.ref_id);
+            if (kader) {
+                namaTampil = kader.nama_kader;
+                idTim = kader.id_tim;
             }
-        } else {
-            // Jika dia Admin (bisa disesuaikan format namanya)
-            namaPengguna = user.username.toUpperCase(); 
         }
 
-        // Buat Sesi Login
         const sessionData = {
             id_kader: 'active_user', 
             username: user.username,
-            role: user.role,
-            nama: namaPengguna,
+            role: user.role_akses, // KADER, ADMIN_KECAMATAN, dll
+            nama: namaTampil,
             id_tim: idTim,
             login_time: new Date().toISOString()
         };
 
         await putData('kader_session', sessionData);
-        formLogin.reset();
         masukKeAplikasi(sessionData);
 
     } catch (error) {
-        console.error("Error saat login:", error);
+        console.error("Login Error:", error);
         alert("Terjadi kesalahan sistem saat login.");
     }
 });
