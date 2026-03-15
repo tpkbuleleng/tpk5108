@@ -10,11 +10,15 @@
     <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
+    <main id="view-splash" class="view-section active splash-container">
+        <img src="assets/img/logo.png" alt="Logo TPK" class="splash-logo">
+        <h2>TPK KABUPATEN BULELENG</h2>
+        <div class="loader"></div>
+    </main>
 
-    <main id="view-login" class="view-section active">
+    <main id="view-login" class="view-section hidden">
         <div class="login-container">
             <img src="assets/img/logo.png" alt="Logo TPK" class="app-logo" onerror="this.style.display='none'">
-            
             <h2 style="font-size: 1.5rem; line-height: 1.3;">Aplikasi Pencatatan dan Pelaporan</h2>
             <h2 style="font-size: 1.5rem; margin-bottom: 2rem; color: var(--primary);">TPK KABUPATEN BULELENG</h2>
             
@@ -30,48 +34,54 @@
                         <span class="toggle-password" onclick="togglePasswordVisibility()" title="Lihat/Sembunyikan Password">👁️</span>
                     </div>
                 </div>
-                <button type="submit" class="btn-primary">Masuk</button>
+                <button type="submit" class="btn-primary" id="btn-login-submit">Masuk</button>
             </form>
         </div>
     </main>
 
     <main id="view-app" class="view-section hidden">
         <header class="app-header">
-            <div>
-                <h1 id="user-greeting">Halo, Kader!</h1>
-                <span class="status-badge offline" id="network-status">Offline Mode</span>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <button class="btn-icon" id="btn-menu" aria-label="Menu" style="font-size: 1.5rem; background: none; color: white; padding: 0;">☰</button>
+                <div>
+                    <h1 id="user-greeting">Dashboard</h1>
+                    <span class="status-badge offline" id="network-status">Offline Mode</span>
+                </div>
             </div>
-            <button class="btn-icon" onclick="logout()" aria-label="Keluar">🚪</button>
+            <button class="btn-icon" onclick="logout()" aria-label="Keluar" style="background: none; border: none; font-size: 1.2rem;">🚪</button>
         </header>
 
-        <section id="content-area" class="content-scroll">
-            <div class="card summary-card">
-                <h3>Belum Disinkronisasi</h3>
-                <p class="big-number" id="pending-sync-count">0</p>
-                <button class="btn-secondary" id="btn-sync-now">Sinkronkan Sekarang</button>
+        <div class="sidebar-overlay" id="sidebar-overlay"></div>
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <img src="assets/img/logo.png" alt="Logo" class="sidebar-logo">
+                <div class="sidebar-user">
+                    <h3 id="sidebar-nama">Nama Pengguna</h3>
+                    <p id="sidebar-role">Role Pengguna</p>
+                </div>
             </div>
-        </section>
+            <nav class="sidebar-nav" id="dynamic-menu-container">
+                </nav>
+        </aside>
 
-        <nav class="bottom-nav">
-            <button class="nav-item active" data-target="home">
-                <span class="icon">🏠</span>
-                <span class="label">Beranda</span>
-            </button>
-            <button class="nav-item" data-target="registrasi">
-                <span class="icon">📝</span>
-                <span class="label">Daftar</span>
-            </button>
-            <button class="nav-item" data-target="lapor">
-                <span class="icon">📋</span>
-                <span class="label">Lapor</span>
-            </button>
-            <button class="nav-item" data-target="data">
-                <span class="icon">📁</span>
-                <span class="label">Data</span>
-            </button>
-        </nav>
+        <section id="content-area" class="content-scroll">
+            </section>
     </main>
 
     <script src="assets/js/app.js" type="module"></script>
+    <script>
+        // Fitur Toggle Password dari luar modul
+        window.togglePasswordVisibility = () => {
+            const pinInput = document.getElementById('kader-pin');
+            const toggleIcon = document.querySelector('.toggle-password');
+            if (pinInput.type === 'password') {
+                pinInput.type = 'text';
+                toggleIcon.textContent = '🙈';
+            } else {
+                pinInput.type = 'password';
+                toggleIcon.textContent = '👁️';
+            }
+        };
+    </script>
 </body>
 </html>
