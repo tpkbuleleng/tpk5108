@@ -35,6 +35,7 @@ const updateNetworkStatus = () => {
 // 2. INISIALISASI APLIKASI
 // ==========================================
 const initApp = async () => {
+    // Failsafe: Paksa hilangkan logo dalam 3.5 detik apapun yang terjadi
     const logoTimeout = setTimeout(() => { tampilkanLayar('login'); }, 3500);
     try {
         await initDB();
@@ -198,10 +199,9 @@ const getKodeKecamatan = (kec) => {
     return map[kec.toUpperCase()] || "XXX";
 };
 
-const const initFormRegistrasi = async () => {
+const initFormRegistrasi = async () => {
     const session = window.currentUser;
     const allWil = await getAllData('master_tim_wilayah').catch(()=>[]);
-    // Memanggil data sheet WILAYAH_BALI
     const allWilBali = await getAllData('master_wilayah_bali').catch(()=>[]); 
     const tugas = allWil.filter(w => w.id_tim === session.id_tim);
     
@@ -210,7 +210,7 @@ const const initFormRegistrasi = async () => {
     const boxCatin = getEl('wilayah-catin');
     const boxDomisili = getEl('wilayah-domisili');
 
-    // 1. Setup Domisili
+    // Setup Domisili
     const selDesa = getEl('reg-desa');
     const selDusun = getEl('reg-dusun');
     const regAlamat = getEl('reg-alamat');
@@ -224,7 +224,7 @@ const const initFormRegistrasi = async () => {
         };
     }
 
-    // 2. Setup Dropdown Bertingkat CATIN (Bali)
+    // Setup Dropdown Bertingkat CATIN
     const catinKab = getEl('catin-kab');
     const catinKec = getEl('catin-kec');
     const catinDesa = getEl('catin-desa');
@@ -247,44 +247,36 @@ const const initFormRegistrasi = async () => {
         };
     }
 
-    // 3. Logika Tampil / Sembunyi berdasarkan Jenis Sasaran
     const questions = await getAllData('master_pertanyaan').catch(()=>[]);
     if (selJenis && containerQ) {
         selJenis.onchange = () => {
             const jenis = selJenis.value;
             
-            // Atur Tampilan Wilayah
-            if (jenis === 'CATIN') {
-                if(boxCatin) boxCatin.style.display = 'block';
-                if(boxDomisili) boxDomisili.style.display = 'none';
-                
-                // Matikan "Wajib Isi" Domisili agar form bisa disimpan
-                if(selDesa) selDesa.removeAttribute('required');
-                if(selDusun) selDusun.removeAttribute('required');
-                if(regAlamat) regAlamat.removeAttribute('required');
-
-                // Nyalakan "Wajib Isi" Alamat Asal
-                if(catinKab) catinKab.setAttribute('required', 'true');
-                if(catinKec) catinKec.setAttribute('required', 'true');
-                if(catinDesa) catinDesa.setAttribute('required', 'true');
-            } else {
-                if(boxCatin) boxCatin.style.display = 'none';
-                if(boxDomisili) boxDomisili.style.display = 'block';
-
-                // Nyalakan kembali "Wajib Isi" Domisili
-                if(selDesa) selDesa.setAttribute('required', 'true');
-                if(selDusun) selDusun.setAttribute('required', 'true');
-                if(regAlamat) regAlamat.setAttribute('required', 'true');
-
-                // Matikan "Wajib Isi" Alamat Asal
-                if(catinKab) catinKab.removeAttribute('required');
-                if(catinKec) catinKec.removeAttribute('required');
-                if(catinDesa) catinDesa.removeAttribute('required');
+            // Tampil Sembunyi Wilayah CATIN vs Domisili
+            if(boxCatin && boxDomisili) {
+                if (jenis === 'CATIN') {
+                    boxCatin.style.display = 'block';
+                    boxDomisili.style.display = 'none';
+                    if(selDesa) selDesa.removeAttribute('required');
+                    if(selDusun) selDusun.removeAttribute('required');
+                    if(regAlamat) regAlamat.removeAttribute('required');
+                    if(catinKab) catinKab.setAttribute('required', 'true');
+                    if(catinKec) catinKec.setAttribute('required', 'true');
+                    if(catinDesa) catinDesa.setAttribute('required', 'true');
+                } else {
+                    boxCatin.style.display = 'none';
+                    boxDomisili.style.display = 'block';
+                    if(selDesa) selDesa.setAttribute('required', 'true');
+                    if(selDusun) selDusun.setAttribute('required', 'true');
+                    if(regAlamat) regAlamat.setAttribute('required', 'true');
+                    if(catinKab) catinKab.removeAttribute('required');
+                    if(catinKec) catinKec.removeAttribute('required');
+                    if(catinDesa) catinDesa.removeAttribute('required');
+                }
             }
 
             if (!jenis) { containerQ.innerHTML = ''; return; }
             
-            // Tampilkan Pertanyaan Dinamis
             const filteredQ = questions.filter(q => q.is_active === 'Y' && (q.kategori_sasaran === 'UMUM' || q.kategori_sasaran === jenis)).sort((a,b)=>a.urutan - b.urutan);
             if (filteredQ.length > 0) {
                 containerQ.innerHTML = `<h4 style="margin-bottom:10px; color:var(--primary);">Pertanyaan Khusus ${jenis}</h4>` + 
@@ -293,13 +285,10 @@ const const initFormRegistrasi = async () => {
                             <label>${q.label_pertanyaan}</label>
                             <input type="${q.tipe_input || 'text'}" name="q_${q.id_pertanyaan}" class="form-control" required>
                         </div>`).join('');
-            } else {
-                containerQ.innerHTML = '';
-            }
+            } else { containerQ.innerHTML = ''; }
         };
     }
 
-    // 4. Proses Simpan
     const formReg = getEl('form-registrasi');
     if (formReg) {
         formReg.onsubmit = async (e) => {
@@ -312,7 +301,6 @@ const const initFormRegistrasi = async () => {
                 const kecamatan = tugas.length > 0 ? tugas[0].kecamatan : 'TIDAK_DIKETAHUI';
                 const jenisSasaran = selJenis.value;
                 
-                // Pembuatan ID Unik
                 let prefix = "REG";
                 if (jenisSasaran === 'CATIN') prefix = "CTN";
                 else if (jenisSasaran === 'BUMIL') prefix = "BML";
@@ -323,7 +311,7 @@ const const initFormRegistrasi = async () => {
                 const angkaUnik = Math.floor(Math.random() * 1000000).toString().padStart(6, '0');
                 const idSasaran = `${prefix}-${kodeKec}-${angkaUnik}`;
                 
-                // Jika CATIN, kosongkan data desa/dusun domisili agar rapi di laporan
+                // Rapikan Alamat
                 const desaFinal = jenisSasaran === 'CATIN' ? '-' : selDesa.value;
                 const dusunFinal = jenisSasaran === 'CATIN' ? '-' : selDusun.value;
 
@@ -350,49 +338,6 @@ const const initFormRegistrasi = async () => {
     }
 };
 
-    const formReg = getEl('form-registrasi');
-    if (formReg) {
-        formReg.onsubmit = async (e) => {
-            e.preventDefault();
-            const btn = e.target.querySelector('button'); btn.disabled = true; btn.innerText = "Menyimpan...";
-            try {
-                const formData = new FormData(e.target);
-                const jawaban = {}; formData.forEach((val, key) => { jawaban[key] = val; });
-                const kecamatan = tugas.length > 0 ? tugas[0].kecamatan : 'TIDAK_DIKETAHUI';
-                const jenisSasaran = selJenis.value;
-                
-                let prefix = "REG";
-                if (jenisSasaran === 'CATIN') prefix = "CTN";
-                else if (jenisSasaran === 'BUMIL') prefix = "BML";
-                else if (jenisSasaran === 'BUFAS') prefix = "BFS";
-                else if (jenisSasaran === 'BADUTA') prefix = "BDT";
-                
-                const kodeKec = getKodeKecamatan(kecamatan);
-                const angkaUnik = Math.floor(Math.random() * 1000000).toString().padStart(6, '0');
-                const idSasaran = `${prefix}-${kodeKec}-${angkaUnik}`;
-                
-                const laporan = {
-                    id: idSasaran,
-                    tipe_laporan: 'REGISTRASI', 
-                    username: session.username, 
-                    id_tim: session.id_tim, 
-                    nomor_tim: session.nomor_tim,
-                    kecamatan: kecamatan, 
-                    jenis_sasaran: jenisSasaran, 
-                    nama_sasaran: jawaban.nama_sasaran || 'Tanpa Nama', // Simpan Nama
-                    desa: selDesa.value, 
-                    dusun: selDusun.value,
-                    data_laporan: jawaban, 
-                    created_at: new Date().toISOString()
-                };
-                await putData('sync_queue', laporan);
-                alert(`✅ Registrasi berhasil! ID Sasaran: ${idSasaran}`);
-                renderKonten('dashboard');
-            } catch (err) { alert("Gagal menyimpan form."); } finally { btn.disabled = false; btn.innerText = "💾 Simpan Registrasi"; }
-        };
-    }
-};
-
 const initDaftarSasaran = async () => {
     const session = window.currentUser;
     const list = getEl('list-sasaran');
@@ -404,15 +349,10 @@ const initDaftarSasaran = async () => {
     if (regList.length === 0) { 
         list.innerHTML = `<div style="text-align:center; padding:20px; color:#999;">Belum ada sasaran yang diregistrasi oleh Tim Anda.</div>`; 
     } else { 
-        // Menggunakan nama_sasaran agar lebih mudah dibaca Kader
         list.innerHTML = regList.map(r => `
             <div style="background:#f4f7f6; padding:15px; border-radius:8px; border-left: 4px solid var(--primary); margin-bottom: 10px;">
-                <div style="font-weight: bold; font-size: 1.15rem; color: #333; text-transform: uppercase;">
-                    ${r.nama_sasaran || 'Tanpa Nama'}
-                </div>
-                <div style="font-size: 0.85rem; color: var(--primary); font-weight: bold; margin-top: 2px;">
-                    [${r.id}] ${r.jenis_sasaran}
-                </div>
+                <div style="font-weight: bold; font-size: 1.15rem; color: #333; text-transform: uppercase;">${r.nama_sasaran || 'Tanpa Nama'}</div>
+                <div style="font-size: 0.85rem; color: var(--primary); font-weight: bold; margin-top: 2px;">[${r.id}] ${r.jenis_sasaran}</div>
                 <div style="font-size: 0.9rem; color: #555; margin-top: 6px;">📍 ${r.dusun}, ${r.desa}</div>
                 <div style="font-size: 0.75rem; color:#888; margin-top: 8px;">⏳ Disimpan: ${new Date(r.created_at).toLocaleString('id-ID')}</div>
             </div>`).join(''); 
@@ -428,7 +368,6 @@ const initFormPendampingan = async () => {
     const regList = antrean.filter(a => a.tipe_laporan === 'REGISTRASI' && a.id_tim === session.id_tim);
     
     if (selSasaran) { 
-        // Dropdown menampilkan Nama Sasaran agar kader tidak bingung
         selSasaran.innerHTML = '<option value="">-- Pilih Sasaran --</option>' + 
         regList.map(r => `<option value="${r.id}">[${r.id}] ${r.nama_sasaran || r.jenis_sasaran} - ${r.dusun}</option>`).join(''); 
         
