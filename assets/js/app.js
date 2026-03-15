@@ -38,15 +38,19 @@ const initApp = async () => {
 const tampilkanLayar = (id) => {
     const vLogin = getEl('view-login');
     const vApp = getEl('view-app');
-    
-    if (vLogin && vApp) {
-        if (id === 'login') {
-            vLogin.classList.remove('hidden');
-            vApp.classList.add('hidden');
-        } else {
-            vLogin.classList.add('hidden');
-            vApp.classList.remove('hidden');
-        }
+    const vSplash = getEl('view-splash');
+
+    // Sembunyikan Splash secara paksa
+    if (vSplash) vSplash.style.display = 'none';
+
+    if (id === 'login') {
+        if (vLogin) vLogin.classList.remove('hidden');
+        if (vApp) vApp.classList.add('hidden');
+        console.log("Layar Login tampil sekarang.");
+    } else if (id === 'app') {
+        if (vLogin) vLogin.classList.add('hidden');
+        if (vApp) vApp.classList.remove('hidden');
+        console.log("Layar Aplikasi tampil sekarang.");
     }
 };
 
