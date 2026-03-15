@@ -57,16 +57,23 @@ const tampilkanLayar = (id) => {
 const masukKeAplikasi = async (session) => {
     window.currentUser = session;
     
-    // Ambil data wilayah untuk Header
-    const semuaTimWilayah = await getAllData('master_tim_wilayah') || [];
-    const wilayahKader = semuaTimWilayah.find(w => w.id_tim === session.id_tim);
-    const namaKecamatan = wilayahKader ? wilayahKader.kecamatan.toUpperCase() : "";
+    // 1. Ambil data Wilayah & Tim untuk detail Dashboard
+    const [allTimWil, allMasterTim] = await Promise.all([
+        getAllData('master_tim_wilayah'),
+        getAllData('master_tim') // Mengambil data dari MASTER_TIM
+    ]);
 
-    // 1. Update Header (Kecamatan Otomatis)
+    const wilayahKader = allTimWil.find(w => w.id_tim === session.id_tim);
+    const detailTim = allMasterTim.find(t => t.id_tim === session.id_tim);
+    
+    const namaKecamatan = wilayahKader ? wilayahKader.kecamatan.toUpperCase() : "";
+    // Ambil nomor_tim dari sheet MASTER_TIM
+    window.currentUser.nomor_tim = detailTim ? detailTim.nomor_tim : session.id_tim;
+
+    // 2. Update Header
     const greeting = getEl('user-greeting');
     if (greeting) {
         greeting.innerHTML = `DASHBOARD KADER KECAMATAN ${namaKecamatan}`;
-        greeting.style.fontSize = "0.9rem"; // Menjaga agar tetap muat di header
     }
 
     if (getEl('sidebar-nama')) getEl('sidebar-nama').innerText = session.nama;
@@ -84,15 +91,21 @@ const renderMenu = (role) => {
     const container = getEl('dynamic-menu-container');
     if (!container) return;
 
-    const r = role ? role.toUpperCase() : "";
-    const menus = (r === 'KADER') ? [
-        { id: 'dashboard', icon: '🏠', label: 'Dashboard' },
-        { id: 'registrasi', icon: '📝', label: 'Registrasi' },
-        { id: 'sinkronisasi', icon: '🔄', label: 'Sinkronisasi' }
-    ] : [
-        { id: 'dashboard_sys', icon: '🖥️', label: 'Sistem' },
-        { id: 'master_wilayah', icon: '🗺️', label: 'Wilayah' }
-    ];
+    let menus = [];
+    if (role.toUpperCase() === 'KADER') {
+        menus = [
+            { id: 'dashboard', icon: '🏠', label: 'Dashboard' },
+            { id: 'registrasi', icon: '📝', label: 'Registrasi Sasaran' },
+            { id: 'daftar_sasaran', icon: '📋', label: 'Daftar Sasaran' },
+            { id: 'pendampingan', icon: '🤝', label: 'Laporan Pendampingan' },
+            { id: 'rekap_kader', icon: '📊', label: 'Rekap Bulanan Kader' },
+            { id: 'rekap_tim', icon: '📈', label: 'Rekap Bulanan Tim' },
+            { id: 'cetak_pdf', icon: '🖨️', label: 'Cetak PDF' },
+            { id: 'ganti_pass', icon: '🔑', label: 'Ganti Password' }
+        ];
+    } else {
+        menus = [{ id: 'dashboard', icon: '🏠', label: 'Dashboard' }];
+    }
 
     container.innerHTML = menus.map(m => `
         <a class="menu-item" data-target="${m.id}">
@@ -115,8 +128,6 @@ const renderKonten = async (target) => {
     if (!area) return;
 
     if (target === 'dashboard') {
-        area.innerHTML = `<div style="padding:20px; text-align:center;">Memuat Data Wilayah...</div>`;
-        
         const session = window.currentUser;
         const [allTimWil, antrean] = await Promise.all([
             getAllData('master_tim_wilayah'),
@@ -130,50 +141,44 @@ const renderKonten = async (target) => {
 
         area.innerHTML = `
             <div class="animate-fade">
-                <div class="card" style="background: linear-gradient(135deg, #0d6efd, #0043a8); color: white; border:none; margin-bottom: 20px; padding: 30px; box-shadow: 0 10px 20px rgba(0,0,0,0.15);">
-                    <p style="margin:0; opacity: 0.9; font-size: 1.1rem; font-weight: 300;">Selamat Datang,</p>
-                    <h2 style="margin: 5px 0 15px 0; font-size: 2.2rem; font-weight: 800; letter-spacing: 1px;">${session.nama}</h2>
+                <div class="card" style="background: linear-gradient(135deg, #0d6efd, #0043a8); color: white; border:none; margin-bottom: 20px; padding: 25px; box-shadow: 0 8px 16px rgba(0,0,0,0.1);">
+                    <p style="margin:0; opacity: 0.9; font-size: 1rem; font-weight: 800;">SELAMAT DATANG,</p>
+                    <h2 style="margin: 5px 0 15px 0; font-size: 1.6rem; font-weight: 700;">${session.nama}</h2>
                     
-                    <div style="background: rgba(255,255,255,0.15); display: inline-block; padding: 5px 15px; border-radius: 8px; font-weight: bold; font-size: 1.1rem; margin-bottom: 20px;">
-                        NO. TIM: ${session.id_tim}
+                    <div style="background: rgba(255,255,255,0.2); display: inline-block; padding: 4px 12px; border-radius: 6px; font-weight: bold; font-size: 0.9rem; margin-bottom: 20px;">
+                        NO. TIM: ${session.nomor_tim}
                     </div>
 
                     <hr style="margin-bottom: 20px; border: 0; border-top: 1px solid rgba(255,255,255,0.2);">
                     
-                    <div style="font-size: 1.15rem; line-height: 1.8;">
-                        <div style="display: flex; align-items: flex-start; margin-bottom: 8px;">
-                            <span style="min-width: 35px;">📍</span>
-                            <span><b>Dusun/RW:</b><br>${daftarDusun}</span>
+                    <div style="font-size: 1.1rem; line-height: 1.7;">
+                        <div style="margin-bottom: 8px;">
+                            📍 <b>Dusun/RW:</b><br><span style="font-size: 1rem; opacity: 0.9;">${daftarDusun}</span>
                         </div>
-                        <div style="display: flex; align-items: center; margin-bottom: 8px;">
-                            <span style="min-width: 35px;">🏘️</span>
-                            <span><b>Desa/Kelurahan:</b> ${desa}</span>
+                        <div style="margin-bottom: 8px;">
+                            🏘️ <b>Desa/Kelurahan:</b> ${desa}
                         </div>
-                        <div style="display: flex; align-items: center;">
-                            <span style="min-width: 35px;">🏛️</span>
-                            <span><b>Kecamatan:</b> ${kec}</span>
+                        <div>
+                            🏛️ <b>Kecamatan:</b> ${kec}
                         </div>
                     </div>
                 </div>
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                    <div class="card" style="text-align:center; padding: 25px;">
-                        <div style="font-size: 2rem; margin-bottom: 10px;">📦</div>
-                        <h3 style="font-size: 1.8rem;">${antrean.length}</h3>
-                        <p style="font-size: 0.8rem; color: #666; font-weight: bold;">TERTUNDA</p>
+                    <div class="card" style="text-align:center; padding: 20px;">
+                        <div style="font-size: 1.8rem; margin-bottom: 5px;">📦</div>
+                        <h3 style="font-size: 1.5rem;">${antrean.length}</h3>
+                        <p style="font-size: 0.75rem; color: #666; font-weight: bold;">TERTUNDA</p>
                     </div>
-                    <div class="card" style="text-align:center; padding: 25px; cursor:pointer; background: #fff;" onclick="renderKonten('registrasi')">
-                        <div style="font-size: 2rem; margin-bottom: 10px;">➕</div>
-                        <h3 style="font-size: 1.8rem; color: var(--primary);">BARU</h3>
-                        <p style="font-size: 0.8rem; color: #666; font-weight: bold;">REGISTRASI</p>
+                    <div class="card" style="text-align:center; padding: 20px; cursor:pointer;" onclick="renderKonten('registrasi')">
+                        <div style="font-size: 1.8rem; margin-bottom: 5px;">📝</div>
+                        <h3 style="font-size: 1.5rem; color: var(--primary);">BARU</h3>
+                        <p style="font-size: 0.75rem; color: #666; font-weight: bold;">REGISTRASI</p>
                     </div>
                 </div>
             </div>`;
-    } else if (target === 'registrasi') {
-        const temp = getEl('template-registrasi');
-        area.innerHTML = '';
-        area.appendChild(temp.content.cloneNode(true));
-        initFormRegistrasi();
+    } else {
+        area.innerHTML = `<div class="card"><h3>Menu ${target.replace(/_/g, ' ').toUpperCase()}</h3><p>Halaman ini sedang dalam pengembangan.</p></div>`;
     }
 };
 
