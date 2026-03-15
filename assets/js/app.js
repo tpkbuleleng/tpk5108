@@ -119,19 +119,17 @@ const renderKonten = async (target) => {
 
     if (target === 'dashboard') {
         const session = window.currentUser || {};
-        
-        // 1. Tampilkan Dashboard DULU (Pakai data yang ada di tangan)
         area.innerHTML = `
             <div class="animate-fade">
-                <div id="dash-card-utama" class="card" style="background: linear-gradient(135deg, #0d6efd, #0043a8); color: white; border:none; margin-bottom: 20px; padding: 25px;">
+                <div class="card" style="background: linear-gradient(135deg, #0d6efd, #0043a8); color: white; border:none; margin-bottom: 20px; padding: 25px;">
                     <p style="margin:0; opacity: 0.9; font-size: 1rem; font-weight: 800;">SELAMAT DATANG,</p>
-                    <h2 style="margin: 5px 0 15px 0; font-size: 1.6rem; font-weight: 700; text-transform: uppercase;">${session.nama || 'USER'}</h2>
+                    <h2 style="margin: 5px 0 15px 0; font-size: 1.6rem; font-weight: 700;">${session.nama || 'USER'}</h2>
                     <div style="background: rgba(255,255,255,0.2); display: inline-block; padding: 4px 12px; border-radius: 6px; font-weight: bold; font-size: 0.9rem; margin-bottom: 20px;">
                         NO. TIM: ${session.nomor_tim || session.id_tim || '-'}
                     </div>
                     <hr style="margin-bottom: 20px; border: 0; border-top: 1px solid rgba(255,255,255,0.2);">
-                    <div id="dash-detail-wilayah" style="font-size: 1.1rem; line-height: 1.7;">
-                        <p style="font-size:0.9rem; opacity:0.8;">Memuat detail wilayah...</p>
+                    <div id="dash-detail-wilayah" style="font-size: 1.1rem; line-height: 1.8;">
+                        <p style="font-size:0.9rem; opacity:0.7;">Memuat detail wilayah...</p>
                     </div>
                 </div>
 
@@ -149,52 +147,85 @@ const renderKonten = async (target) => {
                 </div>
             </div>`;
 
-        // 2. Baru kemudian ambil data detail secara perlahan (Background)
+        // Ambil data wilayah secara async
         try {
             const [allWil, antrean] = await Promise.all([
-                getAllData('master_tim_wilayah').catch(() => []),
-                getAllData('sync_queue').catch(() => [])
+                getAllData('master_tim_wilayah'),
+                getAllData('sync_queue')
             ]);
 
             const wilayahKerja = allWil.filter(w => w.id_tim === session.id_tim);
-            const daftarDusun = wilayahKerja.map(w => w.dusun_rw).join(', ') || 'Belum ada data wilayah';
+            const daftarDusun = wilayahKerja.map(w => w.dusun_rw).join(', ') || 'Data dusun tidak ditemukan';
             const desa = wilayahKerja.length > 0 ? wilayahKerja[0].desa_kelurahan : '-';
             const kec = wilayahKerja.length > 0 ? wilayahKerja[0].kecamatan : '-';
 
-            // Update hanya bagian detailnya saja tanpa merusak layar
             const containerDetail = getEl('dash-detail-wilayah');
             if(containerDetail) {
+                // Perbaikan: Hapus display flex/justify agar teks rata kiri
                 containerDetail.innerHTML = `
                     <div style="margin-bottom: 12px;">
-                        <span style="opacity:0.8;">📍 Dusun/RW:</span><br>
+                        <span style="opacity:0.8; font-size: 0.9rem;">📍 Dusun/RW:</span><br>
                         <span style="font-weight: 500;">${daftarDusun}</span>
                     </div>
-                    <div style="margin-bottom: 8px; display: flex; justify-content: space-between;">
-                        <span style="opacity:0.8;">🏘️ Desa/Kelurahan:</span>
+                    <div style="margin-bottom: 8px;">
+                        <span style="opacity:0.8; font-size: 0.9rem;">🏘️ Desa/Kelurahan:</span><br>
                         <span style="font-weight: 600;">${desa}</span>
                     </div>
-                    <div style="display: flex; justify-content: space-between;">
-                        <span style="opacity:0.8;">🏛️ Kecamatan:</span>
+                    <div>
+                        <span style="opacity:0.8; font-size: 0.9rem;">🏛️ Kecamatan:</span><br>
                         <span style="font-weight: 600;">${kec}</span>
                     </div>
                 `;
             }
             if(getEl('dash-count-tunda')) getEl('dash-count-tunda').innerText = antrean.length;
-
-        } catch (e) {
-            console.warn("Detail gagal dimuat, tapi dashboard tetap tampil.");
-        }
+        } catch (e) { console.error(e); }
 
     } else if (target === 'registrasi') {
         const temp = getEl('template-registrasi');
         if (temp) {
             area.innerHTML = '';
             area.appendChild(temp.content.cloneNode(true));
-            if (typeof initFormRegistrasi === "function") initFormRegistrasi();
+            initFormRegistrasi(); // Panggil fungsi filter wilayah
         }
     } else {
         area.innerHTML = `<div class="card" style="text-align:center; padding:40px;"><h3>Menu ${target.toUpperCase()}</h3><p>Halaman sedang disiapkan.</p></div>`;
     }
+};
+
+const initFormRegistrasi = async () => {
+    try {
+        const session = window.currentUser;
+        // Pastikan nama store sesuai dengan db.js (master_tim_wilayah)
+        const allWil = await getAllData('master_tim_wilayah') || [];
+        const tugasKader = allWil.filter(w => w.id_tim === session.id_tim);
+
+        const selDesa = getEl('reg-desa');
+        const selDusun = getEl('reg-dusun');
+        const containerQ = getEl('pertanyaan-dinamis');
+
+        if (selDesa && tugasKader.length > 0) {
+            const daftarDesa = [...new Set(tugasKader.map(w => w.desa_kelurahan))];
+            selDesa.innerHTML = '<option value="">-- Pilih Desa --</option>' + 
+                daftarDesa.map(d => `<option value="${d}">${d}</option>`).join('');
+
+            selDesa.onchange = () => {
+                const dusunFiltered = tugasKader.filter(w => w.desa_kelurahan === selDesa.value);
+                selDusun.innerHTML = '<option value="">-- Pilih Dusun --</option>' + 
+                    dusunFiltered.map(d => `<option value="${d.dusun_rw}">${d.dusun_rw}</option>`).join('');
+            };
+        } else if (selDesa) {
+            selDesa.innerHTML = '<option value="">Data Wilayah Kosong (Sinkronkan Data)</option>';
+        }
+
+        // Muat Pertanyaan
+        const q = await getAllData('master_pertanyaan') || [];
+        if (containerQ) {
+            containerQ.innerHTML = q.sort((a,b) => a.urutan - b.urutan).map(item => {
+                if(item.is_active !== 'Y') return '';
+                return `<div class="form-group"><label>${item.label_pertanyaan}</label><input type="text" name="q_${item.id_pertanyaan}" class="form-control" placeholder="Masukkan jawaban"></div>`;
+            }).join('');
+        }
+    } catch (err) { console.error("Gagal init form:", err); }
 };
 
 // ==========================================
