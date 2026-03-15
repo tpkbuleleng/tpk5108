@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>TPK BULELENG</title>
+    <meta name="theme-color" content="#0d6efd">
+    <meta name="description" content="Aplikasi Pendampingan Keluarga Buleleng">
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+
+    <main id="view-login" class="view-section active">
+        <div class="login-container">
+            <img src="assets/img/logo.png" alt="Logo TPK" class="app-logo" onerror="this.style.display='none'">
+            <h2>Masuk Kader</h2>
+            <p class="subtitle">Aplikasi Pelaporan TPK Buleleng</p>
+            
+            <form id="form-login" class="modern-form">
+                <div class="input-group">
+                    <label for="kader-id">ID Pengguna</label>
+                    <input type="text" id="kader-id" required autocomplete="off" placeholder="Masukkan ID">
+                </div>
+                <div class="input-group">
+                    <label for="kader-pin">PIN / Password</label>
+                    <input type="password" id="kader-pin" required placeholder="••••••">
+                </div>
+                <button type="submit" class="btn-primary">Masuk</button>
+            </form>
+        </div>
+    </main>
+
+    <main id="view-app" class="view-section hidden">
+        <header class="app-header">
+            <div>
+                <h1 id="user-greeting">Halo, Kader!</h1>
+                <span class="status-badge offline" id="network-status">Offline Mode</span>
+            </div>
+            <button class="btn-icon" onclick="logout()" aria-label="Keluar">🚪</button>
+        </header>
+
+        <section id="content-area" class="content-scroll">
+            <div class="card summary-card">
+                <h3>Belum Disinkronisasi</h3>
+                <p class="big-number" id="pending-sync-count">0</p>
+                <button class="btn-secondary" id="btn-sync-now">Sinkronkan Sekarang</button>
+            </div>
+        </section>
+
+        <nav class="bottom-nav">
+            <button class="nav-item active" data-target="home">
+                <span class="icon">🏠</span>
+                <span class="label">Beranda</span>
+            </button>
+            <button class="nav-item" data-target="registrasi">
+                <span class="icon">📝</span>
+                <span class="label">Daftar</span>
+            </button>
+            <button class="nav-item" data-target="lapor">
+                <span class="icon">📋</span>
+                <span class="label">Lapor</span>
+            </button>
+            <button class="nav-item" data-target="data">
+                <span class="icon">📁</span>
+                <span class="label">Data</span>
+            </button>
+        </nav>
+    </main>
+
+    <script src="assets/js/app.js" type="module"></script>
+</body>
+</html>
