@@ -1,307 +1,216 @@
 import { initDB, putData, getDataById, deleteData, getAllData } from './db.js';
-import { downloadMasterData, uploadLaporanTunda } from './sync.js';
+import { downloadMasterData } from './sync.js';
 
 // ==========================================
-// 1. DEKLARASI ELEMEN UI
+// 1. ELEMEN UI
 // ==========================================
 const viewSplash = document.getElementById('view-splash');
 const viewLogin = document.getElementById('view-login');
 const viewApp = document.getElementById('view-app');
-const formLogin = document.getElementById('form-login');
-const userGreeting = document.getElementById('user-greeting');
-const networkStatus = document.getElementById('network-status');
 const contentArea = document.getElementById('content-area');
-
-// Elemen Sidebar & Menu
+const menuContainer = document.getElementById('dynamic-menu-container');
 const sidebar = document.getElementById('sidebar');
 const sidebarOverlay = document.getElementById('sidebar-overlay');
-const btnMenu = document.getElementById('btn-menu');
-const sidebarNama = document.getElementById('sidebar-nama');
-const sidebarRole = document.getElementById('sidebar-role');
-const menuContainer = document.getElementById('dynamic-menu-container');
 
 // ==========================================
-// 2. FUNGSI INISIALISASI & SPLASH SCREEN
+// 2. INISIALISASI APLIKASI
 // ==========================================
 const initApp = async () => {
     try {
         await initDB();
-        console.log("Database TPK Buleleng Siap!");
         
-        // Pantau status jaringan (Online/Offline)
+        // Pantau Koneksi
         updateNetworkStatus();
         window.addEventListener('online', updateNetworkStatus);
         window.addEventListener('offline', updateNetworkStatus);
 
-        // Cek apakah ada sesi login aktif di HP
         const session = await getDataById('kader_session', 'active_user');
 
-        // LOGIKA SPLASH SCREEN: Tahan animasi selama 1.5 detik
         setTimeout(async () => {
-            // 1. Matikan Splash Screen dan tampilkan layar yang sesuai (agar tidak blank putih)
             viewSplash.classList.remove('active');
             
             if (session) {
-                tampilkanLayar('app');
                 masukKeAplikasi(session);
             } else {
-                tampilkanLayar('login'); 
+                tampilkanLayar('login');
             }
 
-            // 2. Cek Master Data (Jika HP baru pertama kali buka aplikasi)
+            // Cek Master Data di latar belakang
             const users = await getAllData('master_user');
-            if (users.length === 0) {
-                if (navigator.onLine) {
-                    const btnLogin = document.getElementById('btn-login-submit');
-                    if(btnLogin) {
-                        btnLogin.innerText = "Mengunduh Data Master...";
-                        btnLogin.disabled = true;
-                    }
-                    
-                    // Proses sedot data dari Google Sheet
-                    console.log("Mulai mengunduh data awal...");
-                    const sukses = await downloadMasterData();
-                    
-                    if(btnLogin) {
-                        btnLogin.innerText = sukses ? "Masuk" : "Gagal Download Data";
-                        btnLogin.disabled = false;
-                        if(!sukses) alert("Gagal mengunduh data. Pastikan URL Web App di sync.js sudah benar.");
-                    }
-                } else {
-                    alert("Aplikasi baru diinstal. Harap nyalakan internet untuk sinkronisasi pertama kali.");
-                }
+            if (users.length === 0 && navigator.onLine) {
+                const btnLogin = document.getElementById('btn-login-submit');
+                if(btnLogin) btnLogin.innerText = "Mengunduh Data...";
+                await downloadMasterData();
+                if(btnLogin) btnLogin.innerText = "Masuk";
             }
-        }, 1500); // Waktu tampil splash screen (1.5 detik)
-
-    } catch (error) {
-        console.error("Gagal inisialisasi:", error);
-    }
+        }, 1500);
+    } catch (err) { console.error(err); }
 };
 
 // ==========================================
-// 3. LOGIKA LOGIN (Validasi Offline via Database)
+// 3. LOGIKA LOGIN (RBAC)
 // ==========================================
-formLogin.addEventListener('submit', async (e) => {
+document.getElementById('form-login').addEventListener('submit', async (e) => {
     e.preventDefault();
+    const idInput = document.getElementById('kader-id').value.trim();
+    const passInput = document.getElementById('kader-pin').value.trim();
+
+    const user = await getDataById('master_user', idInput);
+
+    if (!user) return alert("ID tidak terdaftar!");
     
-    const inputId = document.getElementById('kader-id').value.trim();
-    const inputPin = document.getElementById('kader-pin').value.trim();
+    // Gunakan header 'password_awal_ref' sesuai Sheet Anda
+    const passBenar = user.password_awal_ref ? user.password_awal_ref.toString() : "";
+    if (passBenar !== passInput) return alert("Password Salah!");
 
-    try {
-        const user = await getDataById('master_user', inputId);
+    let namaTampil = user.username;
+    let idTim = '-';
 
-        if (!user) {
-            alert("ID Pengguna tidak terdaftar!");
-            return;
+    // Cari detail jika Role adalah KADER
+    if (user.role_akses === 'KADER') {
+        const detail = await getDataById('master_kader', user.ref_id);
+        if (detail) {
+            namaTampil = detail.nama_kader;
+            idTim = detail.id_tim;
         }
-
-        // SESUAIKAN: Menggunakan kolom password_awal_ref dari Sheet USER_LOGIN
-        const passSistem = user.password_awal_ref ? user.password_awal_ref.toString() : "";
-
-        if (passSistem !== inputPin) {
-            alert("Password / PIN salah!");
-            return;
-        }
-
-        // Ambil Nama untuk Profil Sidebar
-        let namaTampil = user.username;
-        let idTim = '-';
-
-        if (user.role_akses === 'KADER') {
-            const kader = await getDataById('master_kader', user.ref_id);
-            if (kader) {
-                namaTampil = kader.nama_kader;
-                idTim = kader.id_tim;
-            }
-        }
-
-        const sessionData = {
-            id_kader: 'active_user', 
-            username: user.username,
-            role: user.role_akses, // KADER, ADMIN_KECAMATAN, dll
-            nama: namaTampil,
-            id_tim: idTim,
-            login_time: new Date().toISOString()
-        };
-
-        await putData('kader_session', sessionData);
-        masukKeAplikasi(sessionData);
-
-    } catch (error) {
-        console.error("Login Error:", error);
-        alert("Terjadi kesalahan sistem saat login.");
     }
+
+    const session = {
+        id_kader: 'active_user',
+        username: user.username,
+        role: user.role_akses, // KADER, ADMIN_KECAMATAN, SUPER_ADMIN, dll
+        nama: namaTampil,
+        id_tim: idTim
+    };
+
+    await putData('kader_session', session);
+    masukKeAplikasi(session);
 });
 
 // ==========================================
-// 4. MANAJEMEN LAYAR & SIDEBAR
+// 4. NAVIGATION & SIDEBAR
 // ==========================================
-const tampilkanLayar = (layar) => {
-    // Sembunyikan semua layar dulu
-    viewSplash.classList.remove('active');
-    viewLogin.classList.remove('active');
-    viewApp.classList.remove('active');
-
-    // Tampilkan yang diminta
-    if (layar === 'login') {
-        viewLogin.classList.add('active');
-    } else if (layar === 'app') {
-        viewApp.classList.add('active');
-    }
-};
-
-const toggleSidebar = () => {
-    sidebar.classList.toggle('active');
-    sidebarOverlay.classList.toggle('active');
-};
-
-btnMenu.addEventListener('click', toggleSidebar);
-sidebarOverlay.addEventListener('click', toggleSidebar);
-
-const masukKeAplikasi = (sessionData) => {
-    window.currentUser = sessionData; // Simpan data user di global memory
+const masukKeAplikasi = (session) => {
+    window.currentUser = session;
+    document.getElementById('user-greeting').innerText = `Dashboard ${session.role}`;
+    document.getElementById('sidebar-nama').innerText = session.nama;
+    document.getElementById('sidebar-role').innerText = session.role;
     
-    // Update Teks Header & Profil di Sidebar
-    userGreeting.innerText = sessionData.role === 'Kader' ? 'Dashboard Kader' : `Dashboard ${sessionData.role}`;
-    sidebarNama.innerText = sessionData.nama;
-    sidebarRole.innerText = sessionData.role;
-
-    // Tampilkan menu berdasarkan jabatannya
-    renderMenuBerdasarkanRole(sessionData.role);
+    renderMenu(session.role);
     tampilkanLayar('app');
 };
 
-// ==========================================
-// 5. DATA MENU DINAMIS (Role-Based Access Control)
-// ==========================================
-const renderMenuBerdasarkanRole = (role) => {
-    let daftarMenu = [];
+const renderMenu = (role) => {
+    let menus = [];
+    const r = role.toUpperCase();
 
-    // Gunakan .toUpperCase() untuk mitigasi perbedaan besar/kecil huruf di Excel
-    const roleUser = role.toUpperCase();
-
-    if (roleUser === 'KADER') {
-        daftarMenu = [
+    if (r === 'KADER') {
+        menus = [
             { id: 'dashboard', icon: '🏠', label: 'Dashboard' },
-            { id: 'profil', icon: '👤', label: 'Profil Saya' },
-            { id: 'tim', icon: '👥', label: 'Tim Saya' },
-            { id: 'wilayah', icon: '🗺️', label: 'Wilayah Kerja' },
             { id: 'registrasi', icon: '📝', label: 'Registrasi Sasaran' },
-            { id: 'daftar_sasaran', icon: '📋', label: 'Daftar Sasaran' },
             { id: 'pendampingan', icon: '🤝', label: 'Pendampingan' },
-            { id: 'rekap_kader', icon: '📊', label: 'Rekap Bulanan Kader' },
-            { id: 'rekap_tim', icon: '📈', label: 'Rekap Bulanan Tim' },
-            { id: 'sinkronisasi', icon: '🔄', label: 'Sinkronisasi Data' },
-            { id: 'cetak', icon: '🖨️', label: 'Cetak PDF' }
+            { id: 'sinkronisasi', icon: '🔄', label: 'Sinkronisasi' }
         ];
-    } else if (roleUser === 'ADMIN_KECAMATAN') {
-        daftarMenu = [
-            { id: 'dashboard_kec', icon: '🏛️', label: 'Dashboard Kecamatan' },
-            { id: 'rekap_sasaran_kader', icon: '📊', label: 'Rekap Sasaran per Kader' },
-            { id: 'rekap_sasaran_desa', icon: '🗺️', label: 'Rekap Sasaran per Desa' },
-            { id: 'rekap_lapor_kader', icon: '📋', label: 'Rekap Pendampingan per Kader' },
-            { id: 'rekap_lapor_desa', icon: '📁', label: 'Rekap Pendampingan per Desa' },
-            { id: 'reset_pass_kader', icon: '🔑', label: 'Reset Password Kader' }
-        ];
-    } else if (roleUser === 'ADMIN_KABUPATEN') {
-        daftarMenu = [
-            { id: 'dashboard_kab', icon: '🏢', label: 'Dashboard Kabupaten' },
-            { id: 'rekap_kecamatan', icon: '📈', label: 'Rekap per Kecamatan' },
-            { id: 'monitoring', icon: '🎯', label: 'Monitoring Capaian' }
-        ];
-    } else if (roleUser === 'SUPER_ADMIN') {
-        daftarMenu = [
+    } else if (r === 'SUPER_ADMIN') {
+        menus = [
             { id: 'dashboard_sys', icon: '🖥️', label: 'Dashboard Sistem' },
             { id: 'kelola_akun', icon: '👥', label: 'Kelola Akun' },
-            { id: 'master_wilayah', icon: '🗺️', label: 'Master Wilayah' },
-            { id: 'log_aktivitas', icon: '⏱️', label: 'Log Aktivitas' },
-            { id: 'pengaturan', icon: '⚙️', label: 'Pengaturan Sistem' }
+            { id: 'master_wilayah', icon: '🗺️', label: 'Master Wilayah' }
         ];
-    }
+    } // Tambahkan else if untuk role lain sesuai kebutuhan
 
-    // ... sisa kode penyuntikan HTML (innerHTML) tetap sama ...
-
-    // Suntikkan kode HTML menu ke dalam Sidebar
-    let htmlMenu = '';
-    daftarMenu.forEach(menu => {
-        htmlMenu += `<a class="menu-item" data-target="${menu.id}">
-                        <span class="icon">${menu.icon}</span> 
-                        <span class="label">${menu.label}</span>
-                     </a>`;
-    });
+    let html = menus.map(m => `
+        <a class="menu-item" data-target="${m.id}">
+            <span class="icon">${m.icon}</span> ${m.label}
+        </a>
+    `).join('');
     
-    // Tambah menu Ganti Password & Logout di paling bawah
-    htmlMenu += `<hr style="border: 0; border-top: 1px solid var(--border); margin: 10px 0;">`;
-    htmlMenu += `<a class="menu-item" data-target="ganti_password"><span class="icon">🔒</span> <span class="label">Ganti Password</span></a>`;
-    htmlMenu += `<a class="menu-item text-danger" style="color: #dc3545;" onclick="logout()"><span class="icon">🚪</span> <span class="label">Keluar / Logout</span></a>`;
+    html += `<hr><a class="menu-item text-danger" onclick="logout()">🚪 Keluar</a>`;
+    menuContainer.innerHTML = html;
 
-    menuContainer.innerHTML = htmlMenu;
-
-    // Pasang fungsi klik untuk setiap tombol menu
     document.querySelectorAll('.menu-item[data-target]').forEach(item => {
-        item.addEventListener('click', (e) => {
-            // Hapus warna biru (active) dari semua menu
-            document.querySelectorAll('.menu-item').forEach(m => m.classList.remove('active'));
-            // Berikan warna biru ke menu yang diklik
-            item.classList.add('active');
-            
-            // Otomatis tutup sidebar setelah diklik (khusus di layar HP)
-            if(window.innerWidth < 768) toggleSidebar();
-            
-            // Ganti konten di tengah layar
-            renderKonten(item.getAttribute('data-target'));
-        });
+        item.onclick = () => {
+            const target = item.getAttribute('data-target');
+            toggleSidebar(false);
+            renderKonten(target);
+        };
     });
-
-    // Otomatis klik menu pertama saat baru masuk
-    if(document.querySelector('.menu-item')) {
-        document.querySelector('.menu-item').click();
-    }
 };
 
 const renderKonten = (target) => {
-    // Area ini nanti akan kita isi dengan Form Registrasi, Laporan, dll.
-    contentArea.innerHTML = `
-        <div class="card" style="animation: fadeIn 0.3s ease-in-out;">
-            <h3 style="color: var(--primary); margin-bottom: 10px;">Menu: ${target.replace(/_/g, ' ').toUpperCase()}</h3>
-            <p>Halaman ini sedang dalam tahap pengembangan. Nanti form dan datanya akan muncul di sini.</p>
-        </div>
-    `;
+    if (target === 'registrasi') {
+        const template = document.getElementById('template-registrasi');
+        contentArea.innerHTML = '';
+        contentArea.appendChild(template.content.cloneNode(true));
+        initFormRegistrasi();
+    } else {
+        contentArea.innerHTML = `<div class="card"><h3>Menu ${target.toUpperCase()}</h3><p>Halaman sedang dikembangkan.</p></div>`;
+    }
 };
 
 // ==========================================
-// 6. UTILITAS JARINGAN & LAINNYA
+// 5. LOGIKA FORM REGISTRASI (AUTO-FILTER)
 // ==========================================
+const initFormRegistrasi = async () => {
+    const session = window.currentUser;
+    const allWilayahTim = await getAllData('master_tim_wilayah');
+    const wilayahTugas = allWilayahTim.filter(w => w.id_tim === session.id_tim);
+
+    const selDesa = document.getElementById('reg-desa');
+    const selDusun = document.getElementById('reg-dusun');
+    const containerQ = document.getElementById('pertanyaan-dinamis');
+
+    // Load Desa
+    const daftarDesa = [...new Set(wilayahTugas.map(w => w.desa_kelurahan))];
+    selDesa.innerHTML = '<option value="">-- Pilih Desa --</option>' + 
+        daftarDesa.map(d => `<option value="${d}">${d}</option>`).join('');
+
+    selDesa.onchange = () => {
+        const dusunFiltered = wilayahTugas.filter(w => w.desa_kelurahan === selDesa.value);
+        selDusun.innerHTML = '<option value="">-- Pilih Dusun --</option>' + 
+            dusunFiltered.map(d => `<option value="${d.dusun_rw}">${d.dusun_rw}</option>`).join('');
+    };
+
+    // Load Pertanyaan Dinamis
+    const questions = await getAllData('master_pertanyaan');
+    containerQ.innerHTML = questions.sort((a,b) => a.urutan - b.urutan).map(q => {
+        if(q.is_active !== 'Y') return '';
+        let input = `<input type="text" name="${q.id_pertanyaan}" class="form-control" ${q.is_required === 'Y'?'required':''}>`;
+        if(q.tipe_input === 'SELECT'){
+            const opsi = JSON.parse(q.opsi_json || '[]');
+            input = `<select name="${q.id_pertanyaan}" class="form-control">${opsi.map(o=>`<option value="${o}">${o}</option>`).join('')}</select>`;
+        }
+        return `<div class="form-group"><label>${q.label_pertanyaan}</label>${input}</div>`;
+    }).join('');
+};
+
+// ==========================================
+// 6. UTILS
+// ==========================================
+const tampilkanLayar = (id) => {
+    viewLogin.classList.toggle('hidden', id !== 'login');
+    viewApp.classList.toggle('hidden', id !== 'app');
+};
+
+const toggleSidebar = (show) => {
+    sidebar.classList.toggle('active', show);
+    sidebarOverlay.classList.toggle('active', show);
+};
+
 const updateNetworkStatus = () => {
-    if (navigator.onLine) {
-        networkStatus.textContent = 'Online';
-        networkStatus.className = 'status-badge online';
-    } else {
-        networkStatus.textContent = 'Offline Mode';
-        networkStatus.className = 'status-badge offline';
-    }
+    const status = document.getElementById('network-status');
+    status.innerText = navigator.onLine ? 'Online' : 'Offline Mode';
+    status.className = 'status-badge ' + (navigator.onLine ? 'online' : 'offline');
 };
 
-// Fungsi Logout Global
 window.logout = async () => {
-    if (confirm("Yakin ingin keluar?")) {
+    if(confirm("Keluar?")) {
         await deleteData('kader_session', 'active_user');
-        window.location.reload(); // Refresh halaman agar bersih total
+        location.reload();
     }
 };
 
-// Fungsi Toggle Lihat Password Global
-window.togglePasswordVisibility = () => {
-    const pinInput = document.getElementById('kader-pin');
-    const toggleIcon = document.querySelector('.toggle-password');
-    if (pinInput.type === 'password') {
-        pinInput.type = 'text';
-        toggleIcon.textContent = '🙈'; // Ikon mata tertutup
-    } else {
-        pinInput.type = 'password';
-        toggleIcon.textContent = '👁️'; // Ikon mata terbuka
-    }
-};
+document.getElementById('btn-menu').onclick = () => toggleSidebar(true);
+sidebarOverlay.onclick = () => toggleSidebar(false);
 
-// Jalankan sistem saat file dimuat
 document.addEventListener('DOMContentLoaded', initApp);
