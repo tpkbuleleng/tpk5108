@@ -4,7 +4,7 @@ import { putBulkData, getAllData, deleteData } from './db.js';
 // 1. KONFIGURASI URL GOOGLE APPS SCRIPT
 // ==========================================
 // TODO: Nanti URL ini akan diganti dengan URL Web App dari Google Apps Script Anda.
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx8VEZDRS4enF1PuqAv4OhbE9By-1vvorWJEl-4t_grYIT_SFSXftvopynYLDaShmZ0UQ/exec'; 
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyythzEYRiCsJSW9IC_A93QoSFczo_96cvDS3zI6AhQZ_0b5VBlLs_8YGPzBZ_9z5Mq4g/exec'; 
 
 // ==========================================
 // 2. FUNGSI TARIK DATA MASTER (DOWNLOAD)
