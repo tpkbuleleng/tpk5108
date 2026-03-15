@@ -6,7 +6,7 @@ const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzEmmn0wMJmC1OHij9JU
 export const downloadMasterData = async () => {
     try {
         console.log("Memulai proses download Master Data...");
-        const fetchUrl = `${SCRIPT_URL}?action=getMaster`;
+        const fetchUrl = `${https://script.google.com/macros/s/AKfycbzEmmn0wMJmC1OHij9JUxm8EIT2xW1AuV0597EYCWDIxG_nkpZYBPx1EGiNYe6OjEHniw/exec}?action=getMaster`;
 
         // Menggunakan fetch paling standar tanpa header tambahan untuk menghindari preflight CORS
         const response = await fetch(fetchUrl);
