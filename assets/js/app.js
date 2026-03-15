@@ -340,3 +340,24 @@ window.logout = async () => {
 
 window.addEventListener('online', updateNetworkStatus);
 window.addEventListener('offline', updateNetworkStatus);
+
+// ==========================================
+// 6. KONTROL SIDEBAR (MENU SAMPING)
+// ==========================================
+const btnMenu = document.getElementById('btn-menu');
+const sidebar = document.getElementById('sidebar');
+const overlay = document.getElementById('sidebar-overlay');
+
+if (btnMenu && sidebar && overlay) {
+    // Membuka menu saat tombol ☰ diklik
+    btnMenu.addEventListener('click', () => {
+        sidebar.classList.add('active');
+        overlay.classList.add('active');
+    });
+
+    // Menutup menu saat area gelap (overlay) diklik
+    overlay.addEventListener('click', () => {
+        sidebar.classList.remove('active');
+        overlay.classList.remove('active');
+    });
+}
