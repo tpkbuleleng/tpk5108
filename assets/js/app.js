@@ -185,11 +185,16 @@ const renderKonten = async (target) => {
         if (temp) {
             area.innerHTML = '';
             area.appendChild(temp.content.cloneNode(true));
-            initFormRegistrasi(); // Panggil fungsi filter wilayah
+            
+            // Inisialisasi Wilayah
+            initFormRegistrasi();
+
+            // PASANG HANDLER SIMPAN (Penting!)
+            const formReg = getEl('form-registrasi');
+            if (formReg) {
+                formReg.onsubmit = simpanRegistrasi;
+            }
         }
-    } else {
-        area.innerHTML = `<div class="card" style="text-align:center; padding:40px;"><h3>Menu ${target.toUpperCase()}</h3><p>Halaman sedang disiapkan.</p></div>`;
-    }
 };
 
 const initFormRegistrasi = async () => {
@@ -229,7 +234,59 @@ const initFormRegistrasi = async () => {
 };
 
 // ==========================================
-// 4. LOGIN & LOGOUT
+// 4. LOGIKA SIMPAN LAPORAN KE HP
+// ==========================================
+const simpanRegistrasi = async (e) => {
+    e.preventDefault();
+    const btn = e.target.querySelector('button[type="submit"]');
+    btn.disabled = true;
+    btn.innerText = "Menyimpan...";
+
+    try {
+        const formData = new FormData(e.target);
+        const session = window.currentUser;
+        
+        // 1. Kumpulkan data dari form
+        const jawaban = {};
+        formData.forEach((value, key) => {
+            jawaban[key] = value;
+        });
+
+        // 2. Buat ID unik untuk laporan ini
+        const idLaporan = `REG-${Date.now()}-${session.username}`;
+
+        // 3. Susun objek laporan lengkap
+        const entriLaporan = {
+            id: idLaporan,
+            username: session.username,
+            nomor_tim: session.nomor_tim,
+            desa: getEl('reg-desa').value,
+            dusun: getEl('reg-dusun').value,
+            data_pertanyaan: jawaban,
+            status: 'PENDING', // Status belum sinkron
+            created_at: new Date().toISOString()
+        };
+
+        // 4. Simpan ke database lokal (IndexedDB)
+        await putData('sync_queue', entriLaporan);
+
+        alert("✅ BERHASIL! Data sasaran telah disimpan di HP. Jangan lupa klik menu SINKRONISASI jika sudah ada sinyal.");
+        
+        // Reset form dan kembali ke dashboard
+        e.target.reset();
+        renderKonten('dashboard');
+
+    } catch (err) {
+        console.error("Gagal simpan:", err);
+        alert("❌ Gagal menyimpan data: " + err.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerText = "💾 Simpan Laporan";
+    }
+};
+
+// ==========================================
+// 5. LOGIN & LOGOUT
 // ==========================================
 const fLogin = getEl('form-login');
 if (fLogin) {
