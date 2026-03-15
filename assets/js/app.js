@@ -304,36 +304,91 @@ const gantiPassword = (e) => {
 };
 
 // ==========================================
-// 5. LOGIN & LOGOUT
+// 5. LOGIN & LOGOUT (Tahan Banting)
 // ==========================================
-const fLogin = getEl('form-login');
-if (fLogin) {
-    fLogin.addEventListener('submit', async (e) => {
+const initLogin = () => {
+    const fLogin = getEl('form-login');
+    if (!fLogin) return;
+
+    // Menggunakan onsubmit untuk memastikan event tidak double
+    fLogin.onsubmit = async (e) => {
         e.preventDefault();
+        
+        const btn = getEl('btn-login-submit');
         const id = getEl('kader-id').value.trim();
         const pin = getEl('kader-pin').value.trim();
-        const user = await getDataById('master_user', id);
-        if (!user) return alert("ID salah!");
-        if ((user.password_awal_ref || "").toString() === pin) {
-            let nama = user.username, tim = '-', noTim = '-';
-            const k = await getDataById('master_kader', user.ref_id);
-            if (k) { 
-                nama = k.nama_kader; tim = k.id_tim; 
-                const t = await getDataById('master_tim', k.id_tim);
-                noTim = t ? t.nomor_tim : tim;
-            }
-            const ses = { id_kader: 'active_user', username: user.username, role: user.role_akses, nama, id_tim: tim, nomor_tim: noTim };
-            await putData('kader_session', ses);
-            masukKeAplikasi(ses);
-        } else alert("PIN salah!");
-    });
-}
 
-window.logout = async () => { if (confirm("Keluar dari aplikasi? Data yang belum sinkron akan tetap aman di perangkat.")) { await deleteData('kader_session', 'active_user'); location.reload(); }};
+        if (!id || !pin) return;
+
+        // Ubah tombol agar user tahu sistem sedang bekerja
+        if (btn) {
+            btn.disabled = true;
+            btn.innerText = "Memeriksa...";
+        }
+
+        try {
+            // Pastikan database siap
+            await initDB();
+
+            const user = await getDataById('master_user', id);
+            
+            if (!user) {
+                alert("ID Pengguna tidak ditemukan di perangkat ini! Jika ini login pertama kali, pastikan internet Anda menyala (Online).");
+                if (btn) { btn.disabled = false; btn.innerText = "Masuk"; }
+                return;
+            }
+
+            const pinBenar = user.password_awal_ref ? user.password_awal_ref.toString() : "";
+            
+            if (pinBenar === pin) {
+                let nama = user.username, tim = '-', noTim = '-';
+                
+                if (user.role_akses === 'KADER') {
+                    const k = await getDataById('master_kader', user.ref_id);
+                    if (k) { 
+                        nama = k.nama_kader; tim = k.id_tim; 
+                        const t = await getDataById('master_tim', k.id_tim);
+                        noTim = t ? t.nomor_tim : tim;
+                    }
+                }
+                
+                const ses = { id_kader: 'active_user', username: user.username, role: user.role_akses, nama, id_tim: tim, nomor_tim: noTim };
+                await putData('kader_session', ses);
+                
+                // Kosongkan form untuk user berikutnya
+                getEl('kader-id').value = '';
+                getEl('kader-pin').value = '';
+                if (btn) { btn.disabled = false; btn.innerText = "Masuk"; }
+                
+                // Masuk ke dashboard
+                masukKeAplikasi(ses);
+            } else { 
+                alert("PIN yang Anda masukkan salah!");
+                if (btn) { btn.disabled = false; btn.innerText = "Masuk"; }
+            }
+        } catch (err) {
+            console.error("Gagal Login:", err);
+            alert("Terjadi kesalahan sistem saat mencoba masuk.");
+            if (btn) { btn.disabled = false; btn.innerText = "Masuk"; }
+        }
+    };
+};
+
+window.logout = async () => { 
+    if (confirm("Yakin ingin keluar dari aplikasi? Data sasaran yang belum Anda sinkronkan akan tetap tersimpan aman di HP ini.")) { 
+        await deleteData('kader_session', 'active_user'); 
+        location.reload(); 
+    }
+};
+
 window.addEventListener('online', updateNetworkStatus);
 window.addEventListener('offline', updateNetworkStatus);
 
 if (getEl('btn-menu')) getEl('btn-menu').onclick = () => { getEl('sidebar').classList.add('active'); getEl('sidebar-overlay').classList.add('active'); };
 if (getEl('sidebar-overlay')) getEl('sidebar-overlay').onclick = () => { getEl('sidebar').classList.remove('active'); getEl('sidebar-overlay').classList.remove('active'); };
 
-document.addEventListener('DOMContentLoaded', initApp);
+// Jalankan semuanya saat halaman siap
+document.addEventListener('DOMContentLoaded', () => {
+    initApp();
+    initLogin();
+});
