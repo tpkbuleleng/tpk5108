@@ -54,10 +54,21 @@ const tampilkanLayar = (id) => {
     }
 };
 
-const masukKeAplikasi = (session) => {
+const masukKeAplikasi = async (session) => {
     window.currentUser = session;
     
-    if (getEl('user-greeting')) getEl('user-greeting').innerText = `Dashboard ${session.role}`;
+    // Ambil data wilayah untuk Header
+    const semuaTimWilayah = await getAllData('master_tim_wilayah') || [];
+    const wilayahKader = semuaTimWilayah.find(w => w.id_tim === session.id_tim);
+    const namaKecamatan = wilayahKader ? wilayahKader.kecamatan.toUpperCase() : "";
+
+    // 1. Update Header (Kecamatan Otomatis)
+    const greeting = getEl('user-greeting');
+    if (greeting) {
+        greeting.innerHTML = `DASHBOARD KADER KECAMATAN ${namaKecamatan}`;
+        greeting.style.fontSize = "0.9rem"; // Menjaga agar tetap muat di header
+    }
+
     if (getEl('sidebar-nama')) getEl('sidebar-nama').innerText = session.nama;
     if (getEl('sidebar-role')) getEl('sidebar-role').innerText = session.role;
     
@@ -104,7 +115,7 @@ const renderKonten = async (target) => {
     if (!area) return;
 
     if (target === 'dashboard') {
-        area.innerHTML = `<div style="padding:20px; text-align:center;">Memuat Dashboard...</div>`;
+        area.innerHTML = `<div style="padding:20px; text-align:center;">Memuat Data Wilayah...</div>`;
         
         const session = window.currentUser;
         const [allTimWil, antrean] = await Promise.all([
@@ -119,27 +130,42 @@ const renderKonten = async (target) => {
 
         area.innerHTML = `
             <div class="animate-fade">
-                <div class="card" style="background: linear-gradient(135deg, #0d6efd, #0043a8); color: white; border:none; margin-bottom: 20px; padding: 25px;">
-                    <p style="margin:0; opacity: 0.8; font-size: 0.9rem;">Selamat Datang,</p>
-                    <h2 style="margin: 5px 0; font-size: 1.5rem;">${session.nama}</h2>
-                    <p style="margin:0; font-size: 0.8rem; opacity: 0.7;">No. Tim: ${session.id_tim}</p>
-                    <hr style="margin: 15px 0; border:0; border-top:1px solid rgba(255,255,255,0.1);">
-                    <div style="font-size: 0.85rem; line-height: 1.6;">
-                        <div>📍 <b>Dusun:</b> ${daftarDusun}</div>
-                        <div>🏘️ <b>Desa:</b> ${desa}</div>
-                        <div>🏛️ <b>Kec:</b> ${kec}</div>
+                <div class="card" style="background: linear-gradient(135deg, #0d6efd, #0043a8); color: white; border:none; margin-bottom: 20px; padding: 30px; box-shadow: 0 10px 20px rgba(0,0,0,0.15);">
+                    <p style="margin:0; opacity: 0.9; font-size: 1.1rem; font-weight: 300;">Selamat Datang,</p>
+                    <h2 style="margin: 5px 0 15px 0; font-size: 2.2rem; font-weight: 800; letter-spacing: 1px;">${session.nama}</h2>
+                    
+                    <div style="background: rgba(255,255,255,0.15); display: inline-block; padding: 5px 15px; border-radius: 8px; font-weight: bold; font-size: 1.1rem; margin-bottom: 20px;">
+                        NO. TIM: ${session.id_tim}
+                    </div>
+
+                    <hr style="margin-bottom: 20px; border: 0; border-top: 1px solid rgba(255,255,255,0.2);">
+                    
+                    <div style="font-size: 1.15rem; line-height: 1.8;">
+                        <div style="display: flex; align-items: flex-start; margin-bottom: 8px;">
+                            <span style="min-width: 35px;">📍</span>
+                            <span><b>Dusun/RW:</b><br>${daftarDusun}</span>
+                        </div>
+                        <div style="display: flex; align-items: center; margin-bottom: 8px;">
+                            <span style="min-width: 35px;">🏘️</span>
+                            <span><b>Desa/Kelurahan:</b> ${desa}</span>
+                        </div>
+                        <div style="display: flex; align-items: center;">
+                            <span style="min-width: 35px;">🏛️</span>
+                            <span><b>Kecamatan:</b> ${kec}</span>
+                        </div>
                     </div>
                 </div>
+
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                    <div class="card" style="text-align:center;">
-                        <div style="font-size: 1.5rem;">📦</div>
-                        <h3>${antrean.length}</h3>
-                        <p style="font-size: 0.7rem; color: #666;">TERTUNDA</p>
+                    <div class="card" style="text-align:center; padding: 25px;">
+                        <div style="font-size: 2rem; margin-bottom: 10px;">📦</div>
+                        <h3 style="font-size: 1.8rem;">${antrean.length}</h3>
+                        <p style="font-size: 0.8rem; color: #666; font-weight: bold;">TERTUNDA</p>
                     </div>
-                    <div class="card" style="text-align:center; cursor:pointer;" onclick="renderKonten('registrasi')">
-                        <div style="font-size: 1.5rem;">➕</div>
-                        <h3>BARU</h3>
-                        <p style="font-size: 0.7rem; color: #666;">REGISTRASI</p>
+                    <div class="card" style="text-align:center; padding: 25px; cursor:pointer; background: #fff;" onclick="renderKonten('registrasi')">
+                        <div style="font-size: 2rem; margin-bottom: 10px;">➕</div>
+                        <h3 style="font-size: 1.8rem; color: var(--primary);">BARU</h3>
+                        <p style="font-size: 0.8rem; color: #666; font-weight: bold;">REGISTRASI</p>
                     </div>
                 </div>
             </div>`;
