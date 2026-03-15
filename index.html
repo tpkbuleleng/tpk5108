@@ -67,6 +67,12 @@
         <div class="card animate-fade">
             <h3 style="margin-bottom: 15px; color: var(--primary);">📝 Registrasi Sasaran Baru</h3>
             <form id="form-registrasi" class="modern-form">
+                
+                <div class="form-group">
+                    <label>Nama Sasaran</label>
+                    <input type="text" name="nama_sasaran" class="form-control" placeholder="Sesuai KTP" required>
+                </div>
+
                 <div class="form-group">
                     <label>Jenis Sasaran</label>
                     <select id="reg-jenis" name="jenis_sasaran" class="form-control" required>
@@ -77,11 +83,48 @@
                         <option value="BADUTA">BADUTA (Anak 0-23 Bulan)</option>
                     </select>
                 </div>
-                <div class="form-group"><label>Desa/Kelurahan</label><select id="reg-desa" name="desa" class="form-control" required></select></div>
-                <div class="form-group"><label>Dusun/RW</label><select id="reg-dusun" name="dusun" class="form-control" required></select></div>
-                <hr style="margin: 20px 0; border: 0; border-top: 1px solid #ddd;">
-                <div id="pertanyaan-dinamis"></div>
-                <button type="submit" class="btn-primary" style="margin-top: 15px; width: 100%;">💾 Simpan Registrasi</button>
+
+                <div class="form-group">
+                    <label>NIK (16 Digit Angka)</label>
+                    <input type="text" name="nik" class="form-control" maxlength="16" minlength="16" pattern="[0-9]{16}" oninput="this.value=this.value.replace(/[^0-9]/g,'');" placeholder="Contoh: 5108xxxxxxxxxxxx" required>
+                </div>
+
+                <div class="form-group">
+                    <label>No KK</label>
+                    <input type="text" name="no_kk" class="form-control" maxlength="16" minlength="16" pattern="[0-9]{16}" oninput="this.value=this.value.replace(/[^0-9]/g,'');" placeholder="Masukkan 16 digit No KK">
+                </div>
+
+                <div class="form-group">
+                    <label>Tanggal Lahir</label>
+                    <input type="date" name="tanggal_lahir" class="form-control" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Jenis Kelamin</label>
+                    <select name="jenis_kelamin" class="form-control" required>
+                        <option value="Perempuan">Perempuan</option>
+                        <option value="Laki-laki">Laki-laki</option>
+                    </select>
+                </div>
+
+                <div id="wilayah-catin" style="display: none; background: #fff3cd; padding: 15px; border-radius: 8px; margin-top: 15px; margin-bottom: 15px; border-left: 4px solid #ffc107;">
+                    <label style="color: #856404; font-weight: bold; margin-bottom: 10px; display: block;">📍 Alamat Asal (Khusus CATIN)</label>
+                    <div class="form-group"><label>Provinsi</label><input type="text" name="prov_asal" class="form-control" value="BALI"></div>
+                    <div class="form-group"><label>Kabupaten/Kota</label><input type="text" name="kab_asal" class="form-control" value="BULELENG"></div>
+                    <div class="form-group"><label>Kecamatan</label><input type="text" name="kec_asal" class="form-control" placeholder="Isi Kecamatan Asal"></div>
+                    <div class="form-group"><label>Desa / Dusun / RW</label><input type="text" name="desa_asal" class="form-control" placeholder="Isi Desa / Dusun Asal"></div>
+                </div>
+
+                <hr style="margin: 20px 0; border: 0; border-top: 2px dashed #eee;">
+                
+                <h4 style="margin-bottom: 15px; color: var(--primary);">Alamat Domisili</h4>
+                <div class="form-group"><label>Desa/Kelurahan Domisili</label><select id="reg-desa" name="desa" class="form-control" required></select></div>
+                <div class="form-group"><label>Dusun/RW Domisili</label><select id="reg-dusun" name="dusun" class="form-control" required></select></div>
+                <div class="form-group"><label>Alamat Lengkap</label><textarea name="alamat" class="form-control" rows="2" placeholder="Nama Jalan / Banjar" required></textarea></div>
+
+                <div id="pertanyaan-dinamis" style="margin-top: 20px;"></div>
+                
+                <button type="submit" class="btn-primary" style="margin-top: 20px; width: 100%;">💾 Simpan Registrasi</button>
             </form>
         </div>
     </template>
@@ -104,8 +147,7 @@
                         <option value="">-- Memuat Sasaran --</option>
                     </select>
                 </div>
-                <div id="form-pendampingan-dinamis">
-                    </div>
+                <div id="form-pendampingan-dinamis"></div>
                 <div class="form-group"><label>Tanggal Kunjungan</label><input type="date" name="tgl_kunjungan" class="form-control" required></div>
                 <div class="form-group"><label>Catatan Umum / Hasil</label><textarea name="catatan" class="form-control" rows="3" required></textarea></div>
                 <button type="submit" class="btn-primary" style="margin-top: 15px; width: 100%;">💾 Simpan Pendampingan</button>
