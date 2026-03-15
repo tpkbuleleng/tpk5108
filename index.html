@@ -14,8 +14,9 @@
     <main id="view-login" class="view-section active">
         <div class="login-container">
             <img src="assets/img/logo.png" alt="Logo TPK" class="app-logo" onerror="this.style.display='none'">
-            <h2>Masuk Kader</h2>
-            <p class="subtitle">Aplikasi Pelaporan TPK Buleleng</p>
+            
+            <h2 style="font-size: 1.5rem; line-height: 1.3;">Aplikasi Pencatatan dan Pelaporan</h2>
+            <h2 style="font-size: 1.5rem; margin-bottom: 2rem; color: var(--primary);">TPK Buleleng</h2>
             
             <form id="form-login" class="modern-form">
                 <div class="input-group">
@@ -24,7 +25,10 @@
                 </div>
                 <div class="input-group">
                     <label for="kader-pin">PIN / Password</label>
-                    <input type="password" id="kader-pin" required placeholder="••••••">
+                    <div class="password-wrapper">
+                        <input type="password" id="kader-pin" required placeholder="••••••">
+                        <span class="toggle-password" onclick="togglePasswordVisibility()" title="Lihat/Sembunyikan Password">👁️</span>
+                    </div>
                 </div>
                 <button type="submit" class="btn-primary">Masuk</button>
             </form>
