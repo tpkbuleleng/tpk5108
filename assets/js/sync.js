@@ -40,7 +40,7 @@ export const downloadMasterData = async () => {
         if (responseData.master_user) await putBulkData('master_user', bersihkanData(responseData.master_user));
         if (responseData.master_kader) await putBulkData('master_kader', bersihkanData(responseData.master_kader));
         if (responseData.master_wilayah) await putBulkData('master_wilayah', bersihkanData(responseData.master_wilayah));
-        if (responseData.master_tim_wilayah) await putBulkData('master_tim_wilayah', bersihkanData(responseData.master_tim_wilayah));
+        if (responseData.master_tim_wilayah) await putBulkData('master_tim_wilayah', bersihkanData(responseData.master_tim_wilayah)); // Sesuai tabel TIM_WILAYAH
         if (responseData.master_pertanyaan) await putBulkData('master_pertanyaan', bersihkanData(responseData.master_pertanyaan));
 
         console.log("✅ Master Data berhasil diunduh dan disimpan di HP!");
