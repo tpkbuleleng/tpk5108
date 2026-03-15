@@ -1,21 +1,33 @@
-// Konfigurasi Database
 const DB_NAME = 'TpkBulelengDB';
-const DB_VERSION = 2; // Naikkan versi karena kita tambah tabel baru
+const DB_VERSION = 3; // Naikkan versi ke 3
 
 let dbInstance = null;
 
 export const initDB = () => {
     return new Promise((resolve, reject) => {
-        if (dbInstance) {
-            resolve(dbInstance);
-            return;
-        }
+        if (dbInstance) return resolve(dbInstance);
 
         const request = indexedDB.open(DB_NAME, DB_VERSION);
 
-        request.onerror = (event) => {
-            console.error("Gagal membuka IndexedDB:", event.target.error);
-            reject(event.target.error);
+        request.onupgradeneeded = (event) => {
+            const db = event.target.result;
+            
+            // Hapus store lama jika ada untuk pembersihan struktur
+            const stores = [
+                { name: 'master_user', key: 'username' },
+                { name: 'master_kader', key: 'id_kader' },
+                { name: 'master_wilayah', key: 'id_wilayah' },
+                { name: 'master_tim_wilayah', key: 'id_tim_wilayah' },
+                { name: 'master_pertanyaan', key: 'id_pertanyaan' },
+                { name: 'kader_session', key: 'id_kader' },
+                { name: 'sync_queue', key: 'id' }
+            ];
+
+            stores.forEach(s => {
+                if (!db.objectStoreNames.contains(s.name)) {
+                    db.createObjectStore(s.name, { keyPath: s.key });
+                }
+            });
         };
 
         request.onsuccess = (event) => {
@@ -23,53 +35,37 @@ export const initDB = () => {
             resolve(dbInstance);
         };
 
-        request.onupgradeneeded = (event) => {
-            const db = event.target.result;
-
-            // --- TABEL DATA TRANSAKSI (INPUT KADER) ---
-            if (!db.objectStoreNames.contains('sasaran')) {
-                db.createObjectStore('sasaran', { keyPath: 'id_sasaran' });
-            }
-            if (!db.objectStoreNames.contains('laporan')) {
-                const laporanStore = db.createObjectStore('laporan', { keyPath: 'id_laporan', autoIncrement: true });
-                laporanStore.createIndex('id_sasaran', 'id_sasaran', { unique: false }); 
-            }
-            if (!db.objectStoreNames.contains('sync_queue')) {
-                db.createObjectStore('sync_queue', { keyPath: 'id', autoIncrement: true });
-            }
-            if (!db.objectStoreNames.contains('kader_session')) {
-                db.createObjectStore('kader_session', { keyPath: 'id_kader' });
-            }
-
-            // --- TABEL MASTER DATA (DARI GOOGLE SHEET) ---
-            if (!db.objectStoreNames.contains('master_user')) {
-                db.createObjectStore('master_user', { keyPath: 'username' });
-            }
-            if (!db.objectStoreNames.contains('master_kader')) {
-                db.createObjectStore('master_kader', { keyPath: 'id_kader' });
-            }
-            if (!db.objectStoreNames.contains('master_wilayah')) {
-                // Gunakan id_wilayah sebagai primary key
-                db.createObjectStore('master_wilayah', { keyPath: 'id_wilayah' });
-            }
-            if (!db.objectStoreNames.contains('master_tim_wilayah')) {
-                db.createObjectStore('master_tim_wilayah', { keyPath: 'id_tim_wilayah' });
-            }
-            if (!db.objectStoreNames.contains('master_pertanyaan')) {
-                db.createObjectStore('master_pertanyaan', { keyPath: 'id_pertanyaan' });
-            }
-        };
+        request.onerror = (event) => reject(event.target.error);
     });
 };
 
-// ... (Sisa fungsi putData, getAllData, deleteData, getDataById biarkan SAMA seperti sebelumnya) ...
-
+// Fungsi Helper Standar
 export const putData = async (storeName, data) => {
     const db = await initDB();
     return new Promise((resolve, reject) => {
-        const transaction = db.transaction(storeName, 'readwrite');
-        const store = transaction.objectStore(storeName);
-        const request = store.put(data);
+        const tx = db.transaction(storeName, 'readwrite');
+        tx.objectStore(storeName).put(data);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+    });
+};
+
+export const putBulkData = async (storeName, dataArray) => {
+    const db = await initDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(storeName, 'readwrite');
+        const store = tx.objectStore(storeName);
+        dataArray.forEach(item => store.put(item));
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+    });
+};
+
+export const getDataById = async (storeName, id) => {
+    const db = await initDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(storeName, 'readonly');
+        const request = tx.objectStore(storeName).get(id);
         request.onsuccess = () => resolve(request.result);
         request.onerror = () => reject(request.error);
     });
@@ -78,9 +74,8 @@ export const putData = async (storeName, data) => {
 export const getAllData = async (storeName) => {
     const db = await initDB();
     return new Promise((resolve, reject) => {
-        const transaction = db.transaction(storeName, 'readonly');
-        const store = transaction.objectStore(storeName);
-        const request = store.getAll();
+        const tx = db.transaction(storeName, 'readonly');
+        const request = tx.objectStore(storeName).getAll();
         request.onsuccess = () => resolve(request.result);
         request.onerror = () => reject(request.error);
     });
@@ -89,38 +84,8 @@ export const getAllData = async (storeName) => {
 export const deleteData = async (storeName, id) => {
     const db = await initDB();
     return new Promise((resolve, reject) => {
-        const transaction = db.transaction(storeName, 'readwrite');
-        const store = transaction.objectStore(storeName);
-        const request = store.delete(id);
-        request.onsuccess = () => resolve(true);
-        request.onerror = () => reject(request.error);
-    });
-};
-
-export const getDataById = async (storeName, id) => {
-    const db = await initDB();
-    return new Promise((resolve, reject) => {
-        const transaction = db.transaction(storeName, 'readonly');
-        const store = transaction.objectStore(storeName);
-        const request = store.get(id);
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-    });
-};
-
-/**
- * FUNGSI BARU: Untuk menyimpan banyak data sekaligus (Batch Insert)
- * Sangat berguna saat download Master Data dari Google Sheet
- */
-export const putBulkData = async (storeName, dataArray) => {
-    const db = await initDB();
-    return new Promise((resolve, reject) => {
-        const transaction = db.transaction(storeName, 'readwrite');
-        const store = transaction.objectStore(storeName);
-        
-        dataArray.forEach(data => store.put(data));
-
-        transaction.oncomplete = () => resolve(true);
-        transaction.onerror = () => reject(transaction.error);
+        const tx = db.transaction(storeName, 'readwrite');
+        tx.objectStore(storeName).delete(id);
+        tx.oncomplete = () => resolve();
     });
 };
