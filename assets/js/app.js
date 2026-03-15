@@ -198,16 +198,22 @@ const getKodeKecamatan = (kec) => {
     return map[kec.toUpperCase()] || "XXX";
 };
 
-const initFormRegistrasi = async () => {
+const const initFormRegistrasi = async () => {
     const session = window.currentUser;
     const allWil = await getAllData('master_tim_wilayah').catch(()=>[]);
+    // Memanggil data sheet WILAYAH_BALI
+    const allWilBali = await getAllData('master_wilayah_bali').catch(()=>[]); 
     const tugas = allWil.filter(w => w.id_tim === session.id_tim);
     
     const selJenis = getEl('reg-jenis');
+    const containerQ = getEl('pertanyaan-dinamis');
+    const boxCatin = getEl('wilayah-catin');
+    const boxDomisili = getEl('wilayah-domisili');
+
+    // 1. Setup Domisili
     const selDesa = getEl('reg-desa');
     const selDusun = getEl('reg-dusun');
-    const containerQ = getEl('pertanyaan-dinamis');
-    const boxCatin = getEl('wilayah-catin'); // Box Khusus CATIN
+    const regAlamat = getEl('reg-alamat');
 
     if (selDesa && tugas.length > 0) {
         const dDesa = [...new Set(tugas.map(w => w.desa_kelurahan))];
@@ -218,26 +224,68 @@ const initFormRegistrasi = async () => {
         };
     }
 
+    // 2. Setup Dropdown Bertingkat CATIN (Bali)
+    const catinKab = getEl('catin-kab');
+    const catinKec = getEl('catin-kec');
+    const catinDesa = getEl('catin-desa');
+
+    if (catinKab && allWilBali.length > 0) {
+        const dKab = [...new Set(allWilBali.map(w => w.kabupaten))].filter(Boolean);
+        catinKab.innerHTML = '<option value="">-- Pilih Kabupaten --</option>' + dKab.map(d => `<option value="${d}">${d}</option>`).join('');
+        
+        catinKab.onchange = () => {
+            const fKec = allWilBali.filter(w => w.kabupaten === catinKab.value);
+            const dKec = [...new Set(fKec.map(w => w.kecamatan))].filter(Boolean);
+            catinKec.innerHTML = '<option value="">-- Pilih Kecamatan --</option>' + dKec.map(d => `<option value="${d}">${d}</option>`).join('');
+            catinDesa.innerHTML = '<option value="">-- Pilih Desa --</option>'; 
+        };
+        
+        catinKec.onchange = () => {
+            const fDesa = allWilBali.filter(w => w.kabupaten === catinKab.value && w.kecamatan === catinKec.value);
+            const dDesa = [...new Set(fDesa.map(w => w.desa_kelurahan))].filter(Boolean);
+            catinDesa.innerHTML = '<option value="">-- Pilih Desa --</option>' + dDesa.map(d => `<option value="${d}">${d}</option>`).join('');
+        };
+    }
+
+    // 3. Logika Tampil / Sembunyi berdasarkan Jenis Sasaran
     const questions = await getAllData('master_pertanyaan').catch(()=>[]);
     if (selJenis && containerQ) {
         selJenis.onchange = () => {
             const jenis = selJenis.value;
             
-            // Logika Tampil Sembunyi Box CATIN
-            if(boxCatin) {
-                if (jenis === 'CATIN') {
-                    boxCatin.style.display = 'block';
-                } else {
-                    boxCatin.style.display = 'none';
-                }
+            // Atur Tampilan Wilayah
+            if (jenis === 'CATIN') {
+                if(boxCatin) boxCatin.style.display = 'block';
+                if(boxDomisili) boxDomisili.style.display = 'none';
+                
+                // Matikan "Wajib Isi" Domisili agar form bisa disimpan
+                if(selDesa) selDesa.removeAttribute('required');
+                if(selDusun) selDusun.removeAttribute('required');
+                if(regAlamat) regAlamat.removeAttribute('required');
+
+                // Nyalakan "Wajib Isi" Alamat Asal
+                if(catinKab) catinKab.setAttribute('required', 'true');
+                if(catinKec) catinKec.setAttribute('required', 'true');
+                if(catinDesa) catinDesa.setAttribute('required', 'true');
+            } else {
+                if(boxCatin) boxCatin.style.display = 'none';
+                if(boxDomisili) boxDomisili.style.display = 'block';
+
+                // Nyalakan kembali "Wajib Isi" Domisili
+                if(selDesa) selDesa.setAttribute('required', 'true');
+                if(selDusun) selDusun.setAttribute('required', 'true');
+                if(regAlamat) regAlamat.setAttribute('required', 'true');
+
+                // Matikan "Wajib Isi" Alamat Asal
+                if(catinKab) catinKab.removeAttribute('required');
+                if(catinKec) catinKec.removeAttribute('required');
+                if(catinDesa) catinDesa.removeAttribute('required');
             }
 
             if (!jenis) { containerQ.innerHTML = ''; return; }
             
-            // Pertanyaan Dinamis
+            // Tampilkan Pertanyaan Dinamis
             const filteredQ = questions.filter(q => q.is_active === 'Y' && (q.kategori_sasaran === 'UMUM' || q.kategori_sasaran === jenis)).sort((a,b)=>a.urutan - b.urutan);
-            
-            // Jika ada pertanyaan tambahan dari sheet, tampilkan
             if (filteredQ.length > 0) {
                 containerQ.innerHTML = `<h4 style="margin-bottom:10px; color:var(--primary);">Pertanyaan Khusus ${jenis}</h4>` + 
                     filteredQ.map(q => `
@@ -250,6 +298,57 @@ const initFormRegistrasi = async () => {
             }
         };
     }
+
+    // 4. Proses Simpan
+    const formReg = getEl('form-registrasi');
+    if (formReg) {
+        formReg.onsubmit = async (e) => {
+            e.preventDefault();
+            const btn = e.target.querySelector('button'); btn.disabled = true; btn.innerText = "Menyimpan...";
+            try {
+                const formData = new FormData(e.target);
+                const jawaban = {}; formData.forEach((val, key) => { jawaban[key] = val; });
+                
+                const kecamatan = tugas.length > 0 ? tugas[0].kecamatan : 'TIDAK_DIKETAHUI';
+                const jenisSasaran = selJenis.value;
+                
+                // Pembuatan ID Unik
+                let prefix = "REG";
+                if (jenisSasaran === 'CATIN') prefix = "CTN";
+                else if (jenisSasaran === 'BUMIL') prefix = "BML";
+                else if (jenisSasaran === 'BUFAS') prefix = "BFS";
+                else if (jenisSasaran === 'BADUTA') prefix = "BDT";
+                
+                const kodeKec = getKodeKecamatan(kecamatan);
+                const angkaUnik = Math.floor(Math.random() * 1000000).toString().padStart(6, '0');
+                const idSasaran = `${prefix}-${kodeKec}-${angkaUnik}`;
+                
+                // Jika CATIN, kosongkan data desa/dusun domisili agar rapi di laporan
+                const desaFinal = jenisSasaran === 'CATIN' ? '-' : selDesa.value;
+                const dusunFinal = jenisSasaran === 'CATIN' ? '-' : selDusun.value;
+
+                const laporan = {
+                    id: idSasaran,
+                    tipe_laporan: 'REGISTRASI', 
+                    username: session.username, 
+                    id_tim: session.id_tim, 
+                    nomor_tim: session.nomor_tim,
+                    kecamatan: kecamatan, 
+                    jenis_sasaran: jenisSasaran, 
+                    nama_sasaran: jawaban.nama_sasaran, 
+                    desa: desaFinal, 
+                    dusun: dusunFinal,
+                    data_laporan: jawaban, 
+                    created_at: new Date().toISOString()
+                };
+                
+                await putData('sync_queue', laporan);
+                alert(`✅ Registrasi berhasil! ID Sasaran: ${idSasaran}`);
+                renderKonten('dashboard');
+            } catch (err) { alert("Gagal menyimpan form."); } finally { btn.disabled = false; btn.innerText = "💾 Simpan Registrasi"; }
+        };
+    }
+};
 
     const formReg = getEl('form-registrasi');
     if (formReg) {
