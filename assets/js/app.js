@@ -4,42 +4,14 @@ import { downloadMasterData } from './sync.js';
 const getEl = (id) => document.getElementById(id);
 
 // ==========================================
-// 1. INISIALISASI APLIKASI
-// ==========================================
-const initApp = async () => {
-    // Pengaman: Jika 3 detik macet, paksa masuk ke login/app
-    const failsafe = setTimeout(() => tampilkanLayar('login'), 3000);
-
-    try {
-        await initDB();
-        const session = await getDataById('kader_session', 'active_user');
-        
-        clearTimeout(failsafe);
-        if (session) {
-            masukKeAplikasi(session);
-        } else {
-            tampilkanLayar('login');
-        }
-
-        // Cek data master di background
-        const users = await getAllData('master_user');
-        if (users.length === 0 && navigator.onLine) {
-            await downloadMasterData();
-        }
-    } catch (err) {
-        console.error("Gagal init:", err);
-        tampilkanLayar('login');
-    }
-};
-
-// ==========================================
-// 2. NAVIGASI LAYAR
+// 1. NAVIGASI LAYAR (SANGAT KRUSIAL)
 // ==========================================
 const tampilkanLayar = (id) => {
     const vSplash = getEl('view-splash');
     const vLogin = getEl('view-login');
     const vApp = getEl('view-app');
 
+    // Paksa hapus splash screen
     if (vSplash) {
         vSplash.classList.remove('active');
         vSplash.style.display = 'none';
@@ -54,27 +26,47 @@ const tampilkanLayar = (id) => {
     }
 };
 
+// ==========================================
+// 2. INISIALISASI APLIKASI
+// ==========================================
+const initApp = async () => {
+    // FAILSAFE: Jika 3 detik macet, paksa masuk ke login
+    const logoTimeout = setTimeout(() => tampilkanLayar('login'), 3500);
+
+    try {
+        await initDB();
+        const session = await getDataById('kader_session', 'active_user');
+
+        if (session) {
+            clearTimeout(logoTimeout);
+            masukKeAplikasi(session);
+        } else {
+            clearTimeout(logoTimeout);
+            tampilkanLayar('login');
+            
+            // Cek Master Data di background
+            const users = await getAllData('master_user');
+            if (users.length === 0 && navigator.onLine) {
+                await downloadMasterData();
+            }
+        }
+    } catch (err) {
+        console.error("Gagal init:", err);
+        tampilkanLayar('login');
+    }
+};
+
 const masukKeAplikasi = async (session) => {
     window.currentUser = session;
     
-    // 1. Ambil data Wilayah & Tim untuk detail Dashboard
-    const [allTimWil, allMasterTim] = await Promise.all([
-        getAllData('master_tim_wilayah'),
-        getAllData('master_tim') // Mengambil data dari MASTER_TIM
-    ]);
-
-    const wilayahKader = allTimWil.find(w => w.id_tim === session.id_tim);
-    const detailTim = allMasterTim.find(t => t.id_tim === session.id_tim);
-    
+    // Ambil detail Kecamatan dari data wilayah
+    const semuaTimWilayah = await getAllData('master_tim_wilayah') || [];
+    const wilayahKader = semuaTimWilayah.find(w => w.id_tim === session.id_tim);
     const namaKecamatan = wilayahKader ? wilayahKader.kecamatan.toUpperCase() : "";
-    // Ambil nomor_tim dari sheet MASTER_TIM
-    window.currentUser.nomor_tim = detailTim ? detailTim.nomor_tim : session.id_tim;
 
-    // 2. Update Header
+    // Set Header
     const greeting = getEl('user-greeting');
-    if (greeting) {
-        greeting.innerHTML = `DASHBOARD KADER KECAMATAN ${namaKecamatan}`;
-    }
+    if (greeting) greeting.innerHTML = `DASHBOARD KADER KECAMATAN ${namaKecamatan}`;
 
     if (getEl('sidebar-nama')) getEl('sidebar-nama').innerText = session.nama;
     if (getEl('sidebar-role')) getEl('sidebar-role').innerText = session.role;
@@ -85,7 +77,7 @@ const masukKeAplikasi = async (session) => {
 };
 
 // ==========================================
-// 3. MENU & KONTEN (DASHBOARD LENGKAP)
+// 3. MENU & KONTEN (ROLE KADER LENGKAP)
 // ==========================================
 const renderMenu = (role) => {
     const container = getEl('dynamic-menu-container');
@@ -103,15 +95,13 @@ const renderMenu = (role) => {
             { id: 'cetak_pdf', icon: '🖨️', label: 'Cetak PDF' },
             { id: 'ganti_pass', icon: '🔑', label: 'Ganti Password' }
         ];
-    } else {
-        menus = [{ id: 'dashboard', icon: '🏠', label: 'Dashboard' }];
     }
 
     container.innerHTML = menus.map(m => `
         <a class="menu-item" data-target="${m.id}">
             <span class="icon">${m.icon}</span> ${m.label}
         </a>
-    `).join('') + `<hr><a class="menu-item text-danger" id="btnLogoutSide">🚪 Keluar</a>`;
+    `).join('') + `<hr><a class="menu-item text-danger" id="btnLogout">🚪 Keluar</a>`;
 
     document.querySelectorAll('.menu-item[data-target]').forEach(item => {
         item.onclick = () => {
@@ -120,7 +110,7 @@ const renderMenu = (role) => {
             renderKonten(item.getAttribute('data-target'));
         };
     });
-    if (getEl('btnLogoutSide')) getEl('btnLogoutSide').onclick = window.logout;
+    if (getEl('btnLogout')) getEl('btnLogout').onclick = window.logout;
 };
 
 const renderKonten = async (target) => {
@@ -128,95 +118,59 @@ const renderKonten = async (target) => {
     if (!area) return;
 
     if (target === 'dashboard') {
+        area.innerHTML = `<div style="padding:20px; text-align:center;">Memuat Dashboard...</div>`;
         const session = window.currentUser;
-        const [allTimWil, antrean] = await Promise.all([
+        
+        // Ambil data untuk Dashboard secara paralel
+        const [allWil, allTim, antrean] = await Promise.all([
             getAllData('master_tim_wilayah'),
+            getAllData('master_tim'),
             getAllData('sync_queue')
         ]);
 
-        const wilayahKerja = allTimWil.filter(w => w.id_tim === session.id_tim);
+        const wilayahKerja = allWil.filter(w => w.id_tim === session.id_tim);
+        const detailTim = allTim.find(t => t.id_tim === session.id_tim);
+        
+        const noTim = detailTim ? detailTim.nomor_tim : session.id_tim;
         const daftarDusun = wilayahKerja.map(w => w.dusun_rw).join(', ') || '-';
         const desa = wilayahKerja.length > 0 ? wilayahKerja[0].desa_kelurahan : '-';
         const kec = wilayahKerja.length > 0 ? wilayahKerja[0].kecamatan : '-';
 
         area.innerHTML = `
             <div class="animate-fade">
-                <div class="card" style="background: linear-gradient(135deg, #0d6efd, #0043a8); color: white; border:none; margin-bottom: 20px; padding: 25px; box-shadow: 0 8px 16px rgba(0,0,0,0.1);">
+                <div class="card" style="background: linear-gradient(135deg, #0d6efd, #0043a8); color: white; border:none; margin-bottom: 20px; padding: 25px;">
                     <p style="margin:0; opacity: 0.9; font-size: 1rem; font-weight: 800;">SELAMAT DATANG,</p>
                     <h2 style="margin: 5px 0 15px 0; font-size: 1.6rem; font-weight: 700;">${session.nama}</h2>
-                    
                     <div style="background: rgba(255,255,255,0.2); display: inline-block; padding: 4px 12px; border-radius: 6px; font-weight: bold; font-size: 0.9rem; margin-bottom: 20px;">
-                        NO. TIM: ${session.nomor_tim}
+                        NO. TIM: ${noTim}
                     </div>
-
                     <hr style="margin-bottom: 20px; border: 0; border-top: 1px solid rgba(255,255,255,0.2);">
-                    
                     <div style="font-size: 1.1rem; line-height: 1.7;">
-                        <div style="margin-bottom: 8px;">
-                            📍 <b>Dusun/RW:</b><br><span style="font-size: 1rem; opacity: 0.9;">${daftarDusun}</span>
-                        </div>
-                        <div style="margin-bottom: 8px;">
-                            🏘️ <b>Desa/Kelurahan:</b> ${desa}
-                        </div>
-                        <div>
-                            🏛️ <b>Kecamatan:</b> ${kec}
-                        </div>
+                        <div style="margin-bottom: 8px;">📍 <b>Dusun/RW:</b><br><span style="font-size: 1rem; opacity: 0.9;">${daftarDusun}</span></div>
+                        <div style="margin-bottom: 8px;">🏘️ <b>Desa/Kelurahan:</b> ${desa}</div>
+                        <div>🏛️ <b>Kecamatan:</b> ${kec}</div>
                     </div>
                 </div>
-
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
                     <div class="card" style="text-align:center; padding: 20px;">
                         <div style="font-size: 1.8rem; margin-bottom: 5px;">📦</div>
-                        <h3 style="font-size: 1.5rem;">${antrean.length}</h3>
+                        <h3>${antrean.length}</h3>
                         <p style="font-size: 0.75rem; color: #666; font-weight: bold;">TERTUNDA</p>
                     </div>
                     <div class="card" style="text-align:center; padding: 20px; cursor:pointer;" onclick="renderKonten('registrasi')">
                         <div style="font-size: 1.8rem; margin-bottom: 5px;">📝</div>
-                        <h3 style="font-size: 1.5rem; color: var(--primary);">BARU</h3>
+                        <h3 style="color:var(--primary);">BARU</h3>
                         <p style="font-size: 0.75rem; color: #666; font-weight: bold;">REGISTRASI</p>
                     </div>
                 </div>
             </div>`;
     } else {
-        area.innerHTML = `<div class="card"><h3>Menu ${target.replace(/_/g, ' ').toUpperCase()}</h3><p>Halaman ini sedang dalam pengembangan.</p></div>`;
+        area.innerHTML = `<div class="card"><h3>Menu ${target.toUpperCase()}</h3><p>Sedang dikembangkan.</p></div>`;
     }
 };
 
 // ==========================================
-// 4. FORM REGISTRASI
-// ==========================================
-const initFormRegistrasi = async () => {
-    const session = window.currentUser;
-    const allWil = await getAllData('master_tim_wilayah');
-    const tugas = allWil.filter(w => w.id_tim === session.id_tim);
-
-    const selDesa = getEl('reg-desa');
-    const selDusun = getEl('reg-dusun');
-    
-    if (selDesa) {
-        const daftarDesa = [...new Set(tugas.map(w => w.desa_kelurahan))];
-        selDesa.innerHTML = '<option value="">-- Pilih Desa --</option>' + 
-            daftarDesa.map(d => `<option value="${d}">${d}</option>`).join('');
-
-        selDesa.onchange = () => {
-            const dusunFiltered = tugas.filter(w => w.desa_kelurahan === selDesa.value);
-            selDusun.innerHTML = '<option value="">-- Pilih Dusun --</option>' + 
-                dusunFiltered.map(d => `<option value="${d.dusun_rw}">${d.dusun_rw}</option>`).join('');
-        };
-    }
-
-    const q = await getAllData('master_pertanyaan');
-    const containerQ = getEl('pertanyaan-dinamis');
-    if (containerQ) {
-        containerQ.innerHTML = q.sort((a,b) => a.urutan - b.urutan).map(item => {
-            if(item.is_active !== 'Y') return '';
-            return `<div class="form-group"><label>${item.label_pertanyaan}</label><input type="text" name="${item.id_pertanyaan}" class="form-control"></div>`;
-        }).join('');
-    }
-};
-
-// ==========================================
-// 5. LOGIN, LOGOUT & SIDEBAR
+// 4. LOGIN & LOGOUT
 // ==========================================
 const fLogin = getEl('form-login');
 if (fLogin) {
@@ -226,7 +180,7 @@ if (fLogin) {
         const pin = getEl('kader-pin').value.trim();
         const user = await getDataById('master_user', id);
         
-        if (!user) return alert("ID tidak ditemukan!");
+        if (!user) return alert("ID tidak terdaftar!");
         const pBenar = user.password_awal_ref ? user.password_awal_ref.toString() : "";
         
         if (pBenar === pin) {
@@ -243,9 +197,13 @@ if (fLogin) {
 }
 
 window.logout = async () => {
-    if (confirm("Keluar?")) { await deleteData('kader_session', 'active_user'); location.reload(); }
+    if (confirm("Keluar dari aplikasi?")) {
+        await deleteData('kader_session', 'active_user');
+        location.reload();
+    }
 };
 
+// Sidebar Events
 if (getEl('btn-menu')) getEl('btn-menu').onclick = () => { getEl('sidebar').classList.add('active'); getEl('sidebar-overlay').classList.add('active'); };
 if (getEl('sidebar-overlay')) getEl('sidebar-overlay').onclick = () => { getEl('sidebar').classList.remove('active'); getEl('sidebar-overlay').classList.remove('active'); };
 
