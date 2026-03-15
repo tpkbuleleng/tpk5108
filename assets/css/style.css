@@ -1,127 +1,181 @@
-/* --- Variabel Tema Dasar --- */
 :root {
     --primary: #0d6efd;
-    --primary-hover: #0b5ed7;
-    --bg-color: #f8f9fa;
-    --surface: #ffffff;
-    --text-main: #212529;
-    --text-muted: #6c757d;
-    --border: #dee2e6;
-    --radius: 12px;
-    --shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+    --primary-dark: #0a58ca;
+    --success: #198754;
+    --danger: #dc3545;
+    --light: #f8f9fa;
+    --dark: #212529;
+    --gray: #6c757d;
+    --white: #ffffff;
+    --shadow: 0 4px 6px rgba(0,0,0,0.1);
 }
 
-/* --- Reset & Base --- */
-* { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-body { background-color: var(--bg-color); color: var(--text-main); -webkit-font-smoothing: antialiased; }
-
-/* --- Sistem View (SPA) --- */
-.view-section { display: none; height: 100vh; width: 100vw; flex-direction: column; }
-.view-section.active { display: flex; animation: fadeIn 0.3s ease-in-out; }
-@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-
-/* --- Login Screen --- */
-.login-container { margin: auto; padding: 2.5rem 2rem; width: 100%; max-width: 480px; text-align: center; }
-
-/* Mengamankan logo: ukuran diperbesar sedikit, object-fit diubah ke contain agar tidak terpotong */
-.app-logo { width: 110px; height: 110px; border-radius: 50%; margin-bottom: 1.5rem; object-fit: contain; background: transparent; }
-.login-container h2 { font-size: 1.8rem; margin-bottom: 0.5rem; }
-.subtitle { color: var(--text-muted); margin-bottom: 2.5rem; font-size: 1.05rem; }
-
-/* --- Forms Modern --- */
-.modern-form { text-align: left; }
-.input-group { margin-bottom: 1.5rem; }
-.input-group label { display: block; margin-bottom: 0.6rem; font-weight: 600; font-size: 1rem; }
-
-/* Memperbesar area ketik (padding) dan ukuran huruf di dalam input */
-.input-group input { width: 100%; padding: 1rem 1.2rem; border: 1.5px solid var(--border); border-radius: var(--radius); font-size: 1.1rem; transition: border 0.2s; }
-.input-group input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 4px rgba(13, 110, 253, 0.2); }
-
-/* --- Buttons --- */
-/* Memperbesar tombol secara proporsional */
-button { border: none; cursor: pointer; border-radius: var(--radius); font-weight: 600; font-size: 1.1rem; padding: 1rem 1.5rem; transition: all 0.2s; }
-.btn-primary { width: 100%; background: var(--primary); color: white; }
-.btn-primary:active { background: var(--primary-hover); transform: scale(0.98); }
-.btn-secondary { background: #e9ecef; color: var(--text-main); width: 100%; }
-
-/* --- Forms Modern --- */
-.modern-form { text-align: left; }
-.input-group { margin-bottom: 1.2rem; }
-.input-group label { display: block; margin-bottom: 0.5rem; font-weight: 500; font-size: 0.9rem; }
-.input-group input { width: 100%; padding: 0.8rem 1rem; border: 1px solid var(--border); border-radius: var(--radius); font-size: 1rem; transition: border 0.2s; }
-.input-group input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.25); }
-
-/* --- Buttons --- */
-button { border: none; cursor: pointer; border-radius: var(--radius); font-weight: 600; font-size: 1rem; padding: 0.8rem 1.5rem; transition: all 0.2s; }
-.btn-primary { width: 100%; background: var(--primary); color: white; }
-.btn-primary:active { background: var(--primary-hover); transform: scale(0.98); }
-.btn-secondary { background: #e9ecef; color: var(--text-main); width: 100%; }
-
-/* --- App Layout (Header, Content, Bottom Nav) --- */
-.app-header { background: var(--primary); color: white; padding: 1rem; display: flex; justify-content: space-between; align-items: center; border-bottom-left-radius: var(--radius); border-bottom-right-radius: var(--radius); box-shadow: var(--shadow); z-index: 10; }
-.app-header h1 { font-size: 1.2rem; margin-bottom: 4px; }
-.status-badge { font-size: 0.75rem; padding: 2px 8px; border-radius: 20px; font-weight: bold; }
-.status-badge.offline { background: #ffc107; color: #000; }
-.status-badge.online { background: #198754; color: #fff; }
-
-.content-scroll { flex: 1; overflow-y: auto; padding: 1rem; padding-bottom: 80px; /* Space for bottom nav */ }
-
-.card { background: var(--surface); padding: 1.5rem; border-radius: var(--radius); box-shadow: var(--shadow); margin-bottom: 1rem; text-align: center; }
-.big-number { font-size: 2.5rem; font-weight: 800; color: var(--primary); margin: 0.5rem 0; }
-
-/* --- Bottom Navigation --- */
-.bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: var(--surface); display: flex; justify-content: space-around; padding: 0.5rem 0; box-shadow: 0 -2px 10px rgba(0,0,0,0.05); border-top-left-radius: 20px; border-top-right-radius: 20px; }
-.nav-item { background: transparent; color: var(--text-muted); padding: 0.5rem; display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 0.75rem; }
-.nav-item.active { color: var(--primary); }
-.nav-item .icon { font-size: 1.2rem; }
-
-/* --- Styling Khusus Toggle Password --- */
-.password-wrapper {
-    position: relative;
-    display: flex;
-    align-items: center;
+/* 1. RESET DASAR - Menghilangkan sela/margin putih di pinggir */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 }
-.password-wrapper input {
+
+html, body {
+    height: 100%;
     width: 100%;
-    padding-right: 3rem; /* Memberi ruang di kanan agar ketikan tidak menabrak ikon */
-}
-.toggle-password {
-    position: absolute;
-    right: 15px;
-    cursor: pointer;
-    font-size: 1.2rem;
-    user-select: none;
-    transition: transform 0.2s;
-}
-.toggle-password:active {
-    transform: scale(0.8);
+    overflow: hidden; /* Mencegah scroll double */
+    background-color: var(--light);
 }
 
-/* --- Splash Screen --- */
-.splash-container { justify-content: center; align-items: center; background-color: var(--primary); color: white; text-align: center; }
+/* 2. SISTEM LAYAR (VIEW MANAGEMENT) */
+.view-section {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    z-index: 10;
+}
 
-/* PERUBAHAN DI SINI: background diubah ke transparent, hapus padding dan border-radius */
-.splash-logo { width: 140px; height: 140px; object-fit: contain; animation: pulse 1.5s infinite alternate; margin-bottom: 20px; background: transparent; padding: 0; }
+.hidden {
+    display: none !important;
+}
 
-.splash-container h2 { font-size: 1.5rem; font-weight: bold; letter-spacing: 1px; }
-.loader { border: 4px solid rgba(255, 255, 255, 0.3); border-top: 4px solid white; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 30px auto; }
+/* 3. SPLASH SCREEN - Full Blue */
+.splash-container {
+    background: var(--primary);
+    color: white;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+}
 
-@keyframes pulse { from { transform: scale(1); } to { transform: scale(1.1); } }
-@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+.splash-logo { width: 100px; margin-bottom: 20px; }
 
-/* --- Sidebar (Hamburger Menu) --- */
-.sidebar-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 99; display: none; opacity: 0; transition: opacity 0.3s; }
-.sidebar-overlay.active { display: block; opacity: 1; }
+/* 4. LAYAR LOGIN - Tengah & Rapih */
+#view-login {
+    background: #e9ecef;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+}
 
-.sidebar { position: fixed; top: 0; left: -280px; width: 280px; height: 100vh; background: var(--surface); z-index: 100; box-shadow: 2px 0 10px rgba(0,0,0,0.1); transition: left 0.3s ease-in-out; display: flex; flex-direction: column; overflow-y: auto; }
+.login-container {
+    background: var(--white);
+    padding: 30px;
+    border-radius: 15px;
+    box-shadow: var(--shadow);
+    width: 100%;
+    max-width: 400px;
+    text-align: center;
+}
+
+.app-logo { width: 80px; margin-bottom: 15px; }
+
+/* 5. APP LAYOUT (Setelah Login) */
+.app-header {
+    background: var(--primary);
+    color: white;
+    padding: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: var(--shadow);
+    height: 65px;
+}
+
+.content-scroll {
+    flex: 1; /* Mengambil sisa ruang layar */
+    overflow-y: auto; /* Scroll hanya di area konten */
+    padding: 20px;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* 6. SIDEBAR - Menutup layar saat dibuka di HP */
+.sidebar {
+    position: fixed;
+    top: 0; left: -280px;
+    width: 280px;
+    height: 100%;
+    background: var(--white);
+    z-index: 2000;
+    transition: 0.3s ease;
+    box-shadow: 4px 0 10px rgba(0,0,0,0.1);
+}
+
 .sidebar.active { left: 0; }
 
-.sidebar-header { background: var(--primary); color: white; padding: 2rem 1.5rem 1.5rem; display: flex; align-items: center; gap: 15px; }
-.sidebar-logo { width: 50px; height: 50px; border-radius: 50%; background: white; padding: 5px; object-fit: contain; }
-.sidebar-user h3 { font-size: 1.1rem; margin: 0; }
-.sidebar-user p { font-size: 0.8rem; margin: 0; opacity: 0.8; text-transform: uppercase; letter-spacing: 0.5px; }
+.sidebar-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 1500;
+    display: none;
+}
 
-.sidebar-nav { padding: 1rem 0; display: flex; flex-direction: column; gap: 5px; }
-.menu-item { padding: 12px 20px; display: flex; align-items: center; gap: 15px; color: var(--text-main); text-decoration: none; font-weight: 500; font-size: 1rem; border-left: 4px solid transparent; cursor: pointer; transition: all 0.2s; }
-.menu-item:hover, .menu-item.active { background: rgba(13, 110, 253, 0.08); color: var(--primary); border-left-color: var(--primary); }
-.menu-item .icon { font-size: 1.2rem; }
+.sidebar-overlay.active { display: block; }
+
+.sidebar-header {
+    background: var(--primary);
+    color: white;
+    padding: 20px;
+}
+
+.menu-item {
+    display: block;
+    padding: 15px 20px;
+    text-decoration: none;
+    color: var(--dark);
+    border-bottom: 1px solid #eee;
+    cursor: pointer;
+}
+
+.menu-item:hover { background: #f0f4ff; }
+.text-danger { color: var(--danger) !important; }
+
+/* 7. FORM & CARD */
+.card {
+    background: var(--white);
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.form-group { margin-bottom: 15px; text-align: left; }
+.form-group label { display: block; margin-bottom: 5px; font-weight: 600; font-size: 0.9rem; }
+
+.form-control {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ced4da;
+    border-radius: 8px;
+    font-size: 1rem;
+}
+
+.btn-primary {
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-weight: bold;
+    width: 100%;
+    cursor: pointer;
+}
+
+.btn-primary:active { background: var(--primary-dark); }
+
+/* Status Badge */
+.status-badge {
+    padding: 2px 8px;
+    border-radius: 10px;
+    color: white;
+}
+.online { background: var(--success); }
+.offline { background: var(--gray); }
+
+/* Animasi */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
