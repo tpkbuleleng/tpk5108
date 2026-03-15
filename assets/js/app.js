@@ -267,3 +267,27 @@ if (getEl('btn-menu')) getEl('btn-menu').onclick = () => { getEl('sidebar').clas
 if (getEl('sidebar-overlay')) getEl('sidebar-overlay').onclick = () => { getEl('sidebar').classList.remove('active'); getEl('sidebar-overlay').classList.remove('active'); };
 
 document.addEventListener('DOMContentLoaded', initApp);
+
+// ==========================================
+// 6. FUNGSI DETEKSI KONEKSI (Baru)
+// ==========================================
+const updateNetworkStatus = () => {
+    const status = getEl('network-status');
+    if (status) {
+        const isOnline = navigator.onLine;
+        status.innerText = isOnline ? 'Online' : 'Offline';
+        
+        // Ganti warna background status: Hijau jika Online, Abu-abu jika Offline
+        status.style.backgroundColor = isOnline ? '#198754' : '#6c757d';
+        status.style.color = 'white';
+        
+        console.log("Status Koneksi:", isOnline ? "Tersambung" : "Terputus");
+    }
+};
+
+// Pasang pendeteksi otomatis agar status berubah saat sinyal HP naik/turun
+window.addEventListener('online', updateNetworkStatus);
+window.addEventListener('offline', updateNetworkStatus);
+
+// Panggil fungsi sekali saat aplikasi baru dibuka
+updateNetworkStatus();
