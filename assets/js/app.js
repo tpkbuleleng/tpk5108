@@ -1,5 +1,5 @@
-// Mengimpor fungsi dari otak database kita
 import { initDB, putData, getDataById, deleteData, getAllData } from './db.js';
+import { downloadMasterData, uploadLaporanTunda } from './sync.js';
 
 // ==========================================
 // 1. DEKLARASI ELEMEN UI
@@ -11,77 +11,108 @@ const userGreeting = document.getElementById('user-greeting');
 const networkStatus = document.getElementById('network-status');
 const navItems = document.querySelectorAll('.nav-item');
 const contentArea = document.getElementById('content-area');
-const pendingSyncCount = document.getElementById('pending-sync-count');
 
 // ==========================================
 // 2. FUNGSI INISIALISASI APLIKASI
 // ==========================================
 const initApp = async () => {
     try {
-        // Nyalakan database
         await initDB();
         console.log("Database TPK Buleleng Siap!");
-
-        // Cek apakah kader sudah login sebelumnya (Offline Login Check)
-        const session = await getDataById('kader_session', 'active_user');
-        
-        if (session) {
-            // Jika sudah login, langsung masuk ke aplikasi
-            masukKeAplikasi(session.nama);
-        } else {
-            // Jika belum, pastikan ada di layar login
-            tampilkanLayar('login');
-        }
 
         // Cek status jaringan saat ini
         updateNetworkStatus();
         window.addEventListener('online', updateNetworkStatus);
         window.addEventListener('offline', updateNetworkStatus);
 
-        // Update jumlah antrean sinkronisasi
-        updateSyncCount();
+        // CEK 1: Apakah ini HP baru yang belum pernah download Master Data?
+        const users = await getAllData('master_user');
+        if (users.length === 0) {
+            if (navigator.onLine) {
+                console.log("Master data kosong, melakukan sinkronisasi awal...");
+                // Ganti tulisan tombol login agar kader tahu sedang proses
+                const btnLogin = formLogin.querySelector('button');
+                btnLogin.innerText = "Mengunduh Data Master...";
+                btnLogin.disabled = true;
+                
+                await downloadMasterData();
+                
+                btnLogin.innerText = "Masuk";
+                btnLogin.disabled = false;
+            } else {
+                alert("Perhatian: Aplikasi baru diinstal. Anda harus terhubung ke internet untuk sinkronisasi pertama kali!");
+            }
+        }
+
+        // CEK 2: Apakah kader sudah login sebelumnya? (Sesi aktif)
+        const session = await getDataById('kader_session', 'active_user');
+        if (session) {
+            masukKeAplikasi(session);
+        } else {
+            tampilkanLayar('login');
+        }
 
     } catch (error) {
-        console.error("Gagal inisialisasi aplikasi:", error);
-        alert("Terjadi kesalahan sistem. Pastikan browser Anda mendukung IndexedDB.");
+        console.error("Gagal inisialisasi:", error);
     }
 };
 
 // ==========================================
-// 3. LOGIKA LOGIN & LOGOUT (BISA OFFLINE)
+// 3. LOGIKA LOGIN (Validasi Offline via Database)
 // ==========================================
 formLogin.addEventListener('submit', async (e) => {
     e.preventDefault();
     
-    const kaderId = document.getElementById('kader-id').value;
-    const kaderPin = document.getElementById('kader-pin').value;
+    const inputId = document.getElementById('kader-id').value.trim();
+    const inputPin = document.getElementById('kader-pin').value.trim();
 
-    // TODO: Di versi produksi, Anda bisa mencocokkan ini dengan data master kader yang di-cache.
-    // Untuk sekarang, kita asumsikan login berhasil jika PIN diisi (Simulasi).
-    if (kaderId && kaderPin.length >= 4) {
-        const userData = {
-            id_kader: 'active_user', // Key statis untuk sesi aktif
-            username: kaderId,
-            nama: `Kader ${kaderId.toUpperCase()}`,
+    try {
+        // 1. Cari user di tabel master_user
+        const user = await getDataById('master_user', inputId);
+
+        if (!user) {
+            alert("ID Pengguna tidak terdaftar di sistem!");
+            return;
+        }
+
+        // 2. Validasi PIN/Password
+        if (user.password.toString() !== inputPin) {
+            alert("PIN/Password salah!");
+            return;
+        }
+
+        // 3. Jika login sukses, ambil data detail Kader dari tabel master_kader
+        const detailKader = await getDataById('master_kader', user.id_referensi);
+
+        if (!detailKader) {
+            alert("Data detail kader tidak ditemukan. Hubungi Admin.");
+            return;
+        }
+
+        // 4. Buat Sesi Login
+        const sessionData = {
+            id_kader: 'active_user', 
+            username: user.username,
+            kode_kader: detailKader.id_kader,
+            nama: detailKader.nama_kader,
+            id_tim: detailKader.id_tim, // Sangat penting untuk filter wilayah nanti
             login_time: new Date().toISOString()
         };
 
-        // Simpan sesi ke IndexedDB agar besok tidak perlu login lagi
-        await putData('kader_session', userData);
+        await putData('kader_session', sessionData);
         
-        // Reset form dan masuk
         formLogin.reset();
-        masukKeAplikasi(userData.nama);
-    } else {
-        alert("ID atau PIN tidak valid!");
+        masukKeAplikasi(sessionData);
+
+    } catch (error) {
+        console.error("Error saat login:", error);
+        alert("Terjadi kesalahan sistem saat login.");
     }
 });
 
-// Jadikan fungsi logout global agar bisa dipanggil dari tombol HTML (onclick="logout()")
+// Logout global
 window.logout = async () => {
-    const konfirmasi = confirm("Yakin ingin keluar?");
-    if (konfirmasi) {
-        // Hapus sesi dari database
+    if (confirm("Yakin ingin keluar?")) {
         await deleteData('kader_session', 'active_user');
         tampilkanLayar('login');
     }
@@ -92,14 +123,9 @@ window.logout = async () => {
 // ==========================================
 navItems.forEach(item => {
     item.addEventListener('click', () => {
-        // Hapus class active dari semua tombol nav
         navItems.forEach(nav => nav.classList.remove('active'));
-        // Tambahkan class active ke tombol yang diklik
         item.classList.add('active');
-
-        // Ganti konten berdasarkan target
-        const target = item.getAttribute('data-target');
-        renderKonten(target);
+        renderKonten(item.getAttribute('data-target'));
     });
 });
 
@@ -113,76 +139,97 @@ const tampilkanLayar = (layar) => {
     }
 };
 
-const masukKeAplikasi = (namaKader) => {
-    userGreeting.innerText = `Halo, ${namaKader}!`;
+const masukKeAplikasi = (sessionData) => {
+    userGreeting.innerText = `Halo, ${sessionData.nama}!`;
     tampilkanLayar('app');
     
-    // Default ke beranda saat baru masuk
+    // Simpan data session di memory global untuk dipakai di form lain
+    window.currentUser = sessionData; 
+    
     document.querySelector('[data-target="home"]').click();
 };
 
 const renderKonten = (target) => {
-    // Di sini nantinya kita memuat form registrasi atau form lapor.
-    // Sementara kita gunakan placeholder:
     if (target === 'home') {
         contentArea.innerHTML = `
             <div class="card summary-card">
-                <h3>Belum Disinkronisasi</h3>
+                <h3>Antrean Sinkronisasi</h3>
                 <p class="big-number" id="pending-sync-count">0</p>
-                <button class="btn-secondary" id="btn-sync-now">Sinkronkan Sekarang</button>
+                <button class="btn-secondary" id="btn-sync-now" onclick="jalankanSinkronisasi()">🔄 Sinkronkan Sekarang</button>
             </div>
             <div class="card">
-                <h3>Info Kader</h3>
-                <p>Anda sedang berada di mode: <b>${navigator.onLine ? 'Online' : 'Offline'}</b>. Seluruh data yang Anda input akan disimpan aman di perangkat ini.</p>
+                <h3>Informasi Profil</h3>
+                <p><b>Nama:</b> ${window.currentUser.nama}</p>
+                <p><b>ID Tim:</b> ${window.currentUser.id_tim}</p>
+                <p style="margin-top:10px; font-size: 0.85rem; color: #666;">
+                   Pastikan Anda melakukan sinkronisasi secara berkala saat mendapat sinyal internet.
+                </p>
             </div>
         `;
-        updateSyncCount(); // Segarkan angka saat kembali ke home
+        updateSyncCount();
     } else if (target === 'registrasi') {
-        contentArea.innerHTML = `<div class="card"><h3>📝 Form Registrasi Sasaran</h3><p>Form input akan dimuat di sini...</p></div>`;
+        contentArea.innerHTML = `<div class="card"><h3>📝 Form Registrasi Sasaran</h3><p>Segera hadir di tahap selanjutnya...</p></div>`;
     } else if (target === 'lapor') {
-        contentArea.innerHTML = `<div class="card"><h3>📋 Form Lapor Pendampingan</h3><p>Form lapor akan dimuat di sini...</p></div>`;
+        contentArea.innerHTML = `<div class="card"><h3>📋 Form Lapor Pendampingan</h3><p>Segera hadir di tahap selanjutnya...</p></div>`;
     } else if (target === 'data') {
-        contentArea.innerHTML = `<div class="card"><h3>📁 Data Tersimpan</h3><p>Daftar sasaran akan dimuat di sini...</p></div>`;
+        contentArea.innerHTML = `<div class="card"><h3>📁 Data Tersimpan</h3><p>Daftar data sasaran dan laporan Anda...</p></div>`;
     }
 };
 
 // ==========================================
-// 5. UTILITAS JARINGAN & DATA
+// 5. UTILITAS JARINGAN & SINKRONISASI
 // ==========================================
 const updateNetworkStatus = () => {
     if (navigator.onLine) {
         networkStatus.textContent = 'Online';
-        networkStatus.classList.remove('offline');
-        networkStatus.classList.add('online');
+        networkStatus.className = 'status-badge online';
     } else {
         networkStatus.textContent = 'Offline Mode';
-        networkStatus.classList.remove('online');
-        networkStatus.classList.add('offline');
+        networkStatus.className = 'status-badge offline';
     }
+    updateSyncCount(); // Update warna tombol saat sinyal berubah
 };
 
 const updateSyncCount = async () => {
-    try {
-        const queue = await getAllData('sync_queue');
-        const countElement = document.getElementById('pending-sync-count');
-        if (countElement) {
-            countElement.innerText = queue.length;
-            // Jika ada antrean dan sedang online, ubah warna tombol
-            const btnSync = document.getElementById('btn-sync-now');
-            if (btnSync) {
-                if (queue.length > 0 && navigator.onLine) {
-                    btnSync.className = 'btn-primary';
-                } else {
-                    btnSync.className = 'btn-secondary';
-                }
-            }
+    const queue = await getAllData('sync_queue');
+    const countElement = document.getElementById('pending-sync-count');
+    const btnSync = document.getElementById('btn-sync-now');
+    
+    if (countElement && btnSync) {
+        countElement.innerText = queue.length;
+        if (navigator.onLine) {
+            btnSync.className = 'btn-primary';
+            btnSync.disabled = false;
+        } else {
+            btnSync.className = 'btn-secondary';
+            btnSync.disabled = true;
+            btnSync.innerText = '⚠️ Koneksi Terputus';
         }
-    } catch (error) {
-        console.error("Gagal menghitung antrean:", error);
     }
 };
 
-// ==========================================
-// JALANKAN APLIKASI
-// ==========================================
+// Fungsi yang dipanggil saat tombol "Sinkronkan Sekarang" diklik
+window.jalankanSinkronisasi = async () => {
+    const btnSync = document.getElementById('btn-sync-now');
+    btnSync.innerText = '⏳ Sedang Proses...';
+    btnSync.disabled = true;
+
+    try {
+        // 1. Upload data yang masih ngantre di HP
+        await uploadLaporanTunda();
+        
+        // 2. Download Master Data terbaru (siapa tahu ada user/wilayah/pertanyaan baru)
+        await downloadMasterData();
+
+        alert("✅ Sinkronisasi Berhasil!");
+    } catch (error) {
+        alert("❌ Sinkronisasi Gagal. Coba lagi saat sinyal lebih baik.");
+    } finally {
+        btnSync.innerText = '🔄 Sinkronkan Sekarang';
+        btnSync.disabled = false;
+        updateSyncCount(); // Refresh angka antrean
+    }
+};
+
+// Jalankan aplikasi saat file siap
 document.addEventListener('DOMContentLoaded', initApp);
