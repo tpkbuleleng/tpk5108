@@ -3,51 +3,63 @@ import { downloadMasterData } from './sync.js';
 
 const getEl = (id) => document.getElementById(id);
 
-// --- FUNGSI NAVIGASI LAYAR (Kunci Perbaikan) ---
+// --- FUNGSI NAVIGASI LAYAR ---
 const tampilkanLayar = (id) => {
+    console.log("Berpindah ke layar:", id);
     const vSplash = getEl('view-splash');
     const vLogin = getEl('view-login');
     const vApp = getEl('view-app');
 
-    // Sembunyikan semua dulu
-    if (vSplash) vSplash.classList.remove('active');
-    if (vLogin) vLogin.classList.add('hidden');
-    if (vApp) vApp.classList.add('hidden');
+    // Sembunyikan Splash secara paksa
+    if (vSplash) {
+        vSplash.classList.remove('active');
+        vSplash.style.display = 'none'; // Tambahan pengaman
+    }
 
-    // Tampilkan yang dipilih
     if (id === 'login') {
-        vLogin.classList.remove('hidden');
+        if (vLogin) vLogin.classList.remove('hidden');
+        if (vApp) vApp.classList.add('hidden');
     } else if (id === 'app') {
-        vApp.classList.remove('hidden');
-    } else if (id === 'splash') {
-        vSplash.classList.add('active');
+        if (vLogin) vLogin.classList.add('hidden');
+        if (vApp) vApp.classList.remove('hidden');
     }
 };
 
+// --- INISIALISASI APLIKASI ---
 const initApp = async () => {
-    try {
-        await initDB();
-        updateNetworkStatus();
+    // FAILSAFE: Jika dalam 4 detik masih stuck di logo, paksa ke login
+    const logoTimeout = setTimeout(() => {
+        const vSplash = getEl('view-splash');
+        if (vSplash && vSplash.classList.contains('active')) {
+            console.warn("Failsafe: Splash screen terlalu lama, memaksa pindah.");
+            tampilkanLayar('login');
+        }
+    }, 4000);
 
-        // Cek apakah sudah ada user yang login
+    try {
+        console.log("Inisialisasi Database...");
+        await initDB();
+        
         const session = await getDataById('kader_session', 'active_user');
 
-        // Beri waktu splash screen tampil sebentar
-        setTimeout(() => {
-            if (session) {
-                masukKeAplikasi(session);
-            } else {
-                tampilkanLayar('login');
+        if (session) {
+            console.log("Sesi aktif ditemukan.");
+            masukKeAplikasi(session);
+        } else {
+            console.log("Tidak ada sesi, cek data master...");
+            tampilkanLayar('login');
+            
+            // Cek apakah data master sudah ada, jika belum download di background
+            const users = await getAllData('master_user');
+            if (users.length === 0 && navigator.onLine) {
+                console.log("Data master kosong, mengunduh...");
+                await downloadMasterData();
             }
-        }, 1500);
-
-        // Download data master jika database kosong (Background process)
-        const users = await getAllData('master_user');
-        if (users.length === 0 && navigator.onLine) {
-            await downloadMasterData();
         }
+        clearTimeout(logoTimeout); // Matikan failsafe jika sukses
     } catch (err) {
-        console.error("Init Error:", err);
+        console.error("Gagal inisialisasi:", err);
+        clearTimeout(logoTimeout);
         tampilkanLayar('login');
     }
 };
@@ -55,41 +67,36 @@ const initApp = async () => {
 const masukKeAplikasi = (session) => {
     window.currentUser = session;
     
-    // Update UI Header & Sidebar
     if (getEl('user-greeting')) getEl('user-greeting').innerText = `Dashboard ${session.role}`;
     if (getEl('sidebar-nama')) getEl('sidebar-nama').innerText = session.nama;
     if (getEl('sidebar-role')) getEl('sidebar-role').innerText = session.role;
     
     renderMenu(session.role);
-    tampilkanLayar('app'); // Pindah ke layar utama
+    tampilkanLayar('app');
 };
 
-// --- LOGIKA FORM LOGIN ---
+// --- LOGIKA LOGIN ---
 const formLogin = getEl('form-login');
 if (formLogin) {
     formLogin.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const btnSubmit = getEl('btn-login-submit');
-        btnSubmit.disabled = true;
-        btnSubmit.innerText = "Memproses...";
+        const btn = getEl('btn-login-submit');
+        btn.disabled = true;
+        btn.innerText = "Memproses...";
 
         const idInput = getEl('kader-id').value.trim();
         const passInput = getEl('kader-pin').value.trim();
 
         try {
             const user = await getDataById('master_user', idInput);
-
             if (!user) {
-                alert("ID Pengguna tidak ditemukan!");
-                btnSubmit.disabled = false;
-                btnSubmit.innerText = "Masuk";
+                alert("ID tidak terdaftar!");
+                btn.disabled = false; btn.innerText = "Masuk";
                 return;
             }
 
             const passBenar = user.password_awal_ref ? user.password_awal_ref.toString() : "";
-            
             if (passBenar === passInput) {
-                // Login Berhasil
                 let namaTampil = user.username;
                 let idTim = '-';
 
@@ -113,37 +120,29 @@ if (formLogin) {
                 masukKeAplikasi(sessionData);
             } else {
                 alert("Password salah!");
-                btnSubmit.disabled = false;
-                btnSubmit.innerText = "Masuk";
+                btn.disabled = false; btn.innerText = "Masuk";
             }
         } catch (err) {
-            console.error(err);
-            alert("Terjadi kesalahan sistem.");
-            btnSubmit.disabled = false;
-            btnSubmit.innerText = "Masuk";
+            alert("Error: " + err.message);
+            btn.disabled = false; btn.innerText = "Masuk";
         }
     });
 }
 
+// --- MENU & KONTEN ---
 const renderMenu = (role) => {
     const container = getEl('dynamic-menu-container');
     if (!container) return;
-
-    let menus = [];
     const r = role ? role.toUpperCase() : "";
 
-    if (r === 'KADER') {
-        menus = [
-            { id: 'dashboard', icon: '🏠', label: 'Dashboard' },
-            { id: 'registrasi', icon: '📝', label: 'Registrasi Sasaran' },
-            { id: 'sinkronisasi', icon: '🔄', label: 'Sinkronisasi' }
-        ];
-    } else {
-        menus = [
-            { id: 'dashboard_sys', icon: '🖥️', label: 'Dashboard Sistem' },
-            { id: 'master_wilayah', icon: '🗺️', label: 'Master Wilayah' }
-        ];
-    }
+    const menus = (r === 'KADER') ? [
+        { id: 'dashboard', icon: '🏠', label: 'Dashboard' },
+        { id: 'registrasi', icon: '📝', label: 'Registrasi' },
+        { id: 'sinkronisasi', icon: '🔄', label: 'Sinkronisasi' }
+    ] : [
+        { id: 'dashboard_sys', icon: '🖥️', label: 'Dashboard Sistem' },
+        { id: 'master_wilayah', icon: '🗺️', label: 'Master Wilayah' }
+    ];
 
     container.innerHTML = menus.map(m => `
         <a class="menu-item" data-target="${m.id}">
@@ -151,59 +150,43 @@ const renderMenu = (role) => {
         </a>
     `).join('') + `<hr><a class="menu-item text-danger" id="btnLogout">🚪 Keluar</a>`;
 
-    // Event Klik Menu
     document.querySelectorAll('.menu-item[data-target]').forEach(item => {
         item.onclick = () => {
-            const target = item.getAttribute('data-target');
             getEl('sidebar').classList.remove('active');
             getEl('sidebar-overlay').classList.remove('active');
-            renderKonten(target);
+            renderKonten(item.getAttribute('data-target'));
         };
     });
-
     if (getEl('btnLogout')) getEl('btnLogout').onclick = window.logout;
 };
 
 const renderKonten = (target) => {
     const area = getEl('content-area');
     if (!area) return;
-
     if (target === 'registrasi') {
         const temp = getEl('template-registrasi');
         area.innerHTML = '';
         area.appendChild(temp.content.cloneNode(true));
-        // Fungsi initFormRegistrasi bisa dipanggil di sini
     } else {
-        area.innerHTML = `<div class="content-card"><h3>Menu ${target.toUpperCase()}</h3><p>Dalam pengembangan.</p></div>`;
-    }
-};
-
-// --- UTILS ---
-const updateNetworkStatus = () => {
-    const status = getEl('network-status');
-    if (status) {
-        status.innerText = navigator.onLine ? 'Online' : 'Offline';
-        status.className = 'status-badge ' + (navigator.onLine ? 'online' : 'offline');
+        area.innerHTML = `<div class="content-card"><h3>Menu ${target.toUpperCase()}</h3></div>`;
     }
 };
 
 window.logout = async () => {
-    if (confirm("Keluar dari aplikasi?")) {
+    if (confirm("Keluar?")) {
         await deleteData('kader_session', 'active_user');
         location.reload();
     }
 };
 
+// Event Sidebar
 if (getEl('btn-menu')) getEl('btn-menu').onclick = () => {
     getEl('sidebar').classList.add('active');
     getEl('sidebar-overlay').classList.add('active');
 };
-
 if (getEl('sidebar-overlay')) getEl('sidebar-overlay').onclick = () => {
     getEl('sidebar').classList.remove('active');
     getEl('sidebar-overlay').classList.remove('active');
 };
 
-window.addEventListener('online', updateNetworkStatus);
-window.addEventListener('offline', updateNetworkStatus);
 document.addEventListener('DOMContentLoaded', initApp);
