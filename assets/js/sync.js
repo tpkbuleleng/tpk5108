@@ -1,7 +1,7 @@
 import { putBulkData, getAllData, deleteData } from './db.js';
 
 // TODO: PASTE URL WEB APP ANDA DI SINI
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyoznaGrtmZdz5FhtS4mxi4-FjKEVY9CybbvV8E30JSct-RYTth61mNyXRrdB89day7lA/exec'; 
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzEmmn0wMJmC1OHij9JUxm8EIT2xW1AuV0597EYCWDIxG_nkpZYBPx1EGiNYe6OjEHniw/exec'; 
 
 export const downloadMasterData = async () => {
     try {
