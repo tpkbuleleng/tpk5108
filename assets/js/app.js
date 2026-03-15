@@ -118,89 +118,82 @@ const renderKonten = async (target) => {
     if (!area) return;
 
     if (target === 'dashboard') {
-        // Tampilkan loading sebentar
-        area.innerHTML = `<div style="padding:20px; text-align:center; opacity:0.5;">Memuat profil...</div>`;
+        const session = window.currentUser || {};
         
-        const session = window.currentUser;
-        
+        // 1. Tampilkan Dashboard DULU (Pakai data yang ada di tangan)
+        area.innerHTML = `
+            <div class="animate-fade">
+                <div id="dash-card-utama" class="card" style="background: linear-gradient(135deg, #0d6efd, #0043a8); color: white; border:none; margin-bottom: 20px; padding: 25px;">
+                    <p style="margin:0; opacity: 0.9; font-size: 1rem; font-weight: 800;">SELAMAT DATANG,</p>
+                    <h2 style="margin: 5px 0 15px 0; font-size: 1.6rem; font-weight: 700; text-transform: uppercase;">${session.nama || 'USER'}</h2>
+                    <div style="background: rgba(255,255,255,0.2); display: inline-block; padding: 4px 12px; border-radius: 6px; font-weight: bold; font-size: 0.9rem; margin-bottom: 20px;">
+                        NO. TIM: ${session.nomor_tim || session.id_tim || '-'}
+                    </div>
+                    <hr style="margin-bottom: 20px; border: 0; border-top: 1px solid rgba(255,255,255,0.2);">
+                    <div id="dash-detail-wilayah" style="font-size: 1.1rem; line-height: 1.7;">
+                        <p style="font-size:0.9rem; opacity:0.8;">Memuat detail wilayah...</p>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <div class="card" style="text-align:center; padding: 20px; border-bottom: 4px solid #fd7e14;">
+                        <div style="font-size: 1.8rem; margin-bottom: 5px;">📦</div>
+                        <h3 id="dash-count-tunda">0</h3>
+                        <p style="font-size: 0.75rem; color: #666; font-weight: bold; margin:0;">TERTUNDA</p>
+                    </div>
+                    <div class="card" style="text-align:center; padding: 20px; cursor:pointer; border-bottom: 4px solid #0d6efd;" onclick="renderKonten('registrasi')">
+                        <div style="font-size: 1.8rem; margin-bottom: 5px;">📝</div>
+                        <h3 style="font-size: 1.5rem; color: #0d6efd; margin:0;">BARU</h3>
+                        <p style="font-size: 0.75rem; color: #666; font-weight: bold; margin:0;">REGISTRASI</p>
+                    </div>
+                </div>
+            </div>`;
+
+        // 2. Baru kemudian ambil data detail secara perlahan (Background)
         try {
-            // Ambil data satu per satu agar jika satu gagal, yang lain tidak ikut macet
-            const allWil = await getAllData('master_tim_wilayah') || [];
-            const allTim = await getAllData('master_tim') || [];
-            const antrean = await getAllData('sync_queue') || [];
+            const [allWil, antrean] = await Promise.all([
+                getAllData('master_tim_wilayah').catch(() => []),
+                getAllData('sync_queue').catch(() => [])
+            ]);
 
             const wilayahKerja = allWil.filter(w => w.id_tim === session.id_tim);
-            const detailTim = allTim.find(t => t.id_tim === session.id_tim);
-            
-            // Logika Fallback: Jika nomor_tim tidak ada, pakai id_tim
-            const noTim = detailTim ? (detailTim.nomor_tim || session.id_tim) : session.id_tim;
-            const daftarDusun = wilayahKerja.map(w => w.dusun_rw).join(', ') || 'Data wilayah belum sinkron';
+            const daftarDusun = wilayahKerja.map(w => w.dusun_rw).join(', ') || 'Belum ada data wilayah';
             const desa = wilayahKerja.length > 0 ? wilayahKerja[0].desa_kelurahan : '-';
             const kec = wilayahKerja.length > 0 ? wilayahKerja[0].kecamatan : '-';
 
-            area.innerHTML = `
-                <div class="animate-fade">
-                    <div class="card" style="background: linear-gradient(135deg, #0d6efd, #0043a8); color: white; border:none; margin-bottom: 20px; padding: 25px; box-shadow: 0 8px 16px rgba(0,0,0,0.1);">
-                        <p style="margin:0; opacity: 0.9; font-size: 1rem; font-weight: 800;">SELAMAT DATANG,</p>
-                        <h2 style="margin: 5px 0 15px 0; font-size: 1.6rem; font-weight: 700; text-transform: uppercase;">${session.nama}</h2>
-                        
-                        <div style="background: rgba(255,255,255,0.2); display: inline-block; padding: 4px 12px; border-radius: 6px; font-weight: bold; font-size: 0.9rem; margin-bottom: 20px;">
-                            NO. TIM: ${noTim}
-                        </div>
-
-                        <hr style="margin-bottom: 20px; border: 0; border-top: 1px solid rgba(255,255,255,0.2);">
-                        
-                        <div style="font-size: 1.1rem; line-height: 1.7;">
-                            <div style="margin-bottom: 12px;">
-                                <span style="opacity:0.8;">📍 Dusun/RW:</span><br>
-                                <span style="font-weight: 500;">${daftarDusun}</span>
-                            </div>
-                            <div style="margin-bottom: 8px; display: flex; justify-content: space-between;">
-                                <span style="opacity:0.8;">🏘️ Desa/Kelurahan:</span>
-                                <span style="font-weight: 600;">${desa}</span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between;">
-                                <span style="opacity:0.8;">🏛️ Kecamatan:</span>
-                                <span style="font-weight: 600;">${kec}</span>
-                            </div>
-                        </div>
+            // Update hanya bagian detailnya saja tanpa merusak layar
+            const containerDetail = getEl('dash-detail-wilayah');
+            if(containerDetail) {
+                containerDetail.innerHTML = `
+                    <div style="margin-bottom: 12px;">
+                        <span style="opacity:0.8;">📍 Dusun/RW:</span><br>
+                        <span style="font-weight: 500;">${daftarDusun}</span>
                     </div>
-
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                        <div class="card" style="text-align:center; padding: 20px; border-bottom: 4px solid #fd7e14;">
-                            <div style="font-size: 1.8rem; margin-bottom: 5px;">📦</div>
-                            <h3 style="font-size: 1.5rem; margin:0;">${antrean.length}</h3>
-                            <p style="font-size: 0.75rem; color: #666; font-weight: bold; margin:0;">TERTUNDA</p>
-                        </div>
-                        <div class="card" style="text-align:center; padding: 20px; cursor:pointer; border-bottom: 4px solid #0d6efd;" onclick="renderKonten('registrasi')">
-                            <div style="font-size: 1.8rem; margin-bottom: 5px;">📝</div>
-                            <h3 style="font-size: 1.5rem; color: #0d6efd; margin:0;">BARU</h3>
-                            <p style="font-size: 0.75rem; color: #666; font-weight: bold; margin:0;">REGISTRASI</p>
-                        </div>
+                    <div style="margin-bottom: 8px; display: flex; justify-content: space-between;">
+                        <span style="opacity:0.8;">🏘️ Desa/Kelurahan:</span>
+                        <span style="font-weight: 600;">${desa}</span>
                     </div>
-                </div>`;
-        } catch (err) {
-            area.innerHTML = `<div class="card" style="text-align:center; padding:30px;">
-                <p>Gagal memuat profil. Silakan coba sinkronisasi data.</p>
-                <button class="btn-primary" onclick="location.reload()">Refresh Halaman</button>
-            </div>`;
+                    <div style="display: flex; justify-content: space-between;">
+                        <span style="opacity:0.8;">🏛️ Kecamatan:</span>
+                        <span style="font-weight: 600;">${kec}</span>
+                    </div>
+                `;
+            }
+            if(getEl('dash-count-tunda')) getEl('dash-count-tunda').innerText = antrean.length;
+
+        } catch (e) {
+            console.warn("Detail gagal dimuat, tapi dashboard tetap tampil.");
         }
+
     } else if (target === 'registrasi') {
         const temp = getEl('template-registrasi');
         if (temp) {
             area.innerHTML = '';
             area.appendChild(temp.content.cloneNode(true));
-            // Tambahkan pemicu init form registrasi di sini
             if (typeof initFormRegistrasi === "function") initFormRegistrasi();
         }
     } else {
-        area.innerHTML = `
-            <div class="card" style="text-align:center; padding:40px;">
-                <div style="font-size: 3rem; margin-bottom: 15px;">🚧</div>
-                <h3>Menu ${target.replace(/_/g, ' ').toUpperCase()}</h3>
-                <p style="color:#666;">Halaman ini sedang dalam tahap pengembangan sistem.</p>
-                <button class="btn-primary" style="margin-top:20px; max-width:200px;" onclick="renderKonten('dashboard')">Kembali ke Dashboard</button>
-            </div>`;
+        area.innerHTML = `<div class="card" style="text-align:center; padding:40px;"><h3>Menu ${target.toUpperCase()}</h3><p>Halaman sedang disiapkan.</p></div>`;
     }
 };
 
