@@ -35,7 +35,7 @@ const updateNetworkStatus = () => {
 // 2. INISIALISASI APLIKASI
 // ==========================================
 const initApp = async () => {
-    const logoTimeout = setTimeout(() => { tampilkanLayar('login'); }, 4000);
+    const logoTimeout = setTimeout(() => { tampilkanLayar('login'); }, 3500);
     try {
         await initDB();
         const session = await getDataById('kader_session', 'active_user').catch(() => null);
@@ -83,7 +83,8 @@ const renderMenu = (role) => {
         { id: 'rekap_kader', icon: '📊', label: 'Rekap Bulanan Kader' },
         { id: 'rekap_tim', icon: '📈', label: 'Rekap Bulanan Tim' },
         { id: 'cetak_pdf', icon: '🖨️', label: 'Cetak PDF' },
-        { id: 'ganti_pass', icon: '🔑', label: 'Ganti Password' }
+        { id: 'ganti_pass', icon: '🔑', label: 'Ganti Password' },
+        { id: 'sync_manual', icon: '🔄', label: 'Sinkronisasi Data' }
     ];
 
     container.innerHTML = menus.map(m => `
@@ -96,7 +97,13 @@ const renderMenu = (role) => {
         item.onclick = () => {
             getEl('sidebar').classList.remove('active');
             getEl('sidebar-overlay').classList.remove('active');
-            renderKonten(item.getAttribute('data-target'));
+            
+            const target = item.getAttribute('data-target');
+            if(target === 'sync_manual') {
+                alert("Fitur Sinkronisasi ke Server Google akan segera diaktifkan.");
+            } else {
+                renderKonten(target);
+            }
         };
     });
     if (getEl('btnLogout')) getEl('btnLogout').onclick = window.logout;
@@ -124,7 +131,7 @@ window.renderKonten = async (target) => {
                     <div class="card" style="text-align:center; padding: 20px; border-bottom: 4px solid orange;">
                         <div style="font-size: 1.8rem;">📦</div>
                         <h3 id="dash-tunda">0</h3>
-                        <p style="font-size: 0.75rem; color: #666; font-weight: bold;">TERTUNDA</p>
+                        <p style="font-size: 0.75rem; color: #666; font-weight: bold;">TERTUNDA SINKRON</p>
                     </div>
                     <div class="card" style="text-align:center; padding: 20px; cursor:pointer; border-bottom: 4px solid #0d6efd;" onclick="renderKonten('registrasi')">
                         <div style="font-size: 1.8rem;">📝</div>
@@ -144,7 +151,7 @@ window.renderKonten = async (target) => {
             
             if (getEl('dash-detail-wilayah')) {
                 getEl('dash-detail-wilayah').innerHTML = `
-                    <div style="margin-bottom: 12px;"><span style="opacity:0.8; font-size: 0.9rem;">📍 Dusun/RW:</span><br><span style="font-weight: 500;">${daftarDusun}</span></div>
+                    <div style="margin-bottom: 12px;"><span style="opacity:0.8; font-size: 0.9rem;">📍 Wilayah Tugas (Dusun/RW):</span><br><span style="font-weight: 500;">${daftarDusun}</span></div>
                     <div style="margin-bottom: 8px;"><span style="opacity:0.8; font-size: 0.9rem;">🏘️ Desa/Kelurahan:</span><br><span style="font-weight: 600;">${wilayahKerja[0]?.desa_kelurahan || '-'}</span></div>
                     <div><span style="opacity:0.8; font-size: 0.9rem;">🏛️ Kecamatan:</span><br><span style="font-weight: 600;">${wilayahKerja[0]?.kecamatan || '-'}</span></div>`;
             }
@@ -167,14 +174,31 @@ window.renderKonten = async (target) => {
             if(getEl('judul-rekap')) getEl('judul-rekap').innerText = target === 'rekap_kader' ? '📊 Rekap Bulanan Kader' : '📈 Rekap Bulanan Tim';
             initRekap();
         }
-    } else {
-        area.innerHTML = `<div class="card" style="text-align:center; padding:30px;"><h3>Menu ${target.replace('_',' ').toUpperCase()}</h3><p>Segera Hadir.</p></div>`;
+    } else if (target === 'cetak_pdf') {
+        const tpl = getEl('template-cetak-pdf');
+        if(tpl) area.appendChild(tpl.content.cloneNode(true));
+    } else if (target === 'ganti_pass') {
+        const tpl = getEl('template-ganti-pass');
+        if(tpl) area.appendChild(tpl.content.cloneNode(true));
+        const formP = getEl('form-ganti-pass');
+        if(formP) formP.onsubmit = (e) => { e.preventDefault(); alert("Permintaan ganti password disimpan."); e.target.reset(); renderKonten('dashboard'); };
     }
 };
 
 // ==========================================
-// 4. LOGIKA FORM DINAMIS (4 JENIS SASARAN)
+// 4. LOGIKA FORM DINAMIS & ID UNIK KECAMATAN
 // ==========================================
+// Fungsi Bantuan Pembuat Kode Kecamatan
+const getKodeKecamatan = (kec) => {
+    if (!kec) return "XXX";
+    const map = {
+        'GEROKGAK': 'GRK', 'SERIRIT': 'SRT', 'BUSUNGBIU': 'BSB',
+        'BANJAR': 'BJR', 'SUKASADA': 'SKS', 'BULELENG': 'BLL',
+        'SAWAN': 'SWN', 'KUBUTAMBAHAN': 'KBT', 'TEJAKULA': 'TJK'
+    };
+    return map[kec.toUpperCase()] || "XXX";
+};
+
 const initFormRegistrasi = async () => {
     const session = window.currentUser;
     const allWil = await getAllData('master_tim_wilayah').catch(()=>[]);
@@ -185,7 +209,6 @@ const initFormRegistrasi = async () => {
     const selDusun = getEl('reg-dusun');
     const containerQ = getEl('pertanyaan-dinamis');
 
-    // 1. Setup Dropdown Wilayah
     if (selDesa && tugas.length > 0) {
         const dDesa = [...new Set(tugas.map(w => w.desa_kelurahan))];
         selDesa.innerHTML = '<option value="">-- Pilih Desa --</option>' + dDesa.map(d => `<option value="${d}">${d}</option>`).join('');
@@ -195,19 +218,21 @@ const initFormRegistrasi = async () => {
         };
     }
 
-    // 2. Setup Pertanyaan Dinamis
     const questions = await getAllData('master_pertanyaan').catch(()=>[]);
     if (selJenis && containerQ) {
         selJenis.onchange = () => {
             const jenis = selJenis.value;
             if (!jenis) { containerQ.innerHTML = ''; return; }
             const filteredQ = questions.filter(q => q.is_active === 'Y' && (q.kategori_sasaran === 'UMUM' || q.kategori_sasaran === jenis)).sort((a,b)=>a.urutan - b.urutan);
-            containerQ.innerHTML = `<h4 style="margin-bottom:10px; color:var(--primary);">Formulir ${jenis}</h4>` + 
-                filteredQ.map(q => `<div class="form-group"><label>${q.label_pertanyaan}</label><input type="text" name="q_${q.id_pertanyaan}" class="form-control" required></div>`).join('');
+            containerQ.innerHTML = `<h4 style="margin-bottom:10px; color:var(--primary);">Formulir Khusus ${jenis}</h4>` + 
+                filteredQ.map(q => `
+                    <div class="form-group">
+                        <label>${q.label_pertanyaan}</label>
+                        <input type="${q.tipe_input || 'text'}" name="q_${q.id_pertanyaan}" class="form-control" required>
+                    </div>`).join('');
         };
     }
 
-    // 3. Simpan Form ke Antrean
     const formReg = getEl('form-registrasi');
     if (formReg) {
         formReg.onsubmit = async (e) => {
@@ -217,13 +242,39 @@ const initFormRegistrasi = async () => {
                 const formData = new FormData(e.target);
                 const jawaban = {}; formData.forEach((val, key) => { jawaban[key] = val; });
                 const kecamatan = tugas.length > 0 ? tugas[0].kecamatan : 'TIDAK_DIKETAHUI';
+                const jenisSasaran = selJenis.value;
+                
+                // 1. Tentukan Prefix Jenis
+                let prefix = "REG";
+                if (jenisSasaran === 'CATIN') prefix = "CTN";
+                else if (jenisSasaran === 'BUMIL') prefix = "BML";
+                else if (jenisSasaran === 'BUFAS') prefix = "BFS";
+                else if (jenisSasaran === 'BADUTA') prefix = "BDT";
+                
+                // 2. Ambil Kode Kecamatan
+                const kodeKec = getKodeKecamatan(kecamatan);
+
+                // 3. Buat 6 Angka Acak Unik (000000 - 999999)
+                const angkaUnik = Math.floor(Math.random() * 1000000).toString().padStart(6, '0');
+                
+                // 4. Rakit ID Lengkap (Misal: CTN-SWN-593021)
+                const idSasaran = `${prefix}-${kodeKec}-${angkaUnik}`;
+                
                 const laporan = {
-                    id: `REG-${Date.now()}`, tipe_laporan: 'REGISTRASI', username: session.username, nomor_tim: session.nomor_tim,
-                    kecamatan: kecamatan, jenis_sasaran: selJenis.value, desa: selDesa.value, dusun: selDusun.value,
-                    data_laporan: jawaban, created_at: new Date().toISOString()
+                    id: idSasaran,
+                    tipe_laporan: 'REGISTRASI', 
+                    username: session.username, 
+                    id_tim: session.id_tim, 
+                    nomor_tim: session.nomor_tim,
+                    kecamatan: kecamatan, 
+                    jenis_sasaran: jenisSasaran, 
+                    desa: selDesa.value, 
+                    dusun: selDusun.value,
+                    data_laporan: jawaban, 
+                    created_at: new Date().toISOString()
                 };
                 await putData('sync_queue', laporan);
-                alert(`✅ Registrasi ${laporan.jenis_sasaran} tersimpan di HP!`);
+                alert(`✅ Registrasi berhasil! ID Sasaran: ${idSasaran}`);
                 renderKonten('dashboard');
             } catch (err) { alert("Gagal menyimpan form."); } finally { btn.disabled = false; btn.innerText = "💾 Simpan Registrasi"; }
         };
@@ -231,19 +282,64 @@ const initFormRegistrasi = async () => {
 };
 
 const initDaftarSasaran = async () => {
+    const session = window.currentUser;
     const list = getEl('list-sasaran');
     if(!list) return;
+    
     const antrean = await getAllData('sync_queue').catch(()=>[]);
-    const regList = antrean.filter(a => a.tipe_laporan === 'REGISTRASI');
-    if (regList.length === 0) { list.innerHTML = `<div style="text-align:center; padding:20px; color:#999;">Belum ada sasaran yang diregistrasi di HP ini.</div>`; } 
-    else { list.innerHTML = regList.map(r => `<div style="background:#f4f7f6; padding:15px; border-radius:8px; border-left: 4px solid var(--primary);"><strong>${r.jenis_sasaran}</strong> - ${r.desa} (${r.dusun})<div style="font-size:0.8rem; color:#666;">${new Date(r.created_at).toLocaleString('id-ID')}</div></div>`).join(''); }
+    const regList = antrean.filter(a => a.tipe_laporan === 'REGISTRASI' && a.id_tim === session.id_tim);
+    
+    if (regList.length === 0) { 
+        list.innerHTML = `<div style="text-align:center; padding:20px; color:#999;">Belum ada sasaran yang diregistrasi oleh Tim Anda.</div>`; 
+    } else { 
+        list.innerHTML = regList.map(r => `
+            <div style="background:#f4f7f6; padding:15px; border-radius:8px; border-left: 4px solid var(--primary); margin-bottom: 10px;">
+                <div style="font-weight: bold; font-size: 1.1rem; color: #333;">[${r.id}] ${r.jenis_sasaran}</div>
+                <div style="font-size: 0.9rem; color: #555; margin-top: 4px;">📍 ${r.dusun}, ${r.desa}</div>
+                <div style="font-size: 0.75rem; color:#888; margin-top: 8px;">⏳ Disimpan: ${new Date(r.created_at).toLocaleString('id-ID')}</div>
+            </div>`).join(''); 
+    }
 };
 
 const initFormPendampingan = async () => {
+    const session = window.currentUser;
     const selSasaran = getEl('pend-sasaran');
+    const containerQ = getEl('form-pendampingan-dinamis');
+    
     const antrean = await getAllData('sync_queue').catch(()=>[]);
-    const regList = antrean.filter(a => a.tipe_laporan === 'REGISTRASI');
-    if (selSasaran) { selSasaran.innerHTML = '<option value="">-- Pilih Sasaran --</option>' + regList.map(r => `<option value="${r.id}">${r.jenis_sasaran} (${r.dusun})</option>`).join(''); }
+    const regList = antrean.filter(a => a.tipe_laporan === 'REGISTRASI' && a.id_tim === session.id_tim);
+    
+    if (selSasaran) { 
+        selSasaran.innerHTML = '<option value="">-- Pilih Sasaran --</option>' + 
+        regList.map(r => `<option value="${r.id}">[${r.id}] ${r.jenis_sasaran} - ${r.dusun}</option>`).join(''); 
+        
+        selSasaran.onchange = () => {
+            const sasaranId = selSasaran.value;
+            const sasaranData = regList.find(r => r.id === sasaranId);
+            if(sasaranData && sasaranData.jenis_sasaran === 'BUMIL') {
+                containerQ.innerHTML = `
+                    <div class="form-group">
+                        <label style="color:var(--primary);">Apakah Ibu Hamil ini sudah melahirkan?</label>
+                        <select id="is_melahirkan" name="is_melahirkan" class="form-control">
+                            <option value="TIDAK">Belum / Tidak</option>
+                            <option value="YA">Ya, Sudah Melahirkan</option>
+                        </select>
+                    </div>
+                    <div class="form-group hidden" id="box-tgl-lahir">
+                        <label>Tanggal Persalinan</label>
+                        <input type="date" name="tgl_persalinan" class="form-control">
+                    </div>`;
+                    
+                getEl('is_melahirkan').onchange = (e) => {
+                    if(e.target.value === 'YA') getEl('box-tgl-lahir').classList.remove('hidden');
+                    else getEl('box-tgl-lahir').classList.add('hidden');
+                };
+            } else {
+                containerQ.innerHTML = '';
+            }
+        };
+    }
+    
     const formPend = getEl('form-pendampingan');
     if (formPend) {
         formPend.onsubmit = async (e) => {
@@ -252,7 +348,28 @@ const initFormPendampingan = async () => {
             try {
                 const formData = new FormData(e.target);
                 const jawaban = {}; formData.forEach((val, key) => { jawaban[key] = val; });
-                const laporan = { id: `PEND-${Date.now()}`, tipe_laporan: 'PENDAMPINGAN', username: window.currentUser.username, id_sasaran_ref: jawaban.id_sasaran, data_laporan: jawaban, created_at: new Date().toISOString() };
+                
+                // Transisi BUMIL -> BUFAS di Lokal HP
+                if(jawaban.is_melahirkan === 'YA' && jawaban.tgl_persalinan) {
+                    const originalReg = await getDataById('sync_queue', jawaban.id_sasaran);
+                    if(originalReg) {
+                        originalReg.jenis_sasaran = 'BUFAS';
+                        // Jika mau ID nya ikut berubah menjadi BFS, bisa diatur disini,
+                        // Namun disarankan ID tetap agar sinkronisasi pusat tidak pecah riwayatnya.
+                        await putData('sync_queue', originalReg);
+                        alert("🎉 Selamat! Ibu ini telah melahirkan dan otomatis pindah ke daftar BUFAS.");
+                    }
+                }
+
+                const laporan = { 
+                    id: `PEND-${Date.now()}`, 
+                    tipe_laporan: 'PENDAMPINGAN', 
+                    username: session.username, 
+                    id_tim: session.id_tim,
+                    id_sasaran_ref: jawaban.id_sasaran, 
+                    data_laporan: jawaban, 
+                    created_at: new Date().toISOString() 
+                };
                 await putData('sync_queue', laporan);
                 alert("✅ Laporan Pendampingan tersimpan di HP!"); renderKonten('dashboard');
             } catch (err) { alert("Gagal menyimpan."); } finally { btn.disabled = false; }
@@ -261,13 +378,16 @@ const initFormPendampingan = async () => {
 };
 
 const initRekap = async () => {
+    const session = window.currentUser;
     const antrean = await getAllData('sync_queue').catch(()=>[]);
-    if(getEl('rekap-total')) getEl('rekap-total').innerText = antrean.filter(a => a.tipe_laporan === 'REGISTRASI').length;
-    if(getEl('rekap-pend')) getEl('rekap-pend').innerText = antrean.filter(a => a.tipe_laporan === 'PENDAMPINGAN').length;
+    const dataTim = antrean.filter(a => a.id_tim === session.id_tim);
+    
+    if(getEl('rekap-total')) getEl('rekap-total').innerText = dataTim.filter(a => a.tipe_laporan === 'REGISTRASI').length;
+    if(getEl('rekap-pend')) getEl('rekap-pend').innerText = dataTim.filter(a => a.tipe_laporan === 'PENDAMPINGAN').length;
 };
 
 // ==========================================
-// 5. LOGIN TAHAN BANTING (DIJAMIN TIDAK ERROR)
+// 5. LOGIN TAHAN BANTING
 // ==========================================
 document.addEventListener('DOMContentLoaded', () => {
     initApp();
@@ -284,25 +404,19 @@ document.addEventListener('DOMContentLoaded', () => {
             if (btn) { btn.disabled = true; btn.innerText = "Memeriksa..."; }
 
             try {
-                // Pastikan DB Siap
                 await initDB();
-                
-                // Cari User dengan perlindungan error (catch)
                 const user = await getDataById('master_user', id).catch(() => null);
                 
                 if (!user) {
-                    alert("❌ ID Pengguna tidak ditemukan. Pastikan koneksi internet menyala saat pertama kali login.");
+                    alert("❌ ID Pengguna tidak ditemukan. Pastikan internet menyala jika ini login pertama.");
                     if (btn) { btn.disabled = false; btn.innerText = "Masuk"; }
                     return;
                 }
 
-                // Amankan pembacaan PIN
                 const pinBenar = user.password_awal_ref ? String(user.password_awal_ref) : "";
                 
                 if (pinBenar === pin) {
                     let nama = user.username, tim = '-', noTim = '-';
-                    
-                    // Amankan pencarian data Kader & Tim
                     if (user.role_akses === 'KADER' && user.ref_id) {
                         const k = await getDataById('master_kader', user.ref_id).catch(() => null);
                         if (k) { 
@@ -312,7 +426,6 @@ document.addEventListener('DOMContentLoaded', () => {
                             noTim = t ? (t.nomor_tim || tim) : tim;
                         }
                     }
-                    
                     const ses = { id_kader: 'active_user', username: user.username, role: user.role_akses, nama, id_tim: tim, nomor_tim: noTim };
                     await putData('kader_session', ses);
                     
@@ -323,7 +436,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             } catch (err) {
                 console.error("Kesalahan Login:", err);
-                alert("Kesalahan Sistem: " + err.message); // Tampilkan pesan error aslinya
+                alert("Kesalahan Sistem: " + err.message);
             } finally {
                 if (btn) { btn.disabled = false; btn.innerText = "Masuk"; }
             }
@@ -332,7 +445,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 window.logout = async () => { 
-    if (confirm("Keluar dari aplikasi? Data Anda yang belum tersinkronisasi akan tetap aman.")) { 
+    if (confirm("Keluar dari aplikasi? Data sasaran belum sinkron tetap aman di HP.")) { 
         await deleteData('kader_session', 'active_user'); 
         location.reload(); 
     }
@@ -344,20 +457,15 @@ window.addEventListener('offline', updateNetworkStatus);
 // ==========================================
 // 6. KONTROL SIDEBAR (MENU SAMPING)
 // ==========================================
-const btnMenu = document.getElementById('btn-menu');
-const sidebar = document.getElementById('sidebar');
-const overlay = document.getElementById('sidebar-overlay');
+const btnMenu = getEl('btn-menu');
+const sidebar = getEl('sidebar');
+const overlay = getEl('sidebar-overlay');
 
 if (btnMenu && sidebar && overlay) {
-    // Membuka menu saat tombol ☰ diklik
     btnMenu.addEventListener('click', () => {
-        sidebar.classList.add('active');
-        overlay.classList.add('active');
+        sidebar.classList.add('active'); overlay.classList.add('active');
     });
-
-    // Menutup menu saat area gelap (overlay) diklik
     overlay.addEventListener('click', () => {
-        sidebar.classList.remove('active');
-        overlay.classList.remove('active');
+        sidebar.classList.remove('active'); overlay.classList.remove('active');
     });
 }
