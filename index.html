@@ -81,7 +81,7 @@
                 <div class="form-group"><label>Dusun/RW</label><select id="reg-dusun" name="dusun" class="form-control" required></select></div>
                 <hr style="margin: 20px 0; border: 0; border-top: 1px solid #ddd;">
                 <div id="pertanyaan-dinamis"></div>
-                <button type="submit" class="btn-primary" style="margin-top: 15px;">💾 Simpan Registrasi</button>
+                <button type="submit" class="btn-primary" style="margin-top: 15px; width: 100%;">💾 Simpan Registrasi</button>
             </form>
         </div>
     </template>
@@ -89,9 +89,8 @@
     <template id="template-daftar-sasaran">
         <div class="card animate-fade">
             <h3 style="margin-bottom: 15px; color: var(--primary);">📋 Daftar Sasaran</h3>
-            <p style="font-size: 0.85rem; color: #666; margin-bottom: 15px;">Data sasaran yang tersimpan di perangkat ini (Belum Sinkron).</p>
-            <div id="list-sasaran" style="display: flex; flex-direction: column; gap: 10px;">
-                </div>
+            <p style="font-size: 0.85rem; color: #666; margin-bottom: 15px;">Daftar sasaran aktif di wilayah Tim Anda (Tersimpan Lokal).</p>
+            <div id="list-sasaran" style="display: flex; flex-direction: column; gap: 10px;"></div>
         </div>
     </template>
 
@@ -105,9 +104,11 @@
                         <option value="">-- Memuat Sasaran --</option>
                     </select>
                 </div>
+                <div id="form-pendampingan-dinamis">
+                    </div>
                 <div class="form-group"><label>Tanggal Kunjungan</label><input type="date" name="tgl_kunjungan" class="form-control" required></div>
-                <div class="form-group"><label>Catatan / Hasil Pendampingan</label><textarea name="catatan" class="form-control" rows="4" required></textarea></div>
-                <button type="submit" class="btn-primary" style="margin-top: 15px;">💾 Simpan Pendampingan</button>
+                <div class="form-group"><label>Catatan Umum / Hasil</label><textarea name="catatan" class="form-control" rows="3" required></textarea></div>
+                <button type="submit" class="btn-primary" style="margin-top: 15px; width: 100%;">💾 Simpan Pendampingan</button>
             </form>
         </div>
     </template>
@@ -118,11 +119,11 @@
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 20px;">
                 <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #ddd;">
                     <h4 id="rekap-total" style="font-size: 2rem; color: var(--primary); margin:0;">0</h4>
-                    <p style="font-size: 0.8rem; color: #666; margin:0;">Total Registrasi</p>
+                    <p style="font-size: 0.8rem; color: #666; margin:0;">Sasaran Baru</p>
                 </div>
                 <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #ddd;">
                     <h4 id="rekap-pend" style="font-size: 2rem; color: #198754; margin:0;">0</h4>
-                    <p style="font-size: 0.8rem; color: #666; margin:0;">Total Pendampingan</p>
+                    <p style="font-size: 0.8rem; color: #666; margin:0;">Pendampingan</p>
                 </div>
             </div>
         </div>
@@ -131,23 +132,18 @@
     <template id="template-cetak-pdf">
         <div class="card animate-fade" style="text-align: center;">
             <h3 style="margin-bottom: 15px; color: var(--primary);">🖨️ Cetak PDF</h3>
-            <p style="font-size: 0.9rem; color: #666; margin-bottom: 20px;">Fitur ini akan mengunduh laporan bulanan dalam format PDF.</p>
-            <div class="form-group" style="text-align: left;">
-                <label>Pilih Bulan</label>
-                <input type="month" id="bulan-cetak" class="form-control" required>
-            </div>
-            <button class="btn-primary" style="background: #dc3545;" onclick="alert('Fitur cetak PDF akan segera aktif setelah terhubung dengan server Google!')">⬇️ Download PDF</button>
+            <p style="font-size: 0.9rem; color: #666; margin-bottom: 20px;">Fitur unduh laporan (Memerlukan koneksi internet).</p>
+            <button class="btn-primary" style="background: #dc3545;" onclick="alert('Fitur cetak PDF akan aktif setelah tersambung ke Server Google.')">⬇️ Download PDF</button>
         </div>
     </template>
-
+    
     <template id="template-ganti-pass">
         <div class="card animate-fade">
             <h3 style="margin-bottom: 15px; color: var(--primary);">🔑 Ganti Password</h3>
             <form id="form-ganti-pass" class="modern-form">
-                <div class="form-group"><label>Password Lama</label><input type="password" id="pass-lama" class="form-control" required></div>
                 <div class="form-group"><label>Password Baru</label><input type="password" id="pass-baru" class="form-control" required></div>
-                <div class="form-group"><label>Konfirmasi Password Baru</label><input type="password" id="pass-konfirm" class="form-control" required></div>
-                <button type="submit" class="btn-primary" style="margin-top: 15px;">🔄 Update Password</button>
+                <div class="form-group"><label>Konfirmasi Password</label><input type="password" id="pass-konfirm" class="form-control" required></div>
+                <button type="submit" class="btn-primary" style="margin-top: 15px; width:100%;">🔄 Update Password</button>
             </form>
         </div>
     </template>
