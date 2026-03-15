@@ -1,63 +1,58 @@
-const DB_NAME = 'TpkBulelengDB';
-const DB_VERSION = 3; // Naikkan versi ke 3
-
-let dbInstance = null;
+const DB_NAME = 'TPKBulelengDB';
+const DB_VERSION = 2; // Versi dinaikkan agar database di-refresh
 
 export const initDB = () => {
     return new Promise((resolve, reject) => {
-        if (dbInstance) return resolve(dbInstance);
-
         const request = indexedDB.open(DB_NAME, DB_VERSION);
 
-        request.onupgradeneeded = (event) => {
-            const db = event.target.result;
+        request.onupgradeneeded = (e) => {
+            const db = e.target.result;
             
-            // Hapus store lama jika ada untuk pembersihan struktur
-            const stores = [
-                { name: 'master_user', key: 'username' },
-                { name: 'master_kader', key: 'id_kader' },
-                { name: 'master_wilayah', key: 'id_wilayah' },
-                { name: 'master_tim_wilayah', key: 'id_tim_wilayah' },
-                { name: 'master_pertanyaan', key: 'id_pertanyaan' },
-                { name: 'kader_session', key: 'id_kader' },
-                { name: 'sync_queue', key: 'id' }
-            ];
-
-            stores.forEach(s => {
-                if (!db.objectStoreNames.contains(s.name)) {
-                    db.createObjectStore(s.name, { keyPath: s.key });
-                }
-            });
+            // Tabel Session (Login)
+            if (!db.objectStoreNames.contains('kader_session')) {
+                db.createObjectStore('kader_session', { keyPath: 'id_kader' });
+            }
+            // Tabel Master User & Kader
+            if (!db.objectStoreNames.contains('master_user')) {
+                db.createObjectStore('master_user', { keyPath: 'id_pengguna' });
+            }
+            if (!db.objectStoreNames.contains('master_kader')) {
+                db.createObjectStore('master_kader', { keyPath: 'id_kader' });
+            }
+            // Tabel Master Wilayah (Tugas Kader)
+            if (!db.objectStoreNames.contains('master_tim_wilayah')) {
+                db.createObjectStore('master_tim_wilayah', { autoIncrement: true });
+            }
+            // Tabel Master Tim
+            if (!db.objectStoreNames.contains('master_tim')) {
+                db.createObjectStore('master_tim', { keyPath: 'id_tim' });
+            }
+            // Tabel Master Pertanyaan Dinamis
+            if (!db.objectStoreNames.contains('master_pertanyaan')) {
+                db.createObjectStore('master_pertanyaan', { keyPath: 'id_pertanyaan' });
+            }
+            // Tabel Master Wilayah Bali (BARU - KHUSUS CATIN)
+            if (!db.objectStoreNames.contains('master_wilayah_bali')) {
+                db.createObjectStore('master_wilayah_bali', { autoIncrement: true });
+            }
+            // Tabel Antrean Sinkronisasi (Offline Data)
+            if (!db.objectStoreNames.contains('sync_queue')) {
+                db.createObjectStore('sync_queue', { keyPath: 'id' });
+            }
         };
 
-        request.onsuccess = (event) => {
-            dbInstance = event.target.result;
-            resolve(dbInstance);
-        };
-
-        request.onerror = (event) => reject(event.target.error);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = (e) => reject(e.target.error);
     });
 };
 
-// Fungsi Helper Standar
 export const putData = async (storeName, data) => {
     const db = await initDB();
     return new Promise((resolve, reject) => {
         const tx = db.transaction(storeName, 'readwrite');
         tx.objectStore(storeName).put(data);
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error);
-    });
-};
-
-export const putBulkData = async (storeName, dataArray) => {
-    const db = await initDB();
-    return new Promise((resolve, reject) => {
-        const tx = db.transaction(storeName, 'readwrite');
-        const store = tx.objectStore(storeName);
-        dataArray.forEach(item => store.put(item));
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error);
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = (e) => reject(e.target.error);
     });
 };
 
@@ -65,9 +60,9 @@ export const getDataById = async (storeName, id) => {
     const db = await initDB();
     return new Promise((resolve, reject) => {
         const tx = db.transaction(storeName, 'readonly');
-        const request = tx.objectStore(storeName).get(id);
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
+        const req = tx.objectStore(storeName).get(id);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = (e) => reject(e.target.error);
     });
 };
 
@@ -75,9 +70,9 @@ export const getAllData = async (storeName) => {
     const db = await initDB();
     return new Promise((resolve, reject) => {
         const tx = db.transaction(storeName, 'readonly');
-        const request = tx.objectStore(storeName).getAll();
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
+        const req = tx.objectStore(storeName).getAll();
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = (e) => reject(e.target.error);
     });
 };
 
@@ -86,6 +81,17 @@ export const deleteData = async (storeName, id) => {
     return new Promise((resolve, reject) => {
         const tx = db.transaction(storeName, 'readwrite');
         tx.objectStore(storeName).delete(id);
-        tx.oncomplete = () => resolve();
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = (e) => reject(e.target.error);
+    });
+};
+
+export const clearStore = async (storeName) => {
+    const db = await initDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(storeName, 'readwrite');
+        tx.objectStore(storeName).clear();
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = (e) => reject(e.target.error);
     });
 };
