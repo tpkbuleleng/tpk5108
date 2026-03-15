@@ -1,71 +1,129 @@
 import { initDB, putData, getDataById, deleteData, getAllData } from './db.js';
 import { downloadMasterData } from './sync.js';
 
-// Helper agar tidak error jika elemen tidak ditemukan
 const getEl = (id) => document.getElementById(id);
+
+// --- FUNGSI NAVIGASI LAYAR (Kunci Perbaikan) ---
+const tampilkanLayar = (id) => {
+    const vSplash = getEl('view-splash');
+    const vLogin = getEl('view-login');
+    const vApp = getEl('view-app');
+
+    // Sembunyikan semua dulu
+    if (vSplash) vSplash.classList.remove('active');
+    if (vLogin) vLogin.classList.add('hidden');
+    if (vApp) vApp.classList.add('hidden');
+
+    // Tampilkan yang dipilih
+    if (id === 'login') {
+        vLogin.classList.remove('hidden');
+    } else if (id === 'app') {
+        vApp.classList.remove('hidden');
+    } else if (id === 'splash') {
+        vSplash.classList.add('active');
+    }
+};
 
 const initApp = async () => {
     try {
-        console.log("Memulai Database...");
         await initDB();
-        
-        // Cek Sesi
+        updateNetworkStatus();
+
+        // Cek apakah sudah ada user yang login
         const session = await getDataById('kader_session', 'active_user');
-        
-        // Timer Splash Screen
+
+        // Beri waktu splash screen tampil sebentar
         setTimeout(() => {
-            const splash = getEl('view-splash');
-            if (splash) splash.style.display = 'none'; // Paksa sembunyi
-            
             if (session) {
-                console.log("Masuk sebagai:", session.nama);
                 masukKeAplikasi(session);
             } else {
                 tampilkanLayar('login');
             }
         }, 1500);
 
+        // Download data master jika database kosong (Background process)
+        const users = await getAllData('master_user');
+        if (users.length === 0 && navigator.onLine) {
+            await downloadMasterData();
+        }
     } catch (err) {
-        console.error("Kritis:", err);
-        // Jika DB gagal, tetap tampilkan login agar tidak putih
-        const splash = getEl('view-splash');
-        if (splash) splash.style.display = 'none';
+        console.error("Init Error:", err);
         tampilkanLayar('login');
-    }
-};
-
-// Fungsi Pindah Layar yang Kuat
-const tampilkanLayar = (id) => {
-    const vLogin = getEl('view-login');
-    const vApp = getEl('view-app');
-    const vSplash = getEl('view-splash');
-
-    // Sembunyikan Splash secara paksa
-    if (vSplash) vSplash.style.display = 'none';
-
-    if (id === 'login') {
-        if (vLogin) vLogin.classList.remove('hidden');
-        if (vApp) vApp.classList.add('hidden');
-        console.log("Layar Login tampil sekarang.");
-    } else if (id === 'app') {
-        if (vLogin) vLogin.classList.add('hidden');
-        if (vApp) vApp.classList.remove('hidden');
-        console.log("Layar Aplikasi tampil sekarang.");
     }
 };
 
 const masukKeAplikasi = (session) => {
     window.currentUser = session;
-    const greeting = getEl('user-greeting');
-    if (greeting) greeting.innerText = `Dashboard ${session.role}`;
     
-    // Set profil sidebar
+    // Update UI Header & Sidebar
+    if (getEl('user-greeting')) getEl('user-greeting').innerText = `Dashboard ${session.role}`;
     if (getEl('sidebar-nama')) getEl('sidebar-nama').innerText = session.nama;
     if (getEl('sidebar-role')) getEl('sidebar-role').innerText = session.role;
     
     renderMenu(session.role);
-    tampilkanLayar('app');
+    tampilkanLayar('app'); // Pindah ke layar utama
 };
+
+// --- LOGIKA FORM LOGIN ---
+const formLogin = getEl('form-login');
+if (formLogin) {
+    formLogin.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btnSubmit = getEl('btn-login-submit');
+        btnSubmit.disabled = true;
+        btnSubmit.innerText = "Memproses...";
+
+        const idInput = getEl('kader-id').value.trim();
+        const passInput = getEl('kader-pin').value.trim();
+
+        try {
+            const user = await getDataById('master_user', idInput);
+
+            if (!user) {
+                alert("ID Pengguna tidak ditemukan!");
+                btnSubmit.disabled = false;
+                btnSubmit.innerText = "Masuk";
+                return;
+            }
+
+            const passBenar = user.password_awal_ref ? user.password_awal_ref.toString() : "";
+            
+            if (passBenar === passInput) {
+                // Login Berhasil
+                let namaTampil = user.username;
+                let idTim = '-';
+
+                if (user.role_akses === 'KADER') {
+                    const detail = await getDataById('master_kader', user.ref_id);
+                    if (detail) {
+                        namaTampil = detail.nama_kader;
+                        idTim = detail.id_tim;
+                    }
+                }
+
+                const sessionData = {
+                    id_kader: 'active_user',
+                    username: user.username,
+                    role: user.role_akses,
+                    nama: namaTampil,
+                    id_tim: idTim
+                };
+
+                await putData('kader_session', sessionData);
+                masukKeAplikasi(sessionData);
+            } else {
+                alert("Password salah!");
+                btnSubmit.disabled = false;
+                btnSubmit.innerText = "Masuk";
+            }
+        } catch (err) {
+            console.error(err);
+            alert("Terjadi kesalahan sistem.");
+            btnSubmit.disabled = false;
+            btnSubmit.innerText = "Masuk";
+        }
+    });
+}
 
 const renderMenu = (role) => {
     const container = getEl('dynamic-menu-container');
@@ -91,14 +149,19 @@ const renderMenu = (role) => {
         <a class="menu-item" data-target="${m.id}">
             <span class="icon">${m.icon}</span> ${m.label}
         </a>
-    `).join('') + `<hr><a class="menu-item text-danger" onclick="logout()">🚪 Keluar</a>`;
+    `).join('') + `<hr><a class="menu-item text-danger" id="btnLogout">🚪 Keluar</a>`;
 
+    // Event Klik Menu
     document.querySelectorAll('.menu-item[data-target]').forEach(item => {
         item.onclick = () => {
-            toggleSidebar(false);
-            renderKonten(item.getAttribute('data-target'));
+            const target = item.getAttribute('data-target');
+            getEl('sidebar').classList.remove('active');
+            getEl('sidebar-overlay').classList.remove('active');
+            renderKonten(target);
         };
     });
+
+    if (getEl('btnLogout')) getEl('btnLogout').onclick = window.logout;
 };
 
 const renderKonten = (target) => {
@@ -107,32 +170,40 @@ const renderKonten = (target) => {
 
     if (target === 'registrasi') {
         const temp = getEl('template-registrasi');
-        if (temp) {
-            area.innerHTML = '';
-            area.appendChild(temp.content.cloneNode(true));
-            // Panggil init form nanti jika sudah muncul
-        }
+        area.innerHTML = '';
+        area.appendChild(temp.content.cloneNode(true));
+        // Fungsi initFormRegistrasi bisa dipanggil di sini
     } else {
-        area.innerHTML = `<div class="card"><h3>Menu ${target.toUpperCase()}</h3></div>`;
+        area.innerHTML = `<div class="content-card"><h3>Menu ${target.toUpperCase()}</h3><p>Dalam pengembangan.</p></div>`;
     }
 };
 
-const toggleSidebar = (show) => {
-    const sb = getEl('sidebar');
-    const ov = getEl('sidebar-overlay');
-    if (sb && ov) {
-        sb.classList.toggle('active', show);
-        ov.classList.toggle('active', show);
+// --- UTILS ---
+const updateNetworkStatus = () => {
+    const status = getEl('network-status');
+    if (status) {
+        status.innerText = navigator.onLine ? 'Online' : 'Offline';
+        status.className = 'status-badge ' + (navigator.onLine ? 'online' : 'offline');
     }
 };
-
-// Event dasar
-if (getEl('btn-menu')) getEl('btn-menu').onclick = () => toggleSidebar(true);
-if (getEl('sidebar-overlay')) getEl('sidebar-overlay').onclick = () => toggleSidebar(false);
 
 window.logout = async () => {
-    await deleteData('kader_session', 'active_user');
-    location.reload();
+    if (confirm("Keluar dari aplikasi?")) {
+        await deleteData('kader_session', 'active_user');
+        location.reload();
+    }
 };
 
+if (getEl('btn-menu')) getEl('btn-menu').onclick = () => {
+    getEl('sidebar').classList.add('active');
+    getEl('sidebar-overlay').classList.add('active');
+};
+
+if (getEl('sidebar-overlay')) getEl('sidebar-overlay').onclick = () => {
+    getEl('sidebar').classList.remove('active');
+    getEl('sidebar-overlay').classList.remove('active');
+};
+
+window.addEventListener('online', updateNetworkStatus);
+window.addEventListener('offline', updateNetworkStatus);
 document.addEventListener('DOMContentLoaded', initApp);
