@@ -109,18 +109,20 @@
 
                 <div id="wilayah-catin" style="display: none; background: #fff3cd; padding: 15px; border-radius: 8px; margin-top: 15px; margin-bottom: 15px; border-left: 4px solid #ffc107;">
                     <label style="color: #856404; font-weight: bold; margin-bottom: 10px; display: block;">📍 Alamat Asal (Khusus CATIN)</label>
-                    <div class="form-group"><label>Provinsi</label><input type="text" name="prov_asal" class="form-control" value="BALI"></div>
-                    <div class="form-group"><label>Kabupaten/Kota</label><input type="text" name="kab_asal" class="form-control" value="BULELENG"></div>
-                    <div class="form-group"><label>Kecamatan</label><input type="text" name="kec_asal" class="form-control" placeholder="Isi Kecamatan Asal"></div>
-                    <div class="form-group"><label>Desa / Dusun / RW</label><input type="text" name="desa_asal" class="form-control" placeholder="Isi Desa / Dusun Asal"></div>
+                    <div class="form-group"><label>Provinsi</label><input type="text" name="prov_asal" class="form-control" value="BALI" readonly></div>
+                    <div class="form-group"><label>Kabupaten/Kota</label><select id="catin-kab" name="kab_asal" class="form-control"></select></div>
+                    <div class="form-group"><label>Kecamatan</label><select id="catin-kec" name="kec_asal" class="form-control"></select></div>
+                    <div class="form-group"><label>Desa / Kelurahan</label><select id="catin-desa" name="desa_asal" class="form-control"></select></div>
+                    <div class="form-group"><label>Dusun / Banjar / RW</label><input type="text" name="dusun_asal" class="form-control" placeholder="Ketik Dusun/Banjar Asal"></div>
                 </div>
 
-                <hr style="margin: 20px 0; border: 0; border-top: 2px dashed #eee;">
-                
-                <h4 style="margin-bottom: 15px; color: var(--primary);">Alamat Domisili</h4>
-                <div class="form-group"><label>Desa/Kelurahan Domisili</label><select id="reg-desa" name="desa" class="form-control" required></select></div>
-                <div class="form-group"><label>Dusun/RW Domisili</label><select id="reg-dusun" name="dusun" class="form-control" required></select></div>
-                <div class="form-group"><label>Alamat Lengkap</label><textarea name="alamat" class="form-control" rows="2" placeholder="Nama Jalan / Banjar" required></textarea></div>
+                <div id="wilayah-domisili">
+                    <hr style="margin: 20px 0; border: 0; border-top: 2px dashed #eee;">
+                    <h4 style="margin-bottom: 15px; color: var(--primary);">Alamat Domisili</h4>
+                    <div class="form-group"><label>Desa/Kelurahan Domisili</label><select id="reg-desa" name="desa" class="form-control" required></select></div>
+                    <div class="form-group"><label>Dusun/RW Domisili</label><select id="reg-dusun" name="dusun" class="form-control" required></select></div>
+                    <div class="form-group"><label>Alamat Lengkap</label><textarea id="reg-alamat" name="alamat" class="form-control" rows="2" placeholder="Nama Jalan / Banjar" required></textarea></div>
+                </div>
 
                 <div id="pertanyaan-dinamis" style="margin-top: 20px;"></div>
                 
