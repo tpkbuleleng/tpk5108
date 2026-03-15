@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tpk-buleleng-cache-v4';
+const CACHE_NAME = 'tpk-buleleng-cache-v5';
 
 // Daftar file pondasi (App Shell) yang HARUS disimpan secara offline
 const ASSETS_TO_CACHE = [
