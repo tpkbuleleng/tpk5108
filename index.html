@@ -1,12 +1,17 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="id">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TPK Buleleng</title>
     
+    <meta name="description" content="Aplikasi Laporan Tim Pendamping Keluarga (TPK) Kabupaten Buleleng.">
+    
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0084FF">
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="apple-touch-icon" href="logo-tpk26.png">
     
     <script src="data-wilayah.js"></script>
@@ -14,25 +19,27 @@
     <script src="data-pertanyaan.js"></script>
 
     <link rel="stylesheet" href="assets/css/app.css">
-
 </head>
 <body>
 
     <div id="splash-screen">
-        <img src="logo-tpk26.png" class="splash-logo" alt="Logo">
+        <img src="logo-tpk26.png" class="splash-logo" alt="Logo TPK Buleleng">
         <h1 class="splash-text">TPK KABUPATEN BULELENG</h1>
         <p class="version-text">Versi 1.0.5</p>
     </div>
 
     <div id="login-screen" class="container hidden">
         <div class="header-title" style="margin-top:20px;">
-            <img src="logo-tpk26.png" class="login-logo" alt="Logo">
+            <img src="logo-tpk26.png" class="login-logo" alt="Logo TPK">
             Laporan TPK<br><span style="font-size: 18px; color: #666;">Kabupaten Buleleng</span>
         </div>
         <form id="login-form">
-            <div class="form-group"><label>ID Pengguna</label><input type="text" id="id-kader" placeholder="Masukkan ID sesuai master Google Sheet" required></div>
             <div class="form-group">
-                <label>Password</label>
+                <label for="id-kader">ID Pengguna</label>
+                <input type="text" id="id-kader" placeholder="Masukkan ID sesuai master Google Sheet" required>
+            </div>
+            <div class="form-group">
+                <label for="login-password">Password</label>
                 <input type="password" id="login-password" required maxlength="64" minlength="4" placeholder="Masukkan Password" autocomplete="current-password" style="padding-right: 90px;">
                 <span class="toggle-pwd" id="toggle-pwd-icon" onclick="togglePassword()">Lihat</span>
             </div>
@@ -40,60 +47,44 @@
         </form>
     </div>
 
-    <div id="main-menu" class="container hidden">
-        <div id="notif-box" class="notif hidden"></div>
-        <div class="welcome-card">
-            <h3>Selamat Datang,</h3>
-            <p id="kader-info-display"></p>
-            <button onclick="logoutKader()" style="margin-top:12px; padding:6px 12px; background:#ffebee; color:#dc3545; border:1px solid #ffcdd2; border-radius:6px; cursor:pointer; font-weight:600; font-size:12px; transition: 0.2s;">Keluar / Logout</button>
-        </div>
-        
-        <div class="menu-grid">
-            <button class="menu-btn" onclick="bukaMenuRegistrasi()">1. REGISTRASI SASARAN <span class="menu-right">></span></button>
-            <button class="menu-btn" onclick="bukaMenuLapor()">2. LAPOR PENDAMPINGAN <span class="menu-right">></span></button>
-            <button class="menu-btn" onclick="bukaMenuData()">3. LIHAT/UPDATE DATA <span class="menu-right">></span></button>
-            <button class="menu-btn" onclick="bukaMenuRekap()">4. REKAPITULASI DATA <span class="menu-right">></span></button>
-            <button class="menu-btn btn-sync" onclick="prosesSinkronisasi()" id="btn-sync-ui">
-                <span id="sync-text">5. SINKRONISASI DATA</span><span class="badge hidden" id="sync-badge">0</span><div class="loader" id="sync-loader"></div>
-            </button>
-        </div>
-    </div>
-    <div id="admin-menu" class="container hidden">
-        <div id="notif-box-admin" class="notif hidden"></div>
-        <div class="welcome-card">
-            <h3>Portal Admin</h3>
-            <p id="admin-info-display"></p>
-            <button onclick="logoutKader()" style="margin-top:12px; padding:6px 12px; background:#ffebee; color:#dc3545; border:1px solid #ffcdd2; border-radius:6px; cursor:pointer; font-weight:600; font-size:12px; transition: 0.2s;">Keluar / Logout</button>
-        </div>
-        <div id="admin-summary-card" class="welcome-card" style="border-left-color: var(--success);">
-            <h3>Ringkasan Kecamatan</h3>
-            <p id="admin-summary-text" class="admin-summary-text">Memuat ringkasan...</p>
-        </div>
-        <div class="menu-grid" id="admin-menu-grid"></div>
-    </div>
-    <div id="admin-report-screen" class="container hidden">
-        <h2 class="header-title" id="admin-report-title" style="margin-top: 10px;">Laporan Admin</h2>
-        <div id="admin-report-toolbar" class="exec-period" style="margin-bottom:12px;"></div>
-        <div class="block-content" id="admin-report-content">Memuat...</div>
-        <button class="btn-secondary" onclick="openScreen('admin-menu')">Kembali ke Menu Admin</button>
-    </div>
-
-    <div id="admin-form-screen" class="container hidden">
-        <h2 class="header-title" id="admin-form-title">Form Admin</h2>
-        <div id="admin-form-content"></div>
-        <button class="btn-secondary" onclick="openScreen('admin-menu')">Kembali ke Menu Admin</button>
-    </div>
     <div id="registrasi-screen" class="container hidden">
         <h2 class="header-title" id="judul-form-sasaran">Registrasi Sasaran Baru</h2>
         <form id="form-registrasi">
-            <div class="form-group hidden" id="reg-kecamatan-group"><label>Kecamatan *</label><select id="reg-kecamatan" required onchange="ubahKecamatan()"><option value="">-- Pilih --</option><option value="GRK">Gerokgak</option><option value="SRT">Seririt</option><option value="BSB">Busungbiu</option><option value="BJR">Banjar</option><option value="BLL">Buleleng</option><option value="SKS">Sukasada</option><option value="SWN">Sawan</option><option value="KBT">Kubutambahan</option><option value="TJK">Tejakula</option></select></div>
-            <div class="form-group"><label>Desa/Kelurahan *</label><select id="reg-desa" required onchange="ubahDesa()"><option value="">-- Pilih Kecamatan Dulu --</option></select></div>
-            <div class="form-group"><label>Banjar Dinas / RW *</label><select id="reg-dusun" required onchange="handleJenisSasaran(false)"><option value="">-- Pilih Desa Dulu --</option></select></div>
-            
-            <div class="form-group"><label>Jenis Sasaran *</label><select id="reg-jenis" required onchange="handleJenisSasaran(false)"><option value="">-- Pilih --</option><option value="CATIN">CATIN</option><option value="BUMIL">BUMIL</option><option value="BUFAS">BUFAS</option><option value="BADUTA">BADUTA</option></select></div>
-            <div class="form-group"><label>ID Sasaran</label><input type="text" id="reg-id" readonly placeholder="Terisi Otomatis"></div>
-            <div class="form-group"><label>NIK Sasaran (16 Digit) *</label><input type="text" id="reg-nik" required pattern="[0-9]{16}" maxlength="16" minlength="16" oninput="this.value = this.value.replace(/[^0-9]/g, '');"></div>
-            <div class="form-group"><label>Nama Lengkap Sasaran *</label><input type="text" id="reg-nama" required></div>
+            <div class="form-group hidden" id="reg-kecamatan-group">
+                <label for="reg-kecamatan">Kecamatan *</label>
+                <select id="reg-kecamatan" required onchange="ubahKecamatan()">
+                    <option value="">-- Pilih --</option>
+                    <option value="GRK">Gerokgak</option>
+                    <option value="SRT">Seririt</option>
+                    </select>
+            </div>
+            <div class="form-group">
+                <label for="reg-desa">Desa/Kelurahan *</label>
+                <select id="reg-desa" required onchange="ubahDesa()"><option value="">-- Pilih Kecamatan Dulu --</option></select>
+            </div>
+            <div class="form-group">
+                <label for="reg-dusun">Banjar Dinas / RW *</label>
+                <select id="reg-dusun" required onchange="handleJenisSasaran(false)"><option value="">-- Pilih Desa Dulu --</option></select>
+            </div>
+            <div class="form-group">
+                <label for="reg-jenis">Jenis Sasaran *</label>
+                <select id="reg-jenis" required onchange="handleJenisSasaran(false)">
+                    <option value="">-- Pilih --</option>
+                    <option value="CATIN">CATIN</option>
+                    </select>
+            </div>
+            <div class="form-group">
+                <label for="reg-id">ID Sasaran</label>
+                <input type="text" id="reg-id" readonly placeholder="Terisi Otomatis">
+            </div>
+            <div class="form-group">
+                <label for="reg-nik">NIK Sasaran (16 Digit) *</label>
+                <input type="text" id="reg-nik" required pattern="[0-9]{16}" maxlength="16" minlength="16" oninput="this.value = this.value.replace(/[^0-9]/g, '');">
+            </div>
+            <div class="form-group">
+                <label for="reg-nama">Nama Lengkap Sasaran *</label>
+                <input type="text" id="reg-nama" required>
+            </div>
             
             <div id="pertanyaan-khusus" class="dynamic-section hidden"><h4 id="judul-khusus">Pertanyaan Khusus</h4><div id="konten-khusus"></div></div>
             <button type="submit" class="btn-primary" id="btn-submit-sasaran">Simpan Sasaran</button>
@@ -101,102 +92,18 @@
         </form>
     </div>
 
-    <div id="lapor-screen" class="container hidden">
-        <h2 class="header-title" id="judul-form-laporan">Lapor Pendampingan</h2>
-        <form id="form-laporan">
-            <div class="form-group"><label>Jenis Sasaran *</label><select id="lapor-jenis" required onchange="filterSasaranLapor()"><option value="">-- Pilih Jenis --</option><option value="CATIN">CATIN</option><option value="BUMIL">BUMIL</option><option value="BUFAS">BUFAS</option><option value="BADUTA">BADUTA</option></select></div>
-            <div class="form-group"><label>Pilih Sasaran *</label><select id="lapor-sasaran-id" required disabled><option value="">-- Pilih Jenis Sasaran Dulu --</option></select></div>
-            <div class="form-group"><label>Tanggal Pendampingan *</label><input type="date" id="lapor-tanggal" required></div>
-            <div class="form-group"><label>Bulan Pelaporan *</label><select id="lapor-bulan" required><option value="">-- Pilih --</option><option value="Januari">Januari</option><option value="Februari">Februari</option><option value="Maret">Maret</option><option value="April">April</option><option value="Mei">Mei</option><option value="Juni">Juni</option><option value="Juli">Juli</option><option value="Agustus">Agustus</option><option value="September">September</option><option value="Oktober">Oktober</option><option value="November">November</option><option value="Desember">Desember</option></select></div>
-            
-            <div class="dynamic-section">
-                <h4>Hasil Pemeriksaan</h4>
-                <div class="form-group"><label>Status Risiko *</label><select id="lapor-status" required><option value="">-- Pilih --</option><option value="Normal">Sehat / Normal</option><option value="Beresiko">Beresiko Stunting / Sakit</option></select></div>
-                <div class="form-group"><label>Edukasi / Bantuan *</label><select id="lapor-edukasi" required><option value="">-- Pilih --</option><option value="KIE">Penyuluhan / KIE</option><option value="Rujukan">Rujukan Faskes</option><option value="Bansos">Fasilitasi Bansos</option></select></div>
-                <div class="form-group"><label>Catatan Kader</label><textarea id="lapor-catatan" rows="3" placeholder="Opsional..."></textarea></div>
-                <div id="lapor-bumil-event-wrap" class="hidden">
-                    <div class="form-group"><label>Event BUMIL</label><select id="lapor-bumil-event"><option value="">-- Tidak Ada Event --</option><option value="PERSALINAN">Persalinan Terjadi</option></select></div>
-                    <div class="form-group hidden" id="lapor-tgl-persalinan-wrap"><label>Tanggal Persalinan</label><input type="date" id="lapor-tgl-persalinan"></div>
-                </div>
-            </div>
-            <button type="submit" class="btn-primary" id="btn-submit-laporan">Simpan Laporan</button>
-            <button type="button" class="btn-secondary" onclick="batalFormLaporan()">Batal & Kembali</button>
-        </form>
-    </div>
-
-    <div id="data-screen" class="container hidden" style="background: transparent; box-shadow: none; padding: 0;">
-        <h2 class="header-title" style="margin-top: 10px;">Data Tersimpan</h2>
-        <div><div class="block-header">Daftar Sasaran<select id="filter-sasaran" class="block-filter" onchange="renderDataSasaran()"><option value="ALL">Semua Jenis</option><option value="CATIN">CATIN</option><option value="BUMIL">BUMIL</option><option value="BUFAS">BUFAS</option><option value="BADUTA">BADUTA</option></select></div><div class="block-content" id="list-sasaran">Memuat...</div></div>
-        <div><div class="block-header">Daftar Laporan<select id="filter-laporan" class="block-filter" onchange="renderDataLaporan()"><option value="ALL">Semua Jenis</option><option value="CATIN">CATIN</option><option value="BUMIL">BUMIL</option><option value="BUFAS">BUFAS</option><option value="BADUTA">BADUTA</option></select></div><div class="block-content" id="list-laporan">Memuat...</div></div>
-        <button class="btn-secondary" style="background: white;" onclick="kembaliKeMenu()">Kembali ke Menu</button>
-    </div>
-
-    <div id="rekap-screen" class="container hidden">
-        <h2 class="header-title">Rekapitulasi</h2>
-        <div class="welcome-card" id="rekap-content" style="border-left-color: var(--success);"></div>
-        <button class="btn-secondary" onclick="kembaliKeMenu()">Kembali ke Menu</button>
-    </div>
     <script src="assets/js/core/00-init-state-db.js" defer></script>
     <script src="assets/js/core/10-wilayah-scope.js" defer></script>
-    <script src="assets/js/core/20-catalog-source.js" defer></script>
-    <script src="assets/js/core/30-backend-auth.js" defer></script>
-    <script src="assets/js/admin/00-shell-dashboard.js" defer></script>
-    <script src="assets/js/admin/10-rekap-management.js" defer></script>
-    <script src="assets/js/shared/00-domain-utils.js" defer></script>
-    <script src="assets/js/auth/00-nav-login-adminform.js" defer></script>
-    <script src="assets/js/kader/10-registrasi-laporan.js" defer></script>
     <script src="assets/js/kader/20-data-rekap-sync.js" defer></script>
 
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(registration => console.log('ServiceWorker sukses didaftarkan dengan scope: ', registration.scope))
+                    .catch(err => console.log('ServiceWorker gagal didaftarkan: ', err));
+            });
+        }
+    </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
