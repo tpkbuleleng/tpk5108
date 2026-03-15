@@ -233,3 +233,19 @@ window.jalankanSinkronisasi = async () => {
 
 // Jalankan aplikasi saat file siap
 document.addEventListener('DOMContentLoaded', initApp);
+
+// ==========================================
+// 6. FITUR TOGGLE PASSWORD
+// ==========================================
+window.togglePasswordVisibility = () => {
+    const pinInput = document.getElementById('kader-pin');
+    const toggleIcon = document.querySelector('.toggle-password');
+    
+    if (pinInput.type === 'password') {
+        pinInput.type = 'text';
+        toggleIcon.textContent = '🙈'; // Ubah jadi ikon mata tertutup
+    } else {
+        pinInput.type = 'password';
+        toggleIcon.textContent = '👁️'; // Ubah kembali jadi mata terbuka
+    }
+};
