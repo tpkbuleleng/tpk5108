@@ -188,7 +188,6 @@ window.renderKonten = async (target) => {
 // ==========================================
 // 4. LOGIKA FORM DINAMIS & ID UNIK KECAMATAN
 // ==========================================
-// Fungsi Bantuan Pembuat Kode Kecamatan
 const getKodeKecamatan = (kec) => {
     if (!kec) return "XXX";
     const map = {
@@ -208,6 +207,7 @@ const initFormRegistrasi = async () => {
     const selDesa = getEl('reg-desa');
     const selDusun = getEl('reg-dusun');
     const containerQ = getEl('pertanyaan-dinamis');
+    const boxCatin = getEl('wilayah-catin'); // Box Khusus CATIN
 
     if (selDesa && tugas.length > 0) {
         const dDesa = [...new Set(tugas.map(w => w.desa_kelurahan))];
@@ -222,14 +222,32 @@ const initFormRegistrasi = async () => {
     if (selJenis && containerQ) {
         selJenis.onchange = () => {
             const jenis = selJenis.value;
+            
+            // Logika Tampil Sembunyi Box CATIN
+            if(boxCatin) {
+                if (jenis === 'CATIN') {
+                    boxCatin.style.display = 'block';
+                } else {
+                    boxCatin.style.display = 'none';
+                }
+            }
+
             if (!jenis) { containerQ.innerHTML = ''; return; }
+            
+            // Pertanyaan Dinamis
             const filteredQ = questions.filter(q => q.is_active === 'Y' && (q.kategori_sasaran === 'UMUM' || q.kategori_sasaran === jenis)).sort((a,b)=>a.urutan - b.urutan);
-            containerQ.innerHTML = `<h4 style="margin-bottom:10px; color:var(--primary);">Formulir Khusus ${jenis}</h4>` + 
-                filteredQ.map(q => `
-                    <div class="form-group">
-                        <label>${q.label_pertanyaan}</label>
-                        <input type="${q.tipe_input || 'text'}" name="q_${q.id_pertanyaan}" class="form-control" required>
-                    </div>`).join('');
+            
+            // Jika ada pertanyaan tambahan dari sheet, tampilkan
+            if (filteredQ.length > 0) {
+                containerQ.innerHTML = `<h4 style="margin-bottom:10px; color:var(--primary);">Pertanyaan Khusus ${jenis}</h4>` + 
+                    filteredQ.map(q => `
+                        <div class="form-group">
+                            <label>${q.label_pertanyaan}</label>
+                            <input type="${q.tipe_input || 'text'}" name="q_${q.id_pertanyaan}" class="form-control" required>
+                        </div>`).join('');
+            } else {
+                containerQ.innerHTML = '';
+            }
         };
     }
 
@@ -244,20 +262,14 @@ const initFormRegistrasi = async () => {
                 const kecamatan = tugas.length > 0 ? tugas[0].kecamatan : 'TIDAK_DIKETAHUI';
                 const jenisSasaran = selJenis.value;
                 
-                // 1. Tentukan Prefix Jenis
                 let prefix = "REG";
                 if (jenisSasaran === 'CATIN') prefix = "CTN";
                 else if (jenisSasaran === 'BUMIL') prefix = "BML";
                 else if (jenisSasaran === 'BUFAS') prefix = "BFS";
                 else if (jenisSasaran === 'BADUTA') prefix = "BDT";
                 
-                // 2. Ambil Kode Kecamatan
                 const kodeKec = getKodeKecamatan(kecamatan);
-
-                // 3. Buat 6 Angka Acak Unik (000000 - 999999)
                 const angkaUnik = Math.floor(Math.random() * 1000000).toString().padStart(6, '0');
-                
-                // 4. Rakit ID Lengkap (Misal: CTN-SWN-593021)
                 const idSasaran = `${prefix}-${kodeKec}-${angkaUnik}`;
                 
                 const laporan = {
@@ -268,6 +280,7 @@ const initFormRegistrasi = async () => {
                     nomor_tim: session.nomor_tim,
                     kecamatan: kecamatan, 
                     jenis_sasaran: jenisSasaran, 
+                    nama_sasaran: jawaban.nama_sasaran || 'Tanpa Nama', // Simpan Nama
                     desa: selDesa.value, 
                     dusun: selDusun.value,
                     data_laporan: jawaban, 
@@ -292,10 +305,16 @@ const initDaftarSasaran = async () => {
     if (regList.length === 0) { 
         list.innerHTML = `<div style="text-align:center; padding:20px; color:#999;">Belum ada sasaran yang diregistrasi oleh Tim Anda.</div>`; 
     } else { 
+        // Menggunakan nama_sasaran agar lebih mudah dibaca Kader
         list.innerHTML = regList.map(r => `
             <div style="background:#f4f7f6; padding:15px; border-radius:8px; border-left: 4px solid var(--primary); margin-bottom: 10px;">
-                <div style="font-weight: bold; font-size: 1.1rem; color: #333;">[${r.id}] ${r.jenis_sasaran}</div>
-                <div style="font-size: 0.9rem; color: #555; margin-top: 4px;">📍 ${r.dusun}, ${r.desa}</div>
+                <div style="font-weight: bold; font-size: 1.15rem; color: #333; text-transform: uppercase;">
+                    ${r.nama_sasaran || 'Tanpa Nama'}
+                </div>
+                <div style="font-size: 0.85rem; color: var(--primary); font-weight: bold; margin-top: 2px;">
+                    [${r.id}] ${r.jenis_sasaran}
+                </div>
+                <div style="font-size: 0.9rem; color: #555; margin-top: 6px;">📍 ${r.dusun}, ${r.desa}</div>
                 <div style="font-size: 0.75rem; color:#888; margin-top: 8px;">⏳ Disimpan: ${new Date(r.created_at).toLocaleString('id-ID')}</div>
             </div>`).join(''); 
     }
@@ -310,8 +329,9 @@ const initFormPendampingan = async () => {
     const regList = antrean.filter(a => a.tipe_laporan === 'REGISTRASI' && a.id_tim === session.id_tim);
     
     if (selSasaran) { 
+        // Dropdown menampilkan Nama Sasaran agar kader tidak bingung
         selSasaran.innerHTML = '<option value="">-- Pilih Sasaran --</option>' + 
-        regList.map(r => `<option value="${r.id}">[${r.id}] ${r.jenis_sasaran} - ${r.dusun}</option>`).join(''); 
+        regList.map(r => `<option value="${r.id}">[${r.id}] ${r.nama_sasaran || r.jenis_sasaran} - ${r.dusun}</option>`).join(''); 
         
         selSasaran.onchange = () => {
             const sasaranId = selSasaran.value;
@@ -349,13 +369,10 @@ const initFormPendampingan = async () => {
                 const formData = new FormData(e.target);
                 const jawaban = {}; formData.forEach((val, key) => { jawaban[key] = val; });
                 
-                // Transisi BUMIL -> BUFAS di Lokal HP
                 if(jawaban.is_melahirkan === 'YA' && jawaban.tgl_persalinan) {
                     const originalReg = await getDataById('sync_queue', jawaban.id_sasaran);
                     if(originalReg) {
                         originalReg.jenis_sasaran = 'BUFAS';
-                        // Jika mau ID nya ikut berubah menjadi BFS, bisa diatur disini,
-                        // Namun disarankan ID tetap agar sinkronisasi pusat tidak pecah riwayatnya.
                         await putData('sync_queue', originalReg);
                         alert("🎉 Selamat! Ibu ini telah melahirkan dan otomatis pindah ke daftar BUFAS.");
                     }
