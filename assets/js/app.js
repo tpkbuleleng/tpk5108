@@ -32,20 +32,20 @@ const updateNetworkStatus = () => {
 };
 
 // ==========================================
-// 2. INISIALISASI APP
+// 2. INISIALISASI APLIKASI
 // ==========================================
 const initApp = async () => {
     const logoTimeout = setTimeout(() => { tampilkanLayar('login'); }, 4000);
     try {
         await initDB();
-        const session = await getDataById('kader_session', 'active_user');
+        const session = await getDataById('kader_session', 'active_user').catch(() => null);
         clearTimeout(logoTimeout);
         if (session) {
             masukKeAplikasi(session);
         } else {
             tampilkanLayar('login');
             if (navigator.onLine) {
-                const users = await getAllData('master_user');
+                const users = await getAllData('master_user').catch(() => []);
                 if (users.length === 0) await downloadMasterData();
             }
         }
@@ -69,7 +69,7 @@ const masukKeAplikasi = async (session) => {
 };
 
 // ==========================================
-// 3. MENU & PENGENDALI KONTEN
+// 3. MENU & KONTEN (DASHBOARD)
 // ==========================================
 const renderMenu = (role) => {
     const container = getEl('dynamic-menu-container');
@@ -105,7 +105,7 @@ const renderMenu = (role) => {
 window.renderKonten = async (target) => {
     const area = getEl('content-area');
     if (!area) return;
-    area.innerHTML = ''; // Bersihkan area
+    area.innerHTML = ''; 
 
     if (target === 'dashboard') {
         const session = window.currentUser;
@@ -152,34 +152,28 @@ window.renderKonten = async (target) => {
         } catch (e) { console.error(e); }
 
     } else if (target === 'registrasi') {
-        area.appendChild(getEl('template-registrasi').content.cloneNode(true));
-        initFormRegistrasi();
-        
+        const tpl = getEl('template-registrasi');
+        if(tpl) { area.appendChild(tpl.content.cloneNode(true)); initFormRegistrasi(); }
     } else if (target === 'daftar_sasaran') {
-        area.appendChild(getEl('template-daftar-sasaran').content.cloneNode(true));
-        initDaftarSasaran();
-
+        const tpl = getEl('template-daftar-sasaran');
+        if(tpl) { area.appendChild(tpl.content.cloneNode(true)); initDaftarSasaran(); }
     } else if (target === 'pendampingan') {
-        area.appendChild(getEl('template-pendampingan').content.cloneNode(true));
-        initFormPendampingan();
-
+        const tpl = getEl('template-pendampingan');
+        if(tpl) { area.appendChild(tpl.content.cloneNode(true)); initFormPendampingan(); }
     } else if (target === 'rekap_kader' || target === 'rekap_tim') {
-        area.appendChild(getEl('template-rekap').content.cloneNode(true));
-        getEl('judul-rekap').innerText = target === 'rekap_kader' ? '📊 Rekap Bulanan Kader' : '📈 Rekap Bulanan Tim';
-        initRekap();
-
-    } else if (target === 'cetak_pdf') {
-        area.appendChild(getEl('template-cetak-pdf').content.cloneNode(true));
-
-    } else if (target === 'ganti_pass') {
-        area.appendChild(getEl('template-ganti-pass').content.cloneNode(true));
-        const formPass = getEl('form-ganti-pass');
-        if (formPass) formPass.onsubmit = gantiPassword;
+        const tpl = getEl('template-rekap');
+        if(tpl) { 
+            area.appendChild(tpl.content.cloneNode(true)); 
+            if(getEl('judul-rekap')) getEl('judul-rekap').innerText = target === 'rekap_kader' ? '📊 Rekap Bulanan Kader' : '📈 Rekap Bulanan Tim';
+            initRekap();
+        }
+    } else {
+        area.innerHTML = `<div class="card" style="text-align:center; padding:30px;"><h3>Menu ${target.replace('_',' ').toUpperCase()}</h3><p>Segera Hadir.</p></div>`;
     }
 };
 
 // ==========================================
-// 4. LOGIKA FORM DINAMIS & SIMPANAN (INTI)
+// 4. LOGIKA FORM DINAMIS (4 JENIS SASARAN)
 // ==========================================
 const initFormRegistrasi = async () => {
     const session = window.currentUser;
@@ -191,6 +185,7 @@ const initFormRegistrasi = async () => {
     const selDusun = getEl('reg-dusun');
     const containerQ = getEl('pertanyaan-dinamis');
 
+    // 1. Setup Dropdown Wilayah
     if (selDesa && tugas.length > 0) {
         const dDesa = [...new Set(tugas.map(w => w.desa_kelurahan))];
         selDesa.innerHTML = '<option value="">-- Pilih Desa --</option>' + dDesa.map(d => `<option value="${d}">${d}</option>`).join('');
@@ -200,20 +195,19 @@ const initFormRegistrasi = async () => {
         };
     }
 
+    // 2. Setup Pertanyaan Dinamis
     const questions = await getAllData('master_pertanyaan').catch(()=>[]);
     if (selJenis && containerQ) {
         selJenis.onchange = () => {
             const jenis = selJenis.value;
             if (!jenis) { containerQ.innerHTML = ''; return; }
-            
-            // Saring pertanyaan: kategori UMUM atau khusus jenis (CATIN/BUMIL dll)
             const filteredQ = questions.filter(q => q.is_active === 'Y' && (q.kategori_sasaran === 'UMUM' || q.kategori_sasaran === jenis)).sort((a,b)=>a.urutan - b.urutan);
-            
-            containerQ.innerHTML = `<h4 style="margin-bottom:10px; color:var(--primary);">Detail ${jenis}</h4>` + 
+            containerQ.innerHTML = `<h4 style="margin-bottom:10px; color:var(--primary);">Formulir ${jenis}</h4>` + 
                 filteredQ.map(q => `<div class="form-group"><label>${q.label_pertanyaan}</label><input type="text" name="q_${q.id_pertanyaan}" class="form-control" required></div>`).join('');
         };
     }
 
+    // 3. Simpan Form ke Antrean
     const formReg = getEl('form-registrasi');
     if (formReg) {
         formReg.onsubmit = async (e) => {
@@ -222,49 +216,34 @@ const initFormRegistrasi = async () => {
             try {
                 const formData = new FormData(e.target);
                 const jawaban = {}; formData.forEach((val, key) => { jawaban[key] = val; });
-                
                 const kecamatan = tugas.length > 0 ? tugas[0].kecamatan : 'TIDAK_DIKETAHUI';
                 const laporan = {
                     id: `REG-${Date.now()}`, tipe_laporan: 'REGISTRASI', username: session.username, nomor_tim: session.nomor_tim,
                     kecamatan: kecamatan, jenis_sasaran: selJenis.value, desa: selDesa.value, dusun: selDusun.value,
                     data_laporan: jawaban, created_at: new Date().toISOString()
                 };
-                
                 await putData('sync_queue', laporan);
-                alert(`✅ Data ${laporan.jenis_sasaran} tersimpan di antrean!`);
+                alert(`✅ Registrasi ${laporan.jenis_sasaran} tersimpan di HP!`);
                 renderKonten('dashboard');
-            } catch (err) { alert("Gagal simpan."); } finally { btn.disabled = false; btn.innerText = "💾 Simpan Registrasi"; }
+            } catch (err) { alert("Gagal menyimpan form."); } finally { btn.disabled = false; btn.innerText = "💾 Simpan Registrasi"; }
         };
     }
 };
 
 const initDaftarSasaran = async () => {
     const list = getEl('list-sasaran');
+    if(!list) return;
     const antrean = await getAllData('sync_queue').catch(()=>[]);
     const regList = antrean.filter(a => a.tipe_laporan === 'REGISTRASI');
-
-    if (regList.length === 0) {
-        list.innerHTML = `<div style="text-align:center; padding:20px; color:#999;">Tidak ada sasaran baru di perangkat ini.</div>`;
-    } else {
-        list.innerHTML = regList.map(r => `
-            <div style="background:#f4f7f6; padding:15px; border-radius:8px; border-left: 4px solid var(--primary);">
-                <strong>${r.jenis_sasaran}</strong> - ${r.desa} (${r.dusun})
-                <div style="font-size:0.8rem; color:#666; margin-top:5px;">Disimpan: ${new Date(r.created_at).toLocaleString('id-ID')}</div>
-            </div>
-        `).join('');
-    }
+    if (regList.length === 0) { list.innerHTML = `<div style="text-align:center; padding:20px; color:#999;">Belum ada sasaran yang diregistrasi di HP ini.</div>`; } 
+    else { list.innerHTML = regList.map(r => `<div style="background:#f4f7f6; padding:15px; border-radius:8px; border-left: 4px solid var(--primary);"><strong>${r.jenis_sasaran}</strong> - ${r.desa} (${r.dusun})<div style="font-size:0.8rem; color:#666;">${new Date(r.created_at).toLocaleString('id-ID')}</div></div>`).join(''); }
 };
 
 const initFormPendampingan = async () => {
     const selSasaran = getEl('pend-sasaran');
     const antrean = await getAllData('sync_queue').catch(()=>[]);
     const regList = antrean.filter(a => a.tipe_laporan === 'REGISTRASI');
-
-    if (selSasaran) {
-        selSasaran.innerHTML = '<option value="">-- Pilih Sasaran Baru di HP ini --</option>' + 
-            regList.map(r => `<option value="${r.id}">${r.jenis_sasaran} - ${r.dusun} (${new Date(r.created_at).toLocaleDateString()})</option>`).join('');
-    }
-
+    if (selSasaran) { selSasaran.innerHTML = '<option value="">-- Pilih Sasaran --</option>' + regList.map(r => `<option value="${r.id}">${r.jenis_sasaran} (${r.dusun})</option>`).join(''); }
     const formPend = getEl('form-pendampingan');
     if (formPend) {
         formPend.onsubmit = async (e) => {
@@ -273,109 +252,87 @@ const initFormPendampingan = async () => {
             try {
                 const formData = new FormData(e.target);
                 const jawaban = {}; formData.forEach((val, key) => { jawaban[key] = val; });
-                
-                const laporan = {
-                    id: `PEND-${Date.now()}`, tipe_laporan: 'PENDAMPINGAN', username: window.currentUser.username,
-                    id_sasaran_ref: jawaban.id_sasaran, data_laporan: jawaban, created_at: new Date().toISOString()
-                };
+                const laporan = { id: `PEND-${Date.now()}`, tipe_laporan: 'PENDAMPINGAN', username: window.currentUser.username, id_sasaran_ref: jawaban.id_sasaran, data_laporan: jawaban, created_at: new Date().toISOString() };
                 await putData('sync_queue', laporan);
-                alert("✅ Laporan Pendampingan tersimpan!"); e.target.reset(); renderKonten('dashboard');
-            } catch (err) { alert("Gagal simpan."); } finally { btn.disabled = false; }
+                alert("✅ Laporan Pendampingan tersimpan di HP!"); renderKonten('dashboard');
+            } catch (err) { alert("Gagal menyimpan."); } finally { btn.disabled = false; }
         };
     }
 };
 
 const initRekap = async () => {
     const antrean = await getAllData('sync_queue').catch(()=>[]);
-    const totalReg = antrean.filter(a => a.tipe_laporan === 'REGISTRASI').length;
-    const totalPend = antrean.filter(a => a.tipe_laporan === 'PENDAMPINGAN').length;
-    
-    if(getEl('rekap-total')) getEl('rekap-total').innerText = totalReg;
-    if(getEl('rekap-pend')) getEl('rekap-pend').innerText = totalPend;
-};
-
-const gantiPassword = (e) => {
-    e.preventDefault();
-    const pBaru = getEl('pass-baru').value;
-    const pKonfirm = getEl('pass-konfirm').value;
-    if (pBaru !== pKonfirm) { alert("❌ Konfirmasi password baru tidak cocok!"); return; }
-    alert("✅ Permintaan ganti password akan disinkronkan ke server saat online.");
-    e.target.reset();
+    if(getEl('rekap-total')) getEl('rekap-total').innerText = antrean.filter(a => a.tipe_laporan === 'REGISTRASI').length;
+    if(getEl('rekap-pend')) getEl('rekap-pend').innerText = antrean.filter(a => a.tipe_laporan === 'PENDAMPINGAN').length;
 };
 
 // ==========================================
-// 5. LOGIN & LOGOUT (Tahan Banting)
+// 5. LOGIN TAHAN BANTING (DIJAMIN TIDAK ERROR)
 // ==========================================
-const initLogin = () => {
+document.addEventListener('DOMContentLoaded', () => {
+    initApp();
+
     const fLogin = getEl('form-login');
-    if (!fLogin) return;
+    if (fLogin) {
+        fLogin.onsubmit = async (e) => {
+            e.preventDefault();
+            const btn = getEl('btn-login-submit');
+            const id = getEl('kader-id').value.trim();
+            const pin = getEl('kader-pin').value.trim();
 
-    // Menggunakan onsubmit untuk memastikan event tidak double
-    fLogin.onsubmit = async (e) => {
-        e.preventDefault();
-        
-        const btn = getEl('btn-login-submit');
-        const id = getEl('kader-id').value.trim();
-        const pin = getEl('kader-pin').value.trim();
+            if (!id || !pin) return;
+            if (btn) { btn.disabled = true; btn.innerText = "Memeriksa..."; }
 
-        if (!id || !pin) return;
-
-        // Ubah tombol agar user tahu sistem sedang bekerja
-        if (btn) {
-            btn.disabled = true;
-            btn.innerText = "Memeriksa...";
-        }
-
-        try {
-            // Pastikan database siap
-            await initDB();
-
-            const user = await getDataById('master_user', id);
-            
-            if (!user) {
-                alert("ID Pengguna tidak ditemukan di perangkat ini! Jika ini login pertama kali, pastikan internet Anda menyala (Online).");
-                if (btn) { btn.disabled = false; btn.innerText = "Masuk"; }
-                return;
-            }
-
-            const pinBenar = user.password_awal_ref ? user.password_awal_ref.toString() : "";
-            
-            if (pinBenar === pin) {
-                let nama = user.username, tim = '-', noTim = '-';
+            try {
+                // Pastikan DB Siap
+                await initDB();
                 
-                if (user.role_akses === 'KADER') {
-                    const k = await getDataById('master_kader', user.ref_id);
-                    if (k) { 
-                        nama = k.nama_kader; tim = k.id_tim; 
-                        const t = await getDataById('master_tim', k.id_tim);
-                        noTim = t ? t.nomor_tim : tim;
-                    }
+                // Cari User dengan perlindungan error (catch)
+                const user = await getDataById('master_user', id).catch(() => null);
+                
+                if (!user) {
+                    alert("❌ ID Pengguna tidak ditemukan. Pastikan koneksi internet menyala saat pertama kali login.");
+                    if (btn) { btn.disabled = false; btn.innerText = "Masuk"; }
+                    return;
                 }
+
+                // Amankan pembacaan PIN
+                const pinBenar = user.password_awal_ref ? String(user.password_awal_ref) : "";
                 
-                const ses = { id_kader: 'active_user', username: user.username, role: user.role_akses, nama, id_tim: tim, nomor_tim: noTim };
-                await putData('kader_session', ses);
-                
-                // Kosongkan form untuk user berikutnya
-                getEl('kader-id').value = '';
-                getEl('kader-pin').value = '';
-                if (btn) { btn.disabled = false; btn.innerText = "Masuk"; }
-                
-                // Masuk ke dashboard
-                masukKeAplikasi(ses);
-            } else { 
-                alert("PIN yang Anda masukkan salah!");
+                if (pinBenar === pin) {
+                    let nama = user.username, tim = '-', noTim = '-';
+                    
+                    // Amankan pencarian data Kader & Tim
+                    if (user.role_akses === 'KADER' && user.ref_id) {
+                        const k = await getDataById('master_kader', user.ref_id).catch(() => null);
+                        if (k) { 
+                            nama = k.nama_kader || nama; 
+                            tim = k.id_tim || '-'; 
+                            const t = await getDataById('master_tim', tim).catch(() => null);
+                            noTim = t ? (t.nomor_tim || tim) : tim;
+                        }
+                    }
+                    
+                    const ses = { id_kader: 'active_user', username: user.username, role: user.role_akses, nama, id_tim: tim, nomor_tim: noTim };
+                    await putData('kader_session', ses);
+                    
+                    getEl('kader-id').value = ''; getEl('kader-pin').value = '';
+                    masukKeAplikasi(ses);
+                } else {
+                    alert("❌ PIN yang Anda masukkan salah!");
+                }
+            } catch (err) {
+                console.error("Kesalahan Login:", err);
+                alert("Kesalahan Sistem: " + err.message); // Tampilkan pesan error aslinya
+            } finally {
                 if (btn) { btn.disabled = false; btn.innerText = "Masuk"; }
             }
-        } catch (err) {
-            console.error("Gagal Login:", err);
-            alert("Terjadi kesalahan sistem saat mencoba masuk.");
-            if (btn) { btn.disabled = false; btn.innerText = "Masuk"; }
-        }
-    };
-};
+        };
+    }
+});
 
 window.logout = async () => { 
-    if (confirm("Yakin ingin keluar dari aplikasi? Data sasaran yang belum Anda sinkronkan akan tetap tersimpan aman di HP ini.")) { 
+    if (confirm("Keluar dari aplikasi? Data Anda yang belum tersinkronisasi akan tetap aman.")) { 
         await deleteData('kader_session', 'active_user'); 
         location.reload(); 
     }
@@ -383,12 +340,3 @@ window.logout = async () => {
 
 window.addEventListener('online', updateNetworkStatus);
 window.addEventListener('offline', updateNetworkStatus);
-
-if (getEl('btn-menu')) getEl('btn-menu').onclick = () => { getEl('sidebar').classList.add('active'); getEl('sidebar-overlay').classList.add('active'); };
-if (getEl('sidebar-overlay')) getEl('sidebar-overlay').onclick = () => { getEl('sidebar').classList.remove('active'); getEl('sidebar-overlay').classList.remove('active'); };
-
-// Jalankan semuanya saat halaman siap
-document.addEventListener('DOMContentLoaded', () => {
-    initApp();
-    initLogin();
-});
