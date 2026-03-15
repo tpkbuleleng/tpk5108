@@ -11,111 +11,97 @@
 </head>
 <body>
 
-    <main id="view-splash" class="view-section active splash-container">
+    <main id="view-splash" class="view-section splash-container active">
         <img src="assets/img/logo.png" alt="Logo TPK" class="splash-logo">
-        <h2>TPK KABUPATEN BULELENG</h2>
+        <h2 class="splash-title">TPK KABUPATEN BULELENG</h2>
         <div class="loader"></div>
     </main>
 
     <main id="view-login" class="view-section hidden">
-        <div class="login-container">
-            <img src="assets/img/logo.png" alt="Logo TPK" class="app-logo">
-            <h2 style="font-size: 1.2rem; margin-top: 10px;">Aplikasi Pencatatan dan Pelaporan</h2>
-            <h2 style="font-size: 1.5rem; margin-bottom: 2rem; color: var(--primary);">TPK KABUPATEN BULELENG</h2>
+        <div class="login-card">
+            <img src="assets/img/logo.png" alt="Logo" class="login-logo">
+            <p class="app-subtitle">Aplikasi Pencatatan dan Pelaporan</p>
+            <h2 class="app-title">TPK KABUPATEN BULELENG</h2>
             
             <form id="form-login" class="modern-form">
-    <div class="form-group">
-        <label for="kader-id">ID Pengguna</label>
-        <input type="text" id="kader-id" class="form-control" required placeholder="Masukkan ID">
-    </div>
-    <div class="form-group">
-        <label for="kader-pin">PIN / Password</label>
-        <div style="position: relative;">
-            <input type="password" id="kader-pin" class="form-control" required placeholder="••••••">
-            <span class="toggle-password" onclick="togglePasswordVisibility()" 
-                  style="position: absolute; right: 10px; top: 10px; cursor: pointer;">👁️</span>
-        </div>
-    </div>
-    <button type="submit" class="btn-primary" id="btn-login-submit" style="margin-top: 10px;">Masuk</button>
-</form>
+                <div class="form-group">
+                    <label>ID Pengguna</label>
+                    <input type="text" id="kader-id" class="form-control" placeholder="Masukkan ID" required>
+                </div>
+                <div class="form-group">
+                    <label>PIN / Password</label>
+                    <div class="password-field">
+                        <input type="password" id="kader-pin" class="form-control" placeholder="••••••" required>
+                        <span class="toggle-eye" onclick="togglePasswordVisibility()">👁️</span>
+                    </div>
+                </div>
+                <button type="submit" id="btn-login-submit" class="btn-primary">Masuk</button>
+            </form>
         </div>
     </main>
 
     <main id="view-app" class="view-section hidden">
         <header class="app-header">
-            <div style="display: flex; align-items: center; gap: 10px;">
-                <button class="btn-icon" id="btn-menu" style="font-size: 1.5rem; background: none; color: white; border: none;">☰</button>
-                <div>
-                    <h1 id="user-greeting" style="font-size: 1.1rem; margin: 0;">Dashboard</h1>
-                    <span class="status-badge offline" id="network-status" style="font-size: 0.7rem;">Offline Mode</span>
+            <div class="header-left">
+                <button id="btn-menu" class="btn-burger">☰</button>
+                <div class="header-info">
+                    <h1 id="user-greeting">Dashboard</h1>
+                    <span id="network-status" class="status-badge offline">Offline</span>
                 </div>
             </div>
-            <button class="btn-icon" onclick="logout()" style="background: none; border: none; font-size: 1.2rem;">🚪</button>
+            <button class="btn-logout-icon" onclick="logout()">🚪</button>
         </header>
 
-        <div class="sidebar-overlay" id="sidebar-overlay"></div>
-        <aside class="sidebar" id="sidebar">
-            <div class="sidebar-header">
-                <img src="assets/img/logo.png" alt="Logo" class="sidebar-logo">
-                <div class="sidebar-user">
-                    <h3 id="sidebar-nama" style="margin:0; font-size: 1rem;">Nama Pengguna</h3>
-                    <p id="sidebar-role" style="margin:0; font-size: 0.8rem; opacity: 0.8;">ROLE</p>
+        <div id="sidebar-overlay" class="sidebar-overlay"></div>
+        <aside id="sidebar" class="sidebar">
+            <div class="sidebar-user-box">
+                <img src="assets/img/logo.png" alt="Logo" class="sidebar-avatar">
+                <div class="sidebar-user-text">
+                    <h3 id="sidebar-nama">Nama User</h3>
+                    <p id="sidebar-role">Role Akses</p>
                 </div>
             </div>
-            <nav class="sidebar-nav" id="dynamic-menu-container">
+            <nav id="dynamic-menu-container" class="sidebar-nav">
                 </nav>
         </aside>
 
-        <section id="content-area" class="content-scroll">
+        <section id="content-area" class="content-body">
             </section>
     </main>
 
     <template id="template-registrasi">
-        <div class="card" style="animation: fadeIn 0.3s ease-in-out;">
-            <div class="card-header" style="margin-bottom: 20px;">
-                <h3 style="color: var(--primary); margin: 0;">📝 Registrasi Sasaran Baru</h3>
-                <p style="font-size: 0.8rem; color: #666;">Silakan lengkapi data sasaran di bawah ini.</p>
+        <div class="content-card animate-fade">
+            <div class="card-header">
+                <h3>📝 Registrasi Sasaran Baru</h3>
+                <p>Lengkapi data sesuai wilayah tugas Anda.</p>
             </div>
-            
             <form id="form-registrasi" class="modern-form">
                 <div class="form-group">
                     <label>Desa / Kelurahan</label>
-                    <select id="reg-desa" class="form-control" required style="width: 100%; padding: 10px; margin-bottom: 15px;">
+                    <select id="reg-desa" class="form-control" required>
                         <option value="">-- Pilih Desa --</option>
                     </select>
                 </div>
                 <div class="form-group">
                     <label>Dusun / Banjar / RW</label>
-                    <select id="reg-dusun" class="form-control" required style="width: 100%; padding: 10px; margin-bottom: 15px;">
+                    <select id="reg-dusun" class="form-control" required>
                         <option value="">-- Pilih Dusun --</option>
                     </select>
                 </div>
-
-                <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
-                
+                <hr class="divider">
                 <div id="pertanyaan-dinamis">
-                    <p style="text-align: center; color: #999;">Memuat formulir...</p>
-                </div>
-
-                <button type="submit" class="btn-primary" style="margin-top: 20px; width: 100%;">💾 Simpan Data Sasaran</button>
+                    </div>
+                <button type="submit" class="btn-primary">💾 Simpan Laporan</button>
             </form>
         </div>
     </template>
 
     <script src="assets/js/app.js" type="module"></script>
     <script>
-        // Fungsi global sederhana
-        window.togglePasswordVisibility = () => {
-            const pinInput = document.getElementById('kader-pin');
-            const toggleIcon = document.querySelector('.toggle-password');
-            if (pinInput.type === 'password') {
-                pinInput.type = 'text';
-                toggleIcon.textContent = '🙈';
-            } else {
-                pinInput.type = 'password';
-                toggleIcon.textContent = '👁️';
-            }
-        };
+        function togglePasswordVisibility() {
+            const pin = document.getElementById('kader-pin');
+            pin.type = pin.type === 'password' ? 'text' : 'password';
+        }
     </script>
 </body>
 </html>
