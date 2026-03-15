@@ -22,17 +22,13 @@
             <img src="assets/img/logo.png" alt="Logo" class="login-logo">
             <p class="app-subtitle">Aplikasi Pencatatan dan Pelaporan</p>
             <h2 class="app-title">TPK KABUPATEN BULELENG</h2>
-            
             <form id="form-login" class="modern-form">
-                <div class="form-group">
-                    <label>ID Pengguna</label>
-                    <input type="text" id="kader-id" class="form-control" placeholder="Masukkan ID" required>
-                </div>
+                <div class="form-group"><label>ID Pengguna</label><input type="text" id="kader-id" class="form-control" placeholder="Masukkan ID" required></div>
                 <div class="form-group">
                     <label>PIN / Password</label>
                     <div class="password-field">
                         <input type="password" id="kader-pin" class="form-control" placeholder="••••••" required>
-                        <span class="toggle-eye" onclick="togglePasswordVisibility()">👁️</span>
+                        <span class="toggle-eye" onclick="const p=document.getElementById('kader-pin');p.type=p.type==='password'?'text':'password';">👁️</span>
                     </div>
                 </div>
                 <button type="submit" id="btn-login-submit" class="btn-primary">Masuk</button>
@@ -45,11 +41,11 @@
             <div class="header-left">
                 <button id="btn-menu" class="btn-burger">☰</button>
                 <div class="header-info">
-                    <h1 id="user-greeting">Dashboard</h1>
+                    <h1 id="user-greeting">DASHBOARD</h1>
                     <span id="network-status" class="status-badge offline">Offline</span>
                 </div>
             </div>
-            <button class="btn-logout-icon" onclick="logout()">🚪</button>
+            <button class="btn-logout-icon" onclick="window.logout()">🚪</button>
         </header>
 
         <div id="sidebar-overlay" class="sidebar-overlay"></div>
@@ -61,47 +57,101 @@
                     <p id="sidebar-role">Role Akses</p>
                 </div>
             </div>
-            <nav id="dynamic-menu-container" class="sidebar-nav">
-                </nav>
+            <nav id="dynamic-menu-container" class="sidebar-nav"></nav>
         </aside>
 
-        <section id="content-area" class="content-body">
-            </section>
+        <section id="content-area" class="content-body"></section>
     </main>
 
     <template id="template-registrasi">
-        <div class="content-card animate-fade">
-            <div class="card-header">
-                <h3>📝 Registrasi Sasaran Baru</h3>
-                <p>Lengkapi data sesuai wilayah tugas Anda.</p>
-            </div>
+        <div class="card animate-fade">
+            <h3 style="margin-bottom: 15px; color: var(--primary);">📝 Registrasi Sasaran Baru</h3>
             <form id="form-registrasi" class="modern-form">
                 <div class="form-group">
-                    <label>Desa / Kelurahan</label>
-                    <select id="reg-desa" class="form-control" required>
-                        <option value="">-- Pilih Desa --</option>
+                    <label>Jenis Sasaran</label>
+                    <select id="reg-jenis" name="jenis_sasaran" class="form-control" required>
+                        <option value="">-- Pilih Jenis --</option>
+                        <option value="CATIN">CATIN (Calon Pengantin)</option>
+                        <option value="BUMIL">BUMIL (Ibu Hamil)</option>
+                        <option value="BUFAS">BUFAS (Ibu Pasca Persalinan)</option>
+                        <option value="BADUTA">BADUTA (Anak 0-23 Bulan)</option>
                     </select>
                 </div>
+                <div class="form-group"><label>Desa/Kelurahan</label><select id="reg-desa" name="desa" class="form-control" required></select></div>
+                <div class="form-group"><label>Dusun/RW</label><select id="reg-dusun" name="dusun" class="form-control" required></select></div>
+                <hr style="margin: 20px 0; border: 0; border-top: 1px solid #ddd;">
+                <div id="pertanyaan-dinamis"></div>
+                <button type="submit" class="btn-primary" style="margin-top: 15px;">💾 Simpan Registrasi</button>
+            </form>
+        </div>
+    </template>
+
+    <template id="template-daftar-sasaran">
+        <div class="card animate-fade">
+            <h3 style="margin-bottom: 15px; color: var(--primary);">📋 Daftar Sasaran</h3>
+            <p style="font-size: 0.85rem; color: #666; margin-bottom: 15px;">Data sasaran yang tersimpan di perangkat ini (Belum Sinkron).</p>
+            <div id="list-sasaran" style="display: flex; flex-direction: column; gap: 10px;">
+                </div>
+        </div>
+    </template>
+
+    <template id="template-pendampingan">
+        <div class="card animate-fade">
+            <h3 style="margin-bottom: 15px; color: var(--primary);">🤝 Laporan Pendampingan</h3>
+            <form id="form-pendampingan" class="modern-form">
                 <div class="form-group">
-                    <label>Dusun / Banjar / RW</label>
-                    <select id="reg-dusun" class="form-control" required>
-                        <option value="">-- Pilih Dusun --</option>
+                    <label>Pilih Sasaran</label>
+                    <select id="pend-sasaran" name="id_sasaran" class="form-control" required>
+                        <option value="">-- Memuat Sasaran --</option>
                     </select>
                 </div>
-                <hr class="divider">
-                <div id="pertanyaan-dinamis">
-                    </div>
-                <button type="submit" class="btn-primary">💾 Simpan Laporan</button>
+                <div class="form-group"><label>Tanggal Kunjungan</label><input type="date" name="tgl_kunjungan" class="form-control" required></div>
+                <div class="form-group"><label>Catatan / Hasil Pendampingan</label><textarea name="catatan" class="form-control" rows="4" required></textarea></div>
+                <button type="submit" class="btn-primary" style="margin-top: 15px;">💾 Simpan Pendampingan</button>
+            </form>
+        </div>
+    </template>
+
+    <template id="template-rekap">
+        <div class="card animate-fade">
+            <h3 id="judul-rekap" style="margin-bottom: 15px; color: var(--primary);">📊 Rekap Bulanan</h3>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 20px;">
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #ddd;">
+                    <h4 id="rekap-total" style="font-size: 2rem; color: var(--primary); margin:0;">0</h4>
+                    <p style="font-size: 0.8rem; color: #666; margin:0;">Total Registrasi</p>
+                </div>
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #ddd;">
+                    <h4 id="rekap-pend" style="font-size: 2rem; color: #198754; margin:0;">0</h4>
+                    <p style="font-size: 0.8rem; color: #666; margin:0;">Total Pendampingan</p>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <template id="template-cetak-pdf">
+        <div class="card animate-fade" style="text-align: center;">
+            <h3 style="margin-bottom: 15px; color: var(--primary);">🖨️ Cetak PDF</h3>
+            <p style="font-size: 0.9rem; color: #666; margin-bottom: 20px;">Fitur ini akan mengunduh laporan bulanan dalam format PDF.</p>
+            <div class="form-group" style="text-align: left;">
+                <label>Pilih Bulan</label>
+                <input type="month" id="bulan-cetak" class="form-control" required>
+            </div>
+            <button class="btn-primary" style="background: #dc3545;" onclick="alert('Fitur cetak PDF akan segera aktif setelah terhubung dengan server Google!')">⬇️ Download PDF</button>
+        </div>
+    </template>
+
+    <template id="template-ganti-pass">
+        <div class="card animate-fade">
+            <h3 style="margin-bottom: 15px; color: var(--primary);">🔑 Ganti Password</h3>
+            <form id="form-ganti-pass" class="modern-form">
+                <div class="form-group"><label>Password Lama</label><input type="password" id="pass-lama" class="form-control" required></div>
+                <div class="form-group"><label>Password Baru</label><input type="password" id="pass-baru" class="form-control" required></div>
+                <div class="form-group"><label>Konfirmasi Password Baru</label><input type="password" id="pass-konfirm" class="form-control" required></div>
+                <button type="submit" class="btn-primary" style="margin-top: 15px;">🔄 Update Password</button>
             </form>
         </div>
     </template>
 
     <script src="assets/js/app.js" type="module"></script>
-    <script>
-        function togglePasswordVisibility() {
-            const pin = document.getElementById('kader-pin');
-            pin.type = pin.type === 'password' ? 'text' : 'password';
-        }
-    </script>
 </body>
 </html>
