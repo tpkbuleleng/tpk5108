@@ -442,7 +442,7 @@ const initRekap = async () => {
 };
 
 // ==========================================
-// 5. LOGIN TAHAN BANTING
+// 5. LOGIN PINTAR (ADAPTIVE HEADER)
 // ==========================================
 document.addEventListener('DOMContentLoaded', () => {
     initApp();
@@ -460,28 +460,48 @@ document.addEventListener('DOMContentLoaded', () => {
 
             try {
                 await initDB();
-                const user = await getDataById('master_user', id).catch(() => null);
+                
+                // Cari data di seluruh baris tabel USER
+                const allUsers = await getAllData('master_user').catch(() => []);
+                
+                // Pencarian Fleksibel (Mencari di kolom id_pengguna, id_user, username, dll)
+                const user = allUsers.find(u => 
+                    String(u.id_pengguna) === id || 
+                    String(u.id_user) === id || 
+                    String(u.username) === id ||
+                    String(u.id) === id
+                );
                 
                 if (!user) {
-                    alert("❌ ID Pengguna tidak ditemukan. Pastikan internet menyala jika ini login pertama.");
+                    alert("❌ ID Pengguna tidak ditemukan. Pastikan data sudah di-sinkronisasi.");
                     if (btn) { btn.disabled = false; btn.innerText = "Masuk"; }
                     return;
                 }
 
-                const pinBenar = user.password_awal_ref ? String(user.password_awal_ref) : "";
+                // Cek PIN Fleksibel
+                const pinBenar = String(user.password_awal_ref || user.password || user.pin || "");
                 
                 if (pinBenar === pin) {
-                    let nama = user.username, tim = '-', noTim = '-';
-                    if (user.role_akses === 'KADER' && user.ref_id) {
-                        const k = await getDataById('master_kader', user.ref_id).catch(() => null);
+                    let nama = user.nama || user.nama_lengkap || user.username || id;
+                    let role = String(user.role_akses || user.role || 'KADER').toUpperCase();
+                    let ref_id = user.ref_id || user.id_kader || user.nik || '';
+                    let tim = '-', noTim = '-';
+                    
+                    // Mencari Detail Tim & Wilayah Fleksibel
+                    if (role.includes('KADER') && ref_id) {
+                        const allKader = await getAllData('master_kader').catch(() => []);
+                        const k = allKader.find(x => String(x.id_kader) === String(ref_id) || String(x.nik) === String(ref_id));
                         if (k) { 
-                            nama = k.nama_kader || nama; 
-                            tim = k.id_tim || '-'; 
-                            const t = await getDataById('master_tim', tim).catch(() => null);
-                            noTim = t ? (t.nomor_tim || tim) : tim;
+                            nama = k.nama_kader || k.nama || nama; 
+                            tim = k.id_tim || k.tim || '-'; 
+                            
+                            const allTim = await getAllData('master_tim').catch(() => []);
+                            const t = allTim.find(x => String(x.id_tim) === String(tim) || String(x.id) === String(tim));
+                            noTim = t ? (t.nomor_tim || t.nama_tim || tim) : tim;
                         }
                     }
-                    const ses = { id_kader: 'active_user', username: user.username, role: user.role_akses, nama, id_tim: tim, nomor_tim: noTim };
+
+                    const ses = { id_kader: 'active_user', username: id, role: role, nama: nama, id_tim: tim, nomor_tim: noTim };
                     await putData('kader_session', ses);
                     
                     getEl('kader-id').value = ''; getEl('kader-pin').value = '';
