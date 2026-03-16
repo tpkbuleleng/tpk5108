@@ -235,7 +235,7 @@ window.renderKonten = async (target) => {
 };
 
 // ==========================================
-// 4. LOGIKA FORM DINAMIS & ID UNIK
+// 4. LOGIKA FORM DINAMIS & KODE KECAMATAN
 // ==========================================
 const getKodeKecamatan = (kec) => {
     if (!kec) return "XXX";
@@ -266,6 +266,9 @@ const initFormRegistrasi = async () => {
     const selDesa = getEl('reg-desa');
     const selDusun = getEl('reg-dusun');
     const regAlamat = getEl('reg-alamat');
+    
+    // Tarik elemen Jenis Kelamin
+    const selJk = document.querySelector('select[name="jenis_kelamin"]');
 
     if (selDesa && tugas.length > 0) {
         const dDesa = [...new Set(tugas.map(w => w.desa_kelurahan))].filter(Boolean);
@@ -303,6 +306,18 @@ const initFormRegistrasi = async () => {
         selJenis.onchange = () => {
             const jenis = selJenis.value;
             
+            // LOGIKA KUNCI JENIS KELAMIN (BUMIL & BUFAS)
+            if (selJk) {
+                if (jenis === 'BUMIL' || jenis === 'BUFAS') {
+                    selJk.value = 'Perempuan';
+                    selJk.style.pointerEvents = 'none'; // Tidak bisa diklik
+                    selJk.style.backgroundColor = '#e9ecef'; // Warna keabu-abuan
+                } else {
+                    selJk.style.pointerEvents = 'auto'; // Bisa diklik
+                    selJk.style.backgroundColor = '#fff'; // Warna normal
+                }
+            }
+
             if(boxIbu && inputIbu) {
                 if(jenis === 'BADUTA') { boxIbu.style.display = 'block'; inputIbu.setAttribute('required', 'true'); } 
                 else { boxIbu.style.display = 'none'; inputIbu.removeAttribute('required'); inputIbu.value = ''; }
@@ -406,7 +421,6 @@ const initDaftarSasaran = async () => {
     const filterStatus = getEl('filter-status');
     const list = getEl('list-sasaran');
     
-    // Elemen Modal
     const modal = getEl('modal-detail');
     const btnTutup = getEl('btn-tutup-modal');
     const kontenDetail = getEl('konten-detail');
@@ -417,7 +431,6 @@ const initDaftarSasaran = async () => {
     const regList = antrean.filter(a => a.tipe_laporan === 'REGISTRASI' && String(a.id_tim) === String(session.id_tim));
     const pendList = antrean.filter(a => a.tipe_laporan === 'PENDAMPINGAN' && String(a.id_tim) === String(session.id_tim));
     
-    // Siapkan Data Tambahan (Status Kedaluwarsa & Format Tampilan)
     const processedList = regList.map(r => {
         let isExpired = false;
         let statusRaw = 'AKTIF';
@@ -432,7 +445,6 @@ const initDaftarSasaran = async () => {
             }
         }
         
-        // Format Jenis Kelamin & Usia (Hanya JK utk Catin & Baduta)
         let jk = r.data_laporan?.jenis_kelamin === 'Laki-laki' ? 'L' : 'P';
         let jkDisplay = (r.jenis_sasaran === 'CATIN' || r.jenis_sasaran === 'BADUTA') ? `(${jk})` : '';
         let usiaTh = r.data_laporan?.usia_saat_daftar_tahun !== undefined ? r.data_laporan.usia_saat_daftar_tahun : '-';
@@ -445,7 +457,6 @@ const initDaftarSasaran = async () => {
         const fJ = filterJenis ? filterJenis.value : 'ALL';
         const fS = filterStatus ? filterStatus.value : 'ALL';
         
-        // Eksekusi Filter
         let filtered = processedList.filter(r => {
             let matchJ = fJ === 'ALL' || r.jenis_sasaran === fJ;
             let matchS = fS === 'ALL' || r.statusRaw === fS;
@@ -464,7 +475,6 @@ const initDaftarSasaran = async () => {
                 </div>`).join(''); 
         }
 
-        // Pasang Event Click pada Kartu
         document.querySelectorAll('.sasaran-card').forEach(card => {
             card.onclick = () => showDetail(card.getAttribute('data-id'));
         });
@@ -474,7 +484,6 @@ const initDaftarSasaran = async () => {
         const r = processedList.find(x => x.id === id);
         if(!r) return;
         
-        // Tarik Data Riwayat Pendampingan dari HP
         const riwayat = pendList.filter(p => p.id_sasaran_ref === id).sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
         
         let htmlRiwayat = riwayat.length === 0 ? '<div style="color:#888; font-size:0.9rem; padding: 10px; background: #f8f9fa; border-radius: 5px;">Belum ada riwayat kunjungan pendampingan.</div>' : 
@@ -510,9 +519,12 @@ const initDaftarSasaran = async () => {
     if(filterJenis) filterJenis.onchange = renderList;
     if(filterStatus) filterStatus.onchange = renderList;
 
-    renderList(); // Tampilkan List Pertama Kali
+    renderList(); 
 };
 
+// ==========================================
+// 6. FORM PENDAMPINGAN (SUDAH DIKEMBALIKAN)
+// ==========================================
 const initFormPendampingan = async () => {
     const session = window.currentUser;
     const selSasaran = getEl('pend-sasaran');
@@ -616,7 +628,7 @@ const initRekap = async () => {
 };
 
 // ==========================================
-// 6. LOGIN PINTAR (ADAPTIVE HEADER)
+// 7. LOGIN PINTAR (ADAPTIVE HEADER)
 // ==========================================
 document.addEventListener('DOMContentLoaded', () => {
     initApp();
@@ -690,9 +702,6 @@ window.logout = async () => {
 window.addEventListener('online', updateNetworkStatus);
 window.addEventListener('offline', updateNetworkStatus);
 
-// ==========================================
-// 7. KONTROL SIDEBAR (MENU SAMPING)
-// ==========================================
 const btnMenu = getEl('btn-menu');
 const sidebar = getEl('sidebar');
 const overlay = getEl('sidebar-overlay');
