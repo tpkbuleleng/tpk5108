@@ -1,80 +1,113 @@
-import { putBulkData, getAllData, deleteData } from './db.js';
+import { putData, getAllData, clearStore, deleteData } from './db.js';
 
-// URL Web App murni Anda yang sudah sukses
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzEmmn0wMJmC1OHij9JUxm8EIT2xW1AuV0597EYCWDIxG_nkpZYBPx1EGiNYe6OjEHniw/exec'; 
+// 👉 GANTI DENGAN URL WEB APP DARI GOOGLE SCRIPT BAPAK (HARUS DIAPIT TANDA KUTIP)
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzEmmn0wMJmC1OHij9JUxm8EIT2xW1AuV0597EYCWDIxG_nkpZYBPx1EGiNYe6OjEHniw/exec';
 
+// 1. Fungsi Narik Data (Download Master)
 export const downloadMasterData = async () => {
     try {
-        console.log("Memulai proses download Master Data...");
-        const timestamp = new Date().getTime();
-        const fetchUrl = `${SCRIPT_URL}?action=getMaster&t=${timestamp}`;
-
-        const response = await fetch(fetchUrl, {
-            method: 'GET',
-            redirect: 'follow' 
-        });
-
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-
-        const responseData = await response.json();
-
-        if (responseData.status === "error") {
-            console.error("Error dari Google Script:", responseData.message);
-            alert("Terjadi kesalahan di Server: " + responseData.message);
+        if (!navigator.onLine) {
+            alert('❌ Tidak ada koneksi internet. Gagal mengunduh data Master.');
             return false;
         }
 
-        // --- FILTER SAKTI: Membuang baris Excel yang kosong / tidak ada ID-nya ---
-        const bersihkanData = (dataArray) => {
-            if (!Array.isArray(dataArray)) return [];
-            return dataArray.filter(item => {
-                const keys = Object.keys(item);
-                if (keys.length === 0) return false;
-                // Asumsi: Kolom pertama di Excel (A1) adalah ID/Username. Jika kosong, buang barisnya.
-                const primaryKey = keys[0]; 
-                return item[primaryKey] !== null && item[primaryKey] !== undefined && item[primaryKey].toString().trim() !== "";
-            });
-        };
+        console.log("Memulai unduh data master...");
+        const response = await fetch(SCRIPT_URL);
+        const result = await response.json();
 
-        // Simpan ke HP menggunakan data yang sudah disaring
-        if (responseData.master_user) await putBulkData('master_user', bersihkanData(responseData.master_user));
-        if (responseData.master_kader) await putBulkData('master_kader', bersihkanData(responseData.master_kader));
-        if (responseData.master_wilayah) await putBulkData('master_wilayah', bersihkanData(responseData.master_wilayah));
-        if (responseData.master_tim_wilayah) await putBulkData('master_tim_wilayah', bersihkanData(responseData.master_tim_wilayah)); // Sesuai tabel TIM_WILAYAH
-        if (responseData.master_pertanyaan) await putBulkData('master_pertanyaan', bersihkanData(responseData.master_pertanyaan));
+        if (result.status === 'success') {
+            const d = result.data;
+            
+            // Bersihkan kamar lama, masukkan data baru satu per satu
+            await clearStore('master_user');
+            for (let item of d.master_user) await putData('master_user', item);
+            
+            await clearStore('master_kader');
+            for (let item of d.master_kader) await putData('master_kader', item);
+            
+            await clearStore('master_tim');
+            for (let item of d.master_tim) await putData('master_tim', item);
+            
+            await clearStore('master_tim_wilayah');
+            for (let item of d.master_tim_wilayah) await putData('master_tim_wilayah', item);
+            
+            await clearStore('master_pertanyaan');
+            for (let item of d.master_pertanyaan) await putData('master_pertanyaan', item);
+            
+            // Data Dropdown Wilayah CATIN
+            await clearStore('master_wilayah_bali');
+            for (let item of d.master_wilayah_bali) await putData('master_wilayah_bali', item);
 
-        console.log("✅ Master Data berhasil diunduh dan disimpan di HP!");
-        return true;
-
+            console.log("✅ Data Master berhasil diperbarui.");
+            return true;
+        } else {
+            console.error("Gagal menarik data:", result.message);
+            return false;
+        }
     } catch (error) {
-        console.error("❌ Gagal download Master Data:", error);
+        console.error("Terjadi kesalahan sinkronisasi:", error);
         return false;
     }
 };
 
-export const uploadLaporanTunda = async () => {
-    try {
-        const antreanSync = await getAllData('sync_queue');
-        
-        if (antreanSync.length === 0) return true;
-
-        const response = await fetch(SCRIPT_URL, {
-            method: 'POST',
-            redirect: 'follow',
-            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({ action: 'uploadLaporan', data: antreanSync })
-        });
-
-        const result = await response.json();
-
-        if (result.status === 'success') {
-            for (let item of antreanSync) await deleteData('sync_queue', item.id);
-            return true;
-        } else {
-            throw new Error(result.message);
-        }
-    } catch (error) {
-        console.error("❌ Gagal mengirim laporan:", error);
-        return false;
+// 2. Fungsi Dorong Data (Upload Antrean)
+export const uploadData = async () => {
+    if (!navigator.onLine) {
+        alert("❌ Perangkat sedang Offline. Tunggu hingga internet menyala.");
+        return;
     }
+
+    try {
+        const queue = await getAllData('sync_queue');
+        if (queue.length === 0) {
+            alert("✨ Tidak ada data tertunda. Semua sudah sinkron.");
+            return;
+        }
+
+        let berhasil = 0;
+        let gagal = 0;
+
+        for (let data of queue) {
+            try {
+                const response = await fetch(SCRIPT_URL, {
+                    method: 'POST',
+                    body: JSON.stringify(data),
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' } // text/plain hindari error CORS
+                });
+                
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    await deleteData('sync_queue', data.id); // Hapus dari HP jika berhasil masuk Server
+                    berhasil++;
+                } else {
+                    gagal++;
+                    console.error("Gagal kirim:", result.message);
+                }
+            } catch (err) {
+                gagal++;
+                console.error("Gagal koneksi:", err);
+            }
+        }
+
+        alert(`🔄 Sinkronisasi Selesai!\n✅ Berhasil: ${berhasil}\n❌ Gagal: ${gagal}`);
+        
+    } catch (error) {
+        alert("Terjadi kesalahan sistem saat proses unggah.");
+    }
+};
+
+// 3. Tombol Eksekusi dari Sidebar
+window.jalankanSinkronisasi = async () => {
+    const btn = document.querySelector('[data-target="sync_manual"]');
+    if(btn) btn.innerHTML = '<span class="icon">⏳</span> Sedang Sinkron...';
+    
+    // Alur: Upload Data Tertunda dulu, baru Download Data Master terbaru
+    await uploadData(); 
+    await downloadMasterData(); 
+    
+    if(btn) btn.innerHTML = '<span class="icon">🔄</span> Sinkronisasi Data';
+    
+    alert("✅ Proses Sinkronisasi Selesai! Aplikasi akan dimuat ulang.");
+    location.reload(); // Refresh aplikasi agar data wilayah langsung muncul
 };
