@@ -18,7 +18,6 @@ export const downloadMasterData = async () => {
         if (result.status === 'success') {
             const d = result.data;
             
-            // Bersihkan kamar lama, masukkan data baru satu per satu
             await clearStore('master_user');
             for (let item of d.master_user) await putData('master_user', item);
             
@@ -34,7 +33,6 @@ export const downloadMasterData = async () => {
             await clearStore('master_pertanyaan');
             for (let item of d.master_pertanyaan) await putData('master_pertanyaan', item);
             
-            // Data Dropdown Wilayah CATIN
             await clearStore('master_wilayah_bali');
             for (let item of d.master_wilayah_bali) await putData('master_wilayah_bali', item);
 
@@ -59,7 +57,11 @@ export const uploadData = async () => {
 
     try {
         const queue = await getAllData('sync_queue');
-        if (queue.length === 0) {
+        
+        // FILTER: HANYA AMBIL DATA YANG BELUM SINKRON
+        const pending = queue.filter(q => !q.is_synced);
+        
+        if (pending.length === 0) {
             alert("✨ Tidak ada data tertunda. Semua sudah sinkron.");
             return;
         }
@@ -67,18 +69,20 @@ export const uploadData = async () => {
         let berhasil = 0;
         let gagal = 0;
 
-        for (let data of queue) {
+        for (let data of pending) {
             try {
                 const response = await fetch(SCRIPT_URL, {
                     method: 'POST',
                     body: JSON.stringify(data),
-                    headers: { 'Content-Type': 'text/plain;charset=utf-8' } // text/plain hindari error CORS
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' } 
                 });
                 
                 const result = await response.json();
                 
                 if (result.status === 'success') {
-                    await deleteData('sync_queue', data.id); // Hapus dari HP jika berhasil masuk Server
+                    // PERUBAHAN DISINI: Data tidak dihapus, hanya diberi stempel SINKRON ✅
+                    data.is_synced = true;
+                    await putData('sync_queue', data); 
                     berhasil++;
                 } else {
                     gagal++;
@@ -102,12 +106,11 @@ window.jalankanSinkronisasi = async () => {
     const btn = document.querySelector('[data-target="sync_manual"]');
     if(btn) btn.innerHTML = '<span class="icon">⏳</span> Sedang Sinkron...';
     
-    // Alur: Upload Data Tertunda dulu, baru Download Data Master terbaru
     await uploadData(); 
     await downloadMasterData(); 
     
     if(btn) btn.innerHTML = '<span class="icon">🔄</span> Sinkronisasi Data';
     
-    alert("✅ Proses Sinkronisasi Selesai! Aplikasi akan dimuat ulang.");
-    location.reload(); // Refresh aplikasi agar data wilayah langsung muncul
+    alert("✅ Proses Sinkronisasi Selesai!");
+    location.reload(); 
 };
