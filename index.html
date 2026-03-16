@@ -68,15 +68,8 @@
             <h3 style="margin-bottom: 15px; color: var(--primary);">📝 Registrasi Sasaran Baru</h3>
             <form id="form-registrasi" class="modern-form">
                 
-                <div class="form-group">
-                    <label>Nama Sasaran</label>
-                    <input type="text" name="nama_sasaran" class="form-control" placeholder="Sesuai KTP" required>
-                </div>
-
-                <div class="form-group">
-                    <label>Nama Kepala Keluarga</label>
-                    <input type="text" name="nama_kk" class="form-control" placeholder="Sesuai KK" required>
-                </div>
+                <div class="form-group"><label>Nama Sasaran</label><input type="text" name="nama_sasaran" class="form-control" placeholder="Sesuai KTP" required></div>
+                <div class="form-group"><label>Nama Kepala Keluarga</label><input type="text" name="nama_kk" class="form-control" placeholder="Sesuai KK" required></div>
 
                 <div class="form-group" id="box-ibu-kandung" style="display: none; background: #f8f9fa; padding: 10px; border-left: 3px solid #198754;">
                     <label style="color: #198754; font-weight: bold; font-size: 0.9rem;">Nama Ibu Kandung (Khusus BADUTA)</label>
@@ -94,20 +87,9 @@
                     </select>
                 </div>
 
-                <div class="form-group">
-                    <label>NIK (16 Digit Angka)</label>
-                    <input type="text" name="nik" class="form-control" maxlength="16" minlength="16" pattern="[0-9]{16}" oninput="this.value=this.value.replace(/[^0-9]/g,'');" placeholder="Contoh: 5108xxxxxxxxxxxx" required>
-                </div>
-
-                <div class="form-group">
-                    <label>No KK</label>
-                    <input type="text" name="no_kk" class="form-control" maxlength="16" minlength="16" pattern="[0-9]{16}" oninput="this.value=this.value.replace(/[^0-9]/g,'');" placeholder="Masukkan 16 digit No KK">
-                </div>
-
-                <div class="form-group">
-                    <label>Tanggal Lahir</label>
-                    <input type="date" name="tanggal_lahir" class="form-control" required>
-                </div>
+                <div class="form-group"><label>NIK (16 Digit Angka)</label><input type="text" name="nik" class="form-control" maxlength="16" minlength="16" pattern="[0-9]{16}" oninput="this.value=this.value.replace(/[^0-9]/g,'');" placeholder="Contoh: 5108xxxxxxxxxxxx" required></div>
+                <div class="form-group"><label>No KK</label><input type="text" name="no_kk" class="form-control" maxlength="16" minlength="16" pattern="[0-9]{16}" oninput="this.value=this.value.replace(/[^0-9]/g,'');" placeholder="Masukkan 16 digit No KK"></div>
+                <div class="form-group"><label>Tanggal Lahir</label><input type="date" name="tanggal_lahir" class="form-control" required></div>
 
                 <div class="form-group">
                     <label>Jenis Kelamin</label>
@@ -140,7 +122,6 @@
                 </div>
 
                 <div id="pertanyaan-dinamis" style="margin-top: 20px;"></div>
-                
                 <button type="submit" class="btn-primary" style="margin-top: 20px; width: 100%;">💾 Simpan Registrasi</button>
             </form>
         </div>
@@ -149,7 +130,6 @@
     <template id="template-daftar-sasaran">
         <div class="card animate-fade">
             <h3 style="margin-bottom: 15px; color: var(--primary);">📋 Daftar Sasaran</h3>
-            
             <div style="display: flex; gap: 10px; margin-bottom: 15px;">
                 <select id="filter-jenis" class="form-control" style="flex: 1; padding: 8px; font-weight: bold;">
                     <option value="ALL">Semua Jenis</option>
@@ -164,7 +144,6 @@
                     <option value="SELESAI">Selesai</option>
                 </select>
             </div>
-
             <div id="list-sasaran" style="display: flex; flex-direction: column; gap: 10px;"></div>
         </div>
 
@@ -174,6 +153,24 @@
                 <h3 style="color: var(--primary); margin-bottom: 15px; padding-right: 60px;">🔍 Detail Sasaran</h3>
                 <div id="konten-detail"></div>
             </div>
+        </div>
+    </template>
+
+    <template id="template-pendampingan">
+        <div class="card animate-fade">
+            <h3 style="margin-bottom: 15px; color: var(--primary);">🤝 Laporan Pendampingan</h3>
+            <form id="form-pendampingan" class="modern-form">
+                <div class="form-group">
+                    <label>Pilih Sasaran</label>
+                    <select id="pend-sasaran" name="id_sasaran" class="form-control" required>
+                        <option value="">-- Memuat Sasaran --</option>
+                    </select>
+                </div>
+                <div id="form-pendampingan-dinamis"></div>
+                <div class="form-group"><label>Tanggal Kunjungan</label><input type="date" name="tgl_kunjungan" class="form-control" required></div>
+                <div class="form-group"><label>Catatan Umum / Hasil</label><textarea name="catatan" class="form-control" rows="3" required></textarea></div>
+                <button type="submit" class="btn-primary" style="margin-top: 15px; width: 100%;">💾 Simpan Pendampingan</button>
+            </form>
         </div>
     </template>
 
