@@ -437,7 +437,7 @@ const initFormRegistrasi = async () => {
 };
 
 // ==========================================
-// 5. FITUR DAFTAR SASARAN & DETAIL POP-UP
+// 5. FITUR DAFTAR SASARAN & DETAIL POP-UP (DIPERBARUI)
 // ==========================================
 const initDaftarSasaran = async () => {
     const session = window.currentUser;
@@ -451,7 +451,10 @@ const initDaftarSasaran = async () => {
 
     if(!list) return;
     
+    // Load data pendukung (termasuk list pertanyaan untuk label riwayat)
     const antrean = await getAllData('sync_queue').catch(()=>[]);
+    const masterPertanyaan = await getAllData('master_pertanyaan').catch(()=>[]);
+    
     const regList = antrean.filter(a => a.tipe_laporan === 'REGISTRASI' && String(a.id_tim) === String(session.id_tim));
     const pendList = antrean.filter(a => a.tipe_laporan === 'PENDAMPINGAN' && String(a.id_tim) === String(session.id_tim));
     
@@ -510,16 +513,55 @@ const initDaftarSasaran = async () => {
         
         const riwayat = pendList.filter(p => p.id_sasaran_ref === id).sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
         
-        let htmlRiwayat = riwayat.length === 0 ? '<div style="color:#888; font-size:0.9rem; padding: 10px; background: #f8f9fa; border-radius: 5px;">Belum ada riwayat kunjungan pendampingan.</div>' : 
-            riwayat.map(p => `
-                <div style="border-left: 3px solid #198754; padding-left: 10px; margin-bottom: 12px;">
-                    <div style="font-size:0.85rem; color:#888;">📅 ${new Date(p.data_laporan?.tgl_kunjungan || p.created_at).toLocaleDateString('id-ID', {day: 'numeric', month: 'long', year: 'numeric'})}</div>
-                    <div style="font-size:0.95rem; color:#333; margin-top: 2px;">${p.data_laporan?.catatan || '-'}</div>
-                </div>
-            `).join('');
+        // PERUBAHAN BESAR PADA DESAIN RIWAYAT (TIMELINE CARDS)
+        let htmlRiwayat = riwayat.length === 0 ? 
+            '<div style="color:#888; font-size:0.9rem; padding: 15px; background: #f8f9fa; border-radius: 8px; text-align:center; border: 1px dashed #ccc;">Belum ada riwayat kunjungan pendampingan.</div>' : 
+            riwayat.map(p => {
+                
+                // Kumpulkan semua jawaban dinamis selain id, tgl_kunjungan, dan catatan
+                let dynamicHtml = '';
+                for (const [key, value] of Object.entries(p.data_laporan || {})) {
+                    if (['id_sasaran', 'tgl_kunjungan', 'catatan'].includes(key)) continue;
+                    
+                    let label = key;
+                    if(key.startsWith('q_')) {
+                        let qId = key.replace('q_', '');
+                        let foundQ = masterPertanyaan.find(mq => String(mq.id_pertanyaan) === String(qId));
+                        if(foundQ) label = foundQ.label_pertanyaan;
+                        else label = 'Pertanyaan Form';
+                    } else {
+                        // Format kunci seperti 'is_melahirkan' menjadi 'Is Melahirkan'
+                        label = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                    }
+
+                    dynamicHtml += `
+                        <div style="margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #eee;">
+                            <div style="font-size: 0.75rem; color: #666; font-weight: normal;">${label}</div>
+                            <div style="font-size: 0.9rem; color: #222; font-weight: 500;">${value}</div>
+                        </div>`;
+                }
+
+                // Kotak Timeline Riwayat Individual
+                return `
+                <div style="background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); overflow: hidden;">
+                    <div style="background: #e8f4fd; padding: 10px 15px; border-bottom: 1px solid #cfe2ff; display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-weight: bold; color: #0d6efd; font-size: 0.9rem;">📅 ${new Date(p.data_laporan?.tgl_kunjungan || p.created_at).toLocaleDateString('id-ID', {day: 'numeric', month: 'long', year: 'numeric'})}</span>
+                        <span style="font-size: 0.7rem; font-weight: bold; color: ${p.is_synced ? '#198754' : '#fd7e14'}; background: #fff; padding: 3px 8px; border-radius: 12px; border: 1px solid #ddd;">
+                            ${p.is_synced ? '✅ Server' : '⏳ Lokal'}
+                        </span>
+                    </div>
+                    <div style="padding: 15px;">
+                        <div style="font-size: 0.8rem; color: #666; margin-bottom: 4px;">Catatan Umum / Hasil:</div>
+                        <div style="font-size: 0.95rem; color: #333; margin-bottom: ${dynamicHtml ? '15px' : '0'}; background: #f8f9fa; padding: 10px; border-radius: 6px; border-left: 4px solid #0d6efd;">
+                            ${p.data_laporan?.catatan || '-'}
+                        </div>
+                        ${dynamicHtml ? `<div style="background: #fff; border: 1px solid #f1f1f1; padding: 10px; border-radius: 6px;">${dynamicHtml}</div>` : ''}
+                    </div>
+                </div>`;
+            }).join('');
 
         kontenDetail.innerHTML = `
-            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #ddd; line-height: 1.4;">
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #ddd; line-height: 1.4;">
                 <div style="font-size: 0.8rem; color: #666;">Nama Sasaran</div>
                 <div style="font-size: 1.15rem; font-weight: bold; color: #222; margin-bottom: 12px; text-transform: uppercase;">${r.nama_sasaran || '-'}</div>
                 
@@ -552,8 +594,10 @@ const initDaftarSasaran = async () => {
                 <div style="font-size: 0.95rem; color: #222;">${r.data_laporan?.alamat || '-'}</div>
             </div>
             
-            <h4 style="margin-bottom: 15px; color: var(--primary); border-bottom: 2px solid #ddd; padding-bottom: 5px;">Riwayat Kunjungan</h4>
-            ${htmlRiwayat}
+            <h4 style="margin-bottom: 15px; color: var(--primary); border-bottom: 2px solid #ddd; padding-bottom: 5px;">Riwayat Kunjungan (${riwayat.length})</h4>
+            <div style="max-height: 400px; overflow-y: auto; padding-right: 5px;">
+                ${htmlRiwayat}
+            </div>
         `;
         
         if(modal) modal.style.display = 'block';
@@ -581,7 +625,6 @@ const initFormPendampingan = async () => {
     
     if (selJenis && selSasaran) { 
         
-        // Logika saat Jenis Sasaran Dipilih
         selJenis.onchange = () => {
             const jenis = selJenis.value;
             containerQ.innerHTML = '';
@@ -613,7 +656,6 @@ const initFormPendampingan = async () => {
             }
         };
 
-        // Logika saat Nama Sasaran Dipilih
         selSasaran.onchange = () => {
             const sasaranId = selSasaran.value;
             const sasaranData = regList.find(r => r.id === sasaranId);
