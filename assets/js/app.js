@@ -58,8 +58,22 @@ const masukKeAplikasi = async (session) => {
     const wilayahKader = allWil.find(w => String(w.id_tim) === String(session.id_tim));
     const namaKec = wilayahKader && wilayahKader.kecamatan ? wilayahKader.kecamatan.toUpperCase() : "BULELENG";
 
+    // PERUBAHAN TAMPILAN HEADER (2 BARIS, CENTER, ONLINE DI KIRI)
     const greeting = getEl('user-greeting');
-    if (greeting) greeting.innerHTML = `DASHBOARD KADER KECAMATAN ${namaKec}`;
+    if (greeting) {
+        greeting.innerHTML = `DASHBOARD KADER<br>KECAMATAN ${namaKec}`;
+        greeting.style.textAlign = 'center';
+        greeting.style.lineHeight = '1.15';
+        greeting.style.fontSize = '1.05rem';
+    }
+    const hInfo = document.querySelector('.header-info');
+    if (hInfo) {
+        hInfo.style.display = 'flex';
+        hInfo.style.alignItems = 'center';
+        hInfo.style.gap = '12px';
+        hInfo.style.flexDirection = 'row-reverse'; // Memaksa Status Online ke kiri judul
+    }
+
     if (getEl('sidebar-nama')) getEl('sidebar-nama').innerText = session.nama;
     if (getEl('sidebar-role')) getEl('sidebar-role').innerText = session.role;
     
@@ -121,14 +135,13 @@ window.renderKonten = async (target) => {
         const session = window.currentUser;
         area.innerHTML = `
             <div class="animate-fade">
-                <div class="card" style="background: linear-gradient(135deg, #0d6efd, #0043a8); color: white; border:none; margin-bottom: 20px; padding: 25px;">
-                    <p style="margin:0; opacity: 0.9; font-weight: 800;">SELAMAT DATANG,</p>
-                    <h2 style="margin: 5px 0 15px 0; font-size: 1.6rem; font-weight: 700;">${session.nama}</h2>
-                    <div style="background: rgba(255,255,255,0.2); display: inline-block; padding: 4px 12px; border-radius: 6px; font-weight: bold; font-size: 0.9rem; margin-bottom: 20px;">
-                        NO. TIM: ${session.nomor_tim || session.id_tim}
-                    </div>
-                    <hr style="margin-bottom: 20px; border: 0; border-top: 1px solid rgba(255,255,255,0.2);">
-                    <div id="dash-detail-wilayah" style="font-size: 1.1rem; line-height: 1.7;">Memuat detail...</div>
+                <div class="card" style="background: linear-gradient(135deg, #0d6efd, #0043a8); color: white; border:none; margin-bottom: 20px; padding: 20px;">
+                    <p style="margin:0; opacity: 0.9; font-weight: 800; font-size: 0.85rem;">SELAMAT DATANG,</p>
+                    
+                    <h2 style="margin: 3px 0 10px 0; font-size: 1.4rem; font-weight: 700; line-height: 1.2;">${session.nama}</h2>
+                    
+                    <hr style="margin-bottom: 12px; border: 0; border-top: 1px solid rgba(255,255,255,0.2);">
+                    <div id="dash-detail-wilayah">Memuat detail...</div>
                 </div>
                 
                 <div id="dash-summary" style="background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; border: 1px solid #eee;">
@@ -138,13 +151,13 @@ window.renderKonten = async (target) => {
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
                     <div class="card" style="text-align:center; padding: 20px; border-bottom: 4px solid orange;">
                         <div style="font-size: 1.8rem;">📦</div>
-                        <h3 id="dash-tunda">0</h3>
-                        <p style="font-size: 0.75rem; color: #666; font-weight: bold;">TERTUNDA SINKRON</p>
+                        <h3 id="dash-tunda" style="font-size: 1.6rem;">0 / 0</h3>
+                        <p style="font-size: 0.75rem; color: #666; font-weight: bold; margin-top: 5px;">DATA SINKRON</p>
                     </div>
                     <div class="card" style="text-align:center; padding: 20px; cursor:pointer; border-bottom: 4px solid #0d6efd;" onclick="renderKonten('registrasi')">
                         <div style="font-size: 1.8rem;">📝</div>
-                        <h3>BARU</h3>
-                        <p style="font-size: 0.75rem; color: #666; font-weight: bold;">REGISTRASI</p>
+                        <h3 style="font-size: 1.6rem;">BARU</h3>
+                        <p style="font-size: 0.75rem; color: #666; font-weight: bold; margin-top: 5px;">REGISTRASI</p>
                     </div>
                 </div>
             </div>`;
@@ -157,17 +170,27 @@ window.renderKonten = async (target) => {
             
             const wilayahKerja = allWil.filter(w => String(w.id_tim) === String(session.id_tim));
             const daftarDusun = wilayahKerja.map(w => w.dusun_rw).join(', ') || '-';
-            const pendingQueue = antrean.filter(a => !a.is_synced);
             
+            // LOGIKA SPASI RAPAT DAN POSISI NO. TIM BARU
             if (getEl('dash-detail-wilayah')) {
                 getEl('dash-detail-wilayah').innerHTML = `
-                    <div style="margin-bottom: 12px;"><span style="opacity:0.8; font-size: 0.9rem;">📍 Wilayah Tugas (Dusun/RW):</span><br><span style="font-weight: 500;">${daftarDusun}</span></div>
-                    <div style="margin-bottom: 8px;"><span style="opacity:0.8; font-size: 0.9rem;">🏘️ Desa/Kelurahan:</span><br><span style="font-weight: 600;">${wilayahKerja[0]?.desa_kelurahan || '-'}</span></div>
-                    <div><span style="opacity:0.8; font-size: 0.9rem;">🏛️ Kecamatan:</span><br><span style="font-weight: 600;">${wilayahKerja[0]?.kecamatan || '-'}</span></div>`;
+                    <div style="background: rgba(255,255,255,0.2); display: inline-block; padding: 4px 10px; border-radius: 6px; font-weight: bold; font-size: 0.85rem; margin-bottom: 12px;">
+                        NO. TIM: ${session.nomor_tim || session.id_tim}
+                    </div>
+                    <div style="line-height: 1.25;">
+                        <div style="margin-bottom: 6px;"><span style="opacity:0.8; font-size: 0.8rem;">📍 Wilayah Tugas (Dusun/RW):</span><br><span style="font-weight: 600; font-size: 0.9rem;">${daftarDusun}</span></div>
+                        <div style="margin-bottom: 6px;"><span style="opacity:0.8; font-size: 0.8rem;">🏘️ Desa/Kelurahan:</span><br><span style="font-weight: 600; font-size: 0.9rem;">${wilayahKerja[0]?.desa_kelurahan || '-'}</span></div>
+                        <div><span style="opacity:0.8; font-size: 0.8rem;">🏛️ Kecamatan:</span><br><span style="font-weight: 600; font-size: 0.9rem;">${wilayahKerja[0]?.kecamatan || '-'}</span></div>
+                    </div>`;
             }
-            if (getEl('dash-tunda')) getEl('dash-tunda').innerText = pendingQueue.length;
-
+            
             const queueTim = antrean.filter(a => String(a.id_tim) === String(session.id_tim));
+            const syncedCount = queueTim.filter(a => a.is_synced).length;
+            const pendingCount = queueTim.filter(a => !a.is_synced).length;
+            
+            // TAMPILKAN RASIO (Sinkron / Belum Sinkron)
+            if (getEl('dash-tunda')) getEl('dash-tunda').innerText = `${syncedCount} / ${pendingCount}`;
+
             const regList = queueTim.filter(a => a.tipe_laporan === 'REGISTRASI');
             const pendList = queueTim.filter(a => a.tipe_laporan === 'PENDAMPINGAN');
             
@@ -267,7 +290,6 @@ const initFormRegistrasi = async () => {
     const selDusun = getEl('reg-dusun');
     const regAlamat = getEl('reg-alamat');
     
-    // Tarik elemen Jenis Kelamin
     const selJk = document.querySelector('select[name="jenis_kelamin"]');
 
     if (selDesa && tugas.length > 0) {
@@ -306,15 +328,14 @@ const initFormRegistrasi = async () => {
         selJenis.onchange = () => {
             const jenis = selJenis.value;
             
-            // LOGIKA KUNCI JENIS KELAMIN (BUMIL & BUFAS)
             if (selJk) {
                 if (jenis === 'BUMIL' || jenis === 'BUFAS') {
                     selJk.value = 'Perempuan';
-                    selJk.style.pointerEvents = 'none'; // Tidak bisa diklik
-                    selJk.style.backgroundColor = '#e9ecef'; // Warna keabu-abuan
+                    selJk.style.pointerEvents = 'none'; 
+                    selJk.style.backgroundColor = '#e9ecef'; 
                 } else {
-                    selJk.style.pointerEvents = 'auto'; // Bisa diklik
-                    selJk.style.backgroundColor = '#fff'; // Warna normal
+                    selJk.style.pointerEvents = 'auto'; 
+                    selJk.style.backgroundColor = '#fff'; 
                 }
             }
 
@@ -523,7 +544,7 @@ const initDaftarSasaran = async () => {
 };
 
 // ==========================================
-// 6. FORM PENDAMPINGAN (SUDAH DIKEMBALIKAN)
+// 6. FORM PENDAMPINGAN 
 // ==========================================
 const initFormPendampingan = async () => {
     const session = window.currentUser;
