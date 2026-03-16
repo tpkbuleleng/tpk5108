@@ -160,13 +160,30 @@
         <div class="card animate-fade">
             <h3 style="margin-bottom: 15px; color: var(--primary);">🤝 Laporan Pendampingan</h3>
             <form id="form-pendampingan" class="modern-form">
+                
                 <div class="form-group">
-                    <label>Pilih Sasaran</label>
-                    <select id="pend-sasaran" name="id_sasaran" class="form-control" required>
-                        <option value="">-- Memuat Sasaran --</option>
+                    <label>Jenis Sasaran</label>
+                    <select id="pend-jenis" class="form-control" required>
+                        <option value="">-- Pilih Jenis Sasaran --</option>
+                        <option value="CATIN">CATIN</option>
+                        <option value="BUMIL">BUMIL</option>
+                        <option value="BUFAS">BUFAS</option>
+                        <option value="BADUTA">BADUTA</option>
                     </select>
                 </div>
+
+                <div class="form-group">
+                    <label>Pilih Sasaran</label>
+                    <select id="pend-sasaran" name="id_sasaran" class="form-control" required disabled>
+                        <option value="">-- Pilih Jenis Dahulu --</option>
+                    </select>
+                </div>
+
+                <div id="pend-info-sasaran" style="display: none; background: #e8f4fd; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #0d6efd;">
+                </div>
+
                 <div id="form-pendampingan-dinamis"></div>
+                
                 <div class="form-group"><label>Tanggal Kunjungan</label><input type="date" name="tgl_kunjungan" class="form-control" required></div>
                 <div class="form-group"><label>Catatan Umum / Hasil</label><textarea name="catatan" class="form-control" rows="3" required></textarea></div>
                 <button type="submit" class="btn-primary" style="margin-top: 15px; width: 100%;">💾 Simpan Pendampingan</button>
