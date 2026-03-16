@@ -167,7 +167,6 @@ window.renderKonten = async (target) => {
             }
             if (getEl('dash-tunda')) getEl('dash-tunda').innerText = pendingQueue.length;
 
-            // LOGIKA REKAP KUMULATIF DASHBOARD
             const queueTim = antrean.filter(a => String(a.id_tim) === String(session.id_tim));
             const regList = queueTim.filter(a => a.tipe_laporan === 'REGISTRASI');
             const pendList = queueTim.filter(a => a.tipe_laporan === 'PENDAMPINGAN');
@@ -236,7 +235,7 @@ window.renderKonten = async (target) => {
 };
 
 // ==========================================
-// 4. LOGIKA FORM DINAMIS & KODE KECAMATAN
+// 4. LOGIKA FORM DINAMIS & ID UNIK
 // ==========================================
 const getKodeKecamatan = (kec) => {
     if (!kec) return "XXX";
@@ -305,31 +304,18 @@ const initFormRegistrasi = async () => {
             const jenis = selJenis.value;
             
             if(boxIbu && inputIbu) {
-                if(jenis === 'BADUTA') {
-                    boxIbu.style.display = 'block';
-                    inputIbu.setAttribute('required', 'true');
-                } else {
-                    boxIbu.style.display = 'none';
-                    inputIbu.removeAttribute('required');
-                    inputIbu.value = '';
-                }
+                if(jenis === 'BADUTA') { boxIbu.style.display = 'block'; inputIbu.setAttribute('required', 'true'); } 
+                else { boxIbu.style.display = 'none'; inputIbu.removeAttribute('required'); inputIbu.value = ''; }
             }
 
             if(boxNikah && inputNikah) {
-                if(jenis === 'CATIN') {
-                    boxNikah.style.display = 'block';
-                    inputNikah.setAttribute('required', 'true');
-                } else {
-                    boxNikah.style.display = 'none';
-                    inputNikah.removeAttribute('required');
-                    inputNikah.value = '';
-                }
+                if(jenis === 'CATIN') { boxNikah.style.display = 'block'; inputNikah.setAttribute('required', 'true'); } 
+                else { boxNikah.style.display = 'none'; inputNikah.removeAttribute('required'); inputNikah.value = ''; }
             }
 
             if(boxCatin && boxDomisili) {
                 if (jenis === 'CATIN') {
-                    boxCatin.style.display = 'block';
-                    boxDomisili.style.display = 'none';
+                    boxCatin.style.display = 'block'; boxDomisili.style.display = 'none';
                     if(selDesa) selDesa.removeAttribute('required');
                     if(selDusun) selDusun.removeAttribute('required');
                     if(regAlamat) regAlamat.removeAttribute('required');
@@ -337,8 +323,7 @@ const initFormRegistrasi = async () => {
                     if(catinKec) catinKec.setAttribute('required', 'true');
                     if(catinDesa) catinDesa.setAttribute('required', 'true');
                 } else {
-                    boxCatin.style.display = 'none';
-                    boxDomisili.style.display = 'block';
+                    boxCatin.style.display = 'none'; boxDomisili.style.display = 'block';
                     if(selDesa) selDesa.setAttribute('required', 'true');
                     if(selDusun) selDusun.setAttribute('required', 'true');
                     if(regAlamat) regAlamat.setAttribute('required', 'true');
@@ -353,11 +338,7 @@ const initFormRegistrasi = async () => {
             const filteredQ = questions.filter(q => String(q.is_active || '').toUpperCase() === 'Y' && (String(q.kategori_sasaran).toUpperCase() === 'UMUM' || String(q.kategori_sasaran).toUpperCase() === jenis)).sort((a,b)=>a.urutan - b.urutan);
             if (filteredQ.length > 0) {
                 containerQ.innerHTML = `<h4 style="margin-bottom:10px; color:var(--primary);">Pertanyaan Khusus ${jenis}</h4>` + 
-                    filteredQ.map(q => `
-                        <div class="form-group">
-                            <label>${q.label_pertanyaan}</label>
-                            <input type="${q.tipe_input || 'text'}" name="q_${q.id_pertanyaan}" class="form-control" required>
-                        </div>`).join('');
+                    filteredQ.map(q => `<div class="form-group"><label>${q.label_pertanyaan}</label><input type="${q.tipe_input || 'text'}" name="q_${q.id_pertanyaan}" class="form-control" required></div>`).join('');
             } else { containerQ.innerHTML = ''; }
         };
     }
@@ -387,37 +368,25 @@ const initFormRegistrasi = async () => {
                 const desaFinal = jenisSasaran === 'CATIN' ? '-' : selDesa.value;
                 const dusunFinal = jenisSasaran === 'CATIN' ? '-' : selDusun.value;
 
-                // LOGIKA HITUNG USIA STATIS SAAT DAFTAR
                 if (jawaban.tanggal_lahir) {
                     const tglLahir = new Date(jawaban.tanggal_lahir);
                     const tglDaftar = new Date();
-                    
                     let umurTahun = tglDaftar.getFullYear() - tglLahir.getFullYear();
                     let umurBulan = tglDaftar.getMonth() - tglLahir.getMonth();
-                    
                     if (umurBulan < 0 || (umurBulan === 0 && tglDaftar.getDate() < tglLahir.getDate())) {
-                        umurTahun--;
-                        umurBulan += 12;
+                        umurTahun--; umurBulan += 12;
                     }
-                    
                     jawaban.usia_saat_daftar_tahun = umurTahun;
                     jawaban.usia_saat_daftar_bulan = umurBulan;
                 }
 
                 const laporan = {
                     id: idSasaran,
-                    tipe_laporan: 'REGISTRASI', 
-                    username: session.username, 
-                    id_tim: session.id_tim, 
-                    nomor_tim: session.nomor_tim,
-                    kecamatan: kecamatan, 
-                    jenis_sasaran: jenisSasaran, 
-                    nama_sasaran: jawaban.nama_sasaran, 
-                    desa: desaFinal, 
-                    dusun: dusunFinal,
-                    data_laporan: jawaban,
-                    is_synced: false, 
-                    created_at: new Date().toISOString()
+                    tipe_laporan: 'REGISTRASI', username: session.username, 
+                    id_tim: session.id_tim, nomor_tim: session.nomor_tim,
+                    kecamatan: kecamatan, jenis_sasaran: jenisSasaran, 
+                    nama_sasaran: jawaban.nama_sasaran, desa: desaFinal, dusun: dusunFinal,
+                    data_laporan: jawaban, is_synced: false, created_at: new Date().toISOString()
                 };
                 
                 await putData('sync_queue', laporan);
@@ -428,49 +397,120 @@ const initFormRegistrasi = async () => {
     }
 };
 
+// ==========================================
+// 5. FITUR DAFTAR SASARAN & DETAIL POP-UP
+// ==========================================
 const initDaftarSasaran = async () => {
     const session = window.currentUser;
+    const filterJenis = getEl('filter-jenis');
+    const filterStatus = getEl('filter-status');
     const list = getEl('list-sasaran');
+    
+    // Elemen Modal
+    const modal = getEl('modal-detail');
+    const btnTutup = getEl('btn-tutup-modal');
+    const kontenDetail = getEl('konten-detail');
+
     if(!list) return;
     
     const antrean = await getAllData('sync_queue').catch(()=>[]);
     const regList = antrean.filter(a => a.tipe_laporan === 'REGISTRASI' && String(a.id_tim) === String(session.id_tim));
+    const pendList = antrean.filter(a => a.tipe_laporan === 'PENDAMPINGAN' && String(a.id_tim) === String(session.id_tim));
     
-    if (regList.length === 0) { 
-        list.innerHTML = `<div style="text-align:center; padding:20px; color:#999;">Belum ada sasaran yang diregistrasi oleh Tim Anda.</div>`; 
-    } else { 
-        list.innerHTML = regList.map(r => {
-            // LOGIKA KEDALUWARSA CATIN
-            let isExpired = false;
-            let labelSelesai = '';
-            
-            if (r.jenis_sasaran === 'CATIN' && r.data_laporan && r.data_laporan.tanggal_pernikahan) {
-                const tglNikah = new Date(r.data_laporan.tanggal_pernikahan);
-                const hariIni = new Date();
-                hariIni.setHours(0,0,0,0);
-                
-                if (tglNikah < hariIni) {
-                    isExpired = true;
-                    labelSelesai = `<div style="color: #dc3545; font-weight:bold; font-size:0.8rem; margin-top:5px; padding: 4px; background: #f8d7da; border-radius: 4px; display: inline-block;">🔒 SELESAI (Sudah Menikah)</div>`;
-                }
+    // Siapkan Data Tambahan (Status Kedaluwarsa & Format Tampilan)
+    const processedList = regList.map(r => {
+        let isExpired = false;
+        let statusRaw = 'AKTIF';
+        let labelSelesai = '<span style="color: var(--primary); font-weight:bold;">Aktif</span>';
+        
+        if (r.jenis_sasaran === 'CATIN' && r.data_laporan && r.data_laporan.tanggal_pernikahan) {
+            const tglNikah = new Date(r.data_laporan.tanggal_pernikahan);
+            const hariIni = new Date(); hariIni.setHours(0,0,0,0);
+            if (tglNikah < hariIni) {
+                isExpired = true; statusRaw = 'SELESAI';
+                labelSelesai = '<span style="color: #dc3545; font-weight:bold;">SELESAI (Sudah Menikah)</span>';
             }
+        }
+        
+        // Format Jenis Kelamin & Usia (Hanya JK utk Catin & Baduta)
+        let jk = r.data_laporan?.jenis_kelamin === 'Laki-laki' ? 'L' : 'P';
+        let jkDisplay = (r.jenis_sasaran === 'CATIN' || r.jenis_sasaran === 'BADUTA') ? `(${jk})` : '';
+        let usiaTh = r.data_laporan?.usia_saat_daftar_tahun !== undefined ? r.data_laporan.usia_saat_daftar_tahun : '-';
+        let textBaris2 = `${r.jenis_sasaran} ${jkDisplay} ${usiaTh} Th`.trim();
 
-            return `
-            <div style="background:${isExpired ? '#f8f9fa' : '#f4f7f6'}; padding:15px; border-radius:8px; border-left: 4px solid ${isExpired ? '#6c757d' : 'var(--primary)'}; margin-bottom: 10px; opacity: ${isExpired ? '0.7' : '1'};">
-                <div style="font-weight: bold; font-size: 1.15rem; color: #333; text-transform: uppercase;">
-                    ${r.nama_sasaran || 'Tanpa Nama'}
+        return { ...r, isExpired, labelSelesai, statusRaw, textBaris2 };
+    });
+
+    const renderList = () => {
+        const fJ = filterJenis ? filterJenis.value : 'ALL';
+        const fS = filterStatus ? filterStatus.value : 'ALL';
+        
+        // Eksekusi Filter
+        let filtered = processedList.filter(r => {
+            let matchJ = fJ === 'ALL' || r.jenis_sasaran === fJ;
+            let matchS = fS === 'ALL' || r.statusRaw === fS;
+            return matchJ && matchS;
+        });
+
+        if (filtered.length === 0) { 
+            list.innerHTML = `<div style="text-align:center; padding:20px; color:#999;">Tidak ada sasaran yang sesuai filter.</div>`; 
+        } else { 
+            list.innerHTML = filtered.map(r => `
+                <div class="sasaran-card" data-id="${r.id}" style="background:${r.isExpired ? '#f8f9fa' : '#fff'}; padding:15px; border-radius:8px; border-left: 4px solid ${r.isExpired ? '#6c757d' : 'var(--primary)'}; opacity: ${r.isExpired ? '0.75' : '1'}; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                    <div style="font-weight: bold; font-size: 1.15rem; color: #333; text-transform: uppercase;">${r.nama_sasaran || 'Tanpa Nama'}</div>
+                    <div style="font-size: 0.95rem; color: #555; font-weight: bold; margin-top: 3px;">${r.textBaris2}</div>
+                    <div style="font-size: 0.85rem; color: #666; margin-top: 3px;">📍 ${r.dusun}, ${r.desa}</div>
+                    <div style="font-size: 0.9rem; margin-top: 6px;">${r.labelSelesai}</div>
+                </div>`).join(''); 
+        }
+
+        // Pasang Event Click pada Kartu
+        document.querySelectorAll('.sasaran-card').forEach(card => {
+            card.onclick = () => showDetail(card.getAttribute('data-id'));
+        });
+    };
+
+    const showDetail = (id) => {
+        const r = processedList.find(x => x.id === id);
+        if(!r) return;
+        
+        // Tarik Data Riwayat Pendampingan dari HP
+        const riwayat = pendList.filter(p => p.id_sasaran_ref === id).sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+        
+        let htmlRiwayat = riwayat.length === 0 ? '<div style="color:#888; font-size:0.9rem; padding: 10px; background: #f8f9fa; border-radius: 5px;">Belum ada riwayat kunjungan pendampingan.</div>' : 
+            riwayat.map(p => `
+                <div style="border-left: 3px solid #198754; padding-left: 10px; margin-bottom: 12px;">
+                    <div style="font-size:0.85rem; color:#888;">📅 ${new Date(p.data_laporan?.tgl_kunjungan || p.created_at).toLocaleDateString('id-ID', {day: 'numeric', month: 'long', year: 'numeric'})}</div>
+                    <div style="font-size:0.95rem; color:#333; margin-top: 2px;">${p.data_laporan?.catatan || '-'}</div>
                 </div>
-                <div style="font-size: 0.85rem; color: ${isExpired ? '#6c757d' : 'var(--primary)'}; font-weight: bold; margin-top: 2px;">
-                    [${r.id}] ${r.jenis_sasaran}
-                </div>
-                <div style="font-size: 0.9rem; color: #555; margin-top: 6px;">📍 ${r.dusun}, ${r.desa}</div>
-                ${labelSelesai}
-                <div style="font-size: 0.8rem; color:#888; margin-top: 8px;">
-                    ${r.is_synced ? '✅ Tersinkron' : '⏳ Belum Sinkron'} | ${new Date(r.created_at).toLocaleString('id-ID')}
-                </div>
-            </div>`;
-        }).join(''); 
-    }
+            `).join('');
+
+        kontenDetail.innerHTML = `
+            <div style="margin-bottom: 20px;">
+                <div style="font-weight: bold; font-size: 1.3rem; color: #222; text-transform: uppercase;">${r.nama_sasaran}</div>
+                <div style="color: #666; font-size: 0.85rem; margin-top: 4px;">ID: ${r.id} <br> NIK: ${r.data_laporan?.nik || '-'}</div>
+            </div>
+            <table style="width: 100%; font-size: 0.95rem; margin-bottom: 25px; line-height: 1.5;">
+                <tr><td style="padding:4px 0; color:#666; width:35%;">Status</td><td>: ${r.labelSelesai}</td></tr>
+                <tr><td style="padding:4px 0; color:#666;">Kategori</td><td>: <b>${r.textBaris2}</b></td></tr>
+                <tr><td style="padding:4px 0; color:#666;">Tgl Lahir</td><td>: ${r.data_laporan?.tanggal_lahir || '-'}</td></tr>
+                <tr><td style="padding:4px 0; color:#666;">Nama KK</td><td>: ${r.data_laporan?.nama_kk || '-'}</td></tr>
+                ${r.jenis_sasaran === 'BADUTA' ? `<tr><td style="padding:4px 0; color:#666;">Nama Ibu</td><td>: ${r.data_laporan?.nama_ibu_kandung || '-'}</td></tr>` : ''}
+                <tr><td style="padding:4px 0; color:#666; vertical-align: top;">Alamat</td><td>: ${r.data_laporan?.alamat || '-'}</td></tr>
+            </table>
+            
+            <h4 style="margin-bottom: 15px; color: var(--primary); border-bottom: 2px solid #ddd; padding-bottom: 5px;">Riwayat Kunjungan</h4>
+            ${htmlRiwayat}
+        `;
+        
+        if(modal) modal.style.display = 'block';
+    };
+
+    if(btnTutup) btnTutup.onclick = () => { if(modal) modal.style.display = 'none'; };
+    if(filterJenis) filterJenis.onchange = renderList;
+    if(filterStatus) filterStatus.onchange = renderList;
+
+    renderList(); // Tampilkan List Pertama Kali
 };
 
 const initFormPendampingan = async () => {
@@ -482,7 +522,6 @@ const initFormPendampingan = async () => {
     const regList = antrean.filter(a => a.tipe_laporan === 'REGISTRASI' && String(a.id_tim) === String(session.id_tim));
     
     if (selSasaran) { 
-        // FILTER CATIN KEDALUWARSA DI DROPDOWN PENDAMPINGAN
         const activeRegList = regList.filter(r => {
             if (r.jenis_sasaran === 'CATIN' && r.data_laporan && r.data_laporan.tanggal_pernikahan) {
                 const tglNikah = new Date(r.data_laporan.tanggal_pernikahan);
@@ -531,7 +570,6 @@ const initFormPendampingan = async () => {
                 const formData = new FormData(e.target);
                 const jawaban = {}; formData.forEach((val, key) => { jawaban[key] = val; });
                 
-                // LOGIKA TRANSISI BUMIL -> BUFAS DAN HITUNG USIA MELAHIRKAN
                 if(jawaban.is_melahirkan === 'YA' && jawaban.tgl_persalinan) {
                     const originalReg = await getDataById('sync_queue', jawaban.id_sasaran);
                     if(originalReg) {
@@ -547,7 +585,6 @@ const initFormPendampingan = async () => {
                             originalReg.data_laporan.usia_saat_melahirkan_bulan = uBulan;
                             originalReg.data_laporan.tgl_persalinan = jawaban.tgl_persalinan;
                         }
-
                         originalReg.jenis_sasaran = 'BUFAS';
                         originalReg.is_synced = false; 
                         await putData('sync_queue', originalReg);
@@ -558,12 +595,9 @@ const initFormPendampingan = async () => {
                 const laporan = { 
                     id: `PEND-${Date.now()}`, 
                     tipe_laporan: 'PENDAMPINGAN', 
-                    username: session.username, 
-                    id_tim: session.id_tim,
-                    id_sasaran_ref: jawaban.id_sasaran, 
-                    data_laporan: jawaban,
-                    is_synced: false,
-                    created_at: new Date().toISOString() 
+                    username: session.username, id_tim: session.id_tim,
+                    id_sasaran_ref: jawaban.id_sasaran, data_laporan: jawaban,
+                    is_synced: false, created_at: new Date().toISOString() 
                 };
                 await putData('sync_queue', laporan);
                 alert("✅ Laporan Pendampingan tersimpan di HP!"); renderKonten('dashboard');
@@ -582,7 +616,7 @@ const initRekap = async () => {
 };
 
 // ==========================================
-// 5. LOGIN PINTAR (ADAPTIVE HEADER)
+// 6. LOGIN PINTAR (ADAPTIVE HEADER)
 // ==========================================
 document.addEventListener('DOMContentLoaded', () => {
     initApp();
@@ -657,7 +691,7 @@ window.addEventListener('online', updateNetworkStatus);
 window.addEventListener('offline', updateNetworkStatus);
 
 // ==========================================
-// 6. KONTROL SIDEBAR (MENU SAMPING)
+// 7. KONTROL SIDEBAR (MENU SAMPING)
 // ==========================================
 const btnMenu = getEl('btn-menu');
 const sidebar = getEl('sidebar');
