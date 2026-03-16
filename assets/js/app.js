@@ -88,13 +88,13 @@ const renderMenu = (role) => {
     const container = getEl('dynamic-menu-container');
     if (!container) return;
 
+    // MENU DIPERBARUI: REKAP KADER & TIM DIGABUNG
     const menus = [
         { id: 'dashboard', icon: '🏠', label: 'Dashboard' },
         { id: 'registrasi', icon: '📝', label: 'Registrasi Sasaran' },
         { id: 'daftar_sasaran', icon: '📋', label: 'Daftar Sasaran' },
         { id: 'pendampingan', icon: '🤝', label: 'Laporan Pendampingan' },
-        { id: 'rekap_kader', icon: '📊', label: 'Rekap Bulanan Kader' },
-        { id: 'rekap_tim', icon: '📈', label: 'Rekap Bulanan Tim' },
+        { id: 'rekap_bulanan', icon: '📊', label: 'Rekap Bulanan' },
         { id: 'cetak_pdf', icon: '🖨️', label: 'Cetak PDF' },
         { id: 'ganti_pass', icon: '🔑', label: 'Ganti Password' },
         { id: 'sync_manual', icon: '🔄', label: 'Sinkronisasi Data' },
@@ -242,11 +242,10 @@ window.renderKonten = async (target) => {
     } else if (target === 'pendampingan') {
         const tpl = getEl('template-pendampingan');
         if(tpl) { area.appendChild(tpl.content.cloneNode(true)); initFormPendampingan(); }
-    } else if (target === 'rekap_kader' || target === 'rekap_tim') {
+    } else if (target === 'rekap_bulanan') { // UPDATE NAMA MENU
         const tpl = getEl('template-rekap');
         if(tpl) { 
             area.appendChild(tpl.content.cloneNode(true)); 
-            if(getEl('judul-rekap')) getEl('judul-rekap').innerText = target === 'rekap_kader' ? '📊 Rekap Bulanan Kader' : '📈 Rekap Bulanan Tim';
             initRekap();
         }
     } else if (target === 'cetak_pdf') {
@@ -437,7 +436,7 @@ const initFormRegistrasi = async () => {
 };
 
 // ==========================================
-// 5. FITUR DAFTAR SASARAN & DETAIL POP-UP (DIPERBARUI)
+// 5. FITUR DAFTAR SASARAN & DETAIL POP-UP
 // ==========================================
 const initDaftarSasaran = async () => {
     const session = window.currentUser;
@@ -451,7 +450,6 @@ const initDaftarSasaran = async () => {
 
     if(!list) return;
     
-    // Load data pendukung (termasuk list pertanyaan untuk label riwayat)
     const antrean = await getAllData('sync_queue').catch(()=>[]);
     const masterPertanyaan = await getAllData('master_pertanyaan').catch(()=>[]);
     
@@ -513,16 +511,12 @@ const initDaftarSasaran = async () => {
         
         const riwayat = pendList.filter(p => p.id_sasaran_ref === id).sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
         
-        // PERUBAHAN BESAR PADA DESAIN RIWAYAT (TIMELINE CARDS)
         let htmlRiwayat = riwayat.length === 0 ? 
             '<div style="color:#888; font-size:0.9rem; padding: 15px; background: #f8f9fa; border-radius: 8px; text-align:center; border: 1px dashed #ccc;">Belum ada riwayat kunjungan pendampingan.</div>' : 
             riwayat.map(p => {
-                
-                // Kumpulkan semua jawaban dinamis selain id, tgl_kunjungan, dan catatan
                 let dynamicHtml = '';
                 for (const [key, value] of Object.entries(p.data_laporan || {})) {
                     if (['id_sasaran', 'tgl_kunjungan', 'catatan'].includes(key)) continue;
-                    
                     let label = key;
                     if(key.startsWith('q_')) {
                         let qId = key.replace('q_', '');
@@ -530,10 +524,8 @@ const initDaftarSasaran = async () => {
                         if(foundQ) label = foundQ.label_pertanyaan;
                         else label = 'Pertanyaan Form';
                     } else {
-                        // Format kunci seperti 'is_melahirkan' menjadi 'Is Melahirkan'
                         label = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
                     }
-
                     dynamicHtml += `
                         <div style="margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #eee;">
                             <div style="font-size: 0.75rem; color: #666; font-weight: normal;">${label}</div>
@@ -541,7 +533,6 @@ const initDaftarSasaran = async () => {
                         </div>`;
                 }
 
-                // Kotak Timeline Riwayat Individual
                 return `
                 <div style="background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); overflow: hidden;">
                     <div style="background: #e8f4fd; padding: 10px 15px; border-bottom: 1px solid #cfe2ff; display: flex; justify-content: space-between; align-items: center;">
@@ -611,7 +602,7 @@ const initDaftarSasaran = async () => {
 };
 
 // ==========================================
-// 6. FORM PENDAMPINGAN (LOGIKA FILTER BARU)
+// 6. FORM PENDAMPINGAN 
 // ==========================================
 const initFormPendampingan = async () => {
     const session = window.currentUser;
@@ -748,17 +739,95 @@ const initFormPendampingan = async () => {
     }
 };
 
+// ==========================================
+// 8. FUNGSI REKAP BULANAN (GABUNGAN)
+// ==========================================
 const initRekap = async () => {
     const session = window.currentUser;
     const antrean = await getAllData('sync_queue').catch(()=>[]);
+
+    // Ambil Semua Data Tim (id_tim sama)
     const dataTim = antrean.filter(a => String(a.id_tim) === String(session.id_tim));
-    
-    if(getEl('rekap-total')) getEl('rekap-total').innerText = dataTim.filter(a => a.tipe_laporan === 'REGISTRASI').length;
-    if(getEl('rekap-pend')) getEl('rekap-pend').innerText = dataTim.filter(a => a.tipe_laporan === 'PENDAMPINGAN').length;
+    // Ambil Khusus Data Kader (username sama)
+    const dataKader = dataTim.filter(a => a.username === session.username);
+
+    const calculateStats = (data) => {
+        const regList = data.filter(a => a.tipe_laporan === 'REGISTRASI');
+        const pendList = data.filter(a => a.tipe_laporan === 'PENDAMPINGAN');
+
+        const stats = {
+            CATIN: { aktif: 0, pend: 0 },
+            BUMIL: { aktif: 0, pend: 0 },
+            BUFAS: { aktif: 0, pend: 0 },
+            BADUTA: { aktif: 0, pend: 0 },
+            TOTAL: { aktif: 0, pend: 0 }
+        };
+
+        const hariIni = new Date(); hariIni.setHours(0,0,0,0);
+
+        regList.forEach(r => {
+            let isAktif = true;
+            // Hanya Abaikan CATIN yang sudah lewat Tgl Nikahnya
+            if (r.jenis_sasaran === 'CATIN' && r.data_laporan?.tanggal_pernikahan) {
+                const tglNikah = new Date(r.data_laporan.tanggal_pernikahan);
+                if (tglNikah < hariIni) isAktif = false;
+            }
+
+            if (isAktif && stats[r.jenis_sasaran]) {
+                stats[r.jenis_sasaran].aktif++;
+                stats.TOTAL.aktif++;
+            }
+        });
+
+        pendList.forEach(p => {
+            let jenis = null;
+            // Coba cari sasaran di regList, kalau tidak ketemu (karena beda HP), deteksi lewat Prefix ID
+            const ref = regList.find(r => r.id === p.id_sasaran_ref);
+            if (ref) {
+                jenis = ref.jenis_sasaran;
+            } else if (p.id_sasaran_ref) {
+                if (p.id_sasaran_ref.startsWith('CTN')) jenis = 'CATIN';
+                else if (p.id_sasaran_ref.startsWith('BML')) jenis = 'BUMIL';
+                else if (p.id_sasaran_ref.startsWith('BFS')) jenis = 'BUFAS';
+                else if (p.id_sasaran_ref.startsWith('BDT')) jenis = 'BADUTA';
+            }
+
+            if (jenis && stats[jenis]) {
+                stats[jenis].pend++;
+                stats.TOTAL.pend++;
+            }
+        });
+
+        return stats;
+    };
+
+    const statsKader = calculateStats(dataKader);
+    const statsTim = calculateStats(dataTim);
+
+    const renderTableRows = (stats) => {
+        const rows = ['CATIN', 'BUMIL', 'BUFAS', 'BADUTA'].map(j => `
+            <tr style="border-bottom: 1px solid #eee;">
+                <td style="padding: 10px 8px; text-align:left; font-weight:600; color: #444;">${j}</td>
+                <td style="padding: 10px 8px;">${stats[j].aktif}</td>
+                <td style="padding: 10px 8px;">${stats[j].pend}</td>
+            </tr>
+        `).join('');
+        const totalRow = `
+            <tr style="background: #e9ecef; font-weight: bold;">
+                <td style="padding: 12px 8px; text-align:left; color: #222;">TOTAL</td>
+                <td style="padding: 12px 8px; color: var(--primary); font-size: 1.1rem;">${stats.TOTAL.aktif}</td>
+                <td style="padding: 12px 8px; color: #198754; font-size: 1.1rem;">${stats.TOTAL.pend}</td>
+            </tr>
+        `;
+        return rows + totalRow;
+    };
+
+    if (getEl('tbody-rekap-kader')) getEl('tbody-rekap-kader').innerHTML = renderTableRows(statsKader);
+    if (getEl('tbody-rekap-tim')) getEl('tbody-rekap-tim').innerHTML = renderTableRows(statsTim);
 };
 
 // ==========================================
-// 7. LOGIN PINTAR (ADAPTIVE HEADER)
+// 9. LOGIN PINTAR (ADAPTIVE HEADER)
 // ==========================================
 document.addEventListener('DOMContentLoaded', () => {
     initApp();
