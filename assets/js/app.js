@@ -422,15 +422,38 @@ const initDaftarSasaran = async () => {
     if (regList.length === 0) { 
         list.innerHTML = `<div style="text-align:center; padding:20px; color:#999;">Belum ada sasaran yang diregistrasi oleh Tim Anda.</div>`; 
     } else { 
-        list.innerHTML = regList.map(r => `
-            <div style="background:#f4f7f6; padding:15px; border-radius:8px; border-left: 4px solid var(--primary); margin-bottom: 10px;">
-                <div style="font-weight: bold; font-size: 1.15rem; color: #333; text-transform: uppercase;">${r.nama_sasaran || 'Tanpa Nama'}</div>
-                <div style="font-size: 0.85rem; color: var(--primary); font-weight: bold; margin-top: 2px;">[${r.id}] ${r.jenis_sasaran}</div>
-                <div style="font-size: 0.9rem; color: #555; margin-top: 6px;">📍 ${r.dusun}, ${r.desa}</div>
-                <div style="font-size: 0.8rem; color:#888; margin-top: 8px;">
-                    ${r.is_synced ? '✅ Tersinkron (Server)' : '⏳ Belum Sinkron (Lokal)'} | ${new Date(r.created_at).toLocaleString('id-ID')}
+        list.innerHTML = regList.map(r => {
+            // LOGIKA KEDALUWARSA CATIN
+            let isExpired = false;
+            let labelSelesai = '';
+            
+            if (r.jenis_sasaran === 'CATIN' && r.data_laporan && r.data_laporan.tanggal_pernikahan) {
+                const tglNikah = new Date(r.data_laporan.tanggal_pernikahan);
+                const hariIni = new Date();
+                hariIni.setHours(0,0,0,0); // Set jam ke 00:00 agar akurat hitung hari
+                
+                if (tglNikah < hariIni) {
+                    isExpired = true;
+                    labelSelesai = `<div style="color: #dc3545; font-weight:bold; font-size:0.8rem; margin-top:5px; padding: 4px; background: #f8d7da; border-radius: 4px; display: inline-block;">🔒 SELESAI (Sudah Menikah)</div>`;
+                }
+            }
+
+            // TAMPILAN KARTU
+            return `
+            <div style="background:${isExpired ? '#f8f9fa' : '#f4f7f6'}; padding:15px; border-radius:8px; border-left: 4px solid ${isExpired ? '#6c757d' : 'var(--primary)'}; margin-bottom: 10px; opacity: ${isExpired ? '0.7' : '1'};">
+                <div style="font-weight: bold; font-size: 1.15rem; color: #333; text-transform: uppercase;">
+                    ${r.nama_sasaran || 'Tanpa Nama'}
                 </div>
-            </div>`).join(''); 
+                <div style="font-size: 0.85rem; color: ${isExpired ? '#6c757d' : 'var(--primary)'}; font-weight: bold; margin-top: 2px;">
+                    [${r.id}] ${r.jenis_sasaran}
+                </div>
+                <div style="font-size: 0.9rem; color: #555; margin-top: 6px;">📍 ${r.dusun}, ${r.desa}</div>
+                ${labelSelesai}
+                <div style="font-size: 0.8rem; color:#888; margin-top: 8px;">
+                    ${r.is_synced ? '✅ Tersinkron' : '⏳ Belum Sinkron'} | ${new Date(r.created_at).toLocaleString('id-ID')}
+                </div>
+            </div>`;
+        }).join(''); 
     }
 };
 
@@ -443,12 +466,22 @@ const initFormPendampingan = async () => {
     const regList = antrean.filter(a => a.tipe_laporan === 'REGISTRASI' && String(a.id_tim) === String(session.id_tim));
     
     if (selSasaran) { 
+        // LOGIKA FILTER DROPDOWN PENDAMPINGAN (SEMBUNYIKAN YANG KEDALUWARSA)
+        const activeRegList = regList.filter(r => {
+            if (r.jenis_sasaran === 'CATIN' && r.data_laporan && r.data_laporan.tanggal_pernikahan) {
+                const tglNikah = new Date(r.data_laporan.tanggal_pernikahan);
+                const hariIni = new Date(); hariIni.setHours(0,0,0,0);
+                return tglNikah >= hariIni; // Hanya tampilkan jika Tgl Nikah masih nanti/hari ini
+            }
+            return true; // Tampilkan yang lain (BUMIL, BUFAS, BADUTA)
+        });
+
         selSasaran.innerHTML = '<option value="">-- Pilih Sasaran --</option>' + 
-        regList.map(r => `<option value="${r.id}">[${r.id}] ${r.nama_sasaran || r.jenis_sasaran} - ${r.dusun}</option>`).join(''); 
+        activeRegList.map(r => `<option value="${r.id}">[${r.id}] ${r.nama_sasaran || r.jenis_sasaran} - ${r.dusun}</option>`).join(''); 
         
         selSasaran.onchange = () => {
             const sasaranId = selSasaran.value;
-            const sasaranData = regList.find(r => r.id === sasaranId);
+            const sasaranData = activeRegList.find(r => r.id === sasaranId);
             if(sasaranData && sasaranData.jenis_sasaran === 'BUMIL') {
                 containerQ.innerHTML = `
                     <div class="form-group">
