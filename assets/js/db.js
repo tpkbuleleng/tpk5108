@@ -1,5 +1,5 @@
 const DB_NAME = 'TPKBulelengDB';
-const DB_VERSION = 2; // Versi dinaikkan agar database di-refresh
+const DB_VERSION = 3; // Versi 3: Adaptif terhadap perubahan nama kolom Excel
 
 export const initDB = () => {
     return new Promise((resolve, reject) => {
@@ -8,37 +8,16 @@ export const initDB = () => {
         request.onupgradeneeded = (e) => {
             const db = e.target.result;
             
-            // Tabel Session (Login)
-            if (!db.objectStoreNames.contains('kader_session')) {
-                db.createObjectStore('kader_session', { keyPath: 'id_kader' });
-            }
-            // Tabel Master User & Kader
-            if (!db.objectStoreNames.contains('master_user')) {
-                db.createObjectStore('master_user', { keyPath: 'id_pengguna' });
-            }
-            if (!db.objectStoreNames.contains('master_kader')) {
-                db.createObjectStore('master_kader', { keyPath: 'id_kader' });
-            }
-            // Tabel Master Wilayah (Tugas Kader)
-            if (!db.objectStoreNames.contains('master_tim_wilayah')) {
-                db.createObjectStore('master_tim_wilayah', { autoIncrement: true });
-            }
-            // Tabel Master Tim
-            if (!db.objectStoreNames.contains('master_tim')) {
-                db.createObjectStore('master_tim', { keyPath: 'id_tim' });
-            }
-            // Tabel Master Pertanyaan Dinamis
-            if (!db.objectStoreNames.contains('master_pertanyaan')) {
-                db.createObjectStore('master_pertanyaan', { keyPath: 'id_pertanyaan' });
-            }
-            // Tabel Master Wilayah Bali (BARU - KHUSUS CATIN)
-            if (!db.objectStoreNames.contains('master_wilayah_bali')) {
-                db.createObjectStore('master_wilayah_bali', { autoIncrement: true });
-            }
-            // Tabel Antrean Sinkronisasi (Offline Data)
-            if (!db.objectStoreNames.contains('sync_queue')) {
-                db.createObjectStore('sync_queue', { keyPath: 'id' });
-            }
+            if (!db.objectStoreNames.contains('kader_session')) db.createObjectStore('kader_session', { keyPath: 'id_kader' });
+            if (!db.objectStoreNames.contains('sync_queue')) db.createObjectStore('sync_queue', { keyPath: 'id' });
+            
+            // Dibuat autoIncrement agar tidak terikat dengan nama kolom Header Excel
+            if (!db.objectStoreNames.contains('master_user')) db.createObjectStore('master_user', { autoIncrement: true });
+            if (!db.objectStoreNames.contains('master_kader')) db.createObjectStore('master_kader', { autoIncrement: true });
+            if (!db.objectStoreNames.contains('master_tim')) db.createObjectStore('master_tim', { autoIncrement: true });
+            if (!db.objectStoreNames.contains('master_tim_wilayah')) db.createObjectStore('master_tim_wilayah', { autoIncrement: true });
+            if (!db.objectStoreNames.contains('master_pertanyaan')) db.createObjectStore('master_pertanyaan', { autoIncrement: true });
+            if (!db.objectStoreNames.contains('master_wilayah_bali')) db.createObjectStore('master_wilayah_bali', { autoIncrement: true });
         };
 
         request.onsuccess = () => resolve(request.result);
