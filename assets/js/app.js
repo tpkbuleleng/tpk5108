@@ -88,7 +88,6 @@ const renderMenu = (role) => {
     const container = getEl('dynamic-menu-container');
     if (!container) return;
 
-    // MENU DIPERBARUI: REKAP KADER & TIM DIGABUNG
     const menus = [
         { id: 'dashboard', icon: '🏠', label: 'Dashboard' },
         { id: 'registrasi', icon: '📝', label: 'Registrasi Sasaran' },
@@ -200,10 +199,20 @@ window.renderKonten = async (target) => {
             const cReg = { CATIN: 0, BUMIL: 0, BUFAS: 0, BADUTA: 0 };
             const cPend = { CATIN: 0, BUMIL: 0, BUFAS: 0, BADUTA: 0 };
 
+            // Dashboard menghitung SEMUA sasaran yang pernah didaftarkan (Termasuk yang Selesai)
             regList.forEach(r => { if(cReg[r.jenis_sasaran] !== undefined) cReg[r.jenis_sasaran]++; });
+            
+            // Dashboard menghitung PENDAMPINGAN berdasarkan "Stempel Permanen" saat form dikirim
             pendList.forEach(p => {
-                const ref = regList.find(r => r.id === p.id_sasaran_ref);
-                if(ref && cPend[ref.jenis_sasaran] !== undefined) cPend[ref.jenis_sasaran]++;
+                let jenis = p.jenis_sasaran_saat_kunjungan;
+                // Fallback untuk data lama yang belum punya stempel
+                if (!jenis && p.id_sasaran_ref) {
+                    if (p.id_sasaran_ref.startsWith('CTN')) jenis = 'CATIN';
+                    else if (p.id_sasaran_ref.startsWith('BML')) jenis = 'BUMIL';
+                    else if (p.id_sasaran_ref.startsWith('BFS')) jenis = 'BUFAS';
+                    else if (p.id_sasaran_ref.startsWith('BDT')) jenis = 'BADUTA';
+                }
+                if(jenis && cPend[jenis] !== undefined) cPend[jenis]++;
             });
 
             if(getEl('dash-summary')){
@@ -242,12 +251,9 @@ window.renderKonten = async (target) => {
     } else if (target === 'pendampingan') {
         const tpl = getEl('template-pendampingan');
         if(tpl) { area.appendChild(tpl.content.cloneNode(true)); initFormPendampingan(); }
-    } else if (target === 'rekap_bulanan') { // UPDATE NAMA MENU
+    } else if (target === 'rekap_bulanan') { 
         const tpl = getEl('template-rekap');
-        if(tpl) { 
-            area.appendChild(tpl.content.cloneNode(true)); 
-            initRekap();
-        }
+        if(tpl) { area.appendChild(tpl.content.cloneNode(true)); initRekap(); }
     } else if (target === 'cetak_pdf') {
         const tpl = getEl('template-cetak-pdf');
         if(tpl) area.appendChild(tpl.content.cloneNode(true));
@@ -424,7 +430,9 @@ const initFormRegistrasi = async () => {
                     id_tim: session.id_tim, nomor_tim: session.nomor_tim,
                     kecamatan: kecamatan, jenis_sasaran: jenisSasaran, 
                     nama_sasaran: jawaban.nama_sasaran, desa: desaFinal, dusun: dusunFinal,
-                    data_laporan: jawaban, is_synced: false, created_at: new Date().toISOString()
+                    data_laporan: jawaban, 
+                    status_sasaran: 'AKTIF', // FLAG TAMBAHAN
+                    is_synced: false, created_at: new Date().toISOString()
                 };
                 
                 await putData('sync_queue', laporan);
@@ -457,8 +465,8 @@ const initDaftarSasaran = async () => {
     const pendList = antrean.filter(a => a.tipe_laporan === 'PENDAMPINGAN' && String(a.id_tim) === String(session.id_tim));
     
     const processedList = regList.map(r => {
-        let isExpired = false;
-        let statusRaw = 'AKTIF';
+        let isExpired = r.status_sasaran === 'SELESAI';
+        let statusRaw = r.status_sasaran || 'AKTIF';
         let labelSelesai = '<span style="color: var(--primary); font-weight:bold;">Aktif</span>';
         
         if (r.jenis_sasaran === 'CATIN' && r.data_laporan && r.data_laporan.tanggal_pernikahan) {
@@ -466,8 +474,14 @@ const initDaftarSasaran = async () => {
             const hariIni = new Date(); hariIni.setHours(0,0,0,0);
             if (tglNikah < hariIni) {
                 isExpired = true; statusRaw = 'SELESAI';
-                labelSelesai = '<span style="color: #dc3545; font-weight:bold;">SELESAI (Sudah Menikah)</span>';
             }
+        }
+        
+        if (isExpired || statusRaw === 'SELESAI') {
+            isExpired = true;
+            statusRaw = 'SELESAI';
+            let alasan = r.jenis_sasaran === 'CATIN' ? 'Sudah Menikah' : (r.jenis_sasaran === 'BUMIL' ? 'Sudah Melahirkan' : 'Selesai');
+            labelSelesai = `<span style="color: #dc3545; font-weight:bold;">SELESAI (${alasan})</span>`;
         }
         
         let jk = r.data_laporan?.jenis_kelamin === 'Laki-laki' ? 'L' : 'P';
@@ -522,7 +536,7 @@ const initDaftarSasaran = async () => {
                         let qId = key.replace('q_', '');
                         let foundQ = masterPertanyaan.find(mq => String(mq.id_pertanyaan) === String(qId));
                         if(foundQ) label = foundQ.label_pertanyaan;
-                        else label = 'Pertanyaan Form';
+                        else label = 'Pertanyaan Khusus';
                     } else {
                         label = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
                     }
@@ -602,7 +616,7 @@ const initDaftarSasaran = async () => {
 };
 
 // ==========================================
-// 6. FORM PENDAMPINGAN 
+// 6. FORM PENDAMPINGAN (LOGIKA TRANSISI NON-DESTRUCTIVE)
 // ==========================================
 const initFormPendampingan = async () => {
     const session = window.currentUser;
@@ -629,6 +643,7 @@ const initFormPendampingan = async () => {
 
             const activeRegList = regList.filter(r => {
                 if (r.jenis_sasaran !== jenis) return false;
+                if (r.status_sasaran === 'SELESAI') return false; // Sembunyikan yang sudah selesai dari dropdown
                 if (r.jenis_sasaran === 'CATIN' && r.data_laporan && r.data_laporan.tanggal_pernikahan) {
                     const tglNikah = new Date(r.data_laporan.tanggal_pernikahan);
                     const hariIni = new Date(); hariIni.setHours(0,0,0,0);
@@ -699,18 +714,21 @@ const initFormPendampingan = async () => {
         formPend.onsubmit = async (e) => {
             e.preventDefault();
             const btn = e.target.querySelector('button'); btn.disabled = true;
+            const jenisKunjungan = selJenis.value; // Stempel permanen jenis kunjungan
             try {
                 const formData = new FormData(e.target);
                 const jawaban = {}; formData.forEach((val, key) => { jawaban[key] = val; });
                 
+                // LOGIKA TRANSISI NON-DESTRUCTIVE (BUMIL -> BUFAS)
                 if(jawaban.is_melahirkan === 'YA' && jawaban.tgl_persalinan) {
                     const originalReg = await getDataById('sync_queue', jawaban.id_sasaran);
                     if(originalReg) {
+                        let uTahun = 0, uBulan = 0;
                         if(originalReg.data_laporan && originalReg.data_laporan.tanggal_lahir) {
                             const tglLahir = new Date(originalReg.data_laporan.tanggal_lahir);
                             const tglSalin = new Date(jawaban.tgl_persalinan);
-                            let uTahun = tglSalin.getFullYear() - tglLahir.getFullYear();
-                            let uBulan = tglSalin.getMonth() - tglLahir.getMonth();
+                            uTahun = tglSalin.getFullYear() - tglLahir.getFullYear();
+                            uBulan = tglSalin.getMonth() - tglLahir.getMonth();
                             if (uBulan < 0 || (uBulan === 0 && tglSalin.getDate() < tglLahir.getDate())) {
                                 uTahun--; uBulan += 12;
                             }
@@ -718,10 +736,26 @@ const initFormPendampingan = async () => {
                             originalReg.data_laporan.usia_saat_melahirkan_bulan = uBulan;
                             originalReg.data_laporan.tgl_persalinan = jawaban.tgl_persalinan;
                         }
-                        originalReg.jenis_sasaran = 'BUFAS';
+                        
+                        // 1. Matikan Status BUMIL lama (Tetap jadi BUMIL, tapi SELESAI)
+                        originalReg.status_sasaran = 'SELESAI'; 
                         originalReg.is_synced = false; 
                         await putData('sync_queue', originalReg);
-                        alert("🎉 Selamat! Ibu ini telah melahirkan dan otomatis pindah ke daftar BUFAS.");
+                        
+                        // 2. Cetak Kartu Identitas BUFAS Baru
+                        const kodeKec = originalReg.id.split('-')[1] || 'XXX';
+                        const newId = `BFS-${kodeKec}-${Math.floor(Math.random() * 1000000).toString().padStart(6, '0')}`;
+                        const newBufas = JSON.parse(JSON.stringify(originalReg)); // Copy seluruh data
+                        newBufas.id = newId;
+                        newBufas.jenis_sasaran = 'BUFAS';
+                        newBufas.status_sasaran = 'AKTIF';
+                        newBufas.is_synced = false;
+                        newBufas.created_at = new Date().toISOString();
+                        newBufas.data_laporan.usia_saat_daftar_tahun = uTahun;
+                        newBufas.data_laporan.usia_saat_daftar_bulan = uBulan;
+                        
+                        await putData('sync_queue', newBufas);
+                        alert("🎉 Selamat! Ibu hamil telah melahirkan. Data BUMIL ditutup otomatis dan Kartu BUFAS baru telah diterbitkan!");
                     }
                 }
 
@@ -729,7 +763,9 @@ const initFormPendampingan = async () => {
                     id: `PEND-${Date.now()}`, 
                     tipe_laporan: 'PENDAMPINGAN', 
                     username: session.username, id_tim: session.id_tim,
-                    id_sasaran_ref: jawaban.id_sasaran, data_laporan: jawaban,
+                    id_sasaran_ref: jawaban.id_sasaran, 
+                    jenis_sasaran_saat_kunjungan: jenisKunjungan, // STEMPEL PERMANEN
+                    data_laporan: jawaban,
                     is_synced: false, created_at: new Date().toISOString() 
                 };
                 await putData('sync_queue', laporan);
@@ -740,15 +776,13 @@ const initFormPendampingan = async () => {
 };
 
 // ==========================================
-// 8. FUNGSI REKAP BULANAN (GABUNGAN)
+// 8. FUNGSI REKAP BULANAN
 // ==========================================
 const initRekap = async () => {
     const session = window.currentUser;
     const antrean = await getAllData('sync_queue').catch(()=>[]);
 
-    // Ambil Semua Data Tim (id_tim sama)
     const dataTim = antrean.filter(a => String(a.id_tim) === String(session.id_tim));
-    // Ambil Khusus Data Kader (username sama)
     const dataKader = dataTim.filter(a => a.username === session.username);
 
     const calculateStats = (data) => {
@@ -756,45 +790,35 @@ const initRekap = async () => {
         const pendList = data.filter(a => a.tipe_laporan === 'PENDAMPINGAN');
 
         const stats = {
-            CATIN: { aktif: 0, pend: 0 },
-            BUMIL: { aktif: 0, pend: 0 },
-            BUFAS: { aktif: 0, pend: 0 },
-            BADUTA: { aktif: 0, pend: 0 },
+            CATIN: { aktif: 0, pend: 0 }, BUMIL: { aktif: 0, pend: 0 },
+            BUFAS: { aktif: 0, pend: 0 }, BADUTA: { aktif: 0, pend: 0 },
             TOTAL: { aktif: 0, pend: 0 }
         };
 
         const hariIni = new Date(); hariIni.setHours(0,0,0,0);
 
         regList.forEach(r => {
-            let isAktif = true;
-            // Hanya Abaikan CATIN yang sudah lewat Tgl Nikahnya
+            let isAktif = r.status_sasaran !== 'SELESAI';
             if (r.jenis_sasaran === 'CATIN' && r.data_laporan?.tanggal_pernikahan) {
                 const tglNikah = new Date(r.data_laporan.tanggal_pernikahan);
                 if (tglNikah < hariIni) isAktif = false;
             }
-
             if (isAktif && stats[r.jenis_sasaran]) {
-                stats[r.jenis_sasaran].aktif++;
-                stats.TOTAL.aktif++;
+                stats[r.jenis_sasaran].aktif++; stats.TOTAL.aktif++;
             }
         });
 
         pendList.forEach(p => {
-            let jenis = null;
-            // Coba cari sasaran di regList, kalau tidak ketemu (karena beda HP), deteksi lewat Prefix ID
-            const ref = regList.find(r => r.id === p.id_sasaran_ref);
-            if (ref) {
-                jenis = ref.jenis_sasaran;
-            } else if (p.id_sasaran_ref) {
+            let jenis = p.jenis_sasaran_saat_kunjungan;
+            // Fallback untuk data lawas
+            if (!jenis && p.id_sasaran_ref) {
                 if (p.id_sasaran_ref.startsWith('CTN')) jenis = 'CATIN';
                 else if (p.id_sasaran_ref.startsWith('BML')) jenis = 'BUMIL';
                 else if (p.id_sasaran_ref.startsWith('BFS')) jenis = 'BUFAS';
                 else if (p.id_sasaran_ref.startsWith('BDT')) jenis = 'BADUTA';
             }
-
             if (jenis && stats[jenis]) {
-                stats[jenis].pend++;
-                stats.TOTAL.pend++;
+                stats[jenis].pend++; stats.TOTAL.pend++;
             }
         });
 
