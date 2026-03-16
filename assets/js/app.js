@@ -208,7 +208,7 @@ window.renderKonten = async (target) => {
 
     } else if (target === 'registrasi') {
         const tpl = getEl('template-registrasi');
-        if(tpl) { area.appendChild(tpl.content.cloneNode(true)); initFormRegistrasi(); }
+        if(tpl) { area.appendChild(tpl.content.cloneNode(true)); (); }
     } else if (target === 'daftar_sasaran') {
         const tpl = getEl('template-daftar-sasaran');
         if(tpl) { area.appendChild(tpl.content.cloneNode(true)); initDaftarSasaran(); }
@@ -257,7 +257,6 @@ const initFormRegistrasi = async () => {
     const boxCatin = getEl('wilayah-catin');
     const boxDomisili = getEl('wilayah-domisili');
 
-    // Element Tambahan Baru
     const boxIbu = getEl('box-ibu-kandung');
     const inputIbu = getEl('input-ibu-kandung');
     const boxNikah = getEl('box-tgl-nikah');
@@ -303,7 +302,6 @@ const initFormRegistrasi = async () => {
         selJenis.onchange = () => {
             const jenis = selJenis.value;
             
-            // Logika Tampil / Sembunyi Dinamis Tambahan
             if(boxIbu && inputIbu) {
                 if(jenis === 'BADUTA') {
                     boxIbu.style.display = 'block';
@@ -387,6 +385,24 @@ const initFormRegistrasi = async () => {
                 const desaFinal = jenisSasaran === 'CATIN' ? '-' : selDesa.value;
                 const dusunFinal = jenisSasaran === 'CATIN' ? '-' : selDusun.value;
 
+                // LOGIKA HITUNG USIA STATIS SAAT DAFTAR
+                if (jawaban.tanggal_lahir) {
+                    const tglLahir = new Date(jawaban.tanggal_lahir);
+                    const tglDaftar = new Date();
+                    
+                    let umurTahun = tglDaftar.getFullYear() - tglLahir.getFullYear();
+                    let umurBulan = tglDaftar.getMonth() - tglLahir.getMonth();
+                    
+                    if (umurBulan < 0 || (umurBulan === 0 && tglDaftar.getDate() < tglLahir.getDate())) {
+                        umurTahun--;
+                        umurBulan += 12;
+                    }
+                    
+                    // Simpan permanen ke JSON laporan
+                    jawaban.usia_saat_daftar_tahun = umurTahun;
+                    jawaban.usia_saat_daftar_bulan = umurBulan;
+                }
+
                 const laporan = {
                     id: idSasaran,
                     tipe_laporan: 'REGISTRASI', 
@@ -466,14 +482,13 @@ const initFormPendampingan = async () => {
     const regList = antrean.filter(a => a.tipe_laporan === 'REGISTRASI' && String(a.id_tim) === String(session.id_tim));
     
     if (selSasaran) { 
-        // LOGIKA FILTER DROPDOWN PENDAMPINGAN (SEMBUNYIKAN YANG KEDALUWARSA)
         const activeRegList = regList.filter(r => {
             if (r.jenis_sasaran === 'CATIN' && r.data_laporan && r.data_laporan.tanggal_pernikahan) {
                 const tglNikah = new Date(r.data_laporan.tanggal_pernikahan);
                 const hariIni = new Date(); hariIni.setHours(0,0,0,0);
-                return tglNikah >= hariIni; // Hanya tampilkan jika Tgl Nikah masih nanti/hari ini
+                return tglNikah >= hariIni; 
             }
-            return true; // Tampilkan yang lain (BUMIL, BUFAS, BADUTA)
+            return true; 
         });
 
         selSasaran.innerHTML = '<option value="">-- Pilih Sasaran --</option>' + 
@@ -515,10 +530,29 @@ const initFormPendampingan = async () => {
                 const formData = new FormData(e.target);
                 const jawaban = {}; formData.forEach((val, key) => { jawaban[key] = val; });
                 
+                // LOGIKA TRANSISI BUMIL -> BUFAS DAN HITUNG USIA MELAHIRKAN
                 if(jawaban.is_melahirkan === 'YA' && jawaban.tgl_persalinan) {
                     const originalReg = await getDataById('sync_queue', jawaban.id_sasaran);
                     if(originalReg) {
+                        
+                        // Hitung Usia Ibu Saat Melahirkan
+                        if(originalReg.data_laporan && originalReg.data_laporan.tanggal_lahir) {
+                            const tglLahir = new Date(originalReg.data_laporan.tanggal_lahir);
+                            const tglSalin = new Date(jawaban.tgl_persalinan);
+                            let uTahun = tglSalin.getFullYear() - tglLahir.getFullYear();
+                            let uBulan = tglSalin.getMonth() - tglLahir.getMonth();
+                            if (uBulan < 0 || (uBulan === 0 && tglSalin.getDate() < tglLahir.getDate())) {
+                                uTahun--; uBulan += 12;
+                            }
+                            
+                            // Suntikkan data usia melahirkan ke data asli sasaran
+                            originalReg.data_laporan.usia_saat_melahirkan_tahun = uTahun;
+                            originalReg.data_laporan.usia_saat_melahirkan_bulan = uBulan;
+                            originalReg.data_laporan.tgl_persalinan = jawaban.tgl_persalinan;
+                        }
+
                         originalReg.jenis_sasaran = 'BUFAS';
+                        originalReg.is_synced = false; // Ubah status jadi 'belum sinkron' agar perubahan dikirim ke Server
                         await putData('sync_queue', originalReg);
                         alert("🎉 Selamat! Ibu ini telah melahirkan dan otomatis pindah ke daftar BUFAS.");
                     }
