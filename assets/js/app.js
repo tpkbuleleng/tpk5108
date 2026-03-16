@@ -55,7 +55,7 @@ const initApp = async () => {
 const masukKeAplikasi = async (session) => {
     window.currentUser = session;
     const allWil = await getAllData('master_tim_wilayah').catch(() => []);
-    const wilayahKader = allWil.find(w => w.id_tim === session.id_tim);
+    const wilayahKader = allWil.find(w => String(w.id_tim) === String(session.id_tim));
     const namaKec = wilayahKader && wilayahKader.kecamatan ? wilayahKader.kecamatan.toUpperCase() : "BULELENG";
 
     const greeting = getEl('user-greeting');
@@ -153,13 +153,16 @@ window.renderKonten = async (target) => {
             const wilayahKerja = allWil.filter(w => String(w.id_tim) === String(session.id_tim));
             const daftarDusun = wilayahKerja.map(w => w.dusun_rw).join(', ') || '-';
             
+            // FILTER: Hanya hitung yang belum disinkronisasi
+            const pendingQueue = antrean.filter(a => !a.is_synced);
+            
             if (getEl('dash-detail-wilayah')) {
                 getEl('dash-detail-wilayah').innerHTML = `
                     <div style="margin-bottom: 12px;"><span style="opacity:0.8; font-size: 0.9rem;">📍 Wilayah Tugas (Dusun/RW):</span><br><span style="font-weight: 500;">${daftarDusun}</span></div>
                     <div style="margin-bottom: 8px;"><span style="opacity:0.8; font-size: 0.9rem;">🏘️ Desa/Kelurahan:</span><br><span style="font-weight: 600;">${wilayahKerja[0]?.desa_kelurahan || '-'}</span></div>
                     <div><span style="opacity:0.8; font-size: 0.9rem;">🏛️ Kecamatan:</span><br><span style="font-weight: 600;">${wilayahKerja[0]?.kecamatan || '-'}</span></div>`;
             }
-            if (getEl('dash-tunda')) getEl('dash-tunda').innerText = antrean.length;
+            if (getEl('dash-tunda')) getEl('dash-tunda').innerText = pendingQueue.length;
         } catch (e) { console.error(e); }
 
     } else if (target === 'registrasi') {
@@ -327,7 +330,8 @@ const initFormRegistrasi = async () => {
                     nama_sasaran: jawaban.nama_sasaran, 
                     desa: desaFinal, 
                     dusun: dusunFinal,
-                    data_laporan: jawaban, 
+                    data_laporan: jawaban,
+                    is_synced: false, // FLAG DEFAULT: Belum Sinkron
                     created_at: new Date().toISOString()
                 };
                 
@@ -350,12 +354,15 @@ const initDaftarSasaran = async () => {
     if (regList.length === 0) { 
         list.innerHTML = `<div style="text-align:center; padding:20px; color:#999;">Belum ada sasaran yang diregistrasi oleh Tim Anda.</div>`; 
     } else { 
+        // Menambahkan label ✅ atau ⏳ di Daftar Sasaran
         list.innerHTML = regList.map(r => `
             <div style="background:#f4f7f6; padding:15px; border-radius:8px; border-left: 4px solid var(--primary); margin-bottom: 10px;">
                 <div style="font-weight: bold; font-size: 1.15rem; color: #333; text-transform: uppercase;">${r.nama_sasaran || 'Tanpa Nama'}</div>
                 <div style="font-size: 0.85rem; color: var(--primary); font-weight: bold; margin-top: 2px;">[${r.id}] ${r.jenis_sasaran}</div>
                 <div style="font-size: 0.9rem; color: #555; margin-top: 6px;">📍 ${r.dusun}, ${r.desa}</div>
-                <div style="font-size: 0.75rem; color:#888; margin-top: 8px;">⏳ Disimpan: ${new Date(r.created_at).toLocaleString('id-ID')}</div>
+                <div style="font-size: 0.8rem; color:#888; margin-top: 8px;">
+                    ${r.is_synced ? '✅ Tersinkron (Server)' : '⏳ Belum Sinkron (Lokal)'} | ${new Date(r.created_at).toLocaleString('id-ID')}
+                </div>
             </div>`).join(''); 
     }
 };
@@ -423,7 +430,8 @@ const initFormPendampingan = async () => {
                     username: session.username, 
                     id_tim: session.id_tim,
                     id_sasaran_ref: jawaban.id_sasaran, 
-                    data_laporan: jawaban, 
+                    data_laporan: jawaban,
+                    is_synced: false, // Laporan pendampingan baru selalu belum sinkron
                     created_at: new Date().toISOString() 
                 };
                 await putData('sync_queue', laporan);
@@ -462,10 +470,7 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 await initDB();
                 
-                // Cari data di seluruh baris tabel
                 const allUsers = await getAllData('master_user').catch(() => []);
-                
-                // Pencarian ID Cerdas
                 const user = allUsers.find(u => 
                     String(u.id_pengguna) === id || 
                     String(u.id_user) === id || 
@@ -479,7 +484,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
 
-                // Cek PIN Cerdas
                 const pinBenar = String(user.password_awal_ref || user.password || user.pin || "");
                 
                 if (pinBenar === pin) {
@@ -488,7 +492,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     let ref_id = user.ref_id || user.id_kader || user.nik || '';
                     let tim = '-', noTim = '-';
                     
-                    // Pencarian Relasi Kader & Tim Cerdas
                     if (role.includes('KADER') && ref_id) {
                         const allKader = await getAllData('master_kader').catch(() => []);
                         const k = allKader.find(x => String(x.id_kader) === String(ref_id) || String(x.nik) === String(ref_id));
