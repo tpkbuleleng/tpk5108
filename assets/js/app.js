@@ -58,7 +58,6 @@ const masukKeAplikasi = async (session) => {
     const wilayahKader = allWil.find(w => String(w.id_tim) === String(session.id_tim));
     const namaKec = wilayahKader && wilayahKader.kecamatan ? wilayahKader.kecamatan.toUpperCase() : "BULELENG";
 
-    // PERUBAHAN TAMPILAN HEADER (2 BARIS, CENTER, ONLINE DI KIRI)
     const greeting = getEl('user-greeting');
     if (greeting) {
         greeting.innerHTML = `DASHBOARD KADER<br>KECAMATAN ${namaKec}`;
@@ -71,7 +70,7 @@ const masukKeAplikasi = async (session) => {
         hInfo.style.display = 'flex';
         hInfo.style.alignItems = 'center';
         hInfo.style.gap = '12px';
-        hInfo.style.flexDirection = 'row-reverse'; // Memaksa Status Online ke kiri judul
+        hInfo.style.flexDirection = 'row-reverse'; 
     }
 
     if (getEl('sidebar-nama')) getEl('sidebar-nama').innerText = session.nama;
@@ -133,13 +132,13 @@ window.renderKonten = async (target) => {
 
     if (target === 'dashboard') {
         const session = window.currentUser;
+        
+        // PERUBAHAN DASHBOARD 3 KOLOM
         area.innerHTML = `
             <div class="animate-fade">
                 <div class="card" style="background: linear-gradient(135deg, #0d6efd, #0043a8); color: white; border:none; margin-bottom: 20px; padding: 20px;">
                     <p style="margin:0; opacity: 0.9; font-weight: 800; font-size: 0.85rem;">SELAMAT DATANG,</p>
-                    
                     <h2 style="margin: 3px 0 10px 0; font-size: 1.4rem; font-weight: 700; line-height: 1.2;">${session.nama}</h2>
-                    
                     <hr style="margin-bottom: 12px; border: 0; border-top: 1px solid rgba(255,255,255,0.2);">
                     <div id="dash-detail-wilayah">Memuat detail...</div>
                 </div>
@@ -148,16 +147,23 @@ window.renderKonten = async (target) => {
                     Memuat ringkasan data...
                 </div>
 
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                    <div class="card" style="text-align:center; padding: 20px; border-bottom: 4px solid orange;">
-                        <div style="font-size: 1.8rem;">📦</div>
-                        <h3 id="dash-tunda" style="font-size: 1.6rem;">0 / 0</h3>
-                        <p style="font-size: 0.75rem; color: #666; font-weight: bold; margin-top: 5px;">DATA SINKRON</p>
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+                    <div class="card" style="text-align:center; padding: 15px 5px; cursor:pointer; border-bottom: 4px solid #0d6efd;" onclick="renderKonten('registrasi')">
+                        <div style="font-size: 1.6rem;">📝</div>
+                        <h3 style="font-size: 0.95rem; margin: 5px 0 0 0;">BARU</h3>
+                        <p style="font-size: 0.65rem; color: #666; font-weight: bold; margin: 2px 0 0 0;">REGISTRASI</p>
                     </div>
-                    <div class="card" style="text-align:center; padding: 20px; cursor:pointer; border-bottom: 4px solid #0d6efd;" onclick="renderKonten('registrasi')">
-                        <div style="font-size: 1.8rem;">📝</div>
-                        <h3 style="font-size: 1.6rem;">BARU</h3>
-                        <p style="font-size: 0.75rem; color: #666; font-weight: bold; margin-top: 5px;">REGISTRASI</p>
+                    
+                    <div class="card" style="text-align:center; padding: 15px 5px; border-bottom: 4px solid orange;">
+                        <div style="font-size: 1.6rem;">📦</div>
+                        <h3 id="dash-tunda" style="font-size: 1rem; margin: 5px 0 0 0;">0/0</h3>
+                        <p style="font-size: 0.65rem; color: #666; font-weight: bold; margin: 2px 0 0 0;">DATA SINKRON</p>
+                    </div>
+                    
+                    <div class="card" style="text-align:center; padding: 15px 5px; cursor:pointer; border-bottom: 4px solid #198754;" onclick="renderKonten('pendampingan')">
+                        <div style="font-size: 1.6rem;">🤝</div>
+                        <h3 style="font-size: 0.95rem; margin: 5px 0 0 0;">LAPOR</h3>
+                        <p style="font-size: 0.65rem; color: #666; font-weight: bold; margin: 2px 0 0 0;">PENDAMPINGAN</p>
                     </div>
                 </div>
             </div>`;
@@ -171,7 +177,6 @@ window.renderKonten = async (target) => {
             const wilayahKerja = allWil.filter(w => String(w.id_tim) === String(session.id_tim));
             const daftarDusun = wilayahKerja.map(w => w.dusun_rw).join(', ') || '-';
             
-            // LOGIKA SPASI RAPAT DAN POSISI NO. TIM BARU
             if (getEl('dash-detail-wilayah')) {
                 getEl('dash-detail-wilayah').innerHTML = `
                     <div style="background: rgba(255,255,255,0.2); display: inline-block; padding: 4px 10px; border-radius: 6px; font-weight: bold; font-size: 0.85rem; margin-bottom: 12px;">
@@ -188,8 +193,7 @@ window.renderKonten = async (target) => {
             const syncedCount = queueTim.filter(a => a.is_synced).length;
             const pendingCount = queueTim.filter(a => !a.is_synced).length;
             
-            // TAMPILKAN RASIO (Sinkron / Belum Sinkron)
-            if (getEl('dash-tunda')) getEl('dash-tunda').innerText = `${syncedCount} / ${pendingCount}`;
+            if (getEl('dash-tunda')) getEl('dash-tunda').innerText = `${syncedCount}/${pendingCount}`;
 
             const regList = queueTim.filter(a => a.tipe_laporan === 'REGISTRASI');
             const pendList = queueTim.filter(a => a.tipe_laporan === 'PENDAMPINGAN');
@@ -501,6 +505,7 @@ const initDaftarSasaran = async () => {
         });
     };
 
+    // PERUBAHAN DESAIN POPUP DETAIL SASARAN (TIDAK PAKAI TABEL, LEBIH RAPI)
     const showDetail = (id) => {
         const r = processedList.find(x => x.id === id);
         if(!r) return;
@@ -516,18 +521,38 @@ const initDaftarSasaran = async () => {
             `).join('');
 
         kontenDetail.innerHTML = `
-            <div style="margin-bottom: 20px;">
-                <div style="font-weight: bold; font-size: 1.3rem; color: #222; text-transform: uppercase;">${r.nama_sasaran}</div>
-                <div style="color: #666; font-size: 0.85rem; margin-top: 4px;">ID: ${r.id} <br> NIK: ${r.data_laporan?.nik || '-'}</div>
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #ddd; line-height: 1.4;">
+                <div style="font-size: 0.8rem; color: #666;">Nama Sasaran</div>
+                <div style="font-size: 1.15rem; font-weight: bold; color: #222; margin-bottom: 12px; text-transform: uppercase;">${r.nama_sasaran || '-'}</div>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+                    <div>
+                        <div style="font-size: 0.8rem; color: #666;">ID Sasaran / NIK</div>
+                        <div style="font-size: 0.95rem; color: #222; font-weight: 500;">${r.id} <br> ${r.data_laporan?.nik || '-'}</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.8rem; color: #666;">Kategori</div>
+                        <div style="font-size: 0.95rem; color: #222; font-weight: bold;">${r.textBaris2}</div>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+                    <div>
+                        <div style="font-size: 0.8rem; color: #666;">Status Pendampingan</div>
+                        <div style="font-size: 0.95rem;">${r.labelSelesai}</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.8rem; color: #666;">Tgl Lahir</div>
+                        <div style="font-size: 0.95rem; color: #222;">${r.data_laporan?.tanggal_lahir || '-'}</div>
+                    </div>
+                </div>
+
+                <div style="font-size: 0.8rem; color: #666;">Nama KK ${r.jenis_sasaran === 'BADUTA' ? '/ Ibu Kandung' : ''}</div>
+                <div style="font-size: 0.95rem; color: #222; margin-bottom: 12px;">${r.data_laporan?.nama_kk || '-'} ${r.jenis_sasaran === 'BADUTA' ? ' / ' + (r.data_laporan?.nama_ibu_kandung || '-') : ''}</div>
+
+                <div style="font-size: 0.8rem; color: #666;">Alamat</div>
+                <div style="font-size: 0.95rem; color: #222;">${r.data_laporan?.alamat || '-'}</div>
             </div>
-            <table style="width: 100%; font-size: 0.95rem; margin-bottom: 25px; line-height: 1.5;">
-                <tr><td style="padding:4px 0; color:#666; width:35%;">Status</td><td>: ${r.labelSelesai}</td></tr>
-                <tr><td style="padding:4px 0; color:#666;">Kategori</td><td>: <b>${r.textBaris2}</b></td></tr>
-                <tr><td style="padding:4px 0; color:#666;">Tgl Lahir</td><td>: ${r.data_laporan?.tanggal_lahir || '-'}</td></tr>
-                <tr><td style="padding:4px 0; color:#666;">Nama KK</td><td>: ${r.data_laporan?.nama_kk || '-'}</td></tr>
-                ${r.jenis_sasaran === 'BADUTA' ? `<tr><td style="padding:4px 0; color:#666;">Nama Ibu</td><td>: ${r.data_laporan?.nama_ibu_kandung || '-'}</td></tr>` : ''}
-                <tr><td style="padding:4px 0; color:#666; vertical-align: top;">Alamat</td><td>: ${r.data_laporan?.alamat || '-'}</td></tr>
-            </table>
             
             <h4 style="margin-bottom: 15px; color: var(--primary); border-bottom: 2px solid #ddd; padding-bottom: 5px;">Riwayat Kunjungan</h4>
             ${htmlRiwayat}
