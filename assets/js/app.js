@@ -85,7 +85,7 @@ const renderMenu = (role) => {
         { id: 'cetak_pdf', icon: '🖨️', label: 'Cetak PDF' },
         { id: 'ganti_pass', icon: '🔑', label: 'Ganti Password' },
         { id: 'sync_manual', icon: '🔄', label: 'Sinkronisasi Data' },
-        { id: 'reload_app', icon: '🔁', label: 'Muat Ulang Layar' } // <--- INI TAMBAHAN BARUNYA
+        { id: 'reload_app', icon: '🔁', label: 'Muat Ulang Layar' }
     ];
 
     container.innerHTML = menus.map(m => `
@@ -102,6 +102,8 @@ const renderMenu = (role) => {
             const target = item.getAttribute('data-target');
             if(target === 'sync_manual') {
                 if(window.jalankanSinkronisasi) window.jalankanSinkronisasi();
+            } else if (target === 'reload_app') {
+                location.reload(true);
             } else {
                 renderKonten(target);
             }
@@ -208,7 +210,7 @@ window.renderKonten = async (target) => {
 
     } else if (target === 'registrasi') {
         const tpl = getEl('template-registrasi');
-        if(tpl) { area.appendChild(tpl.content.cloneNode(true)); (); }
+        if(tpl) { area.appendChild(tpl.content.cloneNode(true)); initFormRegistrasi(); }
     } else if (target === 'daftar_sasaran') {
         const tpl = getEl('template-daftar-sasaran');
         if(tpl) { area.appendChild(tpl.content.cloneNode(true)); initDaftarSasaran(); }
@@ -234,7 +236,7 @@ window.renderKonten = async (target) => {
 };
 
 // ==========================================
-// 4. LOGIKA FORM DINAMIS & ID UNIK
+// 4. LOGIKA FORM DINAMIS & KODE KECAMATAN
 // ==========================================
 const getKodeKecamatan = (kec) => {
     if (!kec) return "XXX";
@@ -398,7 +400,6 @@ const initFormRegistrasi = async () => {
                         umurBulan += 12;
                     }
                     
-                    // Simpan permanen ke JSON laporan
                     jawaban.usia_saat_daftar_tahun = umurTahun;
                     jawaban.usia_saat_daftar_bulan = umurBulan;
                 }
@@ -446,7 +447,7 @@ const initDaftarSasaran = async () => {
             if (r.jenis_sasaran === 'CATIN' && r.data_laporan && r.data_laporan.tanggal_pernikahan) {
                 const tglNikah = new Date(r.data_laporan.tanggal_pernikahan);
                 const hariIni = new Date();
-                hariIni.setHours(0,0,0,0); // Set jam ke 00:00 agar akurat hitung hari
+                hariIni.setHours(0,0,0,0);
                 
                 if (tglNikah < hariIni) {
                     isExpired = true;
@@ -454,7 +455,6 @@ const initDaftarSasaran = async () => {
                 }
             }
 
-            // TAMPILAN KARTU
             return `
             <div style="background:${isExpired ? '#f8f9fa' : '#f4f7f6'}; padding:15px; border-radius:8px; border-left: 4px solid ${isExpired ? '#6c757d' : 'var(--primary)'}; margin-bottom: 10px; opacity: ${isExpired ? '0.7' : '1'};">
                 <div style="font-weight: bold; font-size: 1.15rem; color: #333; text-transform: uppercase;">
@@ -482,6 +482,7 @@ const initFormPendampingan = async () => {
     const regList = antrean.filter(a => a.tipe_laporan === 'REGISTRASI' && String(a.id_tim) === String(session.id_tim));
     
     if (selSasaran) { 
+        // FILTER CATIN KEDALUWARSA DI DROPDOWN PENDAMPINGAN
         const activeRegList = regList.filter(r => {
             if (r.jenis_sasaran === 'CATIN' && r.data_laporan && r.data_laporan.tanggal_pernikahan) {
                 const tglNikah = new Date(r.data_laporan.tanggal_pernikahan);
@@ -534,8 +535,6 @@ const initFormPendampingan = async () => {
                 if(jawaban.is_melahirkan === 'YA' && jawaban.tgl_persalinan) {
                     const originalReg = await getDataById('sync_queue', jawaban.id_sasaran);
                     if(originalReg) {
-                        
-                        // Hitung Usia Ibu Saat Melahirkan
                         if(originalReg.data_laporan && originalReg.data_laporan.tanggal_lahir) {
                             const tglLahir = new Date(originalReg.data_laporan.tanggal_lahir);
                             const tglSalin = new Date(jawaban.tgl_persalinan);
@@ -544,15 +543,13 @@ const initFormPendampingan = async () => {
                             if (uBulan < 0 || (uBulan === 0 && tglSalin.getDate() < tglLahir.getDate())) {
                                 uTahun--; uBulan += 12;
                             }
-                            
-                            // Suntikkan data usia melahirkan ke data asli sasaran
                             originalReg.data_laporan.usia_saat_melahirkan_tahun = uTahun;
                             originalReg.data_laporan.usia_saat_melahirkan_bulan = uBulan;
                             originalReg.data_laporan.tgl_persalinan = jawaban.tgl_persalinan;
                         }
 
                         originalReg.jenis_sasaran = 'BUFAS';
-                        originalReg.is_synced = false; // Ubah status jadi 'belum sinkron' agar perubahan dikirim ke Server
+                        originalReg.is_synced = false; 
                         await putData('sync_queue', originalReg);
                         alert("🎉 Selamat! Ibu ini telah melahirkan dan otomatis pindah ke daftar BUFAS.");
                     }
