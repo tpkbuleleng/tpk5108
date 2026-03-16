@@ -35,7 +35,6 @@ const updateNetworkStatus = () => {
 // 2. INISIALISASI APLIKASI
 // ==========================================
 const initApp = async () => {
-    // Failsafe: Paksa hilangkan logo dalam 3.5 detik apapun yang terjadi
     const logoTimeout = setTimeout(() => { tampilkanLayar('login'); }, 3500);
     try {
         await initDB();
@@ -57,7 +56,7 @@ const masukKeAplikasi = async (session) => {
     window.currentUser = session;
     const allWil = await getAllData('master_tim_wilayah').catch(() => []);
     const wilayahKader = allWil.find(w => w.id_tim === session.id_tim);
-    const namaKec = wilayahKader ? wilayahKader.kecamatan.toUpperCase() : "BULELENG";
+    const namaKec = wilayahKader && wilayahKader.kecamatan ? wilayahKader.kecamatan.toUpperCase() : "BULELENG";
 
     const greeting = getEl('user-greeting');
     if (greeting) greeting.innerHTML = `DASHBOARD KADER KECAMATAN ${namaKec}`;
@@ -101,7 +100,11 @@ const renderMenu = (role) => {
             
             const target = item.getAttribute('data-target');
             if(target === 'sync_manual') {
-                alert("Fitur Sinkronisasi ke Server Google akan segera diaktifkan.");
+                if(window.jalankanSinkronisasi) {
+                    window.jalankanSinkronisasi();
+                } else {
+                    alert("Fungsi sinkronisasi belum tersedia.");
+                }
             } else {
                 renderKonten(target);
             }
@@ -147,7 +150,7 @@ window.renderKonten = async (target) => {
                 getAllData('master_tim_wilayah').catch(()=>[]),
                 getAllData('sync_queue').catch(()=>[])
             ]);
-            const wilayahKerja = allWil.filter(w => w.id_tim === session.id_tim);
+            const wilayahKerja = allWil.filter(w => String(w.id_tim) === String(session.id_tim));
             const daftarDusun = wilayahKerja.map(w => w.dusun_rw).join(', ') || '-';
             
             if (getEl('dash-detail-wilayah')) {
@@ -203,7 +206,7 @@ const initFormRegistrasi = async () => {
     const session = window.currentUser;
     const allWil = await getAllData('master_tim_wilayah').catch(()=>[]);
     const allWilBali = await getAllData('master_wilayah_bali').catch(()=>[]); 
-    const tugas = allWil.filter(w => w.id_tim === session.id_tim);
+    const tugas = allWil.filter(w => String(w.id_tim) === String(session.id_tim));
     
     const selJenis = getEl('reg-jenis');
     const containerQ = getEl('pertanyaan-dinamis');
@@ -216,7 +219,7 @@ const initFormRegistrasi = async () => {
     const regAlamat = getEl('reg-alamat');
 
     if (selDesa && tugas.length > 0) {
-        const dDesa = [...new Set(tugas.map(w => w.desa_kelurahan))];
+        const dDesa = [...new Set(tugas.map(w => w.desa_kelurahan))].filter(Boolean);
         selDesa.innerHTML = '<option value="">-- Pilih Desa --</option>' + dDesa.map(d => `<option value="${d}">${d}</option>`).join('');
         selDesa.onchange = () => {
             const dDusun = tugas.filter(w => w.desa_kelurahan === selDesa.value);
@@ -252,7 +255,6 @@ const initFormRegistrasi = async () => {
         selJenis.onchange = () => {
             const jenis = selJenis.value;
             
-            // Tampil Sembunyi Wilayah CATIN vs Domisili
             if(boxCatin && boxDomisili) {
                 if (jenis === 'CATIN') {
                     boxCatin.style.display = 'block';
@@ -277,7 +279,7 @@ const initFormRegistrasi = async () => {
 
             if (!jenis) { containerQ.innerHTML = ''; return; }
             
-            const filteredQ = questions.filter(q => q.is_active === 'Y' && (q.kategori_sasaran === 'UMUM' || q.kategori_sasaran === jenis)).sort((a,b)=>a.urutan - b.urutan);
+            const filteredQ = questions.filter(q => String(q.is_active || '').toUpperCase() === 'Y' && (String(q.kategori_sasaran).toUpperCase() === 'UMUM' || String(q.kategori_sasaran).toUpperCase() === jenis)).sort((a,b)=>a.urutan - b.urutan);
             if (filteredQ.length > 0) {
                 containerQ.innerHTML = `<h4 style="margin-bottom:10px; color:var(--primary);">Pertanyaan Khusus ${jenis}</h4>` + 
                     filteredQ.map(q => `
@@ -311,7 +313,6 @@ const initFormRegistrasi = async () => {
                 const angkaUnik = Math.floor(Math.random() * 1000000).toString().padStart(6, '0');
                 const idSasaran = `${prefix}-${kodeKec}-${angkaUnik}`;
                 
-                // Rapikan Alamat
                 const desaFinal = jenisSasaran === 'CATIN' ? '-' : selDesa.value;
                 const dusunFinal = jenisSasaran === 'CATIN' ? '-' : selDusun.value;
 
@@ -344,7 +345,7 @@ const initDaftarSasaran = async () => {
     if(!list) return;
     
     const antrean = await getAllData('sync_queue').catch(()=>[]);
-    const regList = antrean.filter(a => a.tipe_laporan === 'REGISTRASI' && a.id_tim === session.id_tim);
+    const regList = antrean.filter(a => a.tipe_laporan === 'REGISTRASI' && String(a.id_tim) === String(session.id_tim));
     
     if (regList.length === 0) { 
         list.innerHTML = `<div style="text-align:center; padding:20px; color:#999;">Belum ada sasaran yang diregistrasi oleh Tim Anda.</div>`; 
@@ -365,7 +366,7 @@ const initFormPendampingan = async () => {
     const containerQ = getEl('form-pendampingan-dinamis');
     
     const antrean = await getAllData('sync_queue').catch(()=>[]);
-    const regList = antrean.filter(a => a.tipe_laporan === 'REGISTRASI' && a.id_tim === session.id_tim);
+    const regList = antrean.filter(a => a.tipe_laporan === 'REGISTRASI' && String(a.id_tim) === String(session.id_tim));
     
     if (selSasaran) { 
         selSasaran.innerHTML = '<option value="">-- Pilih Sasaran --</option>' + 
@@ -435,7 +436,7 @@ const initFormPendampingan = async () => {
 const initRekap = async () => {
     const session = window.currentUser;
     const antrean = await getAllData('sync_queue').catch(()=>[]);
-    const dataTim = antrean.filter(a => a.id_tim === session.id_tim);
+    const dataTim = antrean.filter(a => String(a.id_tim) === String(session.id_tim));
     
     if(getEl('rekap-total')) getEl('rekap-total').innerText = dataTim.filter(a => a.tipe_laporan === 'REGISTRASI').length;
     if(getEl('rekap-pend')) getEl('rekap-pend').innerText = dataTim.filter(a => a.tipe_laporan === 'PENDAMPINGAN').length;
@@ -461,10 +462,10 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 await initDB();
                 
-                // Cari data di seluruh baris tabel USER
+                // Cari data di seluruh baris tabel
                 const allUsers = await getAllData('master_user').catch(() => []);
                 
-                // Pencarian Fleksibel (Mencari di kolom id_pengguna, id_user, username, dll)
+                // Pencarian ID Cerdas
                 const user = allUsers.find(u => 
                     String(u.id_pengguna) === id || 
                     String(u.id_user) === id || 
@@ -478,7 +479,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
 
-                // Cek PIN Fleksibel
+                // Cek PIN Cerdas
                 const pinBenar = String(user.password_awal_ref || user.password || user.pin || "");
                 
                 if (pinBenar === pin) {
@@ -487,7 +488,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     let ref_id = user.ref_id || user.id_kader || user.nik || '';
                     let tim = '-', noTim = '-';
                     
-                    // Mencari Detail Tim & Wilayah Fleksibel
+                    // Pencarian Relasi Kader & Tim Cerdas
                     if (role.includes('KADER') && ref_id) {
                         const allKader = await getAllData('master_kader').catch(() => []);
                         const k = allKader.find(x => String(x.id_kader) === String(ref_id) || String(x.nik) === String(ref_id));
