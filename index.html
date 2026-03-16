@@ -149,26 +149,31 @@
     <template id="template-daftar-sasaran">
         <div class="card animate-fade">
             <h3 style="margin-bottom: 15px; color: var(--primary);">📋 Daftar Sasaran</h3>
-            <p style="font-size: 0.85rem; color: #666; margin-bottom: 15px;">Daftar sasaran aktif di wilayah Tim Anda (Tersimpan Lokal).</p>
+            
+            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                <select id="filter-jenis" class="form-control" style="flex: 1; padding: 8px; font-weight: bold;">
+                    <option value="ALL">Semua Jenis</option>
+                    <option value="CATIN">CATIN</option>
+                    <option value="BUMIL">BUMIL</option>
+                    <option value="BUFAS">BUFAS</option>
+                    <option value="BADUTA">BADUTA</option>
+                </select>
+                <select id="filter-status" class="form-control" style="flex: 1; padding: 8px; font-weight: bold;">
+                    <option value="ALL">Semua Status</option>
+                    <option value="AKTIF">Aktif</option>
+                    <option value="SELESAI">Selesai</option>
+                </select>
+            </div>
+
             <div id="list-sasaran" style="display: flex; flex-direction: column; gap: 10px;"></div>
         </div>
-    </template>
 
-    <template id="template-pendampingan">
-        <div class="card animate-fade">
-            <h3 style="margin-bottom: 15px; color: var(--primary);">🤝 Laporan Pendampingan</h3>
-            <form id="form-pendampingan" class="modern-form">
-                <div class="form-group">
-                    <label>Pilih Sasaran</label>
-                    <select id="pend-sasaran" name="id_sasaran" class="form-control" required>
-                        <option value="">-- Memuat Sasaran --</option>
-                    </select>
-                </div>
-                <div id="form-pendampingan-dinamis"></div>
-                <div class="form-group"><label>Tanggal Kunjungan</label><input type="date" name="tgl_kunjungan" class="form-control" required></div>
-                <div class="form-group"><label>Catatan Umum / Hasil</label><textarea name="catatan" class="form-control" rows="3" required></textarea></div>
-                <button type="submit" class="btn-primary" style="margin-top: 15px; width: 100%;">💾 Simpan Pendampingan</button>
-            </form>
+        <div id="modal-detail" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 9999; padding: 20px; box-sizing: border-box; overflow-y: auto;">
+            <div class="card animate-fade" style="margin-top: 20px; position: relative; max-width: 500px; margin-left: auto; margin-right: auto;">
+                <button id="btn-tutup-modal" style="position: absolute; right: 15px; top: 15px; background: #dc3545; color: white; border: none; border-radius: 5px; padding: 6px 12px; font-weight: bold; cursor: pointer;">Tutup</button>
+                <h3 style="color: var(--primary); margin-bottom: 15px; padding-right: 60px;">🔍 Detail Sasaran</h3>
+                <div id="konten-detail"></div>
+            </div>
         </div>
     </template>
 
