@@ -84,7 +84,8 @@ const renderMenu = (role) => {
         { id: 'rekap_tim', icon: '📈', label: 'Rekap Bulanan Tim' },
         { id: 'cetak_pdf', icon: '🖨️', label: 'Cetak PDF' },
         { id: 'ganti_pass', icon: '🔑', label: 'Ganti Password' },
-        { id: 'sync_manual', icon: '🔄', label: 'Sinkronisasi Data' }
+        { id: 'sync_manual', icon: '🔄', label: 'Sinkronisasi Data' },
+        { id: 'reload_app', icon: '🔁', label: 'Muat Ulang Layar' } // <--- INI TAMBAHAN BARUNYA
     ];
 
     container.innerHTML = menus.map(m => `
