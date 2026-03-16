@@ -133,7 +133,6 @@ window.renderKonten = async (target) => {
     if (target === 'dashboard') {
         const session = window.currentUser;
         
-        // PERUBAHAN DASHBOARD 3 KOLOM
         area.innerHTML = `
             <div class="animate-fade">
                 <div class="card" style="background: linear-gradient(135deg, #0d6efd, #0043a8); color: white; border:none; margin-bottom: 20px; padding: 20px;">
@@ -505,7 +504,6 @@ const initDaftarSasaran = async () => {
         });
     };
 
-    // PERUBAHAN DESAIN POPUP DETAIL SASARAN (TIDAK PAKAI TABEL, LEBIH RAPI)
     const showDetail = (id) => {
         const r = processedList.find(x => x.id === id);
         if(!r) return;
@@ -569,32 +567,76 @@ const initDaftarSasaran = async () => {
 };
 
 // ==========================================
-// 6. FORM PENDAMPINGAN 
+// 6. FORM PENDAMPINGAN (LOGIKA FILTER BARU)
 // ==========================================
 const initFormPendampingan = async () => {
     const session = window.currentUser;
+    const selJenis = getEl('pend-jenis');
     const selSasaran = getEl('pend-sasaran');
+    const infoBox = getEl('pend-info-sasaran');
     const containerQ = getEl('form-pendampingan-dinamis');
     
     const antrean = await getAllData('sync_queue').catch(()=>[]);
     const regList = antrean.filter(a => a.tipe_laporan === 'REGISTRASI' && String(a.id_tim) === String(session.id_tim));
     
-    if (selSasaran) { 
-        const activeRegList = regList.filter(r => {
-            if (r.jenis_sasaran === 'CATIN' && r.data_laporan && r.data_laporan.tanggal_pernikahan) {
-                const tglNikah = new Date(r.data_laporan.tanggal_pernikahan);
-                const hariIni = new Date(); hariIni.setHours(0,0,0,0);
-                return tglNikah >= hariIni; 
-            }
-            return true; 
-        });
-
-        selSasaran.innerHTML = '<option value="">-- Pilih Sasaran --</option>' + 
-        activeRegList.map(r => `<option value="${r.id}">[${r.id}] ${r.nama_sasaran || r.jenis_sasaran} - ${r.dusun}</option>`).join(''); 
+    if (selJenis && selSasaran) { 
         
+        // Logika saat Jenis Sasaran Dipilih
+        selJenis.onchange = () => {
+            const jenis = selJenis.value;
+            containerQ.innerHTML = '';
+            if(infoBox) infoBox.style.display = 'none';
+            
+            if (!jenis) {
+                selSasaran.innerHTML = '<option value="">-- Pilih Jenis Dahulu --</option>';
+                selSasaran.disabled = true;
+                return;
+            }
+
+            const activeRegList = regList.filter(r => {
+                if (r.jenis_sasaran !== jenis) return false;
+                if (r.jenis_sasaran === 'CATIN' && r.data_laporan && r.data_laporan.tanggal_pernikahan) {
+                    const tglNikah = new Date(r.data_laporan.tanggal_pernikahan);
+                    const hariIni = new Date(); hariIni.setHours(0,0,0,0);
+                    return tglNikah >= hariIni; 
+                }
+                return true; 
+            });
+
+            if (activeRegList.length === 0) {
+                selSasaran.innerHTML = `<option value="">-- Tidak ada data ${jenis} aktif --</option>`;
+                selSasaran.disabled = true;
+            } else {
+                selSasaran.innerHTML = '<option value="">-- Pilih Sasaran --</option>' + 
+                activeRegList.map(r => `<option value="${r.id}">${r.nama_sasaran || r.jenis_sasaran} - ${r.dusun}</option>`).join(''); 
+                selSasaran.disabled = false;
+            }
+        };
+
+        // Logika saat Nama Sasaran Dipilih
         selSasaran.onchange = () => {
             const sasaranId = selSasaran.value;
-            const sasaranData = activeRegList.find(r => r.id === sasaranId);
+            const sasaranData = regList.find(r => r.id === sasaranId);
+            
+            if (sasaranData && infoBox) {
+                const dl = sasaranData.data_laporan || {};
+                const usiaTahun = dl.usia_saat_daftar_tahun !== undefined ? dl.usia_saat_daftar_tahun : '-';
+                
+                infoBox.style.display = 'block';
+                infoBox.innerHTML = `
+                    <div style="font-weight:bold; color:#0d6efd; margin-bottom: 8px; font-size: 0.95rem;">📌 Data Profil Sasaran</div>
+                    <table style="width:100%; font-size: 0.85rem; line-height: 1.5;">
+                        <tr><td style="width:35%; color:#555;">Nama</td><td>: <b>${sasaranData.nama_sasaran || '-'}</b></td></tr>
+                        <tr><td style="color:#555;">Nama KK</td><td>: ${dl.nama_kk || '-'}</td></tr>
+                        <tr><td style="color:#555;">NIK</td><td>: ${dl.nik || '-'}</td></tr>
+                        <tr><td style="color:#555;">J. Kelamin</td><td>: ${dl.jenis_kelamin || '-'}</td></tr>
+                        <tr><td style="color:#555;">Usia Daftar</td><td>: ${usiaTahun} Tahun</td></tr>
+                    </table>
+                `;
+            } else if (infoBox) {
+                infoBox.style.display = 'none';
+            }
+
             if(sasaranData && sasaranData.jenis_sasaran === 'BUMIL') {
                 containerQ.innerHTML = `
                     <div class="form-group">
