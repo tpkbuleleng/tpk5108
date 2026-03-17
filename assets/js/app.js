@@ -229,7 +229,6 @@ window.renderKonten = async (target) => {
                     tglBatas.setDate(tglBatas.getDate() + 42); 
                     if (hariIni > tglBatas) isAktif = false;
                 }
-                
                 if(cReg[r.jenis_sasaran] !== undefined) cReg[r.jenis_sasaran]++; 
             });
 
@@ -311,11 +310,9 @@ const getKodeKecamatan = (kec) => {
     return map[kec.toUpperCase()] || "XXX";
 };
 
-// FUNGSI RENDER PERTANYAAN DINAMIS (UPDATE JSON & MODUL)
 const renderPertanyaanDinamis = (jenis, modul, container, questions) => {
     if (!jenis) { container.innerHTML = ''; return; }
     
-    // Filter pertanyaan sesuai Modul (REGISTRASI / PENDAMPINGAN) dan Jenis Sasaran (Tepat / UMUM)
     const filteredQ = questions.filter(q => 
         String(q.is_active || '').toUpperCase() === 'Y' && 
         String(q.modul || '').toUpperCase() === modul.toUpperCase() &&
@@ -331,13 +328,9 @@ const renderPertanyaanDinamis = (jenis, modul, container, questions) => {
             let markerReq = req ? '<span style="color:red; font-weight:bold;">*</span>' : '';
             let inputHtml = '';
             
-            // Baca Tipe Input dan Opsi JSON
             if(q.tipe_input === 'select') {
                 let opsi = [];
-                try { 
-                    opsi = JSON.parse(q.opsi_json || '[]'); 
-                } catch(e) { console.error("JSON Error", e); }
-                
+                try { opsi = JSON.parse(q.opsi_json || '[]'); } catch(e) { }
                 let opsiHtml = opsi.map(o => `<option value="${o}">${o}</option>`).join('');
                 inputHtml = `<select name="${q.id_pertanyaan}" class="form-control" ${req}><option value="">-- Pilih Jawaban --</option>${opsiHtml}</select>`;
             } else {
@@ -352,9 +345,7 @@ const renderPertanyaanDinamis = (jenis, modul, container, questions) => {
         });
         html += `</div>`;
         container.innerHTML = html;
-    } else { 
-        container.innerHTML = ''; 
-    }
+    } else { container.innerHTML = ''; }
 };
 
 const initFormRegistrasi = async () => {
@@ -378,7 +369,6 @@ const initFormRegistrasi = async () => {
     const selDesa = getEl('reg-desa');
     const selDusun = getEl('reg-dusun');
     const regAlamat = getEl('reg-alamat');
-    
     const selJk = document.querySelector('select[name="jenis_kelamin"]');
 
     if (selDesa && tugas.length > 0) {
@@ -397,14 +387,12 @@ const initFormRegistrasi = async () => {
     if (catinKab && allWilBali.length > 0) {
         const dKab = [...new Set(allWilBali.map(w => w.kabupaten))].filter(Boolean);
         catinKab.innerHTML = '<option value="">-- Pilih Kabupaten --</option>' + dKab.map(d => `<option value="${d}">${d}</option>`).join('');
-        
         catinKab.onchange = () => {
             const fKec = allWilBali.filter(w => w.kabupaten === catinKab.value);
             const dKec = [...new Set(fKec.map(w => w.kecamatan))].filter(Boolean);
             catinKec.innerHTML = '<option value="">-- Pilih Kecamatan --</option>' + dKec.map(d => `<option value="${d}">${d}</option>`).join('');
             catinDesa.innerHTML = '<option value="">-- Pilih Desa --</option>'; 
         };
-        
         catinKec.onchange = () => {
             const fDesa = allWilBali.filter(w => w.kabupaten === catinKab.value && w.kecamatan === catinKec.value);
             const dDesa = [...new Set(fDesa.map(w => w.desa_kelurahan))].filter(Boolean);
@@ -430,17 +418,14 @@ const initFormRegistrasi = async () => {
                 if(jenis === 'BADUTA') { boxIbu.style.display = 'block'; inputIbu.setAttribute('required', 'true'); } 
                 else { boxIbu.style.display = 'none'; inputIbu.removeAttribute('required'); inputIbu.value = ''; }
             }
-
             if(boxNikah && inputNikah) {
                 if(jenis === 'CATIN') { boxNikah.style.display = 'block'; inputNikah.setAttribute('required', 'true'); } 
                 else { boxNikah.style.display = 'none'; inputNikah.removeAttribute('required'); inputNikah.value = ''; }
             }
-
             if(boxSalinReg && inputSalinReg) {
                 if(jenis === 'BUFAS') { boxSalinReg.style.display = 'block'; inputSalinReg.setAttribute('required', 'true'); } 
                 else { boxSalinReg.style.display = 'none'; inputSalinReg.removeAttribute('required'); inputSalinReg.value = ''; }
             }
-
             if(boxCatin && boxDomisili) {
                 if (jenis === 'CATIN') {
                     boxCatin.style.display = 'block'; boxDomisili.style.display = 'none';
@@ -454,8 +439,6 @@ const initFormRegistrasi = async () => {
                     if(catinKec) catinKec.removeAttribute('required'); if(catinDesa) catinDesa.removeAttribute('required');
                 }
             }
-
-            // Panggil fungsi render baru untuk REGISTRASI
             renderPertanyaanDinamis(jenis, 'REGISTRASI', containerQ, questions);
         };
     }
@@ -471,7 +454,6 @@ const initFormRegistrasi = async () => {
                 
                 const kecamatan = tugas.length > 0 ? tugas[0].kecamatan : 'TIDAK_DIKETAHUI';
                 const jenisSasaran = selJenis.value;
-                
                 let prefix = "REG";
                 if (jenisSasaran === 'CATIN') prefix = "CTN";
                 else if (jenisSasaran === 'BUMIL') prefix = "BML";
@@ -525,7 +507,7 @@ const initFormRegistrasi = async () => {
 };
 
 // ==========================================
-// 5. FITUR DAFTAR SASARAN & DETAIL POP-UP
+// 5. FITUR DAFTAR SASARAN & DETAIL POP-UP (UPDATE KIA/KKA DIGITAL)
 // ==========================================
 const initDaftarSasaran = async () => {
     const session = window.currentUser;
@@ -610,28 +592,113 @@ const initDaftarSasaran = async () => {
         if(!r) return;
         
         const riwayat = pendList.filter(p => p.id_sasaran_ref === id).sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+        let htmlRiwayat = '';
+
+        if (riwayat.length === 0) {
+            htmlRiwayat = '<div style="color:#888; font-size:0.9rem; padding: 15px; background: #f8f9fa; border-radius: 8px; text-align:center; border: 1px dashed #ccc;">Belum ada riwayat kunjungan pendampingan.</div>';
         
-        let htmlRiwayat = riwayat.length === 0 ? 
-            '<div style="color:#888; font-size:0.9rem; padding: 15px; background: #f8f9fa; border-radius: 8px; text-align:center; border: 1px dashed #ccc;">Belum ada riwayat kunjungan pendampingan.</div>' : 
-            riwayat.map(p => {
+        } else if (r.jenis_sasaran === 'BADUTA') {
+            // ==========================================
+            // KEAJAIBAN BUKU KIA/KKA DIGITAL UNTUK BADUTA
+            // ==========================================
+            htmlRiwayat += `<div style="overflow-x:auto; background: #fff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border: 1px solid #ddd;">
+                <table style="width:100%; border-collapse: collapse; font-size: 0.85rem; text-align:center; min-width:600px;">
+                    <thead>
+                        <tr style="background: var(--primary); color: white;">
+                            <th style="padding:10px; border:1px solid #c6c6c6;">Tanggal</th>
+                            <th style="padding:10px; border:1px solid #c6c6c6;">Usia</th>
+                            <th style="padding:10px; border:1px solid #c6c6c6;">BB (kg)</th>
+                            <th style="padding:10px; border:1px solid #c6c6c6;">TB/PB (cm)</th>
+                            <th style="padding:10px; border:1px solid #c6c6c6;">LK (cm)</th>
+                            <th style="padding:10px; border:1px solid #c6c6c6;">Status KKA</th>
+                            <th style="padding:10px; border:1px solid #c6c6c6; text-align:left;">Catatan Lainnya</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+
+            riwayat.forEach(p => {
+                let tglKunjungan = new Date(p.data_laporan?.tgl_kunjungan || p.created_at);
+                let tglLahir = new Date(r.data_laporan?.tanggal_lahir || new Date());
+                
+                // Menghitung umur bulan yang presisi
+                let umurBulan = (tglKunjungan.getFullYear() - tglLahir.getFullYear()) * 12;
+                umurBulan -= tglLahir.getMonth();
+                umurBulan += tglKunjungan.getMonth();
+                if (tglKunjungan.getDate() < tglLahir.getDate()) umurBulan--;
+                if (umurBulan < 0) umurBulan = 0;
+
+                let valBB = '-', valTB = '-', valLK = '-', valKKA = '-';
+                let catatanLain = `<span style="display:block; margin-bottom:4px;"><b>Hasil Umum:</b> ${p.data_laporan?.catatan || '-'}</span>`;
+
+                for (const [key, value] of Object.entries(p.data_laporan || {})) {
+                    if (['id_sasaran', 'tgl_kunjungan', 'catatan', 'is_melahirkan', 'tgl_persalinan'].includes(key)) continue;
+                    if (!value) continue;
+
+                    let label = key;
+                    let foundQ = masterPertanyaan.find(mq => String(mq.id_pertanyaan) === String(key));
+                    
+                    if(foundQ) {
+                        label = foundQ.label_pertanyaan.toLowerCase();
+                    } else {
+                        // Coba baca format lawas
+                        if(key.startsWith('q_')) {
+                            let qId = key.replace('q_', '');
+                            let fQ2 = masterPertanyaan.find(mq => String(mq.id_pertanyaan) === String(qId));
+                            if(fQ2) label = fQ2.label_pertanyaan.toLowerCase();
+                            else continue; 
+                        } else {
+                            label = key.toLowerCase();
+                        }
+                    }
+
+                    // KECERDASAN BUATAN: Mencocokkan Kata Kunci (Keyword Matching)
+                    if (label.includes('berat') || label === 'bb') valBB = value;
+                    else if (label.includes('tinggi') || label.includes('panjang') || label.includes('tb') || label.includes('pb')) valTB = value;
+                    else if (label.includes('lingkar kepala') || label === 'lk') valLK = value;
+                    else if (label.includes('perkembangan') || label.includes('kka') || label.includes('sesuai umur')) valKKA = value;
+                    else {
+                        // Jika bukan data KIA utama, masukkan ke kolom Catatan Lainnya
+                        catatanLain += `<small style="display:block; border-top: 1px dashed #ccc; padding-top:3px; margin-top:3px;"><b>${foundQ ? foundQ.label_pertanyaan : key}:</b> ${value}</small>`;
+                    }
+                }
+
+                let syncIcon = p.is_synced ? '<span style="color:#198754; font-size:0.7rem;">(Server)</span>' : '<span style="color:#fd7e14; font-size:0.7rem;">(Lokal)</span>';
+                
+                // Warnai merah jika Status KKA tidak sesuai/terlambat
+                let kkaStyle = (valKKA.toLowerCase().includes('terlambat') || valKKA.toLowerCase().includes('tidak')) ? 'color:#dc3545; font-weight:bold;' : 'color:#198754; font-weight:bold;';
+
+                htmlRiwayat += `
+                    <tr style="border-bottom: 1px solid #eee;">
+                        <td style="padding:10px; border:1px solid #eee;">${tglKunjungan.toLocaleDateString('id-ID', {day: 'numeric', month: 'short', year: '2-digit'})} <br>${syncIcon}</td>
+                        <td style="padding:10px; border:1px solid #eee; font-weight:bold; font-size:1rem; color:var(--primary);">${umurBulan} Bln</td>
+                        <td style="padding:10px; border:1px solid #eee;">${valBB}</td>
+                        <td style="padding:10px; border:1px solid #eee;">${valTB}</td>
+                        <td style="padding:10px; border:1px solid #eee;">${valLK}</td>
+                        <td style="padding:10px; border:1px solid #eee; ${kkaStyle}">${valKKA}</td>
+                        <td style="padding:10px; border:1px solid #eee; text-align:left; line-height:1.3;">${catatanLain}</td>
+                    </tr>`;
+            });
+
+            htmlRiwayat += `</tbody></table></div>`;
+
+        } else {
+            // FORMAT TIMELINE UNTUK SASARAN SELAIN BADUTA
+            htmlRiwayat = riwayat.map(p => {
                 let dynamicHtml = '';
                 for (const [key, value] of Object.entries(p.data_laporan || {})) {
-                    // Abaikan isian bawaan sistem agar tidak muncul dobel
                     if (['id_sasaran', 'tgl_kunjungan', 'catatan', 'is_melahirkan', 'tgl_persalinan', 'nama_sasaran', 'nama_kk', 'nik', 'jenis_kelamin'].includes(key)) continue;
                     
                     let label = key;
-                    // Cek ID pertanyaan di Master Pertanyaan
                     let foundQ = masterPertanyaan.find(mq => String(mq.id_pertanyaan) === String(key));
                     
                     if(foundQ) {
                         label = foundQ.label_pertanyaan;
                     } else {
-                        // Jika format lawas (q_12)
                         if(key.startsWith('q_')) {
                             let qId = key.replace('q_', '');
                             let fQ2 = masterPertanyaan.find(mq => String(mq.id_pertanyaan) === String(qId));
                             if(fQ2) label = fQ2.label_pertanyaan;
-                            else continue; // Abaikan jika tidak dikenali
+                            else continue; 
                         } else {
                             label = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
                         }
@@ -661,6 +728,7 @@ const initDaftarSasaran = async () => {
                     </div>
                 </div>`;
             }).join('');
+        }
 
         kontenDetail.innerHTML = `
             <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #ddd; line-height: 1.4;">
@@ -696,7 +764,9 @@ const initDaftarSasaran = async () => {
                 <div style="font-size: 0.95rem; color: #222;">${r.data_laporan?.alamat || '-'}</div>
             </div>
             
-            <h4 style="margin-bottom: 15px; color: var(--primary); border-bottom: 2px solid #ddd; padding-bottom: 5px;">Riwayat Kunjungan (${riwayat.length})</h4>
+            <h4 style="margin-bottom: 15px; color: var(--primary); border-bottom: 2px solid #ddd; padding-bottom: 5px;">
+                ${r.jenis_sasaran === 'BADUTA' ? '📈 Buku KIA/KKA Digital' : 'Riwayat Kunjungan'} (${riwayat.length})
+            </h4>
             <div style="max-height: 400px; overflow-y: auto; padding-right: 5px;">
                 ${htmlRiwayat}
             </div>
@@ -792,10 +862,8 @@ const initFormPendampingan = async () => {
                 infoBox.style.display = 'none';
             }
 
-            // PANGGIL FORM DINAMIS UNTUK PENDAMPINGAN
             renderPertanyaanDinamis(selJenis.value, 'PENDAMPINGAN', containerQ, masterPertanyaan);
 
-            // LOGIKA TAMBAHAN KHUSUS BUMIL (Apakah Sudah Melahirkan)
             if(sasaranData && sasaranData.jenis_sasaran === 'BUMIL') {
                 const bumilHtml = `
                     <div style="background: #fcf1f6; padding: 15px; border-radius: 8px; border-left: 4px solid #d63384; margin-top: 15px;">
@@ -812,7 +880,6 @@ const initFormPendampingan = async () => {
                         </div>
                     </div>`;
                 
-                // Tambahkan di akhir container (setelah form dinamis)
                 containerQ.insertAdjacentHTML('beforeend', bumilHtml);
                     
                 const isMelahirkanEl = getEl('is_melahirkan');
