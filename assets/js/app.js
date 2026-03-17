@@ -4,6 +4,25 @@ import { downloadMasterData } from './sync.js';
 const getEl = (id) => document.getElementById(id);
 
 // ==========================================
+// 0. INISIALISASI SETTING TAMPILAN
+// ==========================================
+const applySettings = () => {
+    // Terapkan Mode Gelap
+    if(localStorage.getItem('theme') === 'dark') {
+        document.body.style.backgroundColor = '#121212';
+        document.body.style.color = '#ffffff';
+    } else {
+        document.body.style.backgroundColor = '#f0f4f8';
+        document.body.style.color = '#333333';
+    }
+    
+    // Terapkan Ukuran Font
+    let fontSize = localStorage.getItem('fontSize') || '16';
+    document.documentElement.style.fontSize = fontSize + 'px';
+};
+applySettings();
+
+// ==========================================
 // 1. NAVIGASI LAYAR & JARINGAN
 // ==========================================
 const tampilkanLayar = (id) => {
@@ -88,6 +107,7 @@ const renderMenu = (role) => {
     const container = getEl('dynamic-menu-container');
     if (!container) return;
 
+    // MENU DIPERBARUI DENGAN PENGATURAN & BANTUAN
     const menus = [
         { id: 'dashboard', icon: '🏠', label: 'Dashboard' },
         { id: 'registrasi', icon: '📝', label: 'Registrasi Sasaran' },
@@ -95,7 +115,8 @@ const renderMenu = (role) => {
         { id: 'pendampingan', icon: '🤝', label: 'Laporan Pendampingan' },
         { id: 'rekap_bulanan', icon: '📊', label: 'Rekap Bulanan' },
         { id: 'cetak_pdf', icon: '🖨️', label: 'Cetak PDF' },
-        { id: 'ganti_pass', icon: '🔑', label: 'Ganti Password' },
+        { id: 'bantuan', icon: '🆘', label: 'Bantuan & Edukasi' },
+        { id: 'setting', icon: '⚙️', label: 'Pengaturan' },
         { id: 'sync_manual', icon: '🔄', label: 'Sinkronisasi Data' },
         { id: 'reload_app', icon: '🔁', label: 'Muat Ulang Layar' }
     ];
@@ -209,11 +230,10 @@ window.renderKonten = async (target) => {
                 }
                 if (r.jenis_sasaran === 'BUFAS' && r.data_laporan?.tgl_persalinan) {
                     const tglBatas = new Date(r.data_laporan.tgl_persalinan);
-                    tglBatas.setDate(tglBatas.getDate() + 42); // Plus 42 Hari Nifas
+                    tglBatas.setDate(tglBatas.getDate() + 42); 
                     if (hariIni > tglBatas) isAktif = false;
                 }
                 
-                // Dashboard hanya menghitung yg Aktif, jika ingin semua, hapus 'if (isAktif)'
                 if(cReg[r.jenis_sasaran] !== undefined) cReg[r.jenis_sasaran]++; 
             });
 
@@ -270,11 +290,27 @@ window.renderKonten = async (target) => {
     } else if (target === 'cetak_pdf') {
         const tpl = getEl('template-cetak-pdf');
         if(tpl) area.appendChild(tpl.content.cloneNode(true));
-    } else if (target === 'ganti_pass') {
-        const tpl = getEl('template-ganti-pass');
+    
+    // RUTE BARU: PENGATURAN
+    } else if (target === 'setting') {
+        const tpl = getEl('template-setting');
+        if(tpl) {
+            area.appendChild(tpl.content.cloneNode(true));
+            initSetting();
+        }
+
+    // RUTE BARU: BANTUAN
+    } else if (target === 'bantuan') {
+        const tpl = getEl('template-bantuan');
         if(tpl) area.appendChild(tpl.content.cloneNode(true));
-        const formP = getEl('form-ganti-pass');
-        if(formP) formP.onsubmit = (e) => { e.preventDefault(); alert("Permintaan ganti password disimpan."); e.target.reset(); renderKonten('dashboard'); };
+        
+    // RUTE BARU: KALKULATOR
+    } else if (target === 'kalkulator') {
+        const tpl = getEl('template-kalkulator');
+        if(tpl) {
+            area.appendChild(tpl.content.cloneNode(true));
+            initKalkulator();
+        }
     }
 };
 
@@ -369,7 +405,6 @@ const initFormRegistrasi = async () => {
                 else { boxNikah.style.display = 'none'; inputNikah.removeAttribute('required'); inputNikah.value = ''; }
             }
 
-            // MUNCULKAN INPUT TANGGAL PERSALINAN UNTUK REGISTRASI BUFAS BARU
             if(boxSalinReg && inputSalinReg) {
                 if(jenis === 'BUFAS') { boxSalinReg.style.display = 'block'; inputSalinReg.setAttribute('required', 'true'); } 
                 else { boxSalinReg.style.display = 'none'; inputSalinReg.removeAttribute('required'); inputSalinReg.value = ''; }
@@ -435,7 +470,6 @@ const initFormRegistrasi = async () => {
                     jawaban.usia_saat_daftar_tahun = umurTahun;
                     jawaban.usia_saat_daftar_bulan = umurBulan;
                     
-                    // HITUNG USIA IBU SAAT MELAHIRKAN JIKA MENDAFTAR SEBAGAI BUFAS BARU
                     if (jenisSasaran === 'BUFAS' && jawaban.tgl_persalinan) {
                         const tglSalin = new Date(jawaban.tgl_persalinan);
                         let uTahun = tglSalin.getFullYear() - tglLahir.getFullYear();
@@ -498,7 +532,6 @@ const initDaftarSasaran = async () => {
             if (tglNikah < hariIni) { isExpired = true; statusRaw = 'SELESAI'; alasanExpired = 'Sudah Menikah'; }
         }
         
-        // MASA NIFAS BUFAS 42 HARI
         if (r.jenis_sasaran === 'BUFAS' && r.data_laporan && r.data_laporan.tgl_persalinan) {
             const tglBatas = new Date(r.data_laporan.tgl_persalinan);
             tglBatas.setDate(tglBatas.getDate() + 42); 
@@ -679,7 +712,6 @@ const initFormPendampingan = async () => {
                     if (tglNikah < hariIni) return false; 
                 }
 
-                // FILTER BUFAS KEDALUWARSA DI DROPDOWN PENDAMPINGAN
                 if (r.jenis_sasaran === 'BUFAS' && r.data_laporan && r.data_laporan.tgl_persalinan) {
                     const tglBatas = new Date(r.data_laporan.tgl_persalinan);
                     tglBatas.setDate(tglBatas.getDate() + 42);
@@ -810,7 +842,7 @@ const initFormPendampingan = async () => {
 };
 
 // ==========================================
-// 8. FUNGSI REKAP BULANAN
+// 7. FUNGSI REKAP BULANAN
 // ==========================================
 const initRekap = async () => {
     const session = window.currentUser;
@@ -839,7 +871,7 @@ const initRekap = async () => {
             }
             if (r.jenis_sasaran === 'BUFAS' && r.data_laporan?.tgl_persalinan) {
                 const tglBatas = new Date(r.data_laporan.tgl_persalinan);
-                tglBatas.setDate(tglBatas.getDate() + 42); // Plus 42 Hari
+                tglBatas.setDate(tglBatas.getDate() + 42); 
                 if (hariIni > tglBatas) isAktif = false;
             }
             if (isAktif && stats[r.jenis_sasaran]) {
@@ -886,6 +918,105 @@ const initRekap = async () => {
 
     if (getEl('tbody-rekap-kader')) getEl('tbody-rekap-kader').innerHTML = renderTableRows(statsKader);
     if (getEl('tbody-rekap-tim')) getEl('tbody-rekap-tim').innerHTML = renderTableRows(statsTim);
+};
+
+// ==========================================
+// 8. FUNGSI PENGATURAN & KALKULATOR
+// ==========================================
+const initSetting = () => {
+    const session = window.currentUser;
+    if(getEl('set-nama')) getEl('set-nama').value = session.nama;
+    if(getEl('set-id')) getEl('set-id').value = session.username;
+
+    const toggleDark = getEl('toggle-dark-mode');
+    if (toggleDark) {
+        toggleDark.checked = localStorage.getItem('theme') === 'dark';
+        toggleDark.onchange = () => {
+            localStorage.setItem('theme', toggleDark.checked ? 'dark' : 'light');
+            applySettings();
+        };
+    }
+
+    const btnMin = getEl('btn-text-min');
+    const btnPlus = getEl('btn-text-plus');
+    if (btnMin && btnPlus) {
+        btnMin.onclick = () => {
+            let size = parseInt(localStorage.getItem('fontSize') || '16');
+            if (size > 12) { size -= 2; localStorage.setItem('fontSize', size); applySettings(); }
+        };
+        btnPlus.onclick = () => {
+            let size = parseInt(localStorage.getItem('fontSize') || '16');
+            if (size < 24) { size += 2; localStorage.setItem('fontSize', size); applySettings(); }
+        };
+    }
+    
+    const formP = getEl('form-ganti-pass');
+    if(formP) formP.onsubmit = (e) => { e.preventDefault(); alert("Permintaan ganti password disimpan."); e.target.reset(); renderKonten('dashboard'); };
+};
+
+const initKalkulator = () => {
+    const sel = getEl('calc-selector');
+    const boxHPL = getEl('box-calc-hpl');
+    const boxIMT = getEl('box-calc-imt');
+    const boxKKA = getEl('box-calc-kka');
+
+    if (sel) {
+        sel.onchange = () => {
+            boxHPL.style.display = sel.value === 'HPL' ? 'block' : 'none';
+            boxIMT.style.display = sel.value === 'IMT' ? 'block' : 'none';
+            boxKKA.style.display = sel.value === 'KKA' ? 'block' : 'none';
+        };
+    }
+
+    // Kalkulator HPL (Naegele's Rule)
+    if (getEl('btn-hitung-hpl')) {
+        getEl('btn-hitung-hpl').onclick = () => {
+            const hpht = getEl('calc-hpht').value;
+            if (!hpht) { alert('Masukkan HPHT terlebih dahulu'); return; }
+            const d = new Date(hpht);
+            d.setDate(d.getDate() + 7);
+            d.setMonth(d.getMonth() - 3);
+            d.setFullYear(d.getFullYear() + 1);
+            getEl('hasil-hpl').innerHTML = `Perkiraan Lahir:<br><span style="font-size:1.5rem;">${d.toLocaleDateString('id-ID', {day:'numeric', month:'long', year:'numeric'})}</span>`;
+        };
+    }
+
+    // Kalkulator IMT
+    if (getEl('btn-hitung-imt')) {
+        getEl('btn-hitung-imt').onclick = () => {
+            const bb = parseFloat(getEl('calc-bb').value);
+            const tb = parseFloat(getEl('calc-tb').value) / 100;
+            if (!bb || !tb) { alert('Masukkan BB dan TB dengan benar'); return; }
+            
+            const imt = (bb / (tb * tb)).toFixed(1);
+            let status = '', color = '';
+            if (imt < 18.5) { status = 'Kekurangan Berat Badan'; color = '#dc3545'; }
+            else if (imt <= 24.9) { status = 'Normal (Ideal)'; color = '#198754'; }
+            else if (imt <= 29.9) { status = 'Kelebihan Berat Badan'; color = '#fd7e14'; }
+            else { status = 'Obesitas'; color = '#dc3545'; }
+            
+            getEl('hasil-imt').innerHTML = `IMT Anda: <span style="font-size:1.5rem; color:${color};">${imt}</span><br><span style="color:${color};">${status}</span>`;
+        };
+    }
+
+    // Kalkulator KKA Sederhana
+    const selKKA = getEl('calc-usia-kka');
+    if (selKKA) {
+        selKKA.onchange = () => {
+            const val = selKKA.value;
+            let html = '';
+            if (val === '0-3') html = '✅ <b>Target KKA 0-3 Bulan:</b><br>- Menatap wajah ibu saat disusui<br>- Tersenyum membalas senyuman<br>- Menggerakkan tangan & kaki aktif';
+            else if (val === '3-6') html = '✅ <b>Target KKA 3-6 Bulan:</b><br>- Tengkurap dan berbalik sendiri<br>- Meraih benda yang didekatkan<br>- Menoleh ke arah suara';
+            else if (val === '6-12') html = '✅ <b>Target KKA 6-12 Bulan:</b><br>- Duduk sendiri tanpa sandaran<br>- Mengucapkan ma-ma / pa-pa<br>- Mengambil benda kecil (menjumput)';
+            else if (val === '12-24') html = '✅ <b>Target KKA 12-24 Bulan:</b><br>- Berjalan sendiri tanpa jatuh<br>- Menyebutkan 3-6 kata bermakna<br>- Menumpuk 2-4 kubus mainan';
+            
+            if(html) {
+                getEl('hasil-kka').innerHTML = `<div style="background:#e8f4fd; padding:15px; border-radius:8px; border-left:4px solid #0d6efd;">${html}<br><br><i style="font-size:0.75rem; color:#666;">*Jika anak belum bisa melakukan 1 hal di atas, sarankan ke Posyandu/Bidan.</i></div>`;
+            } else {
+                getEl('hasil-kka').innerHTML = '';
+            }
+        };
+    }
 };
 
 // ==========================================
