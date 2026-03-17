@@ -7,7 +7,6 @@ const getEl = (id) => document.getElementById(id);
 // 0. INISIALISASI SETTING TAMPILAN
 // ==========================================
 const applySettings = () => {
-    // Terapkan Mode Gelap
     if(localStorage.getItem('theme') === 'dark') {
         document.body.style.backgroundColor = '#121212';
         document.body.style.color = '#ffffff';
@@ -15,8 +14,6 @@ const applySettings = () => {
         document.body.style.backgroundColor = '#f0f4f8';
         document.body.style.color = '#333333';
     }
-    
-    // Terapkan Ukuran Font
     let fontSize = localStorage.getItem('fontSize') || '16';
     document.documentElement.style.fontSize = fontSize + 'px';
 };
@@ -107,7 +104,6 @@ const renderMenu = (role) => {
     const container = getEl('dynamic-menu-container');
     if (!container) return;
 
-    // MENU DIPERBARUI DENGAN PENGATURAN & BANTUAN
     const menus = [
         { id: 'dashboard', icon: '🏠', label: 'Dashboard' },
         { id: 'registrasi', icon: '📝', label: 'Registrasi Sasaran' },
@@ -290,27 +286,15 @@ window.renderKonten = async (target) => {
     } else if (target === 'cetak_pdf') {
         const tpl = getEl('template-cetak-pdf');
         if(tpl) area.appendChild(tpl.content.cloneNode(true));
-    
-    // RUTE BARU: PENGATURAN
     } else if (target === 'setting') {
         const tpl = getEl('template-setting');
-        if(tpl) {
-            area.appendChild(tpl.content.cloneNode(true));
-            initSetting();
-        }
-
-    // RUTE BARU: BANTUAN
+        if(tpl) { area.appendChild(tpl.content.cloneNode(true)); initSetting(); }
     } else if (target === 'bantuan') {
         const tpl = getEl('template-bantuan');
         if(tpl) area.appendChild(tpl.content.cloneNode(true));
-        
-    // RUTE BARU: KALKULATOR
     } else if (target === 'kalkulator') {
         const tpl = getEl('template-kalkulator');
-        if(tpl) {
-            area.appendChild(tpl.content.cloneNode(true));
-            initKalkulator();
-        }
+        if(tpl) { area.appendChild(tpl.content.cloneNode(true)); initKalkulator(); }
     }
 };
 
@@ -325,6 +309,52 @@ const getKodeKecamatan = (kec) => {
         'SAWAN': 'SWN', 'KUBUTAMBAHAN': 'KBT', 'TEJAKULA': 'TJK'
     };
     return map[kec.toUpperCase()] || "XXX";
+};
+
+// FUNGSI RENDER PERTANYAAN DINAMIS (UPDATE JSON & MODUL)
+const renderPertanyaanDinamis = (jenis, modul, container, questions) => {
+    if (!jenis) { container.innerHTML = ''; return; }
+    
+    // Filter pertanyaan sesuai Modul (REGISTRASI / PENDAMPINGAN) dan Jenis Sasaran (Tepat / UMUM)
+    const filteredQ = questions.filter(q => 
+        String(q.is_active || '').toUpperCase() === 'Y' && 
+        String(q.modul || '').toUpperCase() === modul.toUpperCase() &&
+        (String(q.jenis_sasaran || '').toUpperCase() === 'UMUM' || String(q.jenis_sasaran || '').toUpperCase() === jenis)
+    ).sort((a,b)=> (parseInt(a.urutan)||0) - (parseInt(b.urutan)||0));
+
+    if (filteredQ.length > 0) {
+        let html = `<div style="background: #f8f9fa; padding: 15px; border-radius: 8px; border-top: 4px solid var(--primary); margin-top: 20px;">
+                    <h4 style="margin-top:0; margin-bottom:15px; color:var(--primary); font-size: 1.1rem;">📝 Formulir Kuesioner Lanjutan</h4>`;
+        
+        filteredQ.forEach(q => {
+            let req = String(q.is_required || '').toUpperCase() === 'Y' ? 'required' : '';
+            let markerReq = req ? '<span style="color:red; font-weight:bold;">*</span>' : '';
+            let inputHtml = '';
+            
+            // Baca Tipe Input dan Opsi JSON
+            if(q.tipe_input === 'select') {
+                let opsi = [];
+                try { 
+                    opsi = JSON.parse(q.opsi_json || '[]'); 
+                } catch(e) { console.error("JSON Error", e); }
+                
+                let opsiHtml = opsi.map(o => `<option value="${o}">${o}</option>`).join('');
+                inputHtml = `<select name="${q.id_pertanyaan}" class="form-control" ${req}><option value="">-- Pilih Jawaban --</option>${opsiHtml}</select>`;
+            } else {
+                let pHolder = q.tipe_input === 'number' ? 'Masukkan angka...' : 'Ketik jawaban...';
+                inputHtml = `<input type="${q.tipe_input || 'text'}" name="${q.id_pertanyaan}" class="form-control" placeholder="${pHolder}" ${req}>`;
+            }
+            
+            html += `<div class="form-group" style="margin-bottom: 12px;">
+                        <label style="font-weight:600; color:#444; font-size: 0.9rem;">${q.label_pertanyaan} ${markerReq}</label>
+                        ${inputHtml}
+                     </div>`;
+        });
+        html += `</div>`;
+        container.innerHTML = html;
+    } else { 
+        container.innerHTML = ''; 
+    }
 };
 
 const initFormRegistrasi = async () => {
@@ -383,6 +413,7 @@ const initFormRegistrasi = async () => {
     }
 
     const questions = await getAllData('master_pertanyaan').catch(()=>[]);
+    
     if (selJenis && containerQ) {
         selJenis.onchange = () => {
             const jenis = selJenis.value;
@@ -424,13 +455,8 @@ const initFormRegistrasi = async () => {
                 }
             }
 
-            if (!jenis) { containerQ.innerHTML = ''; return; }
-            
-            const filteredQ = questions.filter(q => String(q.is_active || '').toUpperCase() === 'Y' && (String(q.kategori_sasaran).toUpperCase() === 'UMUM' || String(q.kategori_sasaran).toUpperCase() === jenis)).sort((a,b)=>a.urutan - b.urutan);
-            if (filteredQ.length > 0) {
-                containerQ.innerHTML = `<h4 style="margin-bottom:10px; color:var(--primary);">Pertanyaan Khusus ${jenis}</h4>` + 
-                    filteredQ.map(q => `<div class="form-group"><label>${q.label_pertanyaan}</label><input type="${q.tipe_input || 'text'}" name="q_${q.id_pertanyaan}" class="form-control" required></div>`).join('');
-            } else { containerQ.innerHTML = ''; }
+            // Panggil fungsi render baru untuk REGISTRASI
+            renderPertanyaanDinamis(jenis, 'REGISTRASI', containerQ, questions);
         };
     }
 
@@ -590,20 +616,31 @@ const initDaftarSasaran = async () => {
             riwayat.map(p => {
                 let dynamicHtml = '';
                 for (const [key, value] of Object.entries(p.data_laporan || {})) {
-                    if (['id_sasaran', 'tgl_kunjungan', 'catatan'].includes(key)) continue;
+                    // Abaikan isian bawaan sistem agar tidak muncul dobel
+                    if (['id_sasaran', 'tgl_kunjungan', 'catatan', 'is_melahirkan', 'tgl_persalinan', 'nama_sasaran', 'nama_kk', 'nik', 'jenis_kelamin'].includes(key)) continue;
+                    
                     let label = key;
-                    if(key.startsWith('q_')) {
-                        let qId = key.replace('q_', '');
-                        let foundQ = masterPertanyaan.find(mq => String(mq.id_pertanyaan) === String(qId));
-                        if(foundQ) label = foundQ.label_pertanyaan;
-                        else label = 'Pertanyaan Khusus';
+                    // Cek ID pertanyaan di Master Pertanyaan
+                    let foundQ = masterPertanyaan.find(mq => String(mq.id_pertanyaan) === String(key));
+                    
+                    if(foundQ) {
+                        label = foundQ.label_pertanyaan;
                     } else {
-                        label = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                        // Jika format lawas (q_12)
+                        if(key.startsWith('q_')) {
+                            let qId = key.replace('q_', '');
+                            let fQ2 = masterPertanyaan.find(mq => String(mq.id_pertanyaan) === String(qId));
+                            if(fQ2) label = fQ2.label_pertanyaan;
+                            else continue; // Abaikan jika tidak dikenali
+                        } else {
+                            label = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                        }
                     }
+
                     dynamicHtml += `
                         <div style="margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #eee;">
                             <div style="font-size: 0.75rem; color: #666; font-weight: normal;">${label}</div>
-                            <div style="font-size: 0.9rem; color: #222; font-weight: 500;">${value}</div>
+                            <div style="font-size: 0.9rem; color: #222; font-weight: 500;">${value || '-'}</div>
                         </div>`;
                 }
 
@@ -684,6 +721,7 @@ const initFormPendampingan = async () => {
     const selSasaran = getEl('pend-sasaran');
     const infoBox = getEl('pend-info-sasaran');
     const containerQ = getEl('form-pendampingan-dinamis');
+    const masterPertanyaan = await getAllData('master_pertanyaan').catch(()=>[]);
     
     const antrean = await getAllData('sync_queue').catch(()=>[]);
     const regList = antrean.filter(a => a.tipe_laporan === 'REGISTRASI' && String(a.id_tim) === String(session.id_tim));
@@ -754,26 +792,36 @@ const initFormPendampingan = async () => {
                 infoBox.style.display = 'none';
             }
 
+            // PANGGIL FORM DINAMIS UNTUK PENDAMPINGAN
+            renderPertanyaanDinamis(selJenis.value, 'PENDAMPINGAN', containerQ, masterPertanyaan);
+
+            // LOGIKA TAMBAHAN KHUSUS BUMIL (Apakah Sudah Melahirkan)
             if(sasaranData && sasaranData.jenis_sasaran === 'BUMIL') {
-                containerQ.innerHTML = `
-                    <div class="form-group">
-                        <label style="color:var(--primary);">Apakah Ibu Hamil ini sudah melahirkan?</label>
-                        <select id="is_melahirkan" name="is_melahirkan" class="form-control">
-                            <option value="TIDAK">Belum / Tidak</option>
-                            <option value="YA">Ya, Sudah Melahirkan</option>
-                        </select>
-                    </div>
-                    <div class="form-group hidden" id="box-tgl-lahir">
-                        <label>Tanggal Persalinan</label>
-                        <input type="date" name="tgl_persalinan" class="form-control">
+                const bumilHtml = `
+                    <div style="background: #fcf1f6; padding: 15px; border-radius: 8px; border-left: 4px solid #d63384; margin-top: 15px;">
+                        <div class="form-group" style="margin-bottom: 10px;">
+                            <label style="color:#d63384; font-weight:bold;">Apakah Ibu Hamil ini sudah melahirkan?</label>
+                            <select id="is_melahirkan" name="is_melahirkan" class="form-control">
+                                <option value="TIDAK">Belum / Tidak</option>
+                                <option value="YA">Ya, Sudah Melahirkan</option>
+                            </select>
+                        </div>
+                        <div class="form-group hidden" id="box-tgl-lahir" style="margin-bottom:0;">
+                            <label style="font-weight:bold;">Tanggal Persalinan</label>
+                            <input type="date" name="tgl_persalinan" class="form-control">
+                        </div>
                     </div>`;
+                
+                // Tambahkan di akhir container (setelah form dinamis)
+                containerQ.insertAdjacentHTML('beforeend', bumilHtml);
                     
-                getEl('is_melahirkan').onchange = (e) => {
-                    if(e.target.value === 'YA') getEl('box-tgl-lahir').classList.remove('hidden');
-                    else getEl('box-tgl-lahir').classList.add('hidden');
-                };
-            } else {
-                containerQ.innerHTML = '';
+                const isMelahirkanEl = getEl('is_melahirkan');
+                if(isMelahirkanEl) {
+                    isMelahirkanEl.onchange = (e) => {
+                        if(e.target.value === 'YA') getEl('box-tgl-lahir').classList.remove('hidden');
+                        else getEl('box-tgl-lahir').classList.add('hidden');
+                    };
+                }
             }
         };
     }
@@ -968,7 +1016,6 @@ const initKalkulator = () => {
         };
     }
 
-    // Kalkulator HPL (Naegele's Rule)
     if (getEl('btn-hitung-hpl')) {
         getEl('btn-hitung-hpl').onclick = () => {
             const hpht = getEl('calc-hpht').value;
@@ -981,7 +1028,6 @@ const initKalkulator = () => {
         };
     }
 
-    // Kalkulator IMT
     if (getEl('btn-hitung-imt')) {
         getEl('btn-hitung-imt').onclick = () => {
             const bb = parseFloat(getEl('calc-bb').value);
@@ -999,7 +1045,6 @@ const initKalkulator = () => {
         };
     }
 
-    // Kalkulator KKA Sederhana
     const selKKA = getEl('calc-usia-kka');
     if (selKKA) {
         selKKA.onchange = () => {
