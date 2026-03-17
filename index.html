@@ -243,15 +243,136 @@
             <button class="btn-primary" style="background: #dc3545;" onclick="alert('Fitur cetak PDF akan aktif setelah tersambung ke Server Google.')">⬇️ Download PDF</button>
         </div>
     </template>
-    
-    <template id="template-ganti-pass">
+
+    <template id="template-setting">
         <div class="card animate-fade">
-            <h3 style="margin-bottom: 15px; color: var(--primary);">🔑 Ganti Password</h3>
-            <form id="form-ganti-pass" class="modern-form">
-                <div class="form-group"><label>Password Baru</label><input type="password" id="pass-baru" class="form-control" required></div>
-                <div class="form-group"><label>Konfirmasi Password</label><input type="password" id="pass-konfirm" class="form-control" required></div>
-                <button type="submit" class="btn-primary" style="margin-top: 15px; width:100%;">🔄 Update Password</button>
-            </form>
+            <h3 style="margin-bottom: 20px; color: var(--primary);">⚙️ Pengaturan</h3>
+            
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #ddd;">
+                <h4 style="margin-bottom: 10px; color: #333; font-size: 1rem;">👤 Profil Kader</h4>
+                <div class="form-group"><label>Nama Kader</label><input type="text" id="set-nama" class="form-control" readonly></div>
+                <div class="form-group"><label>ID / Username</label><input type="text" id="set-id" class="form-control" readonly></div>
+                <p style="font-size: 0.75rem; color: #888; margin-top: 5px;">*Perubahan profil utama dilakukan melalui Admin Kecamatan.</p>
+            </div>
+
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #ddd;">
+                <h4 style="margin-bottom: 10px; color: #333; font-size: 1rem;">📱 Tampilan Layar</h4>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <span style="font-weight: bold; color: #555;">Mode Gelap (Malam)</span>
+                    <label class="switch">
+                        <input type="checkbox" id="toggle-dark-mode">
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-weight: bold; color: #555;">Ukuran Teks</span>
+                    <div style="display: flex; gap: 10px;">
+                        <button id="btn-text-min" style="padding: 5px 15px; font-weight:bold; font-size:1.2rem; border-radius:5px; border:1px solid #ccc;">A-</button>
+                        <button id="btn-text-plus" style="padding: 5px 15px; font-weight:bold; font-size:1.2rem; border-radius:5px; border:1px solid #ccc;">A+</button>
+                    </div>
+                </div>
+            </div>
+
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #ddd;">
+                <h4 style="margin-bottom: 10px; color: #333; font-size: 1rem;">🔑 Ganti Password</h4>
+                <form id="form-ganti-pass" class="modern-form">
+                    <div class="form-group"><label>Password Baru</label><input type="password" id="pass-baru" class="form-control" required></div>
+                    <div class="form-group"><label>Konfirmasi Password</label><input type="password" id="pass-konfirm" class="form-control" required></div>
+                    <button type="submit" class="btn-primary" style="margin-top: 10px; width:100%;">🔄 Update Password</button>
+                </form>
+            </div>
+        </div>
+    </template>
+
+    <template id="template-bantuan">
+        <div class="card animate-fade">
+            <h3 style="margin-bottom: 20px; color: var(--primary);">🆘 Bantuan & Edukasi</h3>
+            
+            <div style="display: grid; grid-template-columns: 1fr; gap: 12px;">
+                <div class="menu-item" style="background: #e8f4fd; border-radius: 8px; padding: 15px; border-left: 5px solid #0d6efd; cursor: pointer;" onclick="renderKonten('kalkulator')">
+                    <span style="font-size: 1.5rem; margin-right: 10px;">🧮</span>
+                    <div style="display: inline-block; vertical-align: middle;">
+                        <div style="font-weight: bold; color: #0d6efd;">Kalkulator Cerdas TPK</div>
+                        <div style="font-size: 0.8rem; color: #666;">Hitung HPL, IMT, dan Cek KKA Balita</div>
+                    </div>
+                </div>
+
+                <div class="menu-item" style="background: #e8f4fd; border-radius: 8px; padding: 15px; border-left: 5px solid #0d6efd; cursor: pointer;" onclick="alert('Fitur E-Library akan terhubung ke Server PDF BKKBN.')">
+                    <span style="font-size: 1.5rem; margin-right: 10px;">📚</span>
+                    <div style="display: inline-block; vertical-align: middle;">
+                        <div style="font-weight: bold; color: #0d6efd;">Pojok Edukasi</div>
+                        <div style="font-size: 0.8rem; color: #666;">Buku KIA & Modul Stunting (PDF)</div>
+                    </div>
+                </div>
+
+                <div class="menu-item" style="background: #e8f4fd; border-radius: 8px; padding: 15px; border-left: 5px solid #0d6efd; cursor: pointer;" onclick="alert('Pertanyaan: Bagaimana cara edit data sasaran?\\n\\nJawab: Data yang sudah tersimpan hanya bisa diedit oleh Admin Kecamatan melalui Master Data.')">
+                    <span style="font-size: 1.5rem; margin-right: 10px;">❓</span>
+                    <div style="display: inline-block; vertical-align: middle;">
+                        <div style="font-weight: bold; color: #0d6efd;">Tanya Jawab (FAQ)</div>
+                        <div style="font-size: 0.8rem; color: #666;">Pertanyaan yang sering diajukan Kader</div>
+                    </div>
+                </div>
+
+                <a href="https://chat.whatsapp.com/contohlinkgrup" target="_blank" style="text-decoration: none;">
+                    <div class="menu-item" style="background: #e8ecef; border-radius: 8px; padding: 15px; border-left: 5px solid #198754;">
+                        <span style="font-size: 1.5rem; margin-right: 10px;">💬</span>
+                        <div style="display: inline-block; vertical-align: middle;">
+                            <div style="font-weight: bold; color: #198754;">Gabung Grup WA TPK</div>
+                            <div style="font-size: 0.8rem; color: #666;">Komunitas Kader se-Kabupaten Buleleng</div>
+                        </div>
+                    </div>
+                </a>
+
+                <div class="menu-item" style="background: #fdf3f4; border-radius: 8px; padding: 15px; border-left: 5px solid #dc3545; cursor: pointer;" onclick="alert('Nomor Darurat:\\n1. Ambulans RSUD: (0362) 123456\\n2. Bidan Koordinator: 0812-3456-7890')">
+                    <span style="font-size: 1.5rem; margin-right: 10px;">📞</span>
+                    <div style="display: inline-block; vertical-align: middle;">
+                        <div style="font-weight: bold; color: #dc3545;">Kontak Darurat</div>
+                        <div style="font-size: 0.8rem; color: #666;">Ambulans & Call Center Puskesmas</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <template id="template-kalkulator">
+        <div class="card animate-fade">
+            <button onclick="renderKonten('bantuan')" style="margin-bottom: 15px; background: none; border: none; color: var(--primary); font-weight: bold; cursor: pointer;">⬅️ Kembali ke Bantuan</button>
+            <h3 style="margin-bottom: 20px; color: var(--primary);">🧮 Kalkulator Cerdas</h3>
+            
+            <div style="margin-bottom: 20px;">
+                <select id="calc-selector" class="form-control" style="font-weight: bold; font-size: 1.1rem;">
+                    <option value="HPL">📅 Hitung HPL (Kehamilan)</option>
+                    <option value="IMT">⚖️ Hitung IMT (Gizi Tubuh)</option>
+                    <option value="KKA">👶 Cek KKA (Kembang Anak)</option>
+                </select>
+            </div>
+
+            <div id="box-calc-hpl" style="background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #ddd;">
+                <div class="form-group"><label>Hari Pertama Haid Terakhir (HPHT)</label><input type="date" id="calc-hpht" class="form-control"></div>
+                <button id="btn-hitung-hpl" class="btn-primary" style="width:100%; margin-bottom:10px;">Hitung HPL</button>
+                <div id="hasil-hpl" style="font-weight: bold; color: #d63384; text-align: center; font-size: 1.1rem;"></div>
+            </div>
+
+            <div id="box-calc-imt" style="display: none; background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #ddd;">
+                <div class="form-group"><label>Berat Badan (Kg)</label><input type="number" id="calc-bb" class="form-control" placeholder="Contoh: 55"></div>
+                <div class="form-group"><label>Tinggi Badan (Cm)</label><input type="number" id="calc-tb" class="form-control" placeholder="Contoh: 160"></div>
+                <button id="btn-hitung-imt" class="btn-primary" style="width:100%; margin-bottom:10px;">Hitung Status Gizi</button>
+                <div id="hasil-imt" style="font-weight: bold; text-align: center; font-size: 1.1rem;"></div>
+            </div>
+
+            <div id="box-calc-kka" style="display: none; background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #ddd;">
+                <div class="form-group">
+                    <label>Pilih Usia Anak (Baduta)</label>
+                    <select id="calc-usia-kka" class="form-control">
+                        <option value="">-- Pilih Usia --</option>
+                        <option value="0-3">0 - 3 Bulan</option>
+                        <option value="3-6">3 - 6 Bulan</option>
+                        <option value="6-12">6 - 12 Bulan</option>
+                        <option value="12-24">12 - 24 Bulan</option>
+                    </select>
+                </div>
+                <div id="hasil-kka" style="font-size: 0.9rem; color: #444; line-height: 1.5;"></div>
+            </div>
         </div>
     </template>
 
