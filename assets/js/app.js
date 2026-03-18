@@ -73,7 +73,7 @@ const renderMenu = (role) => {
     const container = getEl('dynamic-menu-container');
     if (!container) return;
 
-    // 🔥 Menu Sinkronisasi Dihapus dari Hamburger
+    // 🔥 Menu Sinkronisasi Dihapus dari Hamburger sesuai instruksi
     const menus = [
         { id: 'dashboard', icon: '🏠', label: 'Dashboard' },
         { id: 'registrasi', icon: '📝', label: 'Registrasi Sasaran' },
@@ -88,6 +88,7 @@ const renderMenu = (role) => {
 
     container.innerHTML = menus.map(m => `<a class="menu-item" data-target="${m.id}"><span class="icon">${m.icon}</span> ${m.label}</a>`).join('') + `<hr><a class="menu-item text-danger" id="btnLogout">🚪 Keluar (Hapus Sesi Lokal)</a>`;
     
+    // Sidebar agar bisa discroll dengan lancar
     container.style.overflowY = 'auto';
     container.style.maxHeight = 'calc(100vh - 180px)'; 
     container.style.paddingBottom = '20px';
@@ -120,7 +121,7 @@ window.mulaiSinkronisasiDashboard = async () => {
     
     if(icon) icon.innerHTML = '⏳';
     if(text) { text.innerHTML = 'SINKRONISASI...'; text.style.color = '#dc3545'; }
-    if(card) card.style.pointerEvents = 'none'; // Cegah klik ganda
+    if(card) card.style.pointerEvents = 'none'; 
     
     if(window.jalankanSinkronisasi) {
         await window.jalankanSinkronisasi();
@@ -149,7 +150,7 @@ window.renderKonten = async (target) => {
                 <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
                     <div class="card" style="text-align:center; padding: 15px 5px; cursor:pointer; border-bottom: 4px solid #0d6efd;" onclick="renderKonten('registrasi')"><div style="font-size: 1.6rem;">📝</div><h3 style="font-size: 0.95rem; margin: 5px 0 0 0;">BARU</h3><p style="font-size: 0.65rem; color: #666; font-weight: bold; margin: 2px 0 0 0;">REGISTRASI</p></div>
                     
-                    <div class="card" id="card-sync-dashboard" style="text-align:center; padding: 15px 5px; cursor:pointer; border-bottom: 4px solid orange; background:#fffdf8;" onclick="mulaiSinkronisasiDashboard()">
+                    <div class="card" id="card-sync-dashboard" style="text-align:center; padding: 15px 5px; cursor:pointer; border-bottom: 4px solid orange; background:#fffdf8;" onclick="window.mulaiSinkronisasiDashboard()">
                         <div id="icon-sync-dash" style="font-size: 1.6rem;">🔄</div>
                         <h3 id="dash-tunda" style="font-size: 1rem; margin: 5px 0 0 0;">0/0</h3>
                         <p id="text-sync-dash" style="font-size: 0.65rem; color: #d63384; font-weight: bold; margin: 2px 0 0 0;">KLIK SINKRON</p>
@@ -359,13 +360,20 @@ const initDaftarSasaran = async () => {
         const fJ = filterJenis ? filterJenis.value : 'ALL'; const fS = filterStatus ? filterStatus.value : 'ALL';
         let filtered = processedList.filter(r => (fJ === 'ALL' || r.jenis_sasaran === fJ) && (fS === 'ALL' || r.statusRaw === fS));
         if (filtered.length === 0) { list.innerHTML = `<div style="text-align:center; padding:20px; color:#999;">Tidak ada sasaran yang sesuai filter.</div>`; } else { 
-            list.innerHTML = filtered.map(r => `
+            // 🔥 PERBAIKAN: Menambahkan Badge Sinkronisasi di Daftar Sasaran
+            list.innerHTML = filtered.map(r => {
+                let syncBadge = r.is_synced ? '<span style="color:#198754; font-size:0.75rem; background:#e8f4fd; padding:2px 6px; border-radius:4px; border:1px solid #198754;">✅ Server</span>' : '<span style="color:#fd7e14; font-size:0.75rem; background:#fff3cd; padding:2px 6px; border-radius:4px; border:1px solid #fd7e14;">⏳ Lokal</span>';
+                return `
                 <div class="sasaran-card" data-id="${r.id}" style="background:${r.isExpired ? '#f8f9fa' : '#fff'}; padding:15px; border-radius:8px; border-left: 4px solid ${r.isExpired ? '#6c757d' : 'var(--primary)'}; opacity: ${r.isExpired ? '0.75' : '1'}; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom:10px;">
                     <div style="font-weight: bold; font-size: 1.15rem; color: #333; text-transform: uppercase;">${r.nama_sasaran || 'Tanpa Nama'}</div>
                     <div style="font-size: 0.95rem; color: #555; font-weight: bold; margin-top: 3px;">${r.textBaris2}</div>
                     <div style="font-size: 0.85rem; color: #666; margin-top: 3px;">📍 ${r.dusun}, ${r.desa}</div>
-                    <div style="font-size: 0.9rem; margin-top: 6px;">${r.labelSelesai}</div>
-                </div>`).join(''); 
+                    <div style="font-size: 0.9rem; margin-top: 8px; display:flex; justify-content:space-between; align-items:center;">
+                        <span>${r.labelSelesai}</span>
+                        ${syncBadge}
+                    </div>
+                </div>`
+            }).join(''); 
         }
         document.querySelectorAll('.sasaran-card').forEach(card => card.onclick = () => showDetail(card.getAttribute('data-id')));
     };
@@ -376,7 +384,7 @@ const initDaftarSasaran = async () => {
         let htmlRiwayat = '';
 
         if (riwayat.length === 0) {
-            htmlRiwayat = '<div style="color:#888; font-size:0.9rem; padding: 15px; background: #f8f9fa; border-radius: 8px; text-align:center; border: 1px dashed #ccc;">Belum ada riwayat kunjungan pendampingan.</div>';
+            htmlRiwayat = '<div style="color:#888; font-size:0.9rem; padding: 15px; background: #fff; border-radius: 8px; text-align:center; border: 1px dashed #ccc;">Belum ada riwayat kunjungan pendampingan.</div>';
         } else if (r.jenis_sasaran === 'BADUTA') {
             htmlRiwayat += `<div style="overflow-x:auto; background: #fff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border: 1px solid #ddd;">
                 <table style="width:100%; border-collapse: collapse; font-size: 0.85rem; text-align:center; min-width:600px;">
@@ -416,14 +424,38 @@ const initDaftarSasaran = async () => {
             }).join('');
         }
 
+        // 🔥 PERBAIKAN: Desain Detail Sasaran (Blok Putih, Font Biru Tua, Tombol Edit, Status Sinkron & Ibu Kandung)
+        let syncStatusHtml = r.is_synced ? '<span style="color:#198754;">✅ Tersinkron (Server)</span>' : '<span style="color:#fd7e14;">⏳ Belum Sinkron (Lokal)</span>';
+
         kontenDetail.innerHTML = `
             <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #ddd; line-height: 1.4;">
-                <div style="font-size: 0.8rem; color: #666;">Nama Sasaran</div><div style="font-size: 1.15rem; font-weight: bold; color: #222; margin-bottom: 12px; text-transform: uppercase;">${r.nama_sasaran || '-'}</div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;"><div><div style="font-size: 0.8rem; color: #666;">ID Sasaran / NIK</div><div style="font-size: 0.95rem; color: #222; font-weight: 500;">${r.id} <br> ${r.data_laporan?.nik || '-'}</div></div><div><div style="font-size: 0.8rem; color: #666;">Kategori</div><div style="font-size: 0.95rem; color: #222; font-weight: bold;">${r.textBaris2}</div></div></div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;"><div><div style="font-size: 0.8rem; color: #666;">Status Pendampingan</div><div style="font-size: 0.95rem;">${r.labelSelesai}</div></div><div><div style="font-size: 0.8rem; color: #666;">Tgl Lahir ${r.jenis_sasaran === 'BUFAS' ? '/ Salin' : ''}</div><div style="font-size: 0.95rem; color: #222;">${r.data_laporan?.tanggal_lahir || '-'} ${r.jenis_sasaran === 'BUFAS' ? '<br>'+(r.data_laporan?.tgl_persalinan || '-') : ''}</div></div></div>
+                <div style="font-size: 0.8rem; color: #666; margin-bottom: 4px;">Nama Sasaran</div>
+                <div style="font-size: 1.15rem; font-weight: bold; color: #0043a8; margin-bottom: 15px; text-transform: uppercase; background: #ffffff; padding: 10px 12px; border-radius: 6px; border: 1px solid #c6c6c6; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                    <span>${r.nama_sasaran || '-'}</span>
+                    <span style="font-size: 0.85rem; color: #0d6efd; cursor: pointer; text-transform: none; font-weight: normal; background: #e8f4fd; padding: 4px 8px; border-radius: 4px;" onclick="alert('Fitur edit sasaran akan segera hadir pada update berikutnya!')">✏️ (edit)</span>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                    <div><div style="font-size: 0.8rem; color: #666;">ID Sasaran / NIK</div><div style="font-size: 0.95rem; color: #222; font-weight: 500;">${r.id} <br> ${r.data_laporan?.nik || '-'}</div></div>
+                    <div><div style="font-size: 0.8rem; color: #666;">Kategori</div><div style="font-size: 0.95rem; color: #222; font-weight: bold;">${r.textBaris2}</div></div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                    <div><div style="font-size: 0.8rem; color: #666;">Status Pendampingan</div><div style="font-size: 0.95rem;">${r.labelSelesai}</div></div>
+                    <div><div style="font-size: 0.8rem; color: #666;">Status Sinkronisasi</div><div style="font-size: 0.95rem; font-weight: bold;">${syncStatusHtml}</div></div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                    <div><div style="font-size: 0.8rem; color: #666;">Tgl Lahir ${r.jenis_sasaran === 'BUFAS' ? '/ Salin' : ''}</div><div style="font-size: 0.95rem; color: #222;">${r.data_laporan?.tanggal_lahir || '-'} ${r.jenis_sasaran === 'BUFAS' ? '<br>'+(r.data_laporan?.tgl_persalinan || '-') : ''}</div></div>
+                    <div><div style="font-size: 0.8rem; color: #666;">Nama KK ${r.jenis_sasaran === 'BADUTA' ? '/ Ibu' : ''}</div><div style="font-size: 0.95rem; color: #222; font-weight: 500;">${r.data_laporan?.nama_kk || '-'} ${r.jenis_sasaran === 'BADUTA' ? '<br>'+(r.data_laporan?.nama_ibu_kandung || '-') : ''}</div></div>
+                </div>
+
                 <div style="font-size: 0.8rem; color: #666;">Alamat</div><div style="font-size: 0.95rem; color: #222;">${r.data_laporan?.alamat || '-'}</div>
             </div>
-            <h4 style="margin-bottom: 15px; color: var(--primary); border-bottom: 2px solid #ddd; padding-bottom: 5px;">${r.jenis_sasaran === 'BADUTA' ? '📈 Buku KIA/KKA Digital' : 'Riwayat Kunjungan'} (${riwayat.length})</h4>
+            
+            <h4 style="margin-bottom: 15px; color: #0043a8; background: #ffffff; padding: 12px; border-radius: 6px; border: 1px solid #c6c6c6; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05); font-weight: 700;">
+                ${r.jenis_sasaran === 'BADUTA' ? '📈 Buku KIA/KKA Digital' : 'Riwayat Kunjungan'} (${riwayat.length})
+            </h4>
             <div style="max-height: 400px; overflow-y: auto; padding-right: 5px;">${htmlRiwayat}</div>`;
         if(modal) modal.style.display = 'block';
     };
@@ -466,7 +498,7 @@ const initFormPendampingan = async () => {
             
             if (infoBox) {
                 infoBox.style.display = 'block';
-                infoBox.innerHTML = `<div style="font-weight:bold; color:#0d6efd; margin-bottom: 8px;">📌 Profil Sasaran</div><table style="width:100%; font-size: 0.85rem;"><tr><td style="width:35%;">Nama</td><td>: <b>${sasaran.nama_sasaran}</b></td></tr><tr><td>NIK</td><td>: ${sasaran.data_laporan?.nik||'-'}</td></tr><tr><td>Umur Daftar</td><td>: ${sasaran.data_laporan?.usia_saat_daftar_tahun||'-'} Thn</td></tr></table>`;
+                infoBox.innerHTML = `<div style="font-weight:bold; color:#0043a8; margin-bottom: 8px; background: #fff; padding: 5px 10px; border-radius: 4px; border: 1px solid #c6c6c6;">📌 Profil Sasaran</div><table style="width:100%; font-size: 0.85rem; background: #fff; padding: 10px; border-radius: 6px; border: 1px solid #ddd;"><tr><td style="width:35%;">Nama</td><td>: <b>${sasaran.nama_sasaran}</b></td></tr><tr><td>NIK</td><td>: ${sasaran.data_laporan?.nik||'-'}</td></tr><tr><td>Umur Daftar</td><td>: ${sasaran.data_laporan?.usia_saat_daftar_tahun||'-'} Thn</td></tr></table>`;
             }
 
             let idInputBB = null, idInputTB = null;
@@ -590,64 +622,29 @@ const initRekap = async () => {
         const regList = data.filter(a => a.tipe_laporan === 'REGISTRASI');
         const pendList = data.filter(a => a.tipe_laporan === 'PENDAMPINGAN');
 
-        const stats = {
-            CATIN: { aktif: 0, pend: 0 }, BUMIL: { aktif: 0, pend: 0 },
-            BUFAS: { aktif: 0, pend: 0 }, BADUTA: { aktif: 0, pend: 0 },
-            TOTAL: { aktif: 0, pend: 0 }
-        };
-
+        const stats = { CATIN: { aktif: 0, pend: 0 }, BUMIL: { aktif: 0, pend: 0 }, BUFAS: { aktif: 0, pend: 0 }, BADUTA: { aktif: 0, pend: 0 }, TOTAL: { aktif: 0, pend: 0 } };
         const hariIni = new Date(); hariIni.setHours(0,0,0,0);
 
         regList.forEach(r => {
             let isAktif = r.status_sasaran !== 'SELESAI';
-            if (r.jenis_sasaran === 'CATIN' && r.data_laporan?.tanggal_pernikahan) {
-                const tglNikah = new Date(r.data_laporan.tanggal_pernikahan);
-                if (tglNikah < hariIni) isAktif = false;
-            }
-            if (r.jenis_sasaran === 'BUFAS' && r.data_laporan?.tgl_persalinan) {
-                const tglBatas = new Date(r.data_laporan.tgl_persalinan);
-                tglBatas.setDate(tglBatas.getDate() + 42); 
-                if (hariIni > tglBatas) isAktif = false;
-            }
-            if (isAktif && stats[r.jenis_sasaran]) {
-                stats[r.jenis_sasaran].aktif++; stats.TOTAL.aktif++;
-            }
+            if (r.jenis_sasaran === 'CATIN' && r.data_laporan?.tanggal_pernikahan) { const tglNikah = new Date(r.data_laporan.tanggal_pernikahan); if (tglNikah < hariIni) isAktif = false; }
+            if (r.jenis_sasaran === 'BUFAS' && r.data_laporan?.tgl_persalinan) { const tglBatas = new Date(r.data_laporan.tgl_persalinan); tglBatas.setDate(tglBatas.getDate() + 42); if (hariIni > tglBatas) isAktif = false; }
+            if (isAktif && stats[r.jenis_sasaran]) { stats[r.jenis_sasaran].aktif++; stats.TOTAL.aktif++; }
         });
 
         pendList.forEach(p => {
             let jenis = p.jenis_sasaran_saat_kunjungan;
-            if (!jenis && p.id_sasaran_ref) {
-                if (p.id_sasaran_ref.startsWith('CTN')) jenis = 'CATIN';
-                else if (p.id_sasaran_ref.startsWith('BML')) jenis = 'BUMIL';
-                else if (p.id_sasaran_ref.startsWith('BFS')) jenis = 'BUFAS';
-                else if (p.id_sasaran_ref.startsWith('BDT')) jenis = 'BADUTA';
-            }
-            if (jenis && stats[jenis]) {
-                stats[jenis].pend++; stats.TOTAL.pend++;
-            }
+            if (!jenis && p.id_sasaran_ref) { if (p.id_sasaran_ref.startsWith('CTN')) jenis = 'CATIN'; else if (p.id_sasaran_ref.startsWith('BML')) jenis = 'BUMIL'; else if (p.id_sasaran_ref.startsWith('BFS')) jenis = 'BUFAS'; else if (p.id_sasaran_ref.startsWith('BDT')) jenis = 'BADUTA'; }
+            if (jenis && stats[jenis]) { stats[jenis].pend++; stats.TOTAL.pend++; }
         });
-
         return stats;
     };
 
-    const statsKader = calculateStats(dataKader);
-    const statsTim = calculateStats(dataTim);
+    const statsKader = calculateStats(dataKader); const statsTim = calculateStats(dataTim);
 
     const renderTableRows = (stats) => {
-        const rows = ['CATIN', 'BUMIL', 'BUFAS', 'BADUTA'].map(j => `
-            <tr style="border-bottom: 1px solid #eee;">
-                <td style="padding: 10px 8px; text-align:left; font-weight:600; color: #444;">${j}</td>
-                <td style="padding: 10px 8px;">${stats[j].aktif}</td>
-                <td style="padding: 10px 8px;">${stats[j].pend}</td>
-            </tr>
-        `).join('');
-        const totalRow = `
-            <tr style="background: #e9ecef; font-weight: bold;">
-                <td style="padding: 12px 8px; text-align:left; color: #222;">TOTAL</td>
-                <td style="padding: 12px 8px; color: var(--primary); font-size: 1.1rem;">${stats.TOTAL.aktif}</td>
-                <td style="padding: 12px 8px; color: #198754; font-size: 1.1rem;">${stats.TOTAL.pend}</td>
-            </tr>
-        `;
+        const rows = ['CATIN', 'BUMIL', 'BUFAS', 'BADUTA'].map(j => `<tr style="border-bottom: 1px solid #eee;"><td style="padding: 10px 8px; text-align:left; font-weight:600; color: #444;">${j}</td><td style="padding: 10px 8px;">${stats[j].aktif}</td><td style="padding: 10px 8px;">${stats[j].pend}</td></tr>`).join('');
+        const totalRow = `<tr style="background: #e9ecef; font-weight: bold;"><td style="padding: 12px 8px; text-align:left; color: #222;">TOTAL</td><td style="padding: 12px 8px; color: var(--primary); font-size: 1.1rem;">${stats.TOTAL.aktif}</td><td style="padding: 12px 8px; color: #198754; font-size: 1.1rem;">${stats.TOTAL.pend}</td></tr>`;
         return rows + totalRow;
     };
 
@@ -660,43 +657,24 @@ const initRekap = async () => {
 // ==========================================
 const initKalkulator = () => {
     const sel = getEl('calc-selector');
-    const boxHPL = getEl('box-calc-hpl');
-    const boxIMT = getEl('box-calc-imt');
-    const boxKKA = getEl('box-calc-kka');
+    const boxHPL = getEl('box-calc-hpl'); const boxIMT = getEl('box-calc-imt'); const boxKKA = getEl('box-calc-kka');
 
-    if (sel) {
-        sel.onchange = () => {
-            boxHPL.style.display = sel.value === 'HPL' ? 'block' : 'none';
-            boxIMT.style.display = sel.value === 'IMT' ? 'block' : 'none';
-            boxKKA.style.display = sel.value === 'KKA' ? 'block' : 'none';
-        };
-    }
+    if (sel) { sel.onchange = () => { boxHPL.style.display = sel.value === 'HPL' ? 'block' : 'none'; boxIMT.style.display = sel.value === 'IMT' ? 'block' : 'none'; boxKKA.style.display = sel.value === 'KKA' ? 'block' : 'none'; }; }
 
     if (getEl('btn-hitung-hpl')) {
         getEl('btn-hitung-hpl').onclick = () => {
-            const hpht = getEl('calc-hpht').value;
-            if (!hpht) { alert('Masukkan HPHT terlebih dahulu'); return; }
-            const d = new Date(hpht);
-            d.setDate(d.getDate() + 7);
-            d.setMonth(d.getMonth() - 3);
-            d.setFullYear(d.getFullYear() + 1);
+            const hpht = getEl('calc-hpht').value; if (!hpht) { alert('Masukkan HPHT terlebih dahulu'); return; }
+            const d = new Date(hpht); d.setDate(d.getDate() + 7); d.setMonth(d.getMonth() - 3); d.setFullYear(d.getFullYear() + 1);
             getEl('hasil-hpl').innerHTML = `Perkiraan Lahir:<br><span style="font-size:1.5rem;">${d.toLocaleDateString('id-ID', {day:'numeric', month:'long', year:'numeric'})}</span>`;
         };
     }
 
     if (getEl('btn-hitung-imt')) {
         getEl('btn-hitung-imt').onclick = () => {
-            const bb = parseFloat(getEl('calc-bb').value);
-            const tb = parseFloat(getEl('calc-tb').value) / 100;
+            const bb = parseFloat(getEl('calc-bb').value); const tb = parseFloat(getEl('calc-tb').value) / 100;
             if (!bb || !tb) { alert('Masukkan BB dan TB dengan benar'); return; }
-            
-            const imt = (bb / (tb * tb)).toFixed(1);
-            let status = '', color = '';
-            if (imt < 18.5) { status = 'Kekurangan Berat Badan'; color = '#dc3545'; }
-            else if (imt <= 24.9) { status = 'Normal (Ideal)'; color = '#198754'; }
-            else if (imt <= 29.9) { status = 'Kelebihan Berat Badan'; color = '#fd7e14'; }
-            else { status = 'Obesitas'; color = '#dc3545'; }
-            
+            const imt = (bb / (tb * tb)).toFixed(1); let status = '', color = '';
+            if (imt < 18.5) { status = 'Kekurangan Berat Badan'; color = '#dc3545'; } else if (imt <= 24.9) { status = 'Normal (Ideal)'; color = '#198754'; } else if (imt <= 29.9) { status = 'Kelebihan Berat Badan'; color = '#fd7e14'; } else { status = 'Obesitas'; color = '#dc3545'; }
             getEl('hasil-imt').innerHTML = `IMT Anda: <span style="font-size:1.5rem; color:${color};">${imt}</span><br><span style="color:${color};">${status}</span>`;
         };
     }
@@ -704,18 +682,9 @@ const initKalkulator = () => {
     const selKKA = getEl('calc-usia-kka');
     if (selKKA) {
         selKKA.onchange = () => {
-            const val = selKKA.value;
-            let html = '';
-            if (val === '0-3') html = '✅ <b>Target KKA 0-3 Bulan:</b><br>- Menatap wajah ibu saat disusui<br>- Tersenyum membalas senyuman<br>- Menggerakkan tangan & kaki aktif';
-            else if (val === '3-6') html = '✅ <b>Target KKA 3-6 Bulan:</b><br>- Tengkurap dan berbalik sendiri<br>- Meraih benda yang didekatkan<br>- Menoleh ke arah suara';
-            else if (val === '6-12') html = '✅ <b>Target KKA 6-12 Bulan:</b><br>- Duduk sendiri tanpa sandaran<br>- Mengucapkan ma-ma / pa-pa<br>- Mengambil benda kecil (menjumput)';
-            else if (val === '12-24') html = '✅ <b>Target KKA 12-24 Bulan:</b><br>- Berjalan sendiri tanpa jatuh<br>- Menyebutkan 3-6 kata bermakna<br>- Menumpuk 2-4 kubus mainan';
-            
-            if(html) {
-                getEl('hasil-kka').innerHTML = `<div style="background:#e8f4fd; padding:15px; border-radius:8px; border-left:4px solid #0d6efd;">${html}<br><br><i style="font-size:0.75rem; color:#666;">*Jika anak belum bisa melakukan 1 hal di atas, sarankan ke Posyandu/Bidan.</i></div>`;
-            } else {
-                getEl('hasil-kka').innerHTML = '';
-            }
+            const val = selKKA.value; let html = '';
+            if (val === '0-3') html = '✅ <b>Target KKA 0-3 Bulan:</b><br>- Menatap wajah ibu saat disusui<br>- Tersenyum membalas senyuman<br>- Menggerakkan tangan & kaki aktif'; else if (val === '3-6') html = '✅ <b>Target KKA 3-6 Bulan:</b><br>- Tengkurap dan berbalik sendiri<br>- Meraih benda yang didekatkan<br>- Menoleh ke arah suara'; else if (val === '6-12') html = '✅ <b>Target KKA 6-12 Bulan:</b><br>- Duduk sendiri tanpa sandaran<br>- Mengucapkan ma-ma / pa-pa<br>- Mengambil benda kecil (menjumput)'; else if (val === '12-24') html = '✅ <b>Target KKA 12-24 Bulan:</b><br>- Berjalan sendiri tanpa jatuh<br>- Menyebutkan 3-6 kata bermakna<br>- Menumpuk 2-4 kubus mainan';
+            if(html) { getEl('hasil-kka').innerHTML = `<div style="background:#e8f4fd; padding:15px; border-radius:8px; border-left:4px solid #0d6efd;">${html}<br><br><i style="font-size:0.75rem; color:#666;">*Jika anak belum bisa melakukan 1 hal di atas, sarankan ke Posyandu/Bidan.</i></div>`; } else { getEl('hasil-kka').innerHTML = ''; }
         };
     }
 };
@@ -731,23 +700,13 @@ const initSetting = () => {
     const toggleDark = getEl('toggle-dark-mode');
     if (toggleDark) {
         toggleDark.checked = localStorage.getItem('theme') === 'dark';
-        toggleDark.onchange = () => {
-            localStorage.setItem('theme', toggleDark.checked ? 'dark' : 'light');
-            applySettings();
-        };
+        toggleDark.onchange = () => { localStorage.setItem('theme', toggleDark.checked ? 'dark' : 'light'); applySettings(); };
     }
     
-    const btnMin = getEl('btn-text-min');
-    const btnPlus = getEl('btn-text-plus');
+    const btnMin = getEl('btn-text-min'); const btnPlus = getEl('btn-text-plus');
     if (btnMin && btnPlus) {
-        btnMin.onclick = () => {
-            let size = parseInt(localStorage.getItem('fontSize') || '16');
-            if (size > 12) { size -= 2; localStorage.setItem('fontSize', size); applySettings(); }
-        };
-        btnPlus.onclick = () => {
-            let size = parseInt(localStorage.getItem('fontSize') || '16');
-            if (size < 24) { size += 2; localStorage.setItem('fontSize', size); applySettings(); }
-        };
+        btnMin.onclick = () => { let size = parseInt(localStorage.getItem('fontSize') || '16'); if (size > 12) { size -= 2; localStorage.setItem('fontSize', size); applySettings(); } };
+        btnPlus.onclick = () => { let size = parseInt(localStorage.getItem('fontSize') || '16'); if (size < 24) { size += 2; localStorage.setItem('fontSize', size); applySettings(); } };
     }
     
     const formP = getEl('form-ganti-pass');
@@ -764,9 +723,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (fLogin) {
         fLogin.onsubmit = async (e) => {
             e.preventDefault(); 
-            const btn = getEl('btn-login-submit');
-            const id = getEl('kader-id').value.trim();
-            const pin = getEl('kader-pin').value.trim();
+            const btn = getEl('btn-login-submit'); const id = getEl('kader-id').value.trim(); const pin = getEl('kader-pin').value.trim();
 
             if (!id || !pin) return;
             if (btn) { btn.disabled = true; btn.innerText = "Memeriksa..."; }
@@ -774,22 +731,13 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 await initDB();
                 const allUsers = await getAllData('master_user').catch(() => []);
-                const user = allUsers.find(u => 
-                    String(u.id_pengguna) === id || String(u.id_user) === id || String(u.username) === id || String(u.id) === id
-                );
+                const user = allUsers.find(u => String(u.id_pengguna) === id || String(u.id_user) === id || String(u.username) === id || String(u.id) === id);
                 
-                if (!user) {
-                    alert("❌ ID Pengguna tidak ditemukan. Pastikan data sudah di-sinkronisasi.");
-                    if (btn) { btn.disabled = false; btn.innerText = "Masuk"; }
-                    return;
-                }
+                if (!user) { alert("❌ ID Pengguna tidak ditemukan. Pastikan data sudah di-sinkronisasi."); if (btn) { btn.disabled = false; btn.innerText = "Masuk"; } return; }
 
                 const pinBenar = String(user.password_awal_ref || user.password || user.pin || "");
                 if (pinBenar === pin) {
-                    let nama = user.nama || user.nama_lengkap || user.username || id;
-                    let role = String(user.role_akses || user.role || 'KADER').toUpperCase();
-                    let ref_id = user.ref_id || user.id_kader || user.nik || '';
-                    let tim = '-', noTim = '-';
+                    let nama = user.nama || user.nama_lengkap || user.username || id; let role = String(user.role_akses || user.role || 'KADER').toUpperCase(); let ref_id = user.ref_id || user.id_kader || user.nik || ''; let tim = '-', noTim = '-';
                     
                     if (role.includes('KADER') && ref_id) {
                         const allKader = await getAllData('master_kader').catch(() => []);
@@ -805,38 +753,23 @@ document.addEventListener('DOMContentLoaded', () => {
                     const ses = { id: 'active_user', username: id, role: role, nama: nama, id_tim: tim, nomor_tim: noTim };
                     await putData('kader_session', ses);
                     
-                    getEl('kader-id').value = ''; getEl('kader-pin').value = '';
-                    masukKeAplikasi(ses);
+                    getEl('kader-id').value = ''; getEl('kader-pin').value = ''; masukKeAplikasi(ses);
                 } else { alert("❌ PIN yang Anda masukkan salah!"); }
-            } catch (err) {
-                console.error("Kesalahan Login:", err);
-                alert("Kesalahan Sistem: " + err.message);
-            } finally { if (btn) { btn.disabled = false; btn.innerText = "Masuk"; } }
+            } catch (err) { console.error("Kesalahan Login:", err); alert("Kesalahan Sistem: " + err.message); } finally { if (btn) { btn.disabled = false; btn.innerText = "Masuk"; } }
         };
     }
 });
 
 window.logout = async () => { 
-    if (confirm("Keluar dari aplikasi? Data sasaran belum sinkron tetap aman di HP.")) { 
-        await deleteData('kader_session', 'active_user'); 
-        location.reload(); 
-    }
+    if (confirm("Keluar dari aplikasi? Data sasaran belum sinkron tetap aman di HP.")) { await deleteData('kader_session', 'active_user'); location.reload(); }
 };
 
 // ==========================================
 // 11. KENDALI MENU HAMBURGER (SIDEBAR)
 // ==========================================
-const btnMenu = getEl('btn-menu');
-const sidebar = getEl('sidebar');
-const overlay = getEl('sidebar-overlay');
+const btnMenu = getEl('btn-menu'); const sidebar = getEl('sidebar'); const overlay = getEl('sidebar-overlay');
 
 if (btnMenu && sidebar && overlay) {
-    btnMenu.addEventListener('click', () => { 
-        sidebar.classList.add('active'); 
-        overlay.classList.add('active'); 
-    });
-    overlay.addEventListener('click', () => { 
-        sidebar.classList.remove('active'); 
-        overlay.classList.remove('active'); 
-    });
+    btnMenu.addEventListener('click', () => { sidebar.classList.add('active'); overlay.classList.add('active'); });
+    overlay.addEventListener('click', () => { sidebar.classList.remove('active'); overlay.classList.remove('active'); });
 }
