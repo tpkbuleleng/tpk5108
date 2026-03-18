@@ -1,5 +1,5 @@
 import { initDB, putData, getDataById, deleteData, getAllData } from './db.js';
-import { downloadMasterData } from './sync.js';
+import { downloadMasterData, uploadData } from './sync.js';
 
 const getEl = (id) => document.getElementById(id);
 
@@ -335,7 +335,7 @@ const renderPertanyaanDinamis = (jenis, modul, container, questions) => {
                 inputHtml = `<select name="${q.id_pertanyaan}" class="form-control" ${req}><option value="">-- Pilih Jawaban --</option>${opsiHtml}</select>`;
             } else {
                 let pHolder = q.tipe_input === 'number' ? 'Masukkan angka...' : 'Ketik jawaban...';
-                inputHtml = `<input type="${q.tipe_input || 'text'}" name="${q.id_pertanyaan}" class="form-control" placeholder="${pHolder}" ${req}>`;
+                inputHtml = `<input type="${q.tipe_input || 'text'}" name="${q.id_pertanyaan}" class="form-control" placeholder="${pHolder}" step="any" ${req}>`;
             }
             
             html += `<div class="form-group" style="margin-bottom: 12px;">
@@ -598,9 +598,6 @@ const initDaftarSasaran = async () => {
             htmlRiwayat = '<div style="color:#888; font-size:0.9rem; padding: 15px; background: #f8f9fa; border-radius: 8px; text-align:center; border: 1px dashed #ccc;">Belum ada riwayat kunjungan pendampingan.</div>';
         
         } else if (r.jenis_sasaran === 'BADUTA') {
-            // ==========================================
-            // KEAJAIBAN BUKU KIA/KKA DIGITAL UNTUK BADUTA
-            // ==========================================
             htmlRiwayat += `<div style="overflow-x:auto; background: #fff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border: 1px solid #ddd;">
                 <table style="width:100%; border-collapse: collapse; font-size: 0.85rem; text-align:center; min-width:600px;">
                     <thead>
@@ -620,7 +617,6 @@ const initDaftarSasaran = async () => {
                 let tglKunjungan = new Date(p.data_laporan?.tgl_kunjungan || p.created_at);
                 let tglLahir = new Date(r.data_laporan?.tanggal_lahir || new Date());
                 
-                // Menghitung umur bulan yang presisi
                 let umurBulan = (tglKunjungan.getFullYear() - tglLahir.getFullYear()) * 12;
                 umurBulan -= tglLahir.getMonth();
                 umurBulan += tglKunjungan.getMonth();
@@ -631,40 +627,28 @@ const initDaftarSasaran = async () => {
                 let catatanLain = `<span style="display:block; margin-bottom:4px;"><b>Hasil Umum:</b> ${p.data_laporan?.catatan || '-'}</span>`;
 
                 for (const [key, value] of Object.entries(p.data_laporan || {})) {
-                    if (['id_sasaran', 'tgl_kunjungan', 'catatan', 'is_melahirkan', 'tgl_persalinan'].includes(key)) continue;
+                    if (['id_sasaran', 'tgl_kunjungan', 'catatan', 'evaluasi_kka'].includes(key)) continue;
                     if (!value) continue;
 
                     let label = key;
                     let foundQ = masterPertanyaan.find(mq => String(mq.id_pertanyaan) === String(key));
                     
-                    if(foundQ) {
-                        label = foundQ.label_pertanyaan.toLowerCase();
-                    } else {
-                        // Coba baca format lawas
-                        if(key.startsWith('q_')) {
-                            let qId = key.replace('q_', '');
-                            let fQ2 = masterPertanyaan.find(mq => String(mq.id_pertanyaan) === String(qId));
-                            if(fQ2) label = fQ2.label_pertanyaan.toLowerCase();
-                            else continue; 
-                        } else {
-                            label = key.toLowerCase();
-                        }
-                    }
+                    if(foundQ) label = foundQ.label_pertanyaan.toLowerCase();
+                    else label = key.toLowerCase();
 
-                    // KECERDASAN BUATAN: Mencocokkan Kata Kunci (Keyword Matching)
                     if (label.includes('berat') || label === 'bb') valBB = value;
                     else if (label.includes('tinggi') || label.includes('panjang') || label.includes('tb') || label.includes('pb')) valTB = value;
                     else if (label.includes('lingkar kepala') || label === 'lk') valLK = value;
                     else if (label.includes('perkembangan') || label.includes('kka') || label.includes('sesuai umur')) valKKA = value;
                     else {
-                        // Jika bukan data KIA utama, masukkan ke kolom Catatan Lainnya
                         catatanLain += `<small style="display:block; border-top: 1px dashed #ccc; padding-top:3px; margin-top:3px;"><b>${foundQ ? foundQ.label_pertanyaan : key}:</b> ${value}</small>`;
                     }
                 }
 
+                // Cek apakah ada asisten KKA yang diisi
+                if (p.data_laporan?.evaluasi_kka) valKKA = p.data_laporan.evaluasi_kka;
+
                 let syncIcon = p.is_synced ? '<span style="color:#198754; font-size:0.7rem;">(Server)</span>' : '<span style="color:#fd7e14; font-size:0.7rem;">(Lokal)</span>';
-                
-                // Warnai merah jika Status KKA tidak sesuai/terlambat
                 let kkaStyle = (valKKA.toLowerCase().includes('terlambat') || valKKA.toLowerCase().includes('tidak')) ? 'color:#dc3545; font-weight:bold;' : 'color:#198754; font-weight:bold;';
 
                 htmlRiwayat += `
@@ -682,7 +666,6 @@ const initDaftarSasaran = async () => {
             htmlRiwayat += `</tbody></table></div>`;
 
         } else {
-            // FORMAT TIMELINE UNTUK SASARAN SELAIN BADUTA
             htmlRiwayat = riwayat.map(p => {
                 let dynamicHtml = '';
                 for (const [key, value] of Object.entries(p.data_laporan || {})) {
@@ -783,7 +766,7 @@ const initDaftarSasaran = async () => {
 };
 
 // ==========================================
-// 6. FORM PENDAMPINGAN 
+// 6. FORM PENDAMPINGAN + ASISTEN KKA OTOMATIS
 // ==========================================
 const initFormPendampingan = async () => {
     const session = window.currentUser;
@@ -864,6 +847,77 @@ const initFormPendampingan = async () => {
 
             renderPertanyaanDinamis(selJenis.value, 'PENDAMPINGAN', containerQ, masterPertanyaan);
 
+            // ==========================================
+            // KEAJAIBAN ASISTEN KKA OTOMATIS (KHUSUS BADUTA)
+            // ==========================================
+            if (sasaranData && sasaranData.jenis_sasaran === 'BADUTA') {
+                const tglLahir = new Date(sasaranData.data_laporan.tanggal_lahir);
+                const tglHariIni = new Date();
+                let umurBulan = (tglHariIni.getFullYear() - tglLahir.getFullYear()) * 12;
+                umurBulan -= tglLahir.getMonth();
+                umurBulan += tglHariIni.getMonth();
+                if (tglHariIni.getDate() < tglLahir.getDate()) umurBulan--;
+                if (umurBulan < 0) umurBulan = 0;
+
+                let kkaTarget = "";
+                let kkaTips = "";
+
+                if (umurBulan <= 3) {
+                    kkaTarget = "1. Menatap wajah ibu<br>2. Tersenyum membalas senyum<br>3. Menggerakkan tangan & kaki aktif";
+                    kkaTips = "Sering tatap mata bayi, ajak tersenyum dan bicara. Gantung mainan berwarna cerah di atasnya.";
+                } else if (umurBulan <= 6) {
+                    kkaTarget = "1. Tengkurap dan berbalik sendiri<br>2. Meraih benda yang didekatkan<br>3. Menoleh ke arah suara";
+                    kkaTips = "Letakkan mainan sedikit di luar jangkauannya saat tengkurap agar anak mau bergerak meraihnya. Panggil namanya dari arah samping.";
+                } else if (umurBulan <= 9) {
+                    kkaTarget = "1. Duduk mandiri tanpa bersandar<br>2. Memungut benda kecil dengan ibu jari & telunjuk (menjumput)<br>3. Mengucapkan ma-ma / pa-pa";
+                    kkaTips = "Beri anak benda kecil yang aman (seperti potongan biskuit) untuk diambil. Ajak bicara dengan artikulasi jelas (ma-ma, pa-pa).";
+                } else if (umurBulan <= 12) {
+                    kkaTarget = "1. Berdiri berpegangan<br>2. Berjalan dengan dituntun<br>3. Menunjuk benda yang diinginkan";
+                    kkaTips = "Bantu anak berdiri dengan menopang tubuhnya atau biarkan berpegangan di kursi kuat. Sering bacakan buku bergambar dan minta anak menunjuk.";
+                } else if (umurBulan <= 18) {
+                    kkaTarget = "1. Berjalan mandiri tanpa jatuh<br>2. Minum sendiri dari gelas tanpa tumpah<br>3. Mencoret-coret dengan alat tulis";
+                    kkaTips = "Sediakan kertas dan krayon/pensil tumpul. Latih kemandirian dengan memberi kesempatan minum dan makan sendiri walau berantakan.";
+                } else {
+                    kkaTarget = "1. Berlari tanpa jatuh<br>2. Menyebut 3-6 kata bermakna<br>3. Menumpuk 2-4 kubus mainan";
+                    kkaTips = "Ajak anak bernyanyi dan menyebut anggota tubuh. Beri mainan balok/kotak aman untuk disusun.";
+                }
+
+                const badutaHtml = `
+                    <div style="background: #e8f4fd; padding: 15px; border-radius: 8px; border-left: 4px solid #0d6efd; margin-top: 15px;">
+                        <h4 style="margin:0 0 10px 0; color:#0d6efd;">🤖 Asisten Cerdas KIA/KKA (Usia: ${umurBulan} Bulan)</h4>
+                        <div style="font-size:0.85rem; margin-bottom:10px;">
+                            <b>Target KKA Bulan Ini:</b><br>${kkaTarget}
+                        </div>
+                        <div class="form-group">
+                            <label style="font-weight:bold;">Apakah anak bisa melakukan SEMUA target di atas?</label>
+                            <select id="kka_eval" name="evaluasi_kka" class="form-control" required>
+                                <option value="">-- Pilih Hasil Evaluasi --</option>
+                                <option value="Sesuai">✅ Ya, Bisa Semua (Sesuai Umur)</option>
+                                <option value="Terlambat">⚠️ Ada yang belum bisa (Terlambat)</option>
+                            </select>
+                        </div>
+                        <div id="kka_tips_box" style="display:none; background:#fff3cd; padding:10px; border-radius:5px; border:1px solid #ffe69c; font-size:0.8rem; margin-top:10px;">
+                            <b style="color:#856404;">💡 Tips Stimulasi Kader:</b><br>
+                            <span style="color:#856404;">${kkaTips}<br><br><i>*Sarankan ibu untuk terus melatih anak di rumah dan wajib konsultasi ke Bidan/Posyandu.</i></span>
+                        </div>
+                        <hr style="border:0; border-top:1px solid #cfe2ff; margin:15px 0;">
+                        <div style="font-size:0.85rem; color:#666;">
+                            <i>*Masukkan angka BB dan TB di form atas untuk deteksi Stunting otomatis (Fitur segera hadir setelah sinkronisasi Antropometri).</i>
+                        </div>
+                    </div>
+                `;
+                
+                containerQ.insertAdjacentHTML('beforeend', badutaHtml);
+
+                const kkaEvalEl = getEl('kka_eval');
+                if(kkaEvalEl) {
+                    kkaEvalEl.onchange = (e) => {
+                        getEl('kka_tips_box').style.display = e.target.value === 'Terlambat' ? 'block' : 'none';
+                    };
+                }
+            }
+
+            // LOGIKA TAMBAHAN KHUSUS BUMIL (Apakah Sudah Melahirkan)
             if(sasaranData && sasaranData.jenis_sasaran === 'BUMIL') {
                 const bumilHtml = `
                     <div style="background: #fcf1f6; padding: 15px; border-radius: 8px; border-left: 4px solid #d63384; margin-top: 15px;">
