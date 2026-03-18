@@ -525,3 +525,21 @@ window.logout = async () => {
         location.reload(); 
     }
 };
+
+// ==========================================
+// 9. KENDALI MENU HAMBURGER (SIDEBAR)
+// ==========================================
+const btnMenu = getEl('btn-menu');
+const sidebar = getEl('sidebar');
+const overlay = getEl('sidebar-overlay');
+
+if (btnMenu && sidebar && overlay) {
+    btnMenu.addEventListener('click', () => { 
+        sidebar.classList.add('active'); 
+        overlay.classList.add('active'); 
+    });
+    overlay.addEventListener('click', () => { 
+        sidebar.classList.remove('active'); 
+        overlay.classList.remove('active'); 
+    });
+}
