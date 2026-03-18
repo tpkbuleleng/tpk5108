@@ -1,37 +1,31 @@
-const DB_NAME = 'TPKBulelengDB';
-const DB_VERSION = 3; // Versi 3: Adaptif terhadap perubahan nama kolom Excel
+const DB_NAME = 'KaderBulelengDB';
+const DB_VERSION = 3; // Naik menjadi versi 3 agar tabel baru tercipta
+const STORES = ['kader_session', 'sync_queue', 'master_user', 'master_kader', 'master_tim', 'master_tim_wilayah', 'master_pertanyaan', 'master_wilayah_bali', 'standar_antropometri', 'master_kembang'];
 
 export const initDB = () => {
     return new Promise((resolve, reject) => {
         const request = indexedDB.open(DB_NAME, DB_VERSION);
-
         request.onupgradeneeded = (e) => {
             const db = e.target.result;
-            
-            if (!db.objectStoreNames.contains('kader_session')) db.createObjectStore('kader_session', { keyPath: 'id_kader' });
-            if (!db.objectStoreNames.contains('sync_queue')) db.createObjectStore('sync_queue', { keyPath: 'id' });
-            
-            // Dibuat autoIncrement agar tidak terikat dengan nama kolom Header Excel
-            if (!db.objectStoreNames.contains('master_user')) db.createObjectStore('master_user', { autoIncrement: true });
-            if (!db.objectStoreNames.contains('master_kader')) db.createObjectStore('master_kader', { autoIncrement: true });
-            if (!db.objectStoreNames.contains('master_tim')) db.createObjectStore('master_tim', { autoIncrement: true });
-            if (!db.objectStoreNames.contains('master_tim_wilayah')) db.createObjectStore('master_tim_wilayah', { autoIncrement: true });
-            if (!db.objectStoreNames.contains('master_pertanyaan')) db.createObjectStore('master_pertanyaan', { autoIncrement: true });
-            if (!db.objectStoreNames.contains('master_wilayah_bali')) db.createObjectStore('master_wilayah_bali', { autoIncrement: true });
+            STORES.forEach(store => {
+                if (!db.objectStoreNames.contains(store)) {
+                    db.createObjectStore(store, { keyPath: 'id', autoIncrement: true });
+                }
+            });
         };
-
         request.onsuccess = () => resolve(request.result);
-        request.onerror = (e) => reject(e.target.error);
+        request.onerror = () => reject(request.error);
     });
 };
 
 export const putData = async (storeName, data) => {
     const db = await initDB();
     return new Promise((resolve, reject) => {
+        if(!data.id) data.id = storeName + '_' + Date.now() + '_' + Math.random();
         const tx = db.transaction(storeName, 'readwrite');
         tx.objectStore(storeName).put(data);
         tx.oncomplete = () => resolve(true);
-        tx.onerror = (e) => reject(e.target.error);
+        tx.onerror = () => reject(tx.error);
     });
 };
 
@@ -41,7 +35,7 @@ export const getDataById = async (storeName, id) => {
         const tx = db.transaction(storeName, 'readonly');
         const req = tx.objectStore(storeName).get(id);
         req.onsuccess = () => resolve(req.result);
-        req.onerror = (e) => reject(e.target.error);
+        req.onerror = () => reject(req.error);
     });
 };
 
@@ -51,7 +45,7 @@ export const getAllData = async (storeName) => {
         const tx = db.transaction(storeName, 'readonly');
         const req = tx.objectStore(storeName).getAll();
         req.onsuccess = () => resolve(req.result);
-        req.onerror = (e) => reject(e.target.error);
+        req.onerror = () => reject(req.error);
     });
 };
 
@@ -61,7 +55,7 @@ export const deleteData = async (storeName, id) => {
         const tx = db.transaction(storeName, 'readwrite');
         tx.objectStore(storeName).delete(id);
         tx.oncomplete = () => resolve(true);
-        tx.onerror = (e) => reject(e.target.error);
+        tx.onerror = () => reject(tx.error);
     });
 };
 
@@ -71,6 +65,6 @@ export const clearStore = async (storeName) => {
         const tx = db.transaction(storeName, 'readwrite');
         tx.objectStore(storeName).clear();
         tx.oncomplete = () => resolve(true);
-        tx.onerror = (e) => reject(e.target.error);
+        tx.onerror = () => reject(tx.error);
     });
 };
