@@ -73,7 +73,6 @@ const renderMenu = (role) => {
     const container = getEl('dynamic-menu-container');
     if (!container) return;
 
-    // 🔥 Menu Sinkronisasi Dihapus dari Hamburger sesuai instruksi
     const menus = [
         { id: 'dashboard', icon: '🏠', label: 'Dashboard' },
         { id: 'registrasi', icon: '📝', label: 'Registrasi Sasaran' },
@@ -88,7 +87,6 @@ const renderMenu = (role) => {
 
     container.innerHTML = menus.map(m => `<a class="menu-item" data-target="${m.id}"><span class="icon">${m.icon}</span> ${m.label}</a>`).join('') + `<hr><a class="menu-item text-danger" id="btnLogout">🚪 Keluar (Hapus Sesi Lokal)</a>`;
     
-    // Sidebar agar bisa discroll dengan lancar
     container.style.overflowY = 'auto';
     container.style.maxHeight = 'calc(100vh - 180px)'; 
     container.style.paddingBottom = '20px';
@@ -104,30 +102,23 @@ const renderMenu = (role) => {
 
     if (getEl('btnLogout')) {
         getEl('btnLogout').onclick = async () => { 
-            if (confirm("🔴 PERINGATAN: Ini akan mengeluarkan Anda dan MENGHAPUS SEMUA DATA UJI COBA (Sasaran & Laporan) di memori HP Anda. Data yang sudah disinkronkan ke server tetap aman.\n\nApakah Anda yakin ingin mereset aplikasi?")) { 
+            if (confirm("🔴 PERINGATAN: Ini akan mengeluarkan Anda dan MENGHAPUS SEMUA DATA UJI COBA (Sasaran & Laporan) di memori HP Anda.\n\nApakah Anda yakin ingin mereset aplikasi?")) { 
                 await clearStore('kader_session'); await clearStore('sync_queue'); location.reload(true); 
             } 
         };
     }
 };
 
-// 🔥 FUNGSI BARU: Pemicu Sinkronisasi dari Dashboard
 window.mulaiSinkronisasiDashboard = async () => {
-    const icon = getEl('icon-sync-dash');
-    const text = getEl('text-sync-dash');
-    const card = getEl('card-sync-dashboard');
-    
+    const icon = getEl('icon-sync-dash'); const text = getEl('text-sync-dash'); const card = getEl('card-sync-dashboard');
     if (!navigator.onLine) { alert("❌ Koneksi internet terputus! Sinkronisasi membutuhkan internet."); return; }
     
     if(icon) icon.innerHTML = '⏳';
     if(text) { text.innerHTML = 'SINKRONISASI...'; text.style.color = '#dc3545'; }
     if(card) card.style.pointerEvents = 'none'; 
     
-    if(window.jalankanSinkronisasi) {
-        await window.jalankanSinkronisasi();
-    } else {
-        alert("Sistem sinkronisasi belum siap. Memuat ulang..."); location.reload();
-    }
+    if(window.jalankanSinkronisasi) { await window.jalankanSinkronisasi(); } 
+    else { alert("Sistem sinkronisasi belum siap. Memuat ulang..."); location.reload(); }
 };
 
 window.renderKonten = async (target) => {
@@ -149,13 +140,9 @@ window.renderKonten = async (target) => {
 
                 <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
                     <div class="card" style="text-align:center; padding: 15px 5px; cursor:pointer; border-bottom: 4px solid #0d6efd;" onclick="renderKonten('registrasi')"><div style="font-size: 1.6rem;">📝</div><h3 style="font-size: 0.95rem; margin: 5px 0 0 0;">BARU</h3><p style="font-size: 0.65rem; color: #666; font-weight: bold; margin: 2px 0 0 0;">REGISTRASI</p></div>
-                    
                     <div class="card" id="card-sync-dashboard" style="text-align:center; padding: 15px 5px; cursor:pointer; border-bottom: 4px solid orange; background:#fffdf8;" onclick="window.mulaiSinkronisasiDashboard()">
-                        <div id="icon-sync-dash" style="font-size: 1.6rem;">🔄</div>
-                        <h3 id="dash-tunda" style="font-size: 1rem; margin: 5px 0 0 0;">0/0</h3>
-                        <p id="text-sync-dash" style="font-size: 0.65rem; color: #d63384; font-weight: bold; margin: 2px 0 0 0;">KLIK SINKRON</p>
+                        <div id="icon-sync-dash" style="font-size: 1.6rem;">🔄</div><h3 id="dash-tunda" style="font-size: 1rem; margin: 5px 0 0 0;">0/0</h3><p id="text-sync-dash" style="font-size: 0.65rem; color: #d63384; font-weight: bold; margin: 2px 0 0 0;">KLIK SINKRON</p>
                     </div>
-                    
                     <div class="card" style="text-align:center; padding: 15px 5px; cursor:pointer; border-bottom: 4px solid #198754;" onclick="renderKonten('pendampingan')"><div style="font-size: 1.6rem;">🤝</div><h3 style="font-size: 0.95rem; margin: 5px 0 0 0;">LAPOR</h3><p style="font-size: 0.65rem; color: #666; font-weight: bold; margin: 2px 0 0 0;">PENDAMPINGAN</p></div>
                 </div>
             </div>`;
@@ -192,7 +179,89 @@ window.renderKonten = async (target) => {
         } catch (e) { console.error(e); }
 
     } else if (target === 'registrasi') {
-        const tpl = getEl('template-registrasi'); if(tpl) { area.appendChild(tpl.content.cloneNode(true)); initFormRegistrasi(); }
+        // 🔥 PERBAIKAN: Form Registrasi dibangun sepenuhnya dari JS
+        area.innerHTML = `
+            <div class="animate-fade">
+                <h3 style="margin-top:0; color:var(--primary); font-size:1.3rem;">📝 Registrasi Sasaran Baru</h3>
+                <form id="form-registrasi" style="background:#fff; padding:15px; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+                    <div class="form-group">
+                        <label style="font-weight:bold;">Jenis Sasaran <span style="color:red">*</span></label>
+                        <select name="jenis_sasaran" id="reg-jenis" class="form-control" required>
+                            <option value="">-- Pilih Jenis Sasaran --</option>
+                            <option value="CATIN">Calon Pengantin (CATIN)</option>
+                            <option value="BUMIL">Ibu Hamil (BUMIL)</option>
+                            <option value="BUFAS">Ibu Nifas (BUFAS)</option>
+                            <option value="BADUTA">Anak Baduta (0-23 Bulan)</option>
+                        </select>
+                    </div>
+                    
+                    <div id="form-core" style="display:none; margin-top:15px;">
+                        <div class="form-group"><label>Nama Sasaran <span style="color:red">*</span></label><input type="text" name="nama_sasaran" class="form-control" required></div>
+                        <div class="form-group"><label>Nama Kepala Keluarga <span style="color:red">*</span></label><input type="text" name="nama_kk" class="form-control" required></div>
+                        <div class="form-group"><label>Nomor KK <span style="color:red">*</span></label><input type="number" name="nomor_kk" class="form-control" required></div>
+                        <div class="form-group"><label>Tanggal Lahir Sasaran <span style="color:red">*</span></label><input type="date" name="tanggal_lahir" class="form-control" required></div>
+                        <div class="form-group"><label>Jenis Kelamin <span style="color:red">*</span></label><select name="jenis_kelamin" id="reg-jk" class="form-control" required><option value="">-- Pilih --</option><option value="Laki-laki">Laki-laki</option><option value="Perempuan">Perempuan</option></select></div>
+                        
+                        <div class="form-group"><label>Sumber Air Minum <span style="color:red">*</span></label>
+                            <select name="sumber_air_minum" class="form-control" required>
+                                <option value="">-- Pilih --</option>
+                                <option value="Air Kemasan / Isi Ulang">Air Kemasan / Isi Ulang</option>
+                                <option value="Ledeng / Pam">Ledeng / Pam</option>
+                                <option value="Sumur Bor / Pompa">Sumur Bor / Pompa</option>
+                                <option value="Sumur Terlindung">Sumur Terlindung</option>
+                                <option value="Sumur Tak Terlindung">Sumur Tak Terlindung</option>
+                                <option value="Mata Air Terlindung">Mata Air Terlindung</option>
+                                <option value="Mata Air Tak Terlindung">Mata Air Tak Terlindung</option>
+                                <option value="Air Permukaan (Sungai/Danau/Waduk/Kolam/Irigasi)">Air Permukaan (Sungai/Danau/Waduk/Kolam/Irigasi)</option>
+                                <option value="Air Hujan">Air Hujan</option>
+                                <option value="Lainnya">Lainnya</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group"><label>Fasilitas BAB <span style="color:red">*</span></label>
+                            <select name="fasilitas_bab" class="form-control" required>
+                                <option value="">-- Pilih --</option>
+                                <option value="Jamban Milik Sendiri Dengan Leher Angsa Dan Tangki Septik / Ipal">Jamban Milik Sendiri Dengan Leher Angsa Dan Tangki Septik / Ipal</option>
+                                <option value="Jamban Pada Mck Komunal Dengan Leher Angsa Dan Tangki Septik / Ipal">Jamban Pada Mck Komunal Dengan Leher Angsa Dan Tangki Septik / Ipal</option>
+                                <option value="Ya Lainnya">Ya Lainnya</option>
+                                <option value="Tidak Ada">Tidak Ada</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group"><label>Kepemilikan Asuransi Kesehatan <span style="color:red">*</span></label>
+                            <select name="asuransi_kesehatan" class="form-control" required>
+                                <option value="">-- Pilih --</option>
+                                <option value="BPJS PBI">BPJS PBI</option>
+                                <option value="BPJS Mandiri">BPJS Mandiri</option>
+                                <option value="Swasta">Swasta</option>
+                                <option value="Tidak Memiliki">Tidak Memiliki</option>
+                            </select>
+                        </div>
+                        
+                        <div id="specific-fields"></div>
+                        
+                        <div id="pertanyaan-dinamis"></div>
+
+                        <div id="wilayah-domisili" style="margin-top:15px; border-top: 1px dashed #ccc; padding-top:15px;">
+                            <div class="form-group"><label>Desa / Kelurahan <span style="color:red">*</span></label><select name="desa" id="reg-desa" class="form-control"></select></div>
+                            <div class="form-group"><label>Dusun / RW <span style="color:red">*</span></label><select name="dusun" id="reg-dusun" class="form-control"></select></div>
+                            <div class="form-group"><label>Alamat Lengkap <span style="color:red">*</span></label><textarea name="alamat" id="reg-alamat" class="form-control" rows="2"></textarea></div>
+                        </div>
+
+                        <div id="wilayah-catin" style="display:none; padding:10px; background:#e8f4fd; border-radius:6px; border:1px solid #b6d4fe; margin-top:15px;">
+                            <label style="font-weight:bold; color:var(--primary); margin-bottom:10px; display:block;">📍 Alamat Domisili Setelah Menikah</label>
+                            <div class="form-group"><label>Kabupaten/Kota</label><select name="catin_kab" id="catin-kab" class="form-control"></select></div>
+                            <div class="form-group"><label>Kecamatan</label><select name="catin_kec" id="catin-kec" class="form-control"></select></div>
+                            <div class="form-group"><label>Desa/Kelurahan</label><select name="catin_desa" id="catin-desa" class="form-control"></select></div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary" style="width:100%; margin-top:15px; font-size:1.1rem; padding:12px;">💾 Simpan Sasaran</button>
+                    </div>
+                </form>
+            </div>
+        `;
+        initFormRegistrasi();
+
     } else if (target === 'daftar_sasaran') {
         const tpl = getEl('template-daftar-sasaran'); if(tpl) { area.appendChild(tpl.content.cloneNode(true)); initDaftarSasaran(); }
     } else if (target === 'pendampingan') {
@@ -215,7 +284,7 @@ window.renderKonten = async (target) => {
 };
 
 // ==========================================
-// 4. LOGIKA FORM DINAMIS & KODE KECAMATAN
+// 4. LOGIKA FORM REGISTRASI
 // ==========================================
 const getKodeKecamatan = (kec) => {
     if (!kec) return "XXX";
@@ -228,9 +297,12 @@ const renderPertanyaanDinamis = (jenis, modul, container, questions) => {
     const filteredQ = questions.filter(q => String(q.is_active || '').toUpperCase() === 'Y' && String(q.modul || '').toUpperCase() === modul.toUpperCase() && (String(q.jenis_sasaran || '').toUpperCase() === 'UMUM' || String(q.jenis_sasaran || '').toUpperCase() === jenis)).sort((a,b)=> (parseInt(a.urutan)||0) - (parseInt(b.urutan)||0));
 
     if (filteredQ.length > 0) {
-        let html = `<div style="background: #f8f9fa; padding: 15px; border-radius: 8px; border-top: 4px solid var(--primary); margin-top: 20px;"><h4 style="margin-top:0; margin-bottom:15px; color:var(--primary); font-size: 1.1rem;">📝 Formulir Kuesioner Lanjutan</h4>`;
+        // 🔥 Judul "Formulir Lanjutan" Dihapus agar menyatu
+        let html = `<div>`;
         filteredQ.forEach(q => {
-            let req = String(q.is_required || '').toUpperCase() === 'Y' ? 'required' : ''; let markerReq = req ? '<span style="color:red; font-weight:bold;">*</span>' : ''; let inputHtml = '';
+            let req = String(q.is_required || '').toUpperCase() === 'Y' ? 'required' : ''; 
+            let markerReq = req ? '<span style="color:red; font-weight:bold;">*</span>' : ''; 
+            let inputHtml = '';
             if(q.tipe_input === 'select') {
                 let opsi = []; try { opsi = JSON.parse(q.opsi_json || '[]'); } catch(e) { }
                 inputHtml = `<select name="${q.id_pertanyaan}" id="${q.id_pertanyaan}" class="form-control" ${req}><option value="">-- Pilih Jawaban --</option>${opsi.map(o => `<option value="${o}">${o}</option>`).join('')}</select>`;
@@ -250,10 +322,9 @@ const initFormRegistrasi = async () => {
     const tugas = allWil.filter(w => String(w.id_tim) === String(session.id_tim));
     
     const selJenis = getEl('reg-jenis'); const containerQ = getEl('pertanyaan-dinamis'); const boxCatin = getEl('wilayah-catin'); const boxDomisili = getEl('wilayah-domisili');
-    const boxIbu = getEl('box-ibu-kandung'); const inputIbu = getEl('input-ibu-kandung'); const boxNikah = getEl('box-tgl-nikah'); const inputNikah = getEl('input-tgl-nikah');
-    const boxSalinReg = getEl('box-tgl-salin-reg'); const inputSalinReg = getEl('input-tgl-salin-reg');
-    const selDesa = getEl('reg-desa'); const selDusun = getEl('reg-dusun'); const regAlamat = getEl('reg-alamat'); const selJk = document.querySelector('select[name="jenis_kelamin"]');
-
+    const selDesa = getEl('reg-desa'); const selDusun = getEl('reg-dusun'); const regAlamat = getEl('reg-alamat'); const selJk = getEl('reg-jk');
+    
+    // Auto-isi Desa/Dusun
     if (selDesa && tugas.length > 0) {
         const dDesa = [...new Set(tugas.map(w => w.desa_kelurahan))].filter(Boolean);
         selDesa.innerHTML = '<option value="">-- Pilih Desa --</option>' + dDesa.map(d => `<option value="${d}">${d}</option>`).join('');
@@ -261,7 +332,6 @@ const initFormRegistrasi = async () => {
     }
 
     const catinKab = getEl('catin-kab'); const catinKec = getEl('catin-kec'); const catinDesa = getEl('catin-desa');
-
     if (catinKab && allWilBali.length > 0) {
         const dKab = [...new Set(allWilBali.map(w => w.kabupaten))].filter(Boolean);
         catinKab.innerHTML = '<option value="">-- Pilih Kabupaten --</option>' + dKab.map(d => `<option value="${d}">${d}</option>`).join('');
@@ -276,26 +346,45 @@ const initFormRegistrasi = async () => {
     }
 
     const questions = await getAllData('master_pertanyaan').catch(()=>[]);
-    if (selJenis && containerQ) {
+    
+    if (selJenis) {
         selJenis.onchange = () => {
             const jenis = selJenis.value;
+            const core = getEl('form-core'); const spec = getEl('specific-fields');
+            
+            if(!jenis) { core.style.display = 'none'; return; }
+            core.style.display = 'block';
+
+            // Auto-lock JK
             if (selJk) { if (jenis === 'BUMIL' || jenis === 'BUFAS') { selJk.value = 'Perempuan'; selJk.style.pointerEvents = 'none'; selJk.style.backgroundColor = '#e9ecef'; } else { selJk.style.pointerEvents = 'auto'; selJk.style.backgroundColor = '#fff'; } }
-            if(boxIbu && inputIbu) { if(jenis === 'BADUTA') { boxIbu.style.display = 'block'; inputIbu.setAttribute('required', 'true'); } else { boxIbu.style.display = 'none'; inputIbu.removeAttribute('required'); inputIbu.value = ''; } }
-            if(boxNikah && inputNikah) { if(jenis === 'CATIN') { boxNikah.style.display = 'block'; inputNikah.setAttribute('required', 'true'); } else { boxNikah.style.display = 'none'; inputNikah.removeAttribute('required'); inputNikah.value = ''; } }
-            if(boxSalinReg && inputSalinReg) { if(jenis === 'BUFAS') { boxSalinReg.style.display = 'block'; inputSalinReg.setAttribute('required', 'true'); } else { boxSalinReg.style.display = 'none'; inputSalinReg.removeAttribute('required'); inputSalinReg.value = ''; } }
+            
+            // 🔥 INJEKSI PERTANYAAN KHUSUS PER SASARAN
+            let htmlSpec = '';
+            if(jenis === 'CATIN') {
+                htmlSpec = `<div class="form-group"><label>Tanggal Rencana Pernikahan <span style="color:red">*</span></label><input type="date" name="tanggal_pernikahan" class="form-control" required></div><div class="form-group"><label>Perkawinan Ke- <span style="color:red">*</span></label><input type="number" name="perkawinan_ke" class="form-control" required></div><div class="form-group"><label>Bekerja di Luar Negeri <span style="color:red">*</span></label><select name="kerja_luar_negeri" class="form-control" required><option value="">-- Pilih --</option><option value="Pernah">Pernah</option><option value="Sedang">Sedang</option><option value="Akan">Akan</option><option value="Tidak">Tidak</option></select></div>`;
+            } else if (jenis === 'BUMIL') {
+                htmlSpec = `<div class="form-group"><label>Kehamilan Ke- <span style="color:red">*</span></label><input type="number" name="kehamilan_ke" class="form-control" required></div><div class="form-group"><label>Keinginan Hamil <span style="color:red">*</span></label><select name="keinginan_hamil" class="form-control" required><option value="">-- Pilih --</option><option value="Ingin Hamil Saat ini">Ingin Hamil Saat ini</option><option value="Ingin Hamil setelah >2 th">Ingin Hamil setelah >2 th</option><option value="Tidak Ingin Hamil Lagi">Tidak Ingin Hamil Lagi</option></select></div>`;
+            } else if (jenis === 'BUFAS') {
+                htmlSpec = `<div class="form-group"><label>Tanggal Persalinan <span style="color:red">*</span></label><input type="date" name="tgl_persalinan" class="form-control" required></div><div class="form-group"><label>Jumlah Anak Kandung <span style="color:red">*</span></label><input type="number" name="jumlah_anak_kandung" class="form-control" required></div>`;
+            } else if (jenis === 'BADUTA') {
+                htmlSpec = `<div class="form-group"><label>Nama Ibu Kandung <span style="color:red">*</span></label><input type="text" name="nama_ibu_kandung" class="form-control" required></div><div class="form-group"><label>Anak Ke- <span style="color:red">*</span></label><input type="number" name="anak_ke" class="form-control" required></div>`;
+            }
+            spec.innerHTML = htmlSpec;
+
+            // Toggle Wilayah Domisili/Catin
             if(boxCatin && boxDomisili) {
                 if (jenis === 'CATIN') {
                     boxCatin.style.display = 'block'; boxDomisili.style.display = 'none';
-                    if(selDesa) selDesa.removeAttribute('required'); if(selDusun) selDusun.removeAttribute('required');
-                    if(regAlamat) regAlamat.removeAttribute('required'); if(catinKab) catinKab.setAttribute('required', 'true');
-                    if(catinKec) catinKec.setAttribute('required', 'true'); if(catinDesa) catinDesa.setAttribute('required', 'true');
+                    if(selDesa) selDesa.removeAttribute('required'); if(selDusun) selDusun.removeAttribute('required'); if(regAlamat) regAlamat.removeAttribute('required');
+                    if(catinKab) catinKab.setAttribute('required', 'true'); if(catinKec) catinKec.setAttribute('required', 'true'); if(catinDesa) catinDesa.setAttribute('required', 'true');
                 } else {
                     boxCatin.style.display = 'none'; boxDomisili.style.display = 'block';
-                    if(selDesa) selDesa.setAttribute('required', 'true'); if(selDusun) selDusun.setAttribute('required', 'true');
-                    if(regAlamat) regAlamat.setAttribute('required', 'true'); if(catinKab) catinKab.removeAttribute('required');
-                    if(catinKec) catinKec.removeAttribute('required'); if(catinDesa) catinDesa.removeAttribute('required');
+                    if(selDesa) selDesa.setAttribute('required', 'true'); if(selDusun) selDusun.setAttribute('required', 'true'); if(regAlamat) regAlamat.setAttribute('required', 'true');
+                    if(catinKab) catinKab.removeAttribute('required'); if(catinKec) catinKec.removeAttribute('required'); if(catinDesa) catinDesa.removeAttribute('required');
                 }
             }
+            
+            // Pertanyaan Tambahan dari Google Sheet
             renderPertanyaanDinamis(jenis, 'REGISTRASI', containerQ, questions);
         };
     }
@@ -360,7 +449,6 @@ const initDaftarSasaran = async () => {
         const fJ = filterJenis ? filterJenis.value : 'ALL'; const fS = filterStatus ? filterStatus.value : 'ALL';
         let filtered = processedList.filter(r => (fJ === 'ALL' || r.jenis_sasaran === fJ) && (fS === 'ALL' || r.statusRaw === fS));
         if (filtered.length === 0) { list.innerHTML = `<div style="text-align:center; padding:20px; color:#999;">Tidak ada sasaran yang sesuai filter.</div>`; } else { 
-            // 🔥 PERBAIKAN: Menambahkan Badge Sinkronisasi di Daftar Sasaran
             list.innerHTML = filtered.map(r => {
                 let syncBadge = r.is_synced ? '<span style="color:#198754; font-size:0.75rem; background:#e8f4fd; padding:2px 6px; border-radius:4px; border:1px solid #198754;">✅ Server</span>' : '<span style="color:#fd7e14; font-size:0.75rem; background:#fff3cd; padding:2px 6px; border-radius:4px; border:1px solid #fd7e14;">⏳ Lokal</span>';
                 return `
@@ -424,7 +512,6 @@ const initDaftarSasaran = async () => {
             }).join('');
         }
 
-        // 🔥 PERBAIKAN: Desain Detail Sasaran (Blok Putih, Font Biru Tua, Tombol Edit, Status Sinkron & Ibu Kandung)
         let syncStatusHtml = r.is_synced ? '<span style="color:#198754;">✅ Tersinkron (Server)</span>' : '<span style="color:#fd7e14;">⏳ Belum Sinkron (Lokal)</span>';
 
         kontenDetail.innerHTML = `
@@ -436,7 +523,7 @@ const initDaftarSasaran = async () => {
                 </div>
                 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
-                    <div><div style="font-size: 0.8rem; color: #666;">ID Sasaran / NIK</div><div style="font-size: 0.95rem; color: #222; font-weight: 500;">${r.id} <br> ${r.data_laporan?.nik || '-'}</div></div>
+                    <div><div style="font-size: 0.8rem; color: #666;">ID / No KK</div><div style="font-size: 0.95rem; color: #222; font-weight: 500;">${r.id} <br> ${r.data_laporan?.nomor_kk || '-'}</div></div>
                     <div><div style="font-size: 0.8rem; color: #666;">Kategori</div><div style="font-size: 0.95rem; color: #222; font-weight: bold;">${r.textBaris2}</div></div>
                 </div>
 
@@ -450,7 +537,7 @@ const initDaftarSasaran = async () => {
                     <div><div style="font-size: 0.8rem; color: #666;">Nama KK ${r.jenis_sasaran === 'BADUTA' ? '/ Ibu' : ''}</div><div style="font-size: 0.95rem; color: #222; font-weight: 500;">${r.data_laporan?.nama_kk || '-'} ${r.jenis_sasaran === 'BADUTA' ? '<br>'+(r.data_laporan?.nama_ibu_kandung || '-') : ''}</div></div>
                 </div>
 
-                <div style="font-size: 0.8rem; color: #666;">Alamat</div><div style="font-size: 0.95rem; color: #222;">${r.data_laporan?.alamat || '-'}</div>
+                <div style="font-size: 0.8rem; color: #666;">Alamat Lengkap</div><div style="font-size: 0.95rem; color: #222;">${r.data_laporan?.alamat || '-'}</div>
             </div>
             
             <h4 style="margin-bottom: 15px; color: #0043a8; background: #ffffff; padding: 12px; border-radius: 6px; border: 1px solid #c6c6c6; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05); font-weight: 700;">
@@ -498,7 +585,8 @@ const initFormPendampingan = async () => {
             
             if (infoBox) {
                 infoBox.style.display = 'block';
-                infoBox.innerHTML = `<div style="font-weight:bold; color:#0043a8; margin-bottom: 8px; background: #fff; padding: 5px 10px; border-radius: 4px; border: 1px solid #c6c6c6;">📌 Profil Sasaran</div><table style="width:100%; font-size: 0.85rem; background: #fff; padding: 10px; border-radius: 6px; border: 1px solid #ddd;"><tr><td style="width:35%;">Nama</td><td>: <b>${sasaran.nama_sasaran}</b></td></tr><tr><td>NIK</td><td>: ${sasaran.data_laporan?.nik||'-'}</td></tr><tr><td>Umur Daftar</td><td>: ${sasaran.data_laporan?.usia_saat_daftar_tahun||'-'} Thn</td></tr></table>`;
+                // 🔥 Blok Profil Sasaran Biru Tua Putih
+                infoBox.innerHTML = `<div style="font-weight:bold; color:#0043a8; margin-bottom: 8px; background: #fff; padding: 6px 12px; border-radius: 6px; border: 1px solid #c6c6c6; text-align:center; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">📌 Profil Sasaran Terpilih</div><table style="width:100%; font-size: 0.85rem; background: #fff; padding: 12px; border-radius: 6px; border: 1px solid #ddd; line-height:1.5;"><tr><td style="width:35%; color:#555;">Nama</td><td>: <b>${sasaran.nama_sasaran}</b></td></tr><tr><td style="color:#555;">No. KK</td><td>: ${sasaran.data_laporan?.nomor_kk||'-'}</td></tr><tr><td style="color:#555;">Umur Daftar</td><td>: ${sasaran.data_laporan?.usia_saat_daftar_tahun||'-'} Tahun</td></tr></table>`;
             }
 
             let idInputBB = null, idInputTB = null;
