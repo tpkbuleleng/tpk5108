@@ -7,24 +7,33 @@ const getEl = (id) => document.getElementById(id);
 // 1. SETTING & NAVIGASI LAYAR
 // ==========================================
 const applySettings = () => {
-    if(localStorage.getItem('theme') === 'dark') { document.body.style.backgroundColor = '#121212'; document.body.style.color = '#ffffff'; } 
-    else { document.body.style.backgroundColor = '#f0f4f8'; document.body.style.color = '#333333'; }
-    let fontSize = localStorage.getItem('fontSize') || '16'; document.documentElement.style.fontSize = fontSize + 'px';
+    if(localStorage.getItem('theme') === 'dark') { 
+        document.body.style.backgroundColor = '#121212'; document.body.style.color = '#ffffff'; 
+    } else { 
+        document.body.style.backgroundColor = '#f0f4f8'; document.body.style.color = '#333333'; 
+    }
+    let fontSize = localStorage.getItem('fontSize') || '16'; 
+    document.documentElement.style.fontSize = fontSize + 'px';
 };
 applySettings();
 
 const tampilkanLayar = (id) => {
     const vSplash = getEl('view-splash'); const vLogin = getEl('view-login'); const vApp = getEl('view-app');
     if (vSplash) { vSplash.classList.remove('active'); vSplash.style.display = 'none'; }
-    if (id === 'login') { if (vLogin) vLogin.classList.remove('hidden'); if (vApp) vApp.classList.add('hidden'); } 
-    else if (id === 'app') { if (vLogin) vLogin.classList.add('hidden'); if (vApp) vApp.classList.remove('hidden'); }
+    if (id === 'login') { 
+        if (vLogin) vLogin.classList.remove('hidden'); if (vApp) vApp.classList.add('hidden'); 
+    } else if (id === 'app') { 
+        if (vLogin) vLogin.classList.add('hidden'); if (vApp) vApp.classList.remove('hidden'); 
+    }
     updateNetworkStatus();
 };
 
 const updateNetworkStatus = () => {
     const status = getEl('network-status');
     if (status) {
-        const isOnline = navigator.onLine; status.innerText = isOnline ? 'Online' : 'Offline'; status.style.backgroundColor = isOnline ? '#198754' : '#6c757d';
+        const isOnline = navigator.onLine; 
+        status.innerText = isOnline ? 'Online' : 'Offline'; 
+        status.style.backgroundColor = isOnline ? '#198754' : '#6c757d';
     }
 };
 
@@ -37,8 +46,15 @@ const initApp = async () => {
         await initDB();
         const session = await getDataById('kader_session', 'active_user').catch(() => null);
         clearTimeout(logoTimeout);
-        if (session) { masukKeAplikasi(session); } 
-        else { tampilkanLayar('login'); if (navigator.onLine) { const users = await getAllData('master_user').catch(() => []); if (users.length === 0) await downloadMasterData(); } }
+        if (session) { 
+            masukKeAplikasi(session); 
+        } else { 
+            tampilkanLayar('login'); 
+            if (navigator.onLine) { 
+                const users = await getAllData('master_user').catch(() => []); 
+                if (users.length === 0) await downloadMasterData(); 
+            } 
+        }
     } catch (err) { clearTimeout(logoTimeout); tampilkanLayar('login'); }
 };
 
@@ -49,35 +65,55 @@ const masukKeAplikasi = async (session) => {
     const namaKec = wilayahKader && wilayahKader.kecamatan ? wilayahKader.kecamatan.toUpperCase() : "BULELENG";
 
     const greeting = getEl('user-greeting');
-    if (greeting) { greeting.innerHTML = `DASHBOARD KADER<br>KECAMATAN ${namaKec}`; greeting.style.textAlign = 'center'; greeting.style.lineHeight = '1.15'; greeting.style.fontSize = '1.05rem'; }
-    
+    if (greeting) { 
+        greeting.innerHTML = `DASHBOARD KADER<br>KECAMATAN ${namaKec}`; 
+        greeting.style.textAlign = 'center'; greeting.style.lineHeight = '1.15'; greeting.style.fontSize = '1.05rem'; 
+    }
+    const hInfo = document.querySelector('.header-info');
+    if (hInfo) {
+        hInfo.style.display = 'flex'; hInfo.style.alignItems = 'center';
+        hInfo.style.gap = '12px'; hInfo.style.flexDirection = 'row-reverse'; 
+    }
+
     if (getEl('sidebar-nama')) getEl('sidebar-nama').innerText = session.nama;
     if (getEl('sidebar-role')) getEl('sidebar-role').innerText = session.role;
     
-    renderMenu(session.role); renderKonten('dashboard'); tampilkanLayar('app');
+    renderMenu(session.role); 
+    renderKonten('dashboard'); 
+    tampilkanLayar('app');
 };
 
 const renderMenu = (role) => {
     const container = getEl('dynamic-menu-container'); if (!container) return;
+    
+    // MENU LENGKAP DIKEMBALIKAN
     const menus = [
-        { id: 'dashboard', icon: '🏠', label: 'Dashboard' }, { id: 'registrasi', icon: '📝', label: 'Registrasi Sasaran' },
-        { id: 'daftar_sasaran', icon: '📋', label: 'Daftar Sasaran' }, { id: 'pendampingan', icon: '🤝', label: 'Laporan Pendampingan' },
-        { id: 'rekap_bulanan', icon: '📊', label: 'Rekap Bulanan' }, { id: 'setting', icon: '⚙️', label: 'Pengaturan' },
+        { id: 'dashboard', icon: '🏠', label: 'Dashboard' }, 
+        { id: 'registrasi', icon: '📝', label: 'Registrasi Sasaran' },
+        { id: 'daftar_sasaran', icon: '📋', label: 'Daftar Sasaran' }, 
+        { id: 'pendampingan', icon: '🤝', label: 'Laporan Pendampingan' },
+        { id: 'rekap_bulanan', icon: '📊', label: 'Rekap Bulanan' }, 
+        { id: 'cetak_pdf', icon: '🖨️', label: 'Cetak PDF' },
+        { id: 'bantuan', icon: '🆘', label: 'Bantuan & Edukasi' },
+        { id: 'setting', icon: '⚙️', label: 'Pengaturan' },
         { id: 'sync_manual', icon: '🔄', label: 'Sinkronisasi Data' }
     ];
+    
     container.innerHTML = menus.map(m => `<a class="menu-item" data-target="${m.id}"><span class="icon">${m.icon}</span> ${m.label}</a>`).join('') + `<hr><a class="menu-item text-danger" id="btnLogout">🚪 Keluar</a>`;
+    
     document.querySelectorAll('.menu-item[data-target]').forEach(item => {
         item.onclick = () => {
             getEl('sidebar').classList.remove('active'); getEl('sidebar-overlay').classList.remove('active');
             const target = item.getAttribute('data-target');
-            if(target === 'sync_manual') { if(window.jalankanSinkronisasi) window.jalankanSinkronisasi(); } else { renderKonten(target); }
+            if(target === 'sync_manual') { if(window.jalankanSinkronisasi) window.jalankanSinkronisasi(); } 
+            else { renderKonten(target); }
         };
     });
     if (getEl('btnLogout')) getEl('btnLogout').onclick = window.logout;
 };
 
 // ==========================================
-// 3. RENDER KONTEN (DASHBOARD)
+// 3. RENDER KONTEN & DASHBOARD
 // ==========================================
 window.renderKonten = async (target) => {
     const area = getEl('content-area'); if (!area) return; area.innerHTML = ''; 
@@ -142,6 +178,10 @@ window.renderKonten = async (target) => {
         const tpl = getEl('template-pendampingan'); if(tpl) { area.appendChild(tpl.content.cloneNode(true)); initFormPendampingan(); }
     } else if (target === 'rekap_bulanan') {
         const tpl = getEl('template-rekap'); if(tpl) { area.appendChild(tpl.content.cloneNode(true)); initRekap(); }
+    } else if (target === 'cetak_pdf') {
+        const tpl = getEl('template-cetak-pdf'); if(tpl) area.appendChild(tpl.content.cloneNode(true));
+    } else if (target === 'bantuan') {
+        const tpl = getEl('template-bantuan'); if(tpl) area.appendChild(tpl.content.cloneNode(true));
     } else if (target === 'setting') {
         const tpl = getEl('template-setting'); if(tpl) { area.appendChild(tpl.content.cloneNode(true)); initSetting(); }
     }
@@ -436,7 +476,7 @@ const initDaftarSasaran = async () => {
 // 7. FUNGSI REKAP & PENGATURAN
 // ==========================================
 const initRekap = async () => { 
-    // Logika Rekap Standar
+    // Logika Rekap Standar Disederhanakan 
 };
 
 const initSetting = () => { 
@@ -463,7 +503,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const fLogin = getEl('form-login');
     if (fLogin) {
         fLogin.onsubmit = async (e) => {
-            e.preventDefault(); // 🛑 MENCEGAH HALAMAN REFRESH OTOMATIS
+            e.preventDefault(); // Mencegah Halaman Ter-refresh
             const btn = getEl('btn-login-submit');
             const id = getEl('kader-id').value.trim();
             const pin = getEl('kader-pin').value.trim();
@@ -475,8 +515,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 await initDB();
                 const allUsers = await getAllData('master_user').catch(() => []);
                 const user = allUsers.find(u => 
-                    String(u.id_pengguna) === id || String(u.id_user) === id || 
-                    String(u.username) === id || String(u.id) === id
+                    String(u.id_pengguna) === id || String(u.id_user) === id || String(u.username) === id || String(u.id) === id
                 );
                 
                 if (!user) {
@@ -496,16 +535,15 @@ document.addEventListener('DOMContentLoaded', () => {
                         const allKader = await getAllData('master_kader').catch(() => []);
                         const k = allKader.find(x => String(x.id_kader) === String(ref_id) || String(x.nik) === String(ref_id));
                         if (k) { 
-                            nama = k.nama_kader || k.nama || nama; 
-                            tim = k.id_tim || k.tim || '-'; 
-                            
+                            nama = k.nama_kader || k.nama || nama; tim = k.id_tim || k.tim || '-'; 
                             const allTim = await getAllData('master_tim').catch(() => []);
                             const t = allTim.find(x => String(x.id_tim) === String(tim) || String(x.id) === String(tim));
                             noTim = t ? (t.nomor_tim || t.nama_tim || tim) : tim;
                         }
                     }
 
-                    const ses = { id_kader: 'active_user', username: id, role: role, nama: nama, id_tim: tim, nomor_tim: noTim };
+                    // SUNTIKAN UTAMA: WAJIB ADA id: 'active_user' agar tidak logout saat refresh
+                    const ses = { id: 'active_user', username: id, role: role, nama: nama, id_tim: tim, nomor_tim: noTim };
                     await putData('kader_session', ses);
                     
                     getEl('kader-id').value = ''; getEl('kader-pin').value = '';
