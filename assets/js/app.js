@@ -73,7 +73,7 @@ const renderMenu = (role) => {
     const container = getEl('dynamic-menu-container');
     if (!container) return;
 
-    // 🔥 PERBAIKAN: Menghapus Kalkulator dari Menu Hamburger Utama
+    // 🔥 Menu Sinkronisasi Dihapus dari Hamburger
     const menus = [
         { id: 'dashboard', icon: '🏠', label: 'Dashboard' },
         { id: 'registrasi', icon: '📝', label: 'Registrasi Sasaran' },
@@ -83,36 +83,49 @@ const renderMenu = (role) => {
         { id: 'cetak_pdf', icon: '🖨️', label: 'Cetak PDF' },
         { id: 'bantuan', icon: '🆘', label: 'Bantuan & Edukasi' },
         { id: 'setting', icon: '⚙️', label: 'Pengaturan' },
-        { id: 'sync_manual', icon: '🔄', label: 'Sinkronisasi Data' },
         { id: 'reload_app', icon: '🔁', label: 'Muat Ulang / Reset Layar' }
     ];
 
     container.innerHTML = menus.map(m => `<a class="menu-item" data-target="${m.id}"><span class="icon">${m.icon}</span> ${m.label}</a>`).join('') + `<hr><a class="menu-item text-danger" id="btnLogout">🚪 Keluar (Hapus Sesi Lokal)</a>`;
     
-    // 🔥 PERBAIKAN: Membuat Container Menu bisa di-scroll
     container.style.overflowY = 'auto';
-    container.style.maxHeight = 'calc(100vh - 180px)'; // Menyisakan ruang untuk header & profil di sidebar
+    container.style.maxHeight = 'calc(100vh - 180px)'; 
     container.style.paddingBottom = '20px';
 
     document.querySelectorAll('.menu-item[data-target]').forEach(item => {
         item.onclick = () => {
             getEl('sidebar').classList.remove('active'); getEl('sidebar-overlay').classList.remove('active');
             const target = item.getAttribute('data-target');
-            if(target === 'sync_manual') { if(window.jalankanSinkronisasi) window.jalankanSinkronisasi(); } 
-            else if (target === 'reload_app') { location.reload(true); } 
+            if (target === 'reload_app') { location.reload(true); } 
             else { renderKonten(target); }
         };
     });
 
-    // 🔥 PERBAIKAN TOTAL RESET: Tombol Keluar sekarang akan mereset memori HP 100%
     if (getEl('btnLogout')) {
         getEl('btnLogout').onclick = async () => { 
             if (confirm("🔴 PERINGATAN: Ini akan mengeluarkan Anda dan MENGHAPUS SEMUA DATA UJI COBA (Sasaran & Laporan) di memori HP Anda. Data yang sudah disinkronkan ke server tetap aman.\n\nApakah Anda yakin ingin mereset aplikasi?")) { 
-                await clearStore('kader_session');
-                await clearStore('sync_queue'); // Hapus antrean lama yang error
-                location.reload(true); 
+                await clearStore('kader_session'); await clearStore('sync_queue'); location.reload(true); 
             } 
         };
+    }
+};
+
+// 🔥 FUNGSI BARU: Pemicu Sinkronisasi dari Dashboard
+window.mulaiSinkronisasiDashboard = async () => {
+    const icon = getEl('icon-sync-dash');
+    const text = getEl('text-sync-dash');
+    const card = getEl('card-sync-dashboard');
+    
+    if (!navigator.onLine) { alert("❌ Koneksi internet terputus! Sinkronisasi membutuhkan internet."); return; }
+    
+    if(icon) icon.innerHTML = '⏳';
+    if(text) { text.innerHTML = 'SINKRONISASI...'; text.style.color = '#dc3545'; }
+    if(card) card.style.pointerEvents = 'none'; // Cegah klik ganda
+    
+    if(window.jalankanSinkronisasi) {
+        await window.jalankanSinkronisasi();
+    } else {
+        alert("Sistem sinkronisasi belum siap. Memuat ulang..."); location.reload();
     }
 };
 
@@ -135,7 +148,13 @@ window.renderKonten = async (target) => {
 
                 <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
                     <div class="card" style="text-align:center; padding: 15px 5px; cursor:pointer; border-bottom: 4px solid #0d6efd;" onclick="renderKonten('registrasi')"><div style="font-size: 1.6rem;">📝</div><h3 style="font-size: 0.95rem; margin: 5px 0 0 0;">BARU</h3><p style="font-size: 0.65rem; color: #666; font-weight: bold; margin: 2px 0 0 0;">REGISTRASI</p></div>
-                    <div class="card" style="text-align:center; padding: 15px 5px; border-bottom: 4px solid orange;"><div style="font-size: 1.6rem;">📦</div><h3 id="dash-tunda" style="font-size: 1rem; margin: 5px 0 0 0;">0/0</h3><p style="font-size: 0.65rem; color: #666; font-weight: bold; margin: 2px 0 0 0;">DATA SINKRON</p></div>
+                    
+                    <div class="card" id="card-sync-dashboard" style="text-align:center; padding: 15px 5px; cursor:pointer; border-bottom: 4px solid orange; background:#fffdf8;" onclick="mulaiSinkronisasiDashboard()">
+                        <div id="icon-sync-dash" style="font-size: 1.6rem;">🔄</div>
+                        <h3 id="dash-tunda" style="font-size: 1rem; margin: 5px 0 0 0;">0/0</h3>
+                        <p id="text-sync-dash" style="font-size: 0.65rem; color: #d63384; font-weight: bold; margin: 2px 0 0 0;">KLIK SINKRON</p>
+                    </div>
+                    
                     <div class="card" style="text-align:center; padding: 15px 5px; cursor:pointer; border-bottom: 4px solid #198754;" onclick="renderKonten('pendampingan')"><div style="font-size: 1.6rem;">🤝</div><h3 style="font-size: 0.95rem; margin: 5px 0 0 0;">LAPOR</h3><p style="font-size: 0.65rem; color: #666; font-weight: bold; margin: 2px 0 0 0;">PENDAMPINGAN</p></div>
                 </div>
             </div>`;
@@ -179,7 +198,7 @@ window.renderKonten = async (target) => {
         const tpl = getEl('template-pendampingan'); if(tpl) { area.appendChild(tpl.content.cloneNode(true)); initFormPendampingan(); }
     } else if (target === 'rekap_bulanan') { 
         const tpl = getEl('template-rekap'); if(tpl) { area.appendChild(tpl.content.cloneNode(true)); initRekap(); }
-    } else if (target === 'kalkulator') { // 🔥 Menu Kalkulator hanya bisa dipanggil dari dalam menu Bantuan & Edukasi
+    } else if (target === 'kalkulator') { 
         const tpl = getEl('template-kalkulator'); if(tpl) { area.appendChild(tpl.content.cloneNode(true)); initKalkulator(); }
     } else if (target === 'cetak_pdf') {
         const tpl = getEl('template-cetak-pdf'); if(tpl) area.appendChild(tpl.content.cloneNode(true));
@@ -189,9 +208,7 @@ window.renderKonten = async (target) => {
         const tpl = getEl('template-bantuan'); 
         if(tpl) { 
             area.appendChild(tpl.content.cloneNode(true)); 
-            // 🔥 Tautkan tombol kalkulator di halaman Bantuan ke renderKonten('kalkulator')
-            const btnCalc = getEl('btn-buka-kalkulator');
-            if(btnCalc) btnCalc.onclick = () => renderKonten('kalkulator');
+            const btnCalc = getEl('btn-buka-kalkulator'); if(btnCalc) btnCalc.onclick = () => renderKonten('kalkulator');
         }
     } 
 };
@@ -212,9 +229,7 @@ const renderPertanyaanDinamis = (jenis, modul, container, questions) => {
     if (filteredQ.length > 0) {
         let html = `<div style="background: #f8f9fa; padding: 15px; border-radius: 8px; border-top: 4px solid var(--primary); margin-top: 20px;"><h4 style="margin-top:0; margin-bottom:15px; color:var(--primary); font-size: 1.1rem;">📝 Formulir Kuesioner Lanjutan</h4>`;
         filteredQ.forEach(q => {
-            let req = String(q.is_required || '').toUpperCase() === 'Y' ? 'required' : '';
-            let markerReq = req ? '<span style="color:red; font-weight:bold;">*</span>' : '';
-            let inputHtml = '';
+            let req = String(q.is_required || '').toUpperCase() === 'Y' ? 'required' : ''; let markerReq = req ? '<span style="color:red; font-weight:bold;">*</span>' : ''; let inputHtml = '';
             if(q.tipe_input === 'select') {
                 let opsi = []; try { opsi = JSON.parse(q.opsi_json || '[]'); } catch(e) { }
                 inputHtml = `<select name="${q.id_pertanyaan}" id="${q.id_pertanyaan}" class="form-control" ${req}><option value="">-- Pilih Jawaban --</option>${opsi.map(o => `<option value="${o}">${o}</option>`).join('')}</select>`;
