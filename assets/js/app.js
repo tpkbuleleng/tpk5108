@@ -435,8 +435,93 @@ const initDaftarSasaran = async () => {
 // ==========================================
 // 7. FUNGSI REKAP & PENGATURAN
 // ==========================================
-const initRekap = async () => { /* LOGIKA STANDAR REKAP - Disederhanakan untuk ruang */ };
-const initSetting = () => { /* LOGIKA STANDAR PENGATURAN */ };
+const initRekap = async () => { 
+    // Logika Rekap Standar
+};
 
-document.addEventListener('DOMContentLoaded', initApp);
-window.logout = async () => { if (confirm("Keluar dari aplikasi?")) { await deleteData('kader_session', 'active_user'); location.reload(); } };
+const initSetting = () => { 
+    const session = window.currentUser;
+    if(getEl('set-nama')) getEl('set-nama').value = session.nama;
+    if(getEl('set-id')) getEl('set-id').value = session.username;
+
+    const toggleDark = getEl('toggle-dark-mode');
+    if (toggleDark) {
+        toggleDark.checked = localStorage.getItem('theme') === 'dark';
+        toggleDark.onchange = () => {
+            localStorage.setItem('theme', toggleDark.checked ? 'dark' : 'light');
+            applySettings();
+        };
+    }
+};
+
+// ==========================================
+// 8. LOGIN PINTAR & INISIALISASI
+// ==========================================
+document.addEventListener('DOMContentLoaded', () => {
+    initApp();
+
+    const fLogin = getEl('form-login');
+    if (fLogin) {
+        fLogin.onsubmit = async (e) => {
+            e.preventDefault(); // 🛑 MENCEGAH HALAMAN REFRESH OTOMATIS
+            const btn = getEl('btn-login-submit');
+            const id = getEl('kader-id').value.trim();
+            const pin = getEl('kader-pin').value.trim();
+
+            if (!id || !pin) return;
+            if (btn) { btn.disabled = true; btn.innerText = "Memeriksa..."; }
+
+            try {
+                await initDB();
+                const allUsers = await getAllData('master_user').catch(() => []);
+                const user = allUsers.find(u => 
+                    String(u.id_pengguna) === id || String(u.id_user) === id || 
+                    String(u.username) === id || String(u.id) === id
+                );
+                
+                if (!user) {
+                    alert("❌ ID Pengguna tidak ditemukan. Pastikan data sudah di-sinkronisasi.");
+                    if (btn) { btn.disabled = false; btn.innerText = "Masuk"; }
+                    return;
+                }
+
+                const pinBenar = String(user.password_awal_ref || user.password || user.pin || "");
+                if (pinBenar === pin) {
+                    let nama = user.nama || user.nama_lengkap || user.username || id;
+                    let role = String(user.role_akses || user.role || 'KADER').toUpperCase();
+                    let ref_id = user.ref_id || user.id_kader || user.nik || '';
+                    let tim = '-', noTim = '-';
+                    
+                    if (role.includes('KADER') && ref_id) {
+                        const allKader = await getAllData('master_kader').catch(() => []);
+                        const k = allKader.find(x => String(x.id_kader) === String(ref_id) || String(x.nik) === String(ref_id));
+                        if (k) { 
+                            nama = k.nama_kader || k.nama || nama; 
+                            tim = k.id_tim || k.tim || '-'; 
+                            
+                            const allTim = await getAllData('master_tim').catch(() => []);
+                            const t = allTim.find(x => String(x.id_tim) === String(tim) || String(x.id) === String(tim));
+                            noTim = t ? (t.nomor_tim || t.nama_tim || tim) : tim;
+                        }
+                    }
+
+                    const ses = { id_kader: 'active_user', username: id, role: role, nama: nama, id_tim: tim, nomor_tim: noTim };
+                    await putData('kader_session', ses);
+                    
+                    getEl('kader-id').value = ''; getEl('kader-pin').value = '';
+                    masukKeAplikasi(ses);
+                } else { alert("❌ PIN yang Anda masukkan salah!"); }
+            } catch (err) {
+                console.error("Kesalahan Login:", err);
+                alert("Kesalahan Sistem: " + err.message);
+            } finally { if (btn) { btn.disabled = false; btn.innerText = "Masuk"; } }
+        };
+    }
+});
+
+window.logout = async () => { 
+    if (confirm("Keluar dari aplikasi? Data sasaran belum sinkron tetap aman di HP.")) { 
+        await deleteData('kader_session', 'active_user'); 
+        location.reload(); 
+    }
+};
