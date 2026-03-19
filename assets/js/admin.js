@@ -1,7 +1,7 @@
 // ==========================================
 // MESIN DASHBOARD ADMIN (EXECUTIVE CONTROL PANEL)
 // ==========================================
-import { deleteData, putData } from './db.js';
+import { deleteData, putData, clearStore } from './db.js';
 
 // 👉 WAJIB SAMAKAN URL INI DENGAN DI SYNC.JS
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzEmmn0wMJmC1OHij9JUxm8EIT2xW1AuV0597EYCWDIxG_nkpZYBPx1EGiNYe6OjEHniw/exec';
@@ -27,6 +27,62 @@ const getNamaKecamatan = (kode) => {
 };
 
 export const initAdmin = async (session) => {
+    const isKabupaten = session.role.toUpperCase().includes('KAB');
+    const textToScan = `${session.kecamatan || ''} ${session.username || ''} ${session.nama || ''}`;
+    let kodeKec = getKodeKecamatan(textToScan);
+
+    // 🛑 SOLUSI ANTI INFINITE LOOP: Tampilkan Layar Pemilihan Wilayah Jika Gagal Deteksi
+    if (!isKabupaten && !kodeKec) {
+        document.body.innerHTML = `
+            <div style="display:flex; height:100vh; width:100vw; background:#f4f6f9; align-items:center; justify-content:center; font-family: 'Segoe UI', sans-serif;">
+                <div style="background:white; padding:30px; border-radius:8px; box-shadow:0 4px 15px rgba(0,0,0,0.1); text-align:center; max-width:400px; width:90%;">
+                    <div style="font-size: 3rem; margin-bottom:10px;">📍</div>
+                    <h3 style="color:#0043a8; margin-top:0;">Pilih Wilayah Tugas</h3>
+                    <p style="color:#666; font-size:0.9rem; margin-bottom:20px;">Sistem tidak dapat mendeteksi kecamatan dari akun Anda. Silakan pilih wilayah Anda secara manual:</p>
+                    <select id="manual-kec-select" style="width:100%; padding:12px; border:1px solid #ccc; border-radius:6px; margin-bottom:20px; font-weight:bold; color:#333;">
+                        <option value="">-- Pilih Kecamatan Anda --</option>
+                        <option value="GRK">KEC. GEROKGAK</option>
+                        <option value="SRT">KEC. SERIRIT</option>
+                        <option value="BSB">KEC. BUSUNGBIU</option>
+                        <option value="BJR">KEC. BANJAR</option>
+                        <option value="SKS">KEC. SUKASADA</option>
+                        <option value="BLL">KEC. BULELENG</option>
+                        <option value="SWN">KEC. SAWAN</option>
+                        <option value="KBT">KEC. KUBUTAMBAHAN</option>
+                        <option value="TJK">KEC. TEJAKULA</option>
+                    </select>
+                    <div style="display:flex; gap:10px;">
+                        <button id="btn-manual-logout" style="flex:1; padding:12px; border:none; background:#dc3545; color:white; border-radius:6px; cursor:pointer; font-weight:bold;">Batal / Keluar</button>
+                        <button id="btn-manual-lanjut" style="flex:1; padding:12px; border:none; background:#198754; color:white; border-radius:6px; cursor:pointer; font-weight:bold;">Masuk Ruang Kontrol</button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.getElementById('btn-manual-logout').onclick = async () => {
+            await clearStore('kader_session'); // Hapus sesi yang error
+            window.location.reload(); // Kembali ke menu login awal
+        };
+
+        document.getElementById('btn-manual-lanjut').onclick = async () => {
+            const val = document.getElementById('manual-kec-select').value;
+            if(!val) { alert('⚠️ Silakan pilih kecamatan terlebih dahulu!'); return; }
+            
+            // Simpan pilihan ke dalam memori agar tidak ditanya lagi saat Refresh (F5)
+            session.kecamatan = getNamaKecamatan(val);
+            await putData('kader_session', session);
+            
+            // Panggil ulang fungsi initAdmin, sekarang dengan kecamatan yang valid
+            initAdmin(session); 
+        };
+
+        return; // Hentikan eksekusi di sini agar tidak memuat Dashboard kosong
+    }
+
+    // JIKA KECAMATAN SUDAH JELAS, LANJUTKAN SEPERTI BIASA
+    session.finalKodeKec = kodeKec;
+    session.finalNamaKec = getNamaKecamatan(kodeKec);
+
     // 1. Tampilkan Splash Screen Bawaan
     const vSplash = document.getElementById('view-splash');
     const vLogin = document.getElementById('view-login');
@@ -46,31 +102,7 @@ export const initAdmin = async (session) => {
         document.head.appendChild(script);
     }
 
-    // 2. Ekstraksi Kecamatan Kuat dengan Fitur Penyelamat (Fallback)
-    const isKabupaten = session.role.toUpperCase().includes('KAB');
-    const textToScan = `${session.kecamatan || ''} ${session.username || ''} ${session.nama || ''}`;
-    let kodeKec = getKodeKecamatan(textToScan);
-    
-    // 🔥 JIKA SISTEM GAGAL MENEBAK, TANYAKAN LANGSUNG KE ADMIN
-    if (!isKabupaten && !kodeKec) {
-        const inputManual = prompt("Sistem tidak mendeteksi wilayah dari akun Anda.\nSilakan ketik nama Kecamatan Anda (contoh: SAWAN, SERIRIT, dll):");
-        kodeKec = getKodeKecamatan(inputManual || "");
-        
-        if(!kodeKec) {
-            alert("❌ Login dibatalkan karena wilayah kecamatan tidak valid.");
-            await deleteData('kader_session', 'active_user'); // Hapus sesi
-            location.reload(); return;
-        }
-        
-        // Simpan pilihan ke dalam memori agar tidak ditanya lagi saat Refresh (F5)
-        session.kecamatan = getNamaKecamatan(kodeKec);
-        await putData('kader_session', session);
-    }
-
-    session.finalKodeKec = kodeKec;
-    session.finalNamaKec = getNamaKecamatan(kodeKec);
-
-    // 3. Tarik Data Segar dari Server
+    // 2. Tarik Data Segar dari Server
     try {
         const url = `${SCRIPT_URL}?action=getAdminData&role=${session.role}&kecamatan=${kodeKec}`;
         const response = await fetch(url);
@@ -86,7 +118,8 @@ export const initAdmin = async (session) => {
             
             setTimeout(() => { if(vSplash) vSplash.style.display = 'none'; renderAdminUI(session); }, 800); 
         } else {
-            alert("❌ Gagal memuat data dari server: " + res.message); location.reload();
+            alert("❌ Gagal memuat data dari server: " + res.message); 
+            await clearStore('kader_session'); location.reload();
         }
     } catch(e) {
         alert("❌ Koneksi terputus. Pastikan internet stabil."); location.reload();
@@ -143,7 +176,7 @@ const renderAdminUI = (session) => {
         </style>
     `;
 
-    document.getElementById('btn-admin-logout').onclick = async () => { if(confirm("Keluar dari Dashboard Admin?")) { await deleteData('kader_session', 'active_user'); location.reload(); } };
+    document.getElementById('btn-admin-logout').onclick = async () => { if(confirm("Keluar dari Dashboard Admin?")) { await clearStore('kader_session'); location.reload(); } };
 
     const menuItems = document.querySelectorAll('.admin-menu-item');
     menuItems.forEach(item => {
