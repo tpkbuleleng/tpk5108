@@ -1,22 +1,26 @@
 import { initDB, putData, getDataById, deleteData, getAllData, clearStore } from './db.js';
 import { downloadMasterData, uploadData } from './sync.js';
-import { initAdmin } from './admin.js'; // 👈 TAMBAHKAN BARIS INI
+import { initAdmin } from './admin.js'; // 🔥 WAJIB ADA UNTUK ROUTING ADMIN
 
 const getEl = (id) => document.getElementById(id);
-
-// Variabel Global untuk Mode Edit
-window.editModeData = null;
 
 // ==========================================
 // 0. INISIALISASI SETTING TAMPILAN
 // ==========================================
 const applySettings = () => {
-    if(localStorage.getItem('theme') === 'dark') { document.body.style.backgroundColor = '#121212'; document.body.style.color = '#ffffff'; } 
-    else { document.body.style.backgroundColor = '#f0f4f8'; document.body.style.color = '#333333'; }
-    let fontSize = localStorage.getItem('fontSize') || '16'; document.documentElement.style.fontSize = fontSize + 'px';
+    if(localStorage.getItem('theme') === 'dark') {
+        document.body.style.backgroundColor = '#121212'; document.body.style.color = '#ffffff';
+    } else {
+        document.body.style.backgroundColor = '#f0f4f8'; document.body.style.color = '#333333';
+    }
+    let fontSize = localStorage.getItem('fontSize') || '16';
+    document.documentElement.style.fontSize = fontSize + 'px';
 };
 applySettings();
 
+// ==========================================
+// 1. NAVIGASI LAYAR & JARINGAN
+// ==========================================
 const tampilkanLayar = (id) => {
     const vSplash = getEl('view-splash'); const vLogin = getEl('view-login'); const vApp = getEl('view-app');
     if (vSplash) { vSplash.classList.remove('active'); vSplash.style.display = 'none'; }
@@ -27,16 +31,33 @@ const tampilkanLayar = (id) => {
 
 const updateNetworkStatus = () => {
     const status = getEl('network-status');
-    if (status) { const isOnline = navigator.onLine; status.innerText = isOnline ? 'Online' : 'Offline'; status.style.backgroundColor = isOnline ? '#198754' : '#6c757d'; }
+    if (status) {
+        const isOnline = navigator.onLine; status.innerText = isOnline ? 'Online' : 'Offline'; status.style.backgroundColor = isOnline ? '#198754' : '#6c757d';
+    }
 };
 
+// ==========================================
+// 2. INISIALISASI APLIKASI & ROUTER (ANTI-F5)
+// ==========================================
 const initApp = async () => {
     const logoTimeout = setTimeout(() => { tampilkanLayar('login'); }, 3500);
     try {
-        await initDB(); const session = await getDataById('kader_session', 'active_user').catch(() => null);
+        await initDB();
+        const session = await getDataById('kader_session', 'active_user').catch(() => null);
         clearTimeout(logoTimeout);
-        if (session) { masukKeAplikasi(session); } 
-        else { tampilkanLayar('login'); if (navigator.onLine) { const users = await getAllData('master_user').catch(() => []); if (users.length === 0) await downloadMasterData(); } }
+        
+        if (session) { 
+            // 🔥 LOGIKA PERCABANGAN (ANTI-F5): Cek Role Saat Refresh
+            if (session.role && session.role.includes('ADMIN')) {
+                initAdmin(session); // Lempar ke Dashboard Eksekutif
+            } else {
+                masukKeAplikasi(session); // Lempar ke Layar HP Kader
+            }
+        } 
+        else { 
+            tampilkanLayar('login'); 
+            if (navigator.onLine) { const users = await getAllData('master_user').catch(() => []); if (users.length === 0) await downloadMasterData(); } 
+        }
     } catch (err) { clearTimeout(logoTimeout); tampilkanLayar('login'); }
 };
 
@@ -57,10 +78,13 @@ const masukKeAplikasi = async (session) => {
     renderMenu(session.role); renderKonten('dashboard'); tampilkanLayar('app');
 };
 
+// ==========================================
+// 3. MENU & KONTEN (DASHBOARD KADER)
+// ==========================================
 const renderMenu = (role) => {
-    const container = getEl('dynamic-menu-container'); if (!container) return;
+    const container = getEl('dynamic-menu-container');
+    if (!container) return;
 
-    // 🔥 Perubahan Nama Menu Daftar Sasaran
     const menus = [
         { id: 'dashboard', icon: '🏠', label: 'Dashboard' },
         { id: 'registrasi', icon: '📝', label: 'Registrasi Sasaran' },
@@ -82,14 +106,17 @@ const renderMenu = (role) => {
             getEl('sidebar').classList.remove('active'); getEl('sidebar-overlay').classList.remove('active');
             const target = item.getAttribute('data-target');
             if (target === 'reload_app') { location.reload(true); } 
-            else { 
-                window.editModeData = null; // Reset edit mode jika pindah menu biasa
-                renderKonten(target); 
-            }
+            else { window.editModeData = null; window.editModeLaporan = null; renderKonten(target); }
         };
     });
 
-    if (getEl('btnLogout')) { getEl('btnLogout').onclick = async () => { if (confirm("🔴 PERINGATAN: Ini akan mengeluarkan Anda dan MENGHAPUS SEMUA DATA UJI COBA (Sasaran & Laporan) di memori HP Anda.\n\nApakah Anda yakin ingin mereset aplikasi?")) { await clearStore('kader_session'); await clearStore('sync_queue'); location.reload(true); } }; }
+    if (getEl('btnLogout')) {
+        getEl('btnLogout').onclick = async () => { 
+            if (confirm("🔴 PERINGATAN: Ini akan mengeluarkan Anda dan MENGHAPUS SEMUA DATA UJI COBA (Sasaran & Laporan) di memori HP Anda.\n\nApakah Anda yakin ingin mereset aplikasi?")) { 
+                await clearStore('kader_session'); await clearStore('sync_queue'); location.reload(true); 
+            } 
+        };
+    }
 };
 
 window.mulaiSinkronisasiDashboard = async () => {
@@ -142,11 +169,7 @@ window.renderKonten = async (target) => {
         } catch (e) {}
 
     } else if (target === 'registrasi') {
-        // 🔥 FORM REGISTRASI SUPER CERDAS (Mendukung Edit Mode)
-        const isEdit = window.editModeData != null;
-        const eData = isEdit ? window.editModeData : null;
-        const eLabel = isEdit ? `Mengedit Data Sasaran` : `Registrasi Sasaran Baru`;
-        
+        const isEdit = window.editModeData != null; const eLabel = isEdit ? `Mengedit Data Sasaran` : `Registrasi Sasaran Baru`;
         area.innerHTML = `
             <div class="animate-fade">
                 <h3 style="margin-top:0; color:var(--primary); font-size:1.3rem;">📝 ${eLabel}</h3>
@@ -155,14 +178,9 @@ window.renderKonten = async (target) => {
                     <div class="form-group">
                         <label style="font-weight:bold;">Jenis Sasaran <span style="color:red">*</span></label>
                         <select name="jenis_sasaran" id="reg-jenis" class="form-control" required ${isEdit ? 'disabled' : ''}>
-                            <option value="">-- Pilih Jenis Sasaran --</option>
-                            <option value="CATIN">Calon Pengantin (CATIN)</option>
-                            <option value="BUMIL">Ibu Hamil (BUMIL)</option>
-                            <option value="BUFAS">Ibu Nifas (BUFAS)</option>
-                            <option value="BADUTA">Anak Baduta (0-23 Bulan)</option>
+                            <option value="">-- Pilih Jenis Sasaran --</option><option value="CATIN">Calon Pengantin (CATIN)</option><option value="BUMIL">Ibu Hamil (BUMIL)</option><option value="BUFAS">Ibu Nifas (BUFAS)</option><option value="BADUTA">Anak Baduta (0-23 Bulan)</option>
                         </select>
                     </div>
-                    
                     <div id="form-core" style="display:none; margin-top:15px;">
                         <div class="form-group"><label>Nama Sasaran <span style="color:red">*</span></label><input type="text" name="nama_sasaran" id="f_nama" class="form-control" required></div>
                         <div class="form-group"><label>NIK Sasaran <span style="color:red">*</span></label><input type="text" name="nik" id="f_nik" class="form-control" pattern="[0-9]{16}" title="NIK harus 16 digit angka" maxlength="16" minlength="16" oninput="this.value=this.value.replace(/[^0-9]/g,'')" placeholder="16 digit angka" required></div>
@@ -170,72 +188,31 @@ window.renderKonten = async (target) => {
                         <div class="form-group"><label>Nomor KK <span style="color:red">*</span></label><input type="text" name="nomor_kk" id="f_kk_no" class="form-control" pattern="[0-9]{16}" title="Nomor KK harus 16 digit angka" maxlength="16" minlength="16" oninput="this.value=this.value.replace(/[^0-9]/g,'')" placeholder="16 digit angka" required></div>
                         <div class="form-group"><label>Tanggal Lahir Sasaran <span style="color:red">*</span></label><input type="date" name="tanggal_lahir" id="f_tgl" class="form-control" required></div>
                         <div class="form-group"><label>Jenis Kelamin <span style="color:red">*</span></label><select name="jenis_kelamin" id="reg-jk" class="form-control" required><option value="">-- Pilih --</option><option value="Laki-laki">Laki-laki</option><option value="Perempuan">Perempuan</option></select></div>
-                        
-                        <div class="form-group"><label>Sumber Air Minum <span style="color:red">*</span></label>
-                            <select name="sumber_air_minum" id="f_air" class="form-control" required>
-                                <option value="">-- Pilih --</option><option value="Air Kemasan / Isi Ulang">Air Kemasan / Isi Ulang</option><option value="Ledeng / Pam">Ledeng / Pam</option><option value="Sumur Bor / Pompa">Sumur Bor / Pompa</option><option value="Sumur Terlindung">Sumur Terlindung</option><option value="Sumur Tak Terlindung">Sumur Tak Terlindung</option><option value="Mata Air Terlindung">Mata Air Terlindung</option><option value="Mata Air Tak Terlindung">Mata Air Tak Terlindung</option><option value="Air Permukaan (Sungai/Danau/Waduk/Kolam/Irigasi)">Air Permukaan (Sungai/Danau/Waduk/Kolam/Irigasi)</option><option value="Air Hujan">Air Hujan</option><option value="Lainnya">Lainnya</option>
-                            </select>
-                        </div>
-                        <div class="form-group"><label>Fasilitas BAB <span style="color:red">*</span></label>
-                            <select name="fasilitas_bab" id="f_bab" class="form-control" required>
-                                <option value="">-- Pilih --</option><option value="Jamban Milik Sendiri Dengan Leher Angsa Dan Tangki Septik / Ipal">Jamban Milik Sendiri Dengan Leher Angsa Dan Tangki Septik / Ipal</option><option value="Jamban Pada Mck Komunal Dengan Leher Angsa Dan Tangki Septik / Ipal">Jamban Pada Mck Komunal Dengan Leher Angsa Dan Tangki Septik / Ipal</option><option value="Ya Lainnya">Ya Lainnya</option><option value="Tidak Ada">Tidak Ada</option>
-                            </select>
-                        </div>
-                        <div class="form-group"><label>Kepemilikan Asuransi Kesehatan <span style="color:red">*</span></label>
-                            <select name="asuransi_kesehatan" id="f_asuransi" class="form-control" required>
-                                <option value="">-- Pilih --</option><option value="BPJS PBI">BPJS PBI</option><option value="BPJS Mandiri">BPJS Mandiri</option><option value="Swasta">Swasta</option><option value="Tidak Memiliki">Tidak Memiliki</option>
-                            </select>
-                        </div>
-                        
-                        <div id="specific-fields"></div>
-                        <div id="pertanyaan-dinamis"></div>
-
+                        <div class="form-group"><label>Sumber Air Minum <span style="color:red">*</span></label><select name="sumber_air_minum" id="f_air" class="form-control" required><option value="">-- Pilih --</option><option value="Air Kemasan / Isi Ulang">Air Kemasan / Isi Ulang</option><option value="Ledeng / Pam">Ledeng / Pam</option><option value="Sumur Bor / Pompa">Sumur Bor / Pompa</option><option value="Sumur Terlindung">Sumur Terlindung</option><option value="Sumur Tak Terlindung">Sumur Tak Terlindung</option><option value="Mata Air Terlindung">Mata Air Terlindung</option><option value="Mata Air Tak Terlindung">Mata Air Tak Terlindung</option><option value="Air Permukaan (Sungai/Danau/Waduk/Kolam/Irigasi)">Air Permukaan (Sungai/Danau/Waduk/Kolam/Irigasi)</option><option value="Air Hujan">Air Hujan</option><option value="Lainnya">Lainnya</option></select></div>
+                        <div class="form-group"><label>Fasilitas BAB <span style="color:red">*</span></label><select name="fasilitas_bab" id="f_bab" class="form-control" required><option value="">-- Pilih --</option><option value="Jamban Milik Sendiri Dengan Leher Angsa Dan Tangki Septik / Ipal">Jamban Milik Sendiri Dengan Leher Angsa Dan Tangki Septik / Ipal</option><option value="Jamban Pada Mck Komunal Dengan Leher Angsa Dan Tangki Septik / Ipal">Jamban Pada Mck Komunal Dengan Leher Angsa Dan Tangki Septik / Ipal</option><option value="Ya Lainnya">Ya Lainnya</option><option value="Tidak Ada">Tidak Ada</option></select></div>
+                        <div class="form-group"><label>Kepemilikan Asuransi Kesehatan <span style="color:red">*</span></label><select name="asuransi_kesehatan" id="f_asuransi" class="form-control" required><option value="">-- Pilih --</option><option value="BPJS PBI">BPJS PBI</option><option value="BPJS Mandiri">BPJS Mandiri</option><option value="Swasta">Swasta</option><option value="Tidak Memiliki">Tidak Memiliki</option></select></div>
+                        <div id="specific-fields"></div><div id="pertanyaan-dinamis"></div>
                         <div id="wilayah-domisili" style="margin-top:15px; border-top: 1px dashed #ccc; padding-top:15px;">
-                            <div class="form-group"><label>Desa / Kelurahan <span style="color:red">*</span></label><select name="desa" id="reg-desa" class="form-control"></select></div>
-                            <div class="form-group"><label>Dusun / RW <span style="color:red">*</span></label><select name="dusun" id="reg-dusun" class="form-control"></select></div>
-                            <div class="form-group"><label>Alamat Lengkap <span style="color:red">*</span></label><textarea name="alamat" id="reg-alamat" class="form-control" rows="2" placeholder="Nama Jalan, RT/RW..."></textarea></div>
+                            <div class="form-group"><label>Desa / Kelurahan <span style="color:red">*</span></label><select name="desa" id="reg-desa" class="form-control"></select></div><div class="form-group"><label>Dusun / RW <span style="color:red">*</span></label><select name="dusun" id="reg-dusun" class="form-control"></select></div><div class="form-group"><label>Alamat Lengkap <span style="color:red">*</span></label><textarea name="alamat" id="reg-alamat" class="form-control" rows="2"></textarea></div>
                         </div>
-
                         <div id="wilayah-catin" style="display:none; padding:10px; background:#e8f4fd; border-radius:6px; border:1px solid #b6d4fe; margin-top:15px;">
                             <label style="font-weight:bold; color:var(--primary); margin-bottom:10px; display:block;">📍 Alamat Domisili Setelah Menikah</label>
-                            <div class="form-group"><label>Kabupaten/Kota <span style="color:red">*</span></label><select name="catin_kab" id="catin-kab" class="form-control"></select></div>
-                            <div class="form-group"><label>Kecamatan <span style="color:red">*</span></label><select name="catin_kec" id="catin-kec" class="form-control"></select></div>
-                            <div class="form-group"><label>Desa/Kelurahan <span style="color:red">*</span></label><select name="catin_desa" id="catin-desa" class="form-control"></select></div>
-                            <div class="form-group">
-                                <label>Dusun / RW <span style="color:red">*</span></label>
-                                <select id="catin-dusun-sel" class="form-control" style="display:none;"></select>
-                                <input type="text" id="catin-dusun-txt" class="form-control" placeholder="Ketik nama Dusun/RW...">
-                            </div>
-                            <div class="form-group"><label>Alamat Lengkap <span style="color:red">*</span></label><textarea name="catin_alamat" id="catin-alamat" class="form-control" rows="2" placeholder="Nama Jalan, Blok, dll..."></textarea></div>
+                            <div class="form-group"><label>Kabupaten/Kota <span style="color:red">*</span></label><select name="catin_kab" id="catin-kab" class="form-control"></select></div><div class="form-group"><label>Kecamatan <span style="color:red">*</span></label><select name="catin_kec" id="catin-kec" class="form-control"></select></div><div class="form-group"><label>Desa/Kelurahan <span style="color:red">*</span></label><select name="catin_desa" id="catin-desa" class="form-control"></select></div><div class="form-group"><label>Dusun / RW <span style="color:red">*</span></label><select id="catin-dusun-sel" class="form-control" style="display:none;"></select><input type="text" id="catin-dusun-txt" class="form-control" placeholder="Ketik nama Dusun/RW..."></div><div class="form-group"><label>Alamat Lengkap <span style="color:red">*</span></label><textarea name="catin_alamat" id="catin-alamat" class="form-control" rows="2"></textarea></div>
                         </div>
-
                         <button type="submit" class="btn btn-primary" style="width:100%; margin-top:15px; font-size:1.1rem; padding:12px;">💾 ${isEdit ? 'Update Data Sasaran' : 'Simpan Sasaran'}</button>
                         ${isEdit ? `<button type="button" class="btn btn-danger" style="width:100%; margin-top:10px; font-size:1rem; padding:10px;" onclick="window.editModeData=null; renderKonten('daftar_sasaran')">❌ Batal Edit</button>` : ''}
                     </div>
                 </form>
-            </div>
-        `;
+            </div>`;
         initFormRegistrasi();
 
-    } else if (target === 'daftar_sasaran') {
-        const tpl = getEl('template-daftar-sasaran'); if(tpl) { area.appendChild(tpl.content.cloneNode(true)); initDaftarSasaran(); }
-    } else if (target === 'pendampingan') {
-        const tpl = getEl('template-pendampingan'); if(tpl) { area.appendChild(tpl.content.cloneNode(true)); initFormPendampingan(); }
-    } else if (target === 'rekap_bulanan') { 
-        const tpl = getEl('template-rekap'); if(tpl) { area.appendChild(tpl.content.cloneNode(true)); initRekap(); }
-    } else if (target === 'kalkulator') { 
-        const tpl = getEl('template-kalkulator'); if(tpl) { area.appendChild(tpl.content.cloneNode(true)); initKalkulator(); }
-    } else if (target === 'cetak_pdf') {
-        const tpl = getEl('template-cetak-pdf'); if(tpl) area.appendChild(tpl.content.cloneNode(true));
-    } else if (target === 'setting') {
-        const tpl = getEl('template-setting'); if(tpl) { area.appendChild(tpl.content.cloneNode(true)); initSetting(); }
-    } else if (target === 'bantuan') {
-        const tpl = getEl('template-bantuan'); 
-        if(tpl) { 
-            area.appendChild(tpl.content.cloneNode(true)); 
-            const btnCalc = getEl('btn-buka-kalkulator'); if(btnCalc) btnCalc.onclick = () => renderKonten('kalkulator');
-        }
-    } 
+    } else if (target === 'daftar_sasaran') { const tpl = getEl('template-daftar-sasaran'); if(tpl) { area.appendChild(tpl.content.cloneNode(true)); initDaftarSasaran(); }
+    } else if (target === 'pendampingan') { const tpl = getEl('template-pendampingan'); if(tpl) { area.appendChild(tpl.content.cloneNode(true)); initFormPendampingan(); }
+    } else if (target === 'rekap_bulanan') { const tpl = getEl('template-rekap'); if(tpl) { area.appendChild(tpl.content.cloneNode(true)); initRekap(); }
+    } else if (target === 'kalkulator') { const tpl = getEl('template-kalkulator'); if(tpl) { area.appendChild(tpl.content.cloneNode(true)); initKalkulator(); }
+    } else if (target === 'cetak_pdf') { const tpl = getEl('template-cetak-pdf'); if(tpl) area.appendChild(tpl.content.cloneNode(true));
+    } else if (target === 'setting') { const tpl = getEl('template-setting'); if(tpl) { area.appendChild(tpl.content.cloneNode(true)); initSetting(); }
+    } else if (target === 'bantuan') { const tpl = getEl('template-bantuan'); if(tpl) { area.appendChild(tpl.content.cloneNode(true)); const btnCalc = getEl('btn-buka-kalkulator'); if(btnCalc) btnCalc.onclick = () => renderKonten('kalkulator'); } } 
 };
 
 // ==========================================
@@ -262,9 +239,7 @@ const renderPertanyaanDinamis = (jenis, modul, container, questions) => {
             let req = String(q.is_required || '').toUpperCase() === 'Y' ? 'required' : ''; let markerReq = req ? '<span style="color:red; font-weight:bold;">*</span>' : ''; 
             
             let extraAttr = ''; let tInput = q.tipe_input || 'text';
-            if(lbl.includes('nik') || lbl.includes('nomor induk')) {
-                tInput = 'text'; extraAttr = 'pattern="[0-9]{16}" title="NIK harus 16 digit angka" maxlength="16" minlength="16" oninput="this.value=this.value.replace(/[^0-9]/g,\'\')"';
-            }
+            if(lbl.includes('nik') || lbl.includes('nomor induk')) { tInput = 'text'; extraAttr = 'pattern="[0-9]{16}" title="NIK harus 16 digit angka" maxlength="16" minlength="16" oninput="this.value=this.value.replace(/[^0-9]/g,\'\')"'; }
 
             let inputHtml = '';
             if(q.tipe_input === 'select') {
@@ -328,24 +303,16 @@ const initFormRegistrasi = async () => {
     const questions = await getAllData('master_pertanyaan').catch(()=>[]);
     if (selJenis) {
         selJenis.onchange = () => {
-            const jenis = selJenis.value;
-            const core = getEl('form-core'); const spec = getEl('specific-fields');
-            
-            if(!jenis) { core.style.display = 'none'; return; }
-            core.style.display = 'block';
+            const jenis = selJenis.value; const core = getEl('form-core'); const spec = getEl('specific-fields');
+            if(!jenis) { core.style.display = 'none'; return; } core.style.display = 'block';
 
             if (selJk) { if (jenis === 'BUMIL' || jenis === 'BUFAS') { selJk.value = 'Perempuan'; selJk.style.pointerEvents = 'none'; selJk.style.backgroundColor = '#e9ecef'; } else { selJk.style.pointerEvents = 'auto'; selJk.style.backgroundColor = '#fff'; } }
             
             let htmlSpec = '';
-            if(jenis === 'CATIN') {
-                htmlSpec = `<div class="form-group"><label>Nama Calon Suami / Istri <span style="color:red">*</span></label><input type="text" name="nama_calon" class="form-control" required></div><div class="form-group"><label>NIK Calon Suami / Istri <span style="color:red">*</span></label><input type="text" name="nik_calon" class="form-control" pattern="[0-9]{16}" title="NIK harus 16 digit angka" maxlength="16" minlength="16" oninput="this.value=this.value.replace(/[^0-9]/g,'')" placeholder="16 digit angka" required></div><div class="form-group"><label>Tanggal Rencana Pernikahan <span style="color:red">*</span></label><input type="date" name="tanggal_pernikahan" class="form-control" required></div><div class="form-group"><label>Perkawinan Ke- <span style="color:red">*</span></label><input type="number" name="perkawinan_ke" class="form-control" required></div><div class="form-group"><label>Berat Badan (Kg)</label><input type="number" name="bb_catin" class="form-control" step="any" placeholder="Cth: 55"></div><div class="form-group"><label>Tinggi Badan (Cm)</label><input type="number" name="tb_catin" class="form-control" step="any" placeholder="Cth: 160"></div><div class="form-group"><label>Bekerja di Luar Negeri <span style="color:red">*</span></label><select name="kerja_luar_negeri" class="form-control" required><option value="">-- Pilih --</option><option value="Pernah">Pernah</option><option value="Sedang">Sedang</option><option value="Akan">Akan</option><option value="Tidak">Tidak</option></select></div>`;
-            } else if (jenis === 'BUMIL') {
-                htmlSpec = `<div class="form-group"><label>Kehamilan Ke- <span style="color:red">*</span></label><input type="number" name="kehamilan_ke" class="form-control" required></div><div class="form-group"><label>Berat Badan Sebelum Hamil (Kg)</label><input type="number" name="bb_sebelum_hamil" class="form-control" step="any" placeholder="Cth: 50"></div><div class="form-group"><label>Keinginan Hamil <span style="color:red">*</span></label><select name="keinginan_hamil" class="form-control" required><option value="">-- Pilih --</option><option value="Ingin Hamil Saat ini">Ingin Hamil Saat ini</option><option value="Ingin Hamil setelah >2 th">Ingin Hamil setelah >2 th</option><option value="Tidak Ingin Hamil Lagi">Tidak Ingin Hamil Lagi</option></select></div>`;
-            } else if (jenis === 'BUFAS') {
-                htmlSpec = `<div class="form-group"><label>Tanggal Persalinan <span style="color:red">*</span></label><input type="date" name="tgl_persalinan" class="form-control" required></div><div class="form-group"><label>Jumlah Anak Kandung <span style="color:red">*</span></label><input type="number" name="jumlah_anak_kandung" class="form-control" required></div>`;
-            } else if (jenis === 'BADUTA') {
-                htmlSpec = `<div class="form-group"><label>Nama Ibu Kandung <span style="color:red">*</span></label><input type="text" name="nama_ibu_kandung" class="form-control" required></div><div class="form-group"><label>Anak Ke- <span style="color:red">*</span></label><input type="number" name="anak_ke" class="form-control" required></div><div class="form-group"><label>Berat Badan Lahir (Kg)</label><input type="number" name="bb_lahir" class="form-control" step="any" placeholder="Cth: 3.2"></div><div class="form-group"><label>Tinggi / Panjang Badan Lahir (Cm)</label><input type="number" name="tb_lahir" class="form-control" step="any" placeholder="Cth: 48"></div>`;
-            }
+            if(jenis === 'CATIN') { htmlSpec = `<div class="form-group"><label>Nama Calon Suami / Istri <span style="color:red">*</span></label><input type="text" name="nama_calon" class="form-control" required></div><div class="form-group"><label>NIK Calon Suami / Istri <span style="color:red">*</span></label><input type="text" name="nik_calon" class="form-control" pattern="[0-9]{16}" title="NIK harus 16 digit angka" maxlength="16" minlength="16" oninput="this.value=this.value.replace(/[^0-9]/g,'')" placeholder="16 digit angka" required></div><div class="form-group"><label>Tanggal Rencana Pernikahan <span style="color:red">*</span></label><input type="date" name="tanggal_pernikahan" class="form-control" required></div><div class="form-group"><label>Perkawinan Ke- <span style="color:red">*</span></label><input type="number" name="perkawinan_ke" class="form-control" required></div><div class="form-group"><label>Berat Badan (Kg)</label><input type="number" name="bb_catin" class="form-control" step="any" placeholder="Cth: 55"></div><div class="form-group"><label>Tinggi Badan (Cm)</label><input type="number" name="tb_catin" class="form-control" step="any" placeholder="Cth: 160"></div><div class="form-group"><label>Bekerja di Luar Negeri <span style="color:red">*</span></label><select name="kerja_luar_negeri" class="form-control" required><option value="">-- Pilih --</option><option value="Pernah">Pernah</option><option value="Sedang">Sedang</option><option value="Akan">Akan</option><option value="Tidak">Tidak</option></select></div>`; } 
+            else if (jenis === 'BUMIL') { htmlSpec = `<div class="form-group"><label>Kehamilan Ke- <span style="color:red">*</span></label><input type="number" name="kehamilan_ke" class="form-control" required></div><div class="form-group"><label>Berat Badan Sebelum Hamil (Kg)</label><input type="number" name="bb_sebelum_hamil" class="form-control" step="any" placeholder="Cth: 50"></div><div class="form-group"><label>Keinginan Hamil <span style="color:red">*</span></label><select name="keinginan_hamil" class="form-control" required><option value="">-- Pilih --</option><option value="Ingin Hamil Saat ini">Ingin Hamil Saat ini</option><option value="Ingin Hamil setelah >2 th">Ingin Hamil setelah >2 th</option><option value="Tidak Ingin Hamil Lagi">Tidak Ingin Hamil Lagi</option></select></div>`; } 
+            else if (jenis === 'BUFAS') { htmlSpec = `<div class="form-group"><label>Tanggal Persalinan <span style="color:red">*</span></label><input type="date" name="tgl_persalinan" class="form-control" required></div><div class="form-group"><label>Jumlah Anak Kandung <span style="color:red">*</span></label><input type="number" name="jumlah_anak_kandung" class="form-control" required></div>`; } 
+            else if (jenis === 'BADUTA') { htmlSpec = `<div class="form-group"><label>Nama Ibu Kandung <span style="color:red">*</span></label><input type="text" name="nama_ibu_kandung" class="form-control" required></div><div class="form-group"><label>Anak Ke- <span style="color:red">*</span></label><input type="number" name="anak_ke" class="form-control" required></div><div class="form-group"><label>Berat Badan Lahir (Kg)</label><input type="number" name="bb_lahir" class="form-control" step="any" placeholder="Cth: 3.2"></div><div class="form-group"><label>Tinggi / Panjang Badan Lahir (Cm)</label><input type="number" name="tb_lahir" class="form-control" step="any" placeholder="Cth: 48"></div>`; }
             spec.innerHTML = htmlSpec;
 
             if(boxCatin && boxDomisili) {
@@ -364,38 +331,23 @@ const initFormRegistrasi = async () => {
             }
             renderPertanyaanDinamis(jenis, 'REGISTRASI', containerQ, questions);
             
-            // 🔥 POPULATE DATA JIKA MODE EDIT
+            // PREFILL UNTUK EDIT MODE
             if(window.editModeData) {
                 setTimeout(() => {
                     const eD = window.editModeData;
-                    if(getEl('f_nama')) getEl('f_nama').value = eD.nama_sasaran || '';
-                    if(getEl('f_nik')) getEl('f_nik').value = eD.data_laporan?.nik || '';
-                    if(getEl('f_kk_nama')) getEl('f_kk_nama').value = eD.data_laporan?.nama_kk || '';
-                    if(getEl('f_kk_no')) getEl('f_kk_no').value = eD.data_laporan?.nomor_kk || '';
-                    if(getEl('f_tgl')) getEl('f_tgl').value = eD.data_laporan?.tanggal_lahir || '';
-                    if(getEl('reg-jk')) getEl('reg-jk').value = eD.data_laporan?.jenis_kelamin || '';
-                    if(getEl('f_air')) getEl('f_air').value = eD.data_laporan?.sumber_air_minum || '';
-                    if(getEl('f_bab')) getEl('f_bab').value = eD.data_laporan?.fasilitas_bab || '';
-                    if(getEl('f_asuransi')) getEl('f_asuransi').value = eD.data_laporan?.asuransi_kesehatan || '';
-                    if(getEl('reg-desa')) getEl('reg-desa').value = eD.desa || '';
-                    if(getEl('reg-desa')) getEl('reg-desa').dispatchEvent(new Event('change'));
-                    if(getEl('reg-dusun')) setTimeout(()=> { getEl('reg-dusun').value = eD.dusun || ''; }, 100);
+                    if(getEl('f_nama')) getEl('f_nama').value = eD.nama_sasaran || ''; if(getEl('f_nik')) getEl('f_nik').value = eD.data_laporan?.nik || '';
+                    if(getEl('f_kk_nama')) getEl('f_kk_nama').value = eD.data_laporan?.nama_kk || ''; if(getEl('f_kk_no')) getEl('f_kk_no').value = eD.data_laporan?.nomor_kk || '';
+                    if(getEl('f_tgl')) getEl('f_tgl').value = eD.data_laporan?.tanggal_lahir || ''; if(getEl('reg-jk')) getEl('reg-jk').value = eD.data_laporan?.jenis_kelamin || '';
+                    if(getEl('f_air')) getEl('f_air').value = eD.data_laporan?.sumber_air_minum || ''; if(getEl('f_bab')) getEl('f_bab').value = eD.data_laporan?.fasilitas_bab || '';
+                    if(getEl('f_asuransi')) getEl('f_asuransi').value = eD.data_laporan?.asuransi_kesehatan || ''; if(getEl('reg-desa')) getEl('reg-desa').value = eD.desa || '';
+                    if(getEl('reg-desa')) getEl('reg-desa').dispatchEvent(new Event('change')); if(getEl('reg-dusun')) setTimeout(()=> { getEl('reg-dusun').value = eD.dusun || ''; }, 100);
                     if(getEl('reg-alamat')) getEl('reg-alamat').value = eD.data_laporan?.alamat || '';
                     
-                    // Isi data spesifik lainnya dengan loop
-                    for (const [key, value] of Object.entries(eD.data_laporan || {})) {
-                        let field = document.querySelector(`[name="${key}"]`);
-                        if(field) field.value = value;
-                    }
+                    for (const [key, value] of Object.entries(eD.data_laporan || {})) { let field = document.querySelector(`[name="${key}"]`); if(field) field.value = value; }
                 }, 200);
             }
         };
-        
-        // Auto trigger jika masuk mode edit
-        if(window.editModeData) {
-            selJenis.value = window.editModeData.jenis_sasaran;
-            selJenis.dispatchEvent(new Event('change'));
-        }
+        if(window.editModeData) { selJenis.value = window.editModeData.jenis_sasaran; selJenis.dispatchEvent(new Event('change')); }
     }
 
     const formReg = getEl('form-registrasi');
@@ -406,15 +358,7 @@ const initFormRegistrasi = async () => {
                 const formData = new FormData(e.target); const jawaban = {}; formData.forEach((val, key) => { jawaban[key] = val; });
                 const kecamatan = tugas.length > 0 ? tugas[0].kecamatan : 'TIDAK_DIKETAHUI'; const jenisSasaran = selJenis.value;
                 
-                let idSasaran = "";
-                if(window.editModeData) {
-                    idSasaran = window.editModeData.id; // Pertahankan ID lama jika Edit
-                } else {
-                    let prefix = "REG"; if (jenisSasaran === 'CATIN') prefix = "CTN"; else if (jenisSasaran === 'BUMIL') prefix = "BML"; else if (jenisSasaran === 'BUFAS') prefix = "BFS"; else if (jenisSasaran === 'BADUTA') prefix = "BDT";
-                    const kodeKec = getKodeKecamatan(kecamatan); const angkaUnik = Math.floor(Math.random() * 1000000).toString().padStart(6, '0'); 
-                    idSasaran = `${prefix}-${kodeKec}-${angkaUnik}`;
-                }
-                
+                let idSasaran = window.editModeData ? window.editModeData.id : `${{"CATIN":"CTN","BUMIL":"BML","BUFAS":"BFS","BADUTA":"BDT"}[jenisSasaran]}-${getKodeKecamatan(kecamatan)}-${Math.floor(Math.random() * 1000000).toString().padStart(6, '0')}`;
                 const desaFinal = jenisSasaran === 'CATIN' ? '-' : selDesa.value; const dusunFinal = jenisSasaran === 'CATIN' ? '-' : selDusun.value;
 
                 if (jawaban.tanggal_lahir) {
@@ -429,14 +373,10 @@ const initFormRegistrasi = async () => {
                         jawaban.usia_saat_melahirkan_tahun = uTahun; jawaban.usia_saat_melahirkan_bulan = uBulan;
                     }
                 }
-                
                 const createdDate = window.editModeData ? window.editModeData.created_at : new Date().toISOString();
                 const laporan = { id: idSasaran, tipe_laporan: 'REGISTRASI', username: session.username, id_tim: session.id_tim, nomor_tim: session.nomor_tim, kecamatan: kecamatan, jenis_sasaran: jenisSasaran, nama_sasaran: jawaban.nama_sasaran, desa: desaFinal, dusun: dusunFinal, data_laporan: jawaban, status_sasaran: 'AKTIF', is_synced: false, created_at: createdDate };
                 
-                await putData('sync_queue', laporan); 
-                window.editModeData = null; // Bersihkan memori edit
-                alert(window.editModeData ? `✅ Data berhasil diperbarui!` : `✅ Registrasi berhasil! ID: ${idSasaran}`); 
-                renderKonten('daftar_sasaran');
+                await putData('sync_queue', laporan); window.editModeData = null; alert(window.editModeData ? `✅ Data berhasil diperbarui!` : `✅ Registrasi berhasil! ID: ${idSasaran}`); renderKonten('daftar_sasaran');
             } catch (err) { alert("Gagal menyimpan form."); } finally { btn.disabled = false; btn.innerText = "💾 Simpan Sasaran"; }
         };
     }
@@ -445,17 +385,8 @@ const initFormRegistrasi = async () => {
 // ==========================================
 // 5. FITUR DAFTAR SASARAN & DETAIL (KIA DIGITAL)
 // ==========================================
-// 🔥 FUNGSI GLOBAL UNTUK EDIT SASARAN
-window.bukaEditSasaran = async (id) => {
-    const r = await getDataById('sync_queue', id);
-    if(r) { window.editModeData = r; renderKonten('registrasi'); } else { alert('Data tidak ditemukan'); }
-};
-
-// 🔥 FUNGSI GLOBAL UNTUK EDIT LAPORAN PENDAMPINGAN
-window.bukaEditLaporan = async (idLaporan) => {
-    const r = await getDataById('sync_queue', idLaporan);
-    if(r) { window.editModeLaporan = r; renderKonten('pendampingan'); } else { alert('Data laporan tidak ditemukan'); }
-};
+window.bukaEditSasaran = async (id) => { const r = await getDataById('sync_queue', id); if(r) { window.editModeData = r; renderKonten('registrasi'); } else { alert('Data tidak ditemukan'); } };
+window.bukaEditLaporan = async (idLaporan) => { const r = await getDataById('sync_queue', idLaporan); if(r) { window.editModeLaporan = r; renderKonten('pendampingan'); } else { alert('Data laporan tidak ditemukan'); } };
 
 const initDaftarSasaran = async () => {
     const session = window.currentUser; const filterJenis = getEl('filter-jenis'); const filterStatus = getEl('filter-status'); const list = getEl('list-sasaran');
@@ -526,7 +457,6 @@ const initDaftarSasaran = async () => {
                 let syncIcon = p.is_synced ? '<span style="color:#198754; font-size:0.7rem;">(Server)</span>' : '<span style="color:#fd7e14; font-size:0.7rem;">(Lokal)</span>';
                 let kkaStyle = (valKKA.toLowerCase().includes('terlambat') || valKKA.toLowerCase().includes('tidak')) ? 'color:#dc3545; font-weight:bold;' : 'color:#198754; font-weight:bold;';
 
-                // 🔥 Tambahkan Edit Laporan
                 htmlRiwayat += `<tr style="border-bottom: 1px solid #eee;"><td style="padding:10px; border:1px solid #eee;">${tglKunjungan.toLocaleDateString('id-ID', {day: 'numeric', month: 'short', year: '2-digit'})} <br>${syncIcon}<br><span style="color:#0d6efd; cursor:pointer; font-size:0.75rem;" onclick="window.bukaEditLaporan('${p.id}')">✏️ Edit</span></td><td style="padding:10px; border:1px solid #eee; font-weight:bold; font-size:1rem; color:var(--primary);">${umurBulan} Bln</td><td style="padding:10px; border:1px solid #eee;">${valBB}</td><td style="padding:10px; border:1px solid #eee;">${valTB}</td><td style="padding:10px; border:1px solid #eee;">${valLK}</td><td style="padding:10px; border:1px solid #eee; ${kkaStyle}">${valKKA}</td><td style="padding:10px; border:1px solid #eee; text-align:left; line-height:1.3;">${catatanLain}</td></tr>`;
             });
             htmlRiwayat += `</tbody></table></div>`;
@@ -539,7 +469,6 @@ const initDaftarSasaran = async () => {
                     let label = foundQ ? foundQ.label_pertanyaan : key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
                     dynamicHtml += `<div style="margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #eee;"><div style="font-size: 0.75rem; color: #666; font-weight: normal;">${label}</div><div style="font-size: 0.9rem; color: #222; font-weight: 500;">${value}</div></div>`;
                 }
-                // 🔥 Tambahkan Edit Laporan
                 return `<div style="background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); overflow: hidden;"><div style="background: #e8f4fd; padding: 10px 15px; border-bottom: 1px solid #cfe2ff; display: flex; justify-content: space-between; align-items: center;"><span style="font-weight: bold; color: #0d6efd; font-size: 0.9rem;">📅 ${new Date(p.data_laporan?.tgl_kunjungan || p.created_at).toLocaleDateString('id-ID', {day: 'numeric', month: 'long', year: 'numeric'})}</span><div><span style="font-size: 0.7rem; font-weight: bold; color: ${p.is_synced ? '#198754' : '#fd7e14'}; background: #fff; padding: 3px 8px; border-radius: 12px; border: 1px solid #ddd; margin-right:5px;">${p.is_synced ? '✅ Server' : '⏳ Lokal'}</span><span style="font-size:0.8rem; cursor:pointer;" onclick="window.bukaEditLaporan('${p.id}')">✏️</span></div></div><div style="padding: 15px;"><div style="font-size: 0.8rem; color: #666; margin-bottom: 4px;">Catatan Umum / Hasil:</div><div style="font-size: 0.95rem; color: #333; margin-bottom: ${dynamicHtml ? '15px' : '0'}; background: #f8f9fa; padding: 10px; border-radius: 6px; border-left: 4px solid #0d6efd;">${p.data_laporan?.catatan || '-'}</div>${dynamicHtml ? `<div style="background: #fff; border: 1px solid #f1f1f1; padding: 10px; border-radius: 6px;">${dynamicHtml}</div>` : ''}</div></div>`;
             }).join('');
         }
@@ -553,25 +482,20 @@ const initDaftarSasaran = async () => {
                     <span>${r.nama_sasaran || '-'}</span>
                     <span style="font-size: 0.85rem; color: #0d6efd; cursor: pointer; text-transform: none; font-weight: normal; background: #e8f4fd; padding: 4px 8px; border-radius: 4px;" onclick="window.bukaEditSasaran('${r.id}')">✏️ (edit)</span>
                 </div>
-                
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
                     <div><div style="font-size: 0.8rem; color: #666;">ID / No NIK</div><div style="font-size: 0.95rem; color: #222; font-weight: 500;">${r.id} <br> ${r.data_laporan?.nik || '-'}</div></div>
                     <div><div style="font-size: 0.8rem; color: #666;">Kategori</div><div style="font-size: 0.95rem; color: #222; font-weight: bold;">${r.textBaris2}</div></div>
                 </div>
-
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
                     <div><div style="font-size: 0.8rem; color: #666;">Status Pendampingan</div><div style="font-size: 0.95rem;">${r.labelSelesai}</div></div>
                     <div><div style="font-size: 0.8rem; color: #666;">Status Sinkronisasi</div><div style="font-size: 0.95rem; font-weight: bold;">${syncStatusHtml}</div></div>
                 </div>
-
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
                     <div><div style="font-size: 0.8rem; color: #666;">Tgl Lahir ${r.jenis_sasaran === 'BUFAS' ? '/ Salin' : ''}</div><div style="font-size: 0.95rem; color: #222;">${r.data_laporan?.tanggal_lahir || '-'} ${r.jenis_sasaran === 'BUFAS' ? '<br>'+(r.data_laporan?.tgl_persalinan || '-') : ''}</div></div>
                     <div><div style="font-size: 0.8rem; color: #666;">Nama KK ${r.jenis_sasaran === 'BADUTA' ? '/ Ibu' : ''}</div><div style="font-size: 0.95rem; color: #222; font-weight: 500;">${r.data_laporan?.nama_kk || '-'} ${r.jenis_sasaran === 'BADUTA' ? '<br>'+(r.data_laporan?.nama_ibu_kandung || '-') : ''}</div></div>
                 </div>
-
                 <div style="font-size: 0.8rem; color: #666;">Alamat Lengkap</div><div style="font-size: 0.95rem; color: #222;">${r.data_laporan?.alamat || '-'}</div>
             </div>
-            
             <h4 style="margin-bottom: 15px; color: #0043a8; background: #ffffff; padding: 12px; border-radius: 6px; border: 1px solid #c6c6c6; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05); font-weight: 700;">
                 ${r.jenis_sasaran === 'BADUTA' ? '📈 Buku KIA/KKA Digital' : 'Riwayat Kunjungan'} (${riwayat.length})
             </h4>
@@ -593,9 +517,7 @@ const initFormPendampingan = async () => {
     const selJenis = getEl('pend-jenis'); const selSasaran = getEl('pend-sasaran');
     const infoBox = getEl('pend-info-sasaran'); const containerQ = getEl('form-pendampingan-dinamis');
     
-    // 🔥 Mode Edit Laporan
-    const isEditLaporan = window.editModeLaporan != null;
-    const eLaporan = isEditLaporan ? window.editModeLaporan : null;
+    const isEditLaporan = window.editModeLaporan != null; const eLaporan = isEditLaporan ? window.editModeLaporan : null;
     
     if(isEditLaporan) {
         getEl('header-pendampingan').innerHTML = `📝 Mengedit Laporan Pendampingan`;
@@ -635,10 +557,8 @@ const initFormPendampingan = async () => {
 
             let htmlQ = `<div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-top: 20px;">`;
             filteredQ.forEach(q => {
-                let lbl = (q.label_pertanyaan||'').toLowerCase();
-                let req = String(q.is_required || '').toUpperCase() === 'Y' ? 'required' : '';
-                if(lbl.includes('berat') || lbl==='bb') idInputBB = q.id_pertanyaan;
-                if(lbl.includes('tinggi') || lbl.includes('panjang') || lbl.includes('tb') || lbl.includes('pb')) idInputTB = q.id_pertanyaan;
+                let lbl = (q.label_pertanyaan||'').toLowerCase(); let req = String(q.is_required || '').toUpperCase() === 'Y' ? 'required' : '';
+                if(lbl.includes('berat') || lbl==='bb') idInputBB = q.id_pertanyaan; if(lbl.includes('tinggi') || lbl.includes('panjang') || lbl.includes('tb') || lbl.includes('pb')) idInputTB = q.id_pertanyaan;
                 
                 let inputHtml = q.tipe_input === 'select' ? `<select name="${q.id_pertanyaan}" id="${q.id_pertanyaan}" class="form-control" ${req}><option value="">-- Pilih --</option>${(JSON.parse(q.opsi_json || '[]')).map(o => `<option value="${o}">${o}</option>`).join('')}</select>` : `<input type="${q.tipe_input}" name="${q.id_pertanyaan}" id="${q.id_pertanyaan}" class="form-control" step="any" ${req}>`;
                 htmlQ += `<div class="form-group" style="margin-bottom:12px;"><label style="font-weight:600;">${q.label_pertanyaan} ${req?'<span style="color:red">*</span>':''}</label>${inputHtml}</div>`;
@@ -651,26 +571,15 @@ const initFormPendampingan = async () => {
                 if (tH.getDate() < tL.getDate()) uBln--; if (uBln < 0) uBln = 0;
                 let jk = sasaran.data_laporan.jenis_kelamin === 'Laki-laki' ? 'L' : 'P';
 
-                const kkaData = getKkaData(uBln);
-                let listT = "", listP = "";
-                kkaData.forEach(k => {
-                    let kode = k.kode_aspek ? `[${k.kode_aspek}] ` : '';
-                    listT += `<li><b>${kode}</b>${k.tugas_perkembangan}</li>`; listP += `<li style="margin-bottom:6px;"><b>${kode}</b>${k.pesan_stimulasi}</li>`;
-                });
+                const kkaData = getKkaData(uBln); let listT = "", listP = "";
+                kkaData.forEach(k => { let kode = k.kode_aspek ? `[${k.kode_aspek}] ` : ''; listT += `<li><b>${kode}</b>${k.tugas_perkembangan}</li>`; listP += `<li style="margin-bottom:6px;"><b>${kode}</b>${k.pesan_stimulasi}</li>`; });
 
                 htmlQ += `
                     <div style="background: #e8f4fd; padding: 15px; border-radius: 8px; border-left: 4px solid #0d6efd; margin-top: 15px;">
                         <h4 style="margin:0 0 10px 0; color:#0d6efd;">🤖 Asisten Cerdas KKA (Usia: ${uBln} Bln)</h4>
                         <div style="font-size:0.85rem; margin-bottom:10px;"><b>Target Pencapaian:</b><ul style="margin:5px 0; padding-left:15px;">${listT}</ul></div>
-                        <div class="form-group">
-                            <label style="font-weight:bold;">Apakah anak bisa melakukan SEMUA target di atas?</label>
-                            <select id="kka_eval" name="evaluasi_kka" class="form-control" required>
-                                <option value="">-- Evaluasi --</option><option value="Sesuai Umur">✅ Ya, Bisa Semua</option><option value="Terlambat">⚠️ Ada yang belum bisa</option>
-                            </select>
-                        </div>
-                        <div id="kka_tips_box" style="display:none; background:#fff3cd; padding:10px; border-radius:5px; border:1px solid #ffe69c; font-size:0.8rem; margin-top:10px;">
-                            <b style="color:#856404;">💡 Panduan Stimulasi:</b><ul style="margin:5px 0; padding-left:15px; color:#856404;">${listP}</ul>
-                        </div>
+                        <div class="form-group"><label style="font-weight:bold;">Apakah anak bisa melakukan SEMUA target di atas?</label><select id="kka_eval" name="evaluasi_kka" class="form-control" required><option value="">-- Evaluasi --</option><option value="Sesuai Umur">✅ Ya, Bisa Semua</option><option value="Terlambat">⚠️ Ada yang belum bisa</option></select></div>
+                        <div id="kka_tips_box" style="display:none; background:#fff3cd; padding:10px; border-radius:5px; border:1px solid #ffe69c; font-size:0.8rem; margin-top:10px;"><b style="color:#856404;">💡 Panduan Stimulasi:</b><ul style="margin:5px 0; padding-left:15px; color:#856404;">${listP}</ul></div>
                     </div>
                     <div id="antro_result" style="display:none; background: #fdfdfe; padding: 15px; border-radius: 8px; border: 2px solid #ddd; margin-top: 15px;"></div>`;
                 
@@ -705,31 +614,21 @@ const initFormPendampingan = async () => {
                 if(getEl('is_melahirkan')) getEl('is_melahirkan').onchange = (e) => { if(e.target.value === 'YA') getEl('box-tgl-lahir').classList.remove('hidden'); else getEl('box-tgl-lahir').classList.add('hidden'); };
             } else { containerQ.innerHTML = htmlQ; }
             
-            // 🔥 POPULATE DATA UNTUK EDIT LAPORAN
             if(window.editModeLaporan) {
                 setTimeout(() => {
                     const eL = window.editModeLaporan;
                     for (const [key, value] of Object.entries(eL.data_laporan || {})) {
                         let field = document.querySelector(`[name="${key}"]`);
-                        if(field) {
-                            field.value = value;
-                            field.dispatchEvent(new Event('change'));
-                            field.dispatchEvent(new Event('input')); // Triggers Antro Calc
-                        }
+                        if(field) { field.value = value; field.dispatchEvent(new Event('change')); field.dispatchEvent(new Event('input')); }
                     }
                 }, 300);
             }
         };
 
-        // Auto trigger jika masuk mode edit laporan
         if(window.editModeLaporan) {
             selJenis.value = window.editModeLaporan.jenis_sasaran_saat_kunjungan || (window.editModeLaporan.id_sasaran_ref.startsWith('CTN')?'CATIN':window.editModeLaporan.id_sasaran_ref.startsWith('BML')?'BUMIL':window.editModeLaporan.id_sasaran_ref.startsWith('BFS')?'BUFAS':'BADUTA');
             selJenis.dispatchEvent(new Event('change'));
-            setTimeout(() => {
-                selSasaran.value = window.editModeLaporan.id_sasaran_ref;
-                selSasaran.dispatchEvent(new Event('change'));
-                selJenis.disabled = true; selSasaran.disabled = true; // Lock id saat edit
-            }, 100);
+            setTimeout(() => { selSasaran.value = window.editModeLaporan.id_sasaran_ref; selSasaran.dispatchEvent(new Event('change')); selJenis.disabled = true; selSasaran.disabled = true; }, 100);
         }
     }
     
@@ -739,7 +638,6 @@ const initFormPendampingan = async () => {
             e.preventDefault(); const btn = e.target.querySelector('button'); btn.disabled = true;
             try {
                 const formData = new FormData(e.target); const jawaban = {}; formData.forEach((val, key) => jawaban[key] = val);
-                
                 if(jawaban.is_melahirkan === 'YA' && jawaban.tgl_persalinan && !window.editModeLaporan) {
                     const oR = await getDataById('sync_queue', jawaban.id_sasaran);
                     if(oR) {
@@ -749,19 +647,12 @@ const initFormPendampingan = async () => {
                         await putData('sync_queue', nB); alert("🎉 BUMIL telah melahirkan. Kartu BUFAS baru diterbitkan!");
                     }
                 }
-                
                 let idLapor = window.editModeLaporan ? window.editModeLaporan.id : `PEND-${Date.now()}`;
                 let createdDate = window.editModeLaporan ? window.editModeLaporan.created_at : new Date().toISOString();
-                
-                // Override sasaran if disabled
-                if(window.editModeLaporan) {
-                    jawaban.id_sasaran = selSasaran.value;
-                }
-
+                if(window.editModeLaporan) { jawaban.id_sasaran = selSasaran.value; }
                 await putData('sync_queue', { id: idLapor, tipe_laporan: 'PENDAMPINGAN', username: session.username, id_tim: session.id_tim, id_sasaran_ref: jawaban.id_sasaran, jenis_sasaran_saat_kunjungan: selJenis.value, data_laporan: jawaban, is_synced: false, created_at: createdDate });
                 
-                window.editModeLaporan = null;
-                alert("✅ Laporan Pendampingan Tersimpan!"); renderKonten('daftar_sasaran');
+                window.editModeLaporan = null; alert("✅ Laporan Pendampingan Tersimpan!"); renderKonten('daftar_sasaran');
             } catch (err) { alert("Gagal menyimpan."); } finally { btn.disabled = false; }
         };
     }
@@ -771,26 +662,18 @@ const initFormPendampingan = async () => {
 // 7. FUNGSI REKAP BULANAN
 // ==========================================
 const initRekap = async () => {
-    const session = window.currentUser;
-    const antrean = await getAllData('sync_queue').catch(()=>[]);
-
-    const dataTim = antrean.filter(a => String(a.id_tim) === String(session.id_tim));
-    const dataKader = dataTim.filter(a => a.username === session.username);
-
+    const session = window.currentUser; const antrean = await getAllData('sync_queue').catch(()=>[]);
+    const dataTim = antrean.filter(a => String(a.id_tim) === String(session.id_tim)); const dataKader = dataTim.filter(a => a.username === session.username);
     const calculateStats = (data) => {
-        const regList = data.filter(a => a.tipe_laporan === 'REGISTRASI');
-        const pendList = data.filter(a => a.tipe_laporan === 'PENDAMPINGAN');
-
+        const regList = data.filter(a => a.tipe_laporan === 'REGISTRASI'); const pendList = data.filter(a => a.tipe_laporan === 'PENDAMPINGAN');
         const stats = { CATIN: { aktif: 0, pend: 0 }, BUMIL: { aktif: 0, pend: 0 }, BUFAS: { aktif: 0, pend: 0 }, BADUTA: { aktif: 0, pend: 0 }, TOTAL: { aktif: 0, pend: 0 } };
         const hariIni = new Date(); hariIni.setHours(0,0,0,0);
-
         regList.forEach(r => {
             let isAktif = r.status_sasaran !== 'SELESAI';
             if (r.jenis_sasaran === 'CATIN' && r.data_laporan?.tanggal_pernikahan) { const tglNikah = new Date(r.data_laporan.tanggal_pernikahan); if (tglNikah < hariIni) isAktif = false; }
             if (r.jenis_sasaran === 'BUFAS' && r.data_laporan?.tgl_persalinan) { const tglBatas = new Date(r.data_laporan.tgl_persalinan); tglBatas.setDate(tglBatas.getDate() + 42); if (hariIni > tglBatas) isAktif = false; }
             if (isAktif && stats[r.jenis_sasaran]) { stats[r.jenis_sasaran].aktif++; stats.TOTAL.aktif++; }
         });
-
         pendList.forEach(p => {
             let jenis = p.jenis_sasaran_saat_kunjungan;
             if (!jenis && p.id_sasaran_ref) { if (p.id_sasaran_ref.startsWith('CTN')) jenis = 'CATIN'; else if (p.id_sasaran_ref.startsWith('BML')) jenis = 'BUMIL'; else if (p.id_sasaran_ref.startsWith('BFS')) jenis = 'BUFAS'; else if (p.id_sasaran_ref.startsWith('BDT')) jenis = 'BADUTA'; }
@@ -798,15 +681,12 @@ const initRekap = async () => {
         });
         return stats;
     };
-
     const statsKader = calculateStats(dataKader); const statsTim = calculateStats(dataTim);
-
     const renderTableRows = (stats) => {
         const rows = ['CATIN', 'BUMIL', 'BUFAS', 'BADUTA'].map(j => `<tr style="border-bottom: 1px solid #eee;"><td style="padding: 10px 8px; text-align:left; font-weight:600; color: #444;">${j}</td><td style="padding: 10px 8px;">${stats[j].aktif}</td><td style="padding: 10px 8px;">${stats[j].pend}</td></tr>`).join('');
         const totalRow = `<tr style="background: #e9ecef; font-weight: bold;"><td style="padding: 12px 8px; text-align:left; color: #222;">TOTAL</td><td style="padding: 12px 8px; color: var(--primary); font-size: 1.1rem;">${stats.TOTAL.aktif}</td><td style="padding: 12px 8px; color: #198754; font-size: 1.1rem;">${stats.TOTAL.pend}</td></tr>`;
         return rows + totalRow;
     };
-
     if (getEl('tbody-rekap-kader')) getEl('tbody-rekap-kader').innerHTML = renderTableRows(statsKader);
     if (getEl('tbody-rekap-tim')) getEl('tbody-rekap-tim').innerHTML = renderTableRows(statsTim);
 };
@@ -815,65 +695,27 @@ const initRekap = async () => {
 // 8. FUNGSI KALKULATOR CERDAS
 // ==========================================
 const initKalkulator = () => {
-    const sel = getEl('calc-selector');
-    const boxHPL = getEl('box-calc-hpl'); const boxIMT = getEl('box-calc-imt'); const boxKKA = getEl('box-calc-kka');
-
+    const sel = getEl('calc-selector'); const boxHPL = getEl('box-calc-hpl'); const boxIMT = getEl('box-calc-imt'); const boxKKA = getEl('box-calc-kka');
     if (sel) { sel.onchange = () => { boxHPL.style.display = sel.value === 'HPL' ? 'block' : 'none'; boxIMT.style.display = sel.value === 'IMT' ? 'block' : 'none'; boxKKA.style.display = sel.value === 'KKA' ? 'block' : 'none'; }; }
-
-    if (getEl('btn-hitung-hpl')) {
-        getEl('btn-hitung-hpl').onclick = () => {
-            const hpht = getEl('calc-hpht').value; if (!hpht) { alert('Masukkan HPHT terlebih dahulu'); return; }
-            const d = new Date(hpht); d.setDate(d.getDate() + 7); d.setMonth(d.getMonth() - 3); d.setFullYear(d.getFullYear() + 1);
-            getEl('hasil-hpl').innerHTML = `Perkiraan Lahir:<br><span style="font-size:1.5rem;">${d.toLocaleDateString('id-ID', {day:'numeric', month:'long', year:'numeric'})}</span>`;
-        };
-    }
-
-    if (getEl('btn-hitung-imt')) {
-        getEl('btn-hitung-imt').onclick = () => {
-            const bb = parseFloat(getEl('calc-bb').value); const tb = parseFloat(getEl('calc-tb').value) / 100;
-            if (!bb || !tb) { alert('Masukkan BB dan TB dengan benar'); return; }
-            const imt = (bb / (tb * tb)).toFixed(1); let status = '', color = '';
-            if (imt < 18.5) { status = 'Kekurangan Berat Badan'; color = '#dc3545'; } else if (imt <= 24.9) { status = 'Normal (Ideal)'; color = '#198754'; } else if (imt <= 29.9) { status = 'Kelebihan Berat Badan'; color = '#fd7e14'; } else { status = 'Obesitas'; color = '#dc3545'; }
-            getEl('hasil-imt').innerHTML = `IMT Anda: <span style="font-size:1.5rem; color:${color};">${imt}</span><br><span style="color:${color};">${status}</span>`;
-        };
-    }
-
+    if (getEl('btn-hitung-hpl')) { getEl('btn-hitung-hpl').onclick = () => { const hpht = getEl('calc-hpht').value; if (!hpht) { alert('Masukkan HPHT terlebih dahulu'); return; } const d = new Date(hpht); d.setDate(d.getDate() + 7); d.setMonth(d.getMonth() - 3); d.setFullYear(d.getFullYear() + 1); getEl('hasil-hpl').innerHTML = `Perkiraan Lahir:<br><span style="font-size:1.5rem;">${d.toLocaleDateString('id-ID', {day:'numeric', month:'long', year:'numeric'})}</span>`; }; }
+    if (getEl('btn-hitung-imt')) { getEl('btn-hitung-imt').onclick = () => { const bb = parseFloat(getEl('calc-bb').value); const tb = parseFloat(getEl('calc-tb').value) / 100; if (!bb || !tb) { alert('Masukkan BB dan TB dengan benar'); return; } const imt = (bb / (tb * tb)).toFixed(1); let status = '', color = ''; if (imt < 18.5) { status = 'Kekurangan Berat Badan'; color = '#dc3545'; } else if (imt <= 24.9) { status = 'Normal (Ideal)'; color = '#198754'; } else if (imt <= 29.9) { status = 'Kelebihan Berat Badan'; color = '#fd7e14'; } else { status = 'Obesitas'; color = '#dc3545'; } getEl('hasil-imt').innerHTML = `IMT Anda: <span style="font-size:1.5rem; color:${color};">${imt}</span><br><span style="color:${color};">${status}</span>`; }; }
     const selKKA = getEl('calc-usia-kka');
-    if (selKKA) {
-        selKKA.onchange = () => {
-            const val = selKKA.value; let html = '';
-            if (val === '0-3') html = '✅ <b>Target KKA 0-3 Bulan:</b><br>- Menatap wajah ibu saat disusui<br>- Tersenyum membalas senyuman<br>- Menggerakkan tangan & kaki aktif'; else if (val === '3-6') html = '✅ <b>Target KKA 3-6 Bulan:</b><br>- Tengkurap dan berbalik sendiri<br>- Meraih benda yang didekatkan<br>- Menoleh ke arah suara'; else if (val === '6-12') html = '✅ <b>Target KKA 6-12 Bulan:</b><br>- Duduk sendiri tanpa sandaran<br>- Mengucapkan ma-ma / pa-pa<br>- Mengambil benda kecil (menjumput)'; else if (val === '12-24') html = '✅ <b>Target KKA 12-24 Bulan:</b><br>- Berjalan sendiri tanpa jatuh<br>- Menyebutkan 3-6 kata bermakna<br>- Menumpuk 2-4 kubus mainan';
-            if(html) { getEl('hasil-kka').innerHTML = `<div style="background:#e8f4fd; padding:15px; border-radius:8px; border-left:4px solid #0d6efd;">${html}<br><br><i style="font-size:0.75rem; color:#666;">*Jika anak belum bisa melakukan 1 hal di atas, sarankan ke Posyandu/Bidan.</i></div>`; } else { getEl('hasil-kka').innerHTML = ''; }
-        };
-    }
+    if (selKKA) { selKKA.onchange = () => { const val = selKKA.value; let html = ''; if (val === '0-3') html = '✅ <b>Target KKA 0-3 Bulan:</b><br>- Menatap wajah ibu saat disusui<br>- Tersenyum membalas senyuman<br>- Menggerakkan tangan & kaki aktif'; else if (val === '3-6') html = '✅ <b>Target KKA 3-6 Bulan:</b><br>- Tengkurap dan berbalik sendiri<br>- Meraih benda yang didekatkan<br>- Menoleh ke arah suara'; else if (val === '6-12') html = '✅ <b>Target KKA 6-12 Bulan:</b><br>- Duduk sendiri tanpa sandaran<br>- Mengucapkan ma-ma / pa-pa<br>- Mengambil benda kecil (menjumput)'; else if (val === '12-24') html = '✅ <b>Target KKA 12-24 Bulan:</b><br>- Berjalan sendiri tanpa jatuh<br>- Menyebutkan 3-6 kata bermakna<br>- Menumpuk 2-4 kubus mainan'; if(html) { getEl('hasil-kka').innerHTML = `<div style="background:#e8f4fd; padding:15px; border-radius:8px; border-left:4px solid #0d6efd;">${html}<br><br><i style="font-size:0.75rem; color:#666;">*Jika anak belum bisa melakukan 1 hal di atas, sarankan ke Posyandu/Bidan.</i></div>`; } else { getEl('hasil-kka').innerHTML = ''; } }; }
 };
 
 // ==========================================
 // 9. PENGATURAN
 // ==========================================
 const initSetting = () => { 
-    const session = window.currentUser;
-    if(getEl('set-nama')) getEl('set-nama').value = session.nama;
-    if(getEl('set-id')) getEl('set-id').value = session.username;
-
-    const toggleDark = getEl('toggle-dark-mode');
-    if (toggleDark) {
-        toggleDark.checked = localStorage.getItem('theme') === 'dark';
-        toggleDark.onchange = () => { localStorage.setItem('theme', toggleDark.checked ? 'dark' : 'light'); applySettings(); };
-    }
-    
+    const session = window.currentUser; if(getEl('set-nama')) getEl('set-nama').value = session.nama; if(getEl('set-id')) getEl('set-id').value = session.username;
+    const toggleDark = getEl('toggle-dark-mode'); if (toggleDark) { toggleDark.checked = localStorage.getItem('theme') === 'dark'; toggleDark.onchange = () => { localStorage.setItem('theme', toggleDark.checked ? 'dark' : 'light'); applySettings(); }; }
     const btnMin = getEl('btn-text-min'); const btnPlus = getEl('btn-text-plus');
-    if (btnMin && btnPlus) {
-        btnMin.onclick = () => { let size = parseInt(localStorage.getItem('fontSize') || '16'); if (size > 12) { size -= 2; localStorage.setItem('fontSize', size); applySettings(); } };
-        btnPlus.onclick = () => { let size = parseInt(localStorage.getItem('fontSize') || '16'); if (size < 24) { size += 2; localStorage.setItem('fontSize', size); applySettings(); } };
-    }
-    
-    const formP = getEl('form-ganti-pass');
-    if(formP) formP.onsubmit = (e) => { e.preventDefault(); alert("Permintaan ganti password disimpan."); e.target.reset(); renderKonten('dashboard'); };
+    if (btnMin && btnPlus) { btnMin.onclick = () => { let size = parseInt(localStorage.getItem('fontSize') || '16'); if (size > 12) { size -= 2; localStorage.setItem('fontSize', size); applySettings(); } }; btnPlus.onclick = () => { let size = parseInt(localStorage.getItem('fontSize') || '16'); if (size < 24) { size += 2; localStorage.setItem('fontSize', size); applySettings(); } }; }
+    const formP = getEl('form-ganti-pass'); if(formP) formP.onsubmit = (e) => { e.preventDefault(); alert("Permintaan ganti password disimpan."); e.target.reset(); renderKonten('dashboard'); };
 };
 
 // ==========================================
-// 10. LOGIN PINTAR & INISIALISASI
+// 10. LOGIN PINTAR
 // ==========================================
 document.addEventListener('DOMContentLoaded', () => {
     initApp();
@@ -909,16 +751,16 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                     }
 
-                    const ses = { id: 'active_user', username: id, role: role, nama: nama, id_tim: tim, nomor_tim: noTim, kecamatan: user.kecamatan || user.wilayah || '' }; // 👈 Tambahkan atribut kecamatan
+                    const ses = { id: 'active_user', username: id, role: role, nama: nama, id_tim: tim, nomor_tim: noTim, kecamatan: user.kecamatan || user.wilayah || '' };
                     await putData('kader_session', ses);
                     
                     getEl('kader-id').value = ''; getEl('kader-pin').value = ''; 
                     
-                    // 🔥 LOGIKA PERCABANGAN (RESEPSIONIS CERDAS)
+                    // 🔥 PERCABANGAN ROUTER ADMIN SETELAH KLIK TOMBOL MASUK
                     if (role.includes('ADMIN')) {
-                        initAdmin(ses); // Masuk ke Ruang Kontrol Eksekutif
+                        initAdmin(ses);
                     } else {
-                        masukKeAplikasi(ses); // Masuk ke Layar HP Kader
+                        masukKeAplikasi(ses);
                     }
                 } else { alert("❌ PIN yang Anda masukkan salah!"); }
             } catch (err) { console.error("Kesalahan Login:", err); alert("Kesalahan Sistem: " + err.message); } finally { if (btn) { btn.disabled = false; btn.innerText = "Masuk"; } }
@@ -926,12 +768,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-window.logout = async () => { 
-    if (confirm("Keluar dari aplikasi? Data sasaran belum sinkron tetap aman di HP.")) { await deleteData('kader_session', 'active_user'); location.reload(); }
-};
-
 // ==========================================
-// 11. KENDALI MENU HAMBURGER (SIDEBAR)
+// 11. SIDEBAR KADER MENU
 // ==========================================
 const btnMenu = getEl('btn-menu'); const sidebar = getEl('sidebar'); const overlay = getEl('sidebar-overlay');
 
