@@ -87,16 +87,13 @@ const renderMenu = (role) => {
 
     container.innerHTML = menus.map(m => `<a class="menu-item" data-target="${m.id}"><span class="icon">${m.icon}</span> ${m.label}</a>`).join('') + `<hr><a class="menu-item text-danger" id="btnLogout">🚪 Keluar (Hapus Sesi Lokal)</a>`;
     
-    container.style.overflowY = 'auto';
-    container.style.maxHeight = 'calc(100vh - 180px)'; 
-    container.style.paddingBottom = '20px';
+    container.style.overflowY = 'auto'; container.style.maxHeight = 'calc(100vh - 180px)'; container.style.paddingBottom = '20px';
 
     document.querySelectorAll('.menu-item[data-target]').forEach(item => {
         item.onclick = () => {
             getEl('sidebar').classList.remove('active'); getEl('sidebar-overlay').classList.remove('active');
             const target = item.getAttribute('data-target');
-            if (target === 'reload_app') { location.reload(true); } 
-            else { renderKonten(target); }
+            if (target === 'reload_app') { location.reload(true); } else { renderKonten(target); }
         };
     });
 
@@ -140,9 +137,7 @@ window.renderKonten = async (target) => {
 
                 <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
                     <div class="card" style="text-align:center; padding: 15px 5px; cursor:pointer; border-bottom: 4px solid #0d6efd;" onclick="renderKonten('registrasi')"><div style="font-size: 1.6rem;">📝</div><h3 style="font-size: 0.95rem; margin: 5px 0 0 0;">BARU</h3><p style="font-size: 0.65rem; color: #666; font-weight: bold; margin: 2px 0 0 0;">REGISTRASI</p></div>
-                    <div class="card" id="card-sync-dashboard" style="text-align:center; padding: 15px 5px; cursor:pointer; border-bottom: 4px solid orange; background:#fffdf8;" onclick="window.mulaiSinkronisasiDashboard()">
-                        <div id="icon-sync-dash" style="font-size: 1.6rem;">🔄</div><h3 id="dash-tunda" style="font-size: 1rem; margin: 5px 0 0 0;">0/0</h3><p id="text-sync-dash" style="font-size: 0.65rem; color: #d63384; font-weight: bold; margin: 2px 0 0 0;">KLIK SINKRON</p>
-                    </div>
+                    <div class="card" id="card-sync-dashboard" style="text-align:center; padding: 15px 5px; cursor:pointer; border-bottom: 4px solid orange; background:#fffdf8;" onclick="window.mulaiSinkronisasiDashboard()"><div id="icon-sync-dash" style="font-size: 1.6rem;">🔄</div><h3 id="dash-tunda" style="font-size: 1rem; margin: 5px 0 0 0;">0/0</h3><p id="text-sync-dash" style="font-size: 0.65rem; color: #d63384; font-weight: bold; margin: 2px 0 0 0;">KLIK SINKRON</p></div>
                     <div class="card" style="text-align:center; padding: 15px 5px; cursor:pointer; border-bottom: 4px solid #198754;" onclick="renderKonten('pendampingan')"><div style="font-size: 1.6rem;">🤝</div><h3 style="font-size: 0.95rem; margin: 5px 0 0 0;">LAPOR</h3><p style="font-size: 0.65rem; color: #666; font-weight: bold; margin: 2px 0 0 0;">PENDAMPINGAN</p></div>
                 </div>
             </div>`;
@@ -179,7 +174,6 @@ window.renderKonten = async (target) => {
         } catch (e) { console.error(e); }
 
     } else if (target === 'registrasi') {
-        // 🔥 FORM REGISTRASI SUPER CERDAS
         area.innerHTML = `
             <div class="animate-fade">
                 <h3 style="margin-top:0; color:var(--primary); font-size:1.3rem;">📝 Registrasi Sasaran Baru</h3>
@@ -198,7 +192,7 @@ window.renderKonten = async (target) => {
                     <div id="form-core" style="display:none; margin-top:15px;">
                         <div class="form-group"><label>Nama Sasaran <span style="color:red">*</span></label><input type="text" name="nama_sasaran" class="form-control" required></div>
                         <div class="form-group"><label>Nama Kepala Keluarga <span style="color:red">*</span></label><input type="text" name="nama_kk" class="form-control" required></div>
-                        <div class="form-group"><label>Nomor KK <span style="color:red">*</span></label><input type="text" name="nomor_kk" class="form-control" pattern="[0-9]{16}" title="Nomor KK harus 16 digit angka" maxlength="16" minlength="16" oninput="this.value=this.value.replace(/[^0-9]/g,'')" required></div>
+                        <div class="form-group"><label>Nomor KK <span style="color:red">*</span></label><input type="text" name="nomor_kk" class="form-control" pattern="[0-9]{16}" title="Nomor KK harus 16 digit angka" maxlength="16" minlength="16" oninput="this.value=this.value.replace(/[^0-9]/g,'')" placeholder="16 digit angka" required></div>
                         <div class="form-group"><label>Tanggal Lahir Sasaran <span style="color:red">*</span></label><input type="date" name="tanggal_lahir" class="form-control" required></div>
                         <div class="form-group"><label>Jenis Kelamin <span style="color:red">*</span></label><select name="jenis_kelamin" id="reg-jk" class="form-control" required><option value="">-- Pilih --</option><option value="Laki-laki">Laki-laki</option><option value="Perempuan">Perempuan</option></select></div>
                         
@@ -253,7 +247,11 @@ window.renderKonten = async (target) => {
                             <div class="form-group"><label>Kabupaten/Kota <span style="color:red">*</span></label><select name="catin_kab" id="catin-kab" class="form-control"></select></div>
                             <div class="form-group"><label>Kecamatan <span style="color:red">*</span></label><select name="catin_kec" id="catin-kec" class="form-control"></select></div>
                             <div class="form-group"><label>Desa/Kelurahan <span style="color:red">*</span></label><select name="catin_desa" id="catin-desa" class="form-control"></select></div>
-                            <div class="form-group"><label>Dusun / RW <span style="color:red">*</span></label><input type="text" name="catin_dusun" id="catin-dusun" class="form-control" placeholder="Ketik nama Dusun/RW..."></div>
+                            <div class="form-group">
+                                <label>Dusun / RW <span style="color:red">*</span></label>
+                                <select id="catin-dusun-sel" class="form-control" style="display:none;"></select>
+                                <input type="text" id="catin-dusun-txt" class="form-control" placeholder="Ketik nama Dusun/RW...">
+                            </div>
                             <div class="form-group"><label>Alamat Lengkap <span style="color:red">*</span></label><textarea name="catin_alamat" id="catin-alamat" class="form-control" rows="2" placeholder="Nama Jalan, Blok, dll..."></textarea></div>
                         </div>
 
@@ -307,7 +305,7 @@ const renderPertanyaanDinamis = (jenis, modul, container, questions) => {
     }).sort((a,b)=> (parseInt(a.urutan)||0) - (parseInt(b.urutan)||0));
 
     if (filteredQ.length > 0) {
-        let html = `<div>`; // Judul dihapus agar menyatu
+        let html = `<div>`; // Menyatu, tanpa judul
         filteredQ.forEach(q => {
             let lbl = String(q.label_pertanyaan || '').toLowerCase();
             let req = String(q.is_required || '').toUpperCase() === 'Y' ? 'required' : ''; 
@@ -349,7 +347,7 @@ const initFormRegistrasi = async () => {
     }
 
     const catinKab = getEl('catin-kab'); const catinKec = getEl('catin-kec'); const catinDesa = getEl('catin-desa');
-    const catinDusun = getEl('catin-dusun'); const catinAlamat = getEl('catin-alamat');
+    const catinDusunSel = getEl('catin-dusun-sel'); const catinDusunTxt = getEl('catin-dusun-txt'); const catinAlamat = getEl('catin-alamat');
 
     if (catinKab && allWilBali.length > 0) {
         const dKab = [...new Set(allWilBali.map(w => w.kabupaten))].filter(Boolean);
@@ -357,10 +355,28 @@ const initFormRegistrasi = async () => {
         catinKab.onchange = () => {
             const fKec = allWilBali.filter(w => w.kabupaten === catinKab.value); const dKec = [...new Set(fKec.map(w => w.kecamatan))].filter(Boolean);
             catinKec.innerHTML = '<option value="">-- Pilih Kecamatan --</option>' + dKec.map(d => `<option value="${d}">${d}</option>`).join(''); catinDesa.innerHTML = '<option value="">-- Pilih Desa --</option>'; 
+            
+            catinDusunTxt.style.display = 'block'; catinDusunTxt.setAttribute('name', 'catin_dusun');
+            catinDusunSel.style.display = 'none'; catinDusunSel.removeAttribute('name');
         };
         catinKec.onchange = () => {
             const fDesa = allWilBali.filter(w => w.kabupaten === catinKab.value && w.kecamatan === catinKec.value); const dDesa = [...new Set(fDesa.map(w => w.desa_kelurahan))].filter(Boolean);
             catinDesa.innerHTML = '<option value="">-- Pilih Desa --</option>' + dDesa.map(d => `<option value="${d}">${d}</option>`).join('');
+        };
+        // 🔥 LOGIKA DROPDOWN DUSUN KHUSUS BULELENG
+        catinDesa.onchange = () => {
+            if (catinKab.value.toUpperCase().includes('BULELENG')) {
+                const dDusun = allWil.filter(w => w.desa_kelurahan === catinDesa.value);
+                if(dDusun.length > 0) {
+                    const uniqueDusun = [...new Set(dDusun.map(w => w.dusun_rw))].filter(Boolean);
+                    catinDusunSel.innerHTML = '<option value="">-- Pilih Dusun --</option>' + uniqueDusun.map(d => `<option value="${d}">${d}</option>`).join('');
+                    catinDusunSel.style.display = 'block'; catinDusunSel.setAttribute('name', 'catin_dusun'); catinDusunSel.setAttribute('required', 'true');
+                    catinDusunTxt.style.display = 'none'; catinDusunTxt.removeAttribute('name'); catinDusunTxt.removeAttribute('required');
+                    return;
+                }
+            }
+            catinDusunTxt.style.display = 'block'; catinDusunTxt.setAttribute('name', 'catin_dusun'); catinDusunTxt.setAttribute('required', 'true');
+            catinDusunSel.style.display = 'none'; catinDusunSel.removeAttribute('name'); catinDusunSel.removeAttribute('required');
         };
     }
 
@@ -378,13 +394,13 @@ const initFormRegistrasi = async () => {
             // 🔥 INJEKSI PERTANYAAN KHUSUS
             let htmlSpec = '';
             if(jenis === 'CATIN') {
-                htmlSpec = `<div class="form-group"><label>Nama Calon Suami / Istri <span style="color:red">*</span></label><input type="text" name="nama_calon" class="form-control" required></div><div class="form-group"><label>NIK Calon Suami / Istri <span style="color:red">*</span></label><input type="text" name="nik_calon" class="form-control" pattern="[0-9]{16}" title="NIK harus 16 digit angka" maxlength="16" minlength="16" oninput="this.value=this.value.replace(/[^0-9]/g,'')" required></div><div class="form-group"><label>Tanggal Rencana Pernikahan <span style="color:red">*</span></label><input type="date" name="tanggal_pernikahan" class="form-control" required></div><div class="form-group"><label>Perkawinan Ke- <span style="color:red">*</span></label><input type="number" name="perkawinan_ke" class="form-control" required></div><div class="form-group"><label>Bekerja di Luar Negeri <span style="color:red">*</span></label><select name="kerja_luar_negeri" class="form-control" required><option value="">-- Pilih --</option><option value="Pernah">Pernah</option><option value="Sedang">Sedang</option><option value="Akan">Akan</option><option value="Tidak">Tidak</option></select></div>`;
+                htmlSpec = `<div class="form-group"><label>Nama Calon Suami / Istri <span style="color:red">*</span></label><input type="text" name="nama_calon" class="form-control" required></div><div class="form-group"><label>NIK Calon Suami / Istri <span style="color:red">*</span></label><input type="text" name="nik_calon" class="form-control" pattern="[0-9]{16}" title="NIK harus 16 digit angka" maxlength="16" minlength="16" oninput="this.value=this.value.replace(/[^0-9]/g,'')" placeholder="16 digit angka" required></div><div class="form-group"><label>Tanggal Rencana Pernikahan <span style="color:red">*</span></label><input type="date" name="tanggal_pernikahan" class="form-control" required></div><div class="form-group"><label>Perkawinan Ke- <span style="color:red">*</span></label><input type="number" name="perkawinan_ke" class="form-control" required></div><div class="form-group"><label>Berat Badan (Kg)</label><input type="number" name="bb_catin" class="form-control" step="any" placeholder="Cth: 55"></div><div class="form-group"><label>Tinggi Badan (Cm)</label><input type="number" name="tb_catin" class="form-control" step="any" placeholder="Cth: 160"></div><div class="form-group"><label>Bekerja di Luar Negeri <span style="color:red">*</span></label><select name="kerja_luar_negeri" class="form-control" required><option value="">-- Pilih --</option><option value="Pernah">Pernah</option><option value="Sedang">Sedang</option><option value="Akan">Akan</option><option value="Tidak">Tidak</option></select></div>`;
             } else if (jenis === 'BUMIL') {
-                htmlSpec = `<div class="form-group"><label>Kehamilan Ke- <span style="color:red">*</span></label><input type="number" name="kehamilan_ke" class="form-control" required></div><div class="form-group"><label>Keinginan Hamil <span style="color:red">*</span></label><select name="keinginan_hamil" class="form-control" required><option value="">-- Pilih --</option><option value="Ingin Hamil Saat ini">Ingin Hamil Saat ini</option><option value="Ingin Hamil setelah >2 th">Ingin Hamil setelah >2 th</option><option value="Tidak Ingin Hamil Lagi">Tidak Ingin Hamil Lagi</option></select></div>`;
+                htmlSpec = `<div class="form-group"><label>Kehamilan Ke- <span style="color:red">*</span></label><input type="number" name="kehamilan_ke" class="form-control" required></div><div class="form-group"><label>Berat Badan Sebelum Hamil (Kg)</label><input type="number" name="bb_sebelum_hamil" class="form-control" step="any" placeholder="Cth: 50"></div><div class="form-group"><label>Keinginan Hamil <span style="color:red">*</span></label><select name="keinginan_hamil" class="form-control" required><option value="">-- Pilih --</option><option value="Ingin Hamil Saat ini">Ingin Hamil Saat ini</option><option value="Ingin Hamil setelah >2 th">Ingin Hamil setelah >2 th</option><option value="Tidak Ingin Hamil Lagi">Tidak Ingin Hamil Lagi</option></select></div>`;
             } else if (jenis === 'BUFAS') {
                 htmlSpec = `<div class="form-group"><label>Tanggal Persalinan <span style="color:red">*</span></label><input type="date" name="tgl_persalinan" class="form-control" required></div><div class="form-group"><label>Jumlah Anak Kandung <span style="color:red">*</span></label><input type="number" name="jumlah_anak_kandung" class="form-control" required></div>`;
             } else if (jenis === 'BADUTA') {
-                htmlSpec = `<div class="form-group"><label>Nama Ibu Kandung <span style="color:red">*</span></label><input type="text" name="nama_ibu_kandung" class="form-control" required></div><div class="form-group"><label>Anak Ke- <span style="color:red">*</span></label><input type="number" name="anak_ke" class="form-control" required></div>`;
+                htmlSpec = `<div class="form-group"><label>Nama Ibu Kandung <span style="color:red">*</span></label><input type="text" name="nama_ibu_kandung" class="form-control" required></div><div class="form-group"><label>Anak Ke- <span style="color:red">*</span></label><input type="number" name="anak_ke" class="form-control" required></div><div class="form-group"><label>Berat Badan Lahir (Kg)</label><input type="number" name="bb_lahir" class="form-control" step="any" placeholder="Cth: 3.2"></div><div class="form-group"><label>Tinggi / Panjang Badan Lahir (Cm)</label><input type="number" name="tb_lahir" class="form-control" step="any" placeholder="Cth: 48"></div>`;
             }
             spec.innerHTML = htmlSpec;
 
@@ -392,13 +408,16 @@ const initFormRegistrasi = async () => {
                 if (jenis === 'CATIN') {
                     boxCatin.style.display = 'block'; boxDomisili.style.display = 'none';
                     if(selDesa) selDesa.removeAttribute('required'); if(selDusun) selDusun.removeAttribute('required'); if(regAlamat) regAlamat.removeAttribute('required');
+                    
                     if(catinKab) catinKab.setAttribute('required', 'true'); if(catinKec) catinKec.setAttribute('required', 'true'); if(catinDesa) catinDesa.setAttribute('required', 'true');
-                    if(catinDusun) catinDusun.setAttribute('required', 'true'); if(catinAlamat) catinAlamat.setAttribute('required', 'true');
+                    if(catinDusunSel.style.display === 'block') { catinDusunSel.setAttribute('required', 'true'); } else { catinDusunTxt.setAttribute('required', 'true'); }
+                    if(catinAlamat) catinAlamat.setAttribute('required', 'true');
                 } else {
                     boxCatin.style.display = 'none'; boxDomisili.style.display = 'block';
                     if(selDesa) selDesa.setAttribute('required', 'true'); if(selDusun) selDusun.setAttribute('required', 'true'); if(regAlamat) regAlamat.setAttribute('required', 'true');
+                    
                     if(catinKab) catinKab.removeAttribute('required'); if(catinKec) catinKec.removeAttribute('required'); if(catinDesa) catinDesa.removeAttribute('required');
-                    if(catinDusun) catinDusun.removeAttribute('required'); if(catinAlamat) catinAlamat.removeAttribute('required');
+                    catinDusunSel.removeAttribute('required'); catinDusunTxt.removeAttribute('required'); if(catinAlamat) catinAlamat.removeAttribute('required');
                 }
             }
             renderPertanyaanDinamis(jenis, 'REGISTRASI', containerQ, questions);
@@ -536,7 +555,7 @@ const initDaftarSasaran = async () => {
                 </div>
                 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
-                    <div><div style="font-size: 0.8rem; color: #666;">ID / No NIK</div><div style="font-size: 0.95rem; color: #222; font-weight: 500;">${r.id} <br> ${r.data_laporan?.nik || '-'}</div></div>
+                    <div><div style="font-size: 0.8rem; color: #666;">ID / No KK</div><div style="font-size: 0.95rem; color: #222; font-weight: 500;">${r.id} <br> ${r.data_laporan?.nomor_kk || '-'}</div></div>
                     <div><div style="font-size: 0.8rem; color: #666;">Kategori</div><div style="font-size: 0.95rem; color: #222; font-weight: bold;">${r.textBaris2}</div></div>
                 </div>
 
