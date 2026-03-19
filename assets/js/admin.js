@@ -123,14 +123,17 @@ export const initAdmin = async (session) => {
 // ==========================================
 const renderAdminUI = (session) => {
     const isKabupaten = session.role.toUpperCase().includes('KAB');
-    const lvlAdmin = isKabupaten ? 'KABUPATEN BULELENG' : `KECAMATAN ${session.finalNamaKec}`;
+    const lvlAdmin = isKabupaten ? 'KABUPATEN BULELENG' : `KEC. ${session.finalNamaKec}`;
 
     document.body.innerHTML = `
         <div id="admin-root" style="display:flex; height:100vh; width:100vw; background:#f4f6f9; font-family: 'Segoe UI', sans-serif;">
             <div style="width:260px; background:#001f3f; color:white; display:flex; flex-direction:column; box-shadow: 2px 0 5px rgba(0,0,0,0.1); z-index:10;">
                 <div style="padding: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); text-align:center;">
-                    <h3 style="margin:0; font-size:1.2rem; font-weight:800; color:#4ea8de;">DASHBOARD ADMIN TPK</h3>
-                    <div style="font-size:0.8rem; color:#adb5bd; margin-top:5px; font-weight:bold;">${lvlAdmin}</div>
+                    <h3 style="margin:0; font-weight:800; line-height:1;">
+                        <span style="font-size:1.4rem; color:#4ea8de; display:block; letter-spacing:1px;">DASHBOARD</span>
+                        <span style="font-size:1rem; color:#ffffff; display:block; margin-top:4px;">ADMIN TPK</span>
+                    </h3>
+                    <div style="font-size:0.75rem; color:#adb5bd; margin-top:10px; padding-top:10px; border-top: 1px dashed rgba(255,255,255,0.2); font-weight:bold; letter-spacing:0.5px;">${lvlAdmin}</div>
                 </div>
                 <div style="flex:1; padding: 20px 0; overflow-y:auto;">
                     <div class="admin-menu-item active" data-target="dash">📊 Ringkasan Eksekutif</div>
