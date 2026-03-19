@@ -7,18 +7,24 @@ import { deleteData } from './db.js';
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzEmmn0wMJmC1OHij9JUxm8EIT2xW1AuV0597EYCWDIxG_nkpZYBPx1EGiNYe6OjEHniw/exec';
 
 export const initAdmin = async (session) => {
-    // 1. Bersihkan seluruh antarmuka Mobile (Layar HP)
-    document.body.innerHTML = `
-        <div id="admin-root" style="display:flex; height:100vh; width:100vw; background:#f4f6f9; font-family: 'Segoe UI', sans-serif;">
-            <div style="margin:auto; text-align:center;">
-                <div style="font-size: 3rem; margin-bottom:15px;">🌐</div>
-                <h2 style="color:#0043a8; margin:0 0 10px 0;">Mempersiapkan Ruang Kontrol...</h2>
-                <p style="color:#666; font-weight:bold;">Menyedot data real-time dari Server Google. Mohon tunggu ⏳</p>
-            </div>
-        </div>
-    `;
+    // 1. Tampilkan Splash Screen Bawaan agar Konsisten
+    const vSplash = document.getElementById('view-splash');
+    const vLogin = document.getElementById('view-login');
+    const vApp = document.getElementById('view-app');
+    
+    if(vLogin) vLogin.classList.add('hidden');
+    if(vApp) vApp.classList.add('hidden');
+    if(vSplash) { 
+        vSplash.style.display = 'flex'; 
+        vSplash.classList.remove('hidden'); 
+        vSplash.classList.add('active'); 
+        
+        // Ubah teks loading khusus Admin
+        const textLoad = vSplash.querySelector('p') || vSplash.querySelector('div');
+        if(textLoad) textLoad.innerHTML = "<b style='font-size:1.1rem; color:var(--primary);'>Memuat Ruang Kontrol Eksekutif...</b><br><small style='color:#666;'>Menyedot data live dari Server Google</small>";
+    }
 
-    // 2. Suntikkan Library Grafik (Chart.js) secara otomatis
+    // 2. Load Chart JS secara Background
     if (!window.Chart) {
         const script = document.createElement('script');
         script.src = 'https://cdn.jsdelivr.net/npm/chart.js';
@@ -34,11 +40,16 @@ export const initAdmin = async (session) => {
         if (res.status === 'success') {
             window.adminData = res.data;
             
-            // Ekstrak string JSON agar mudah dibaca oleh tabel
+            // Format string JSON
             window.adminData.registrasi.forEach(r => { try { r.data_json = JSON.parse(r.data_laporan || '{}'); } catch(e) { r.data_json = {}; } });
             window.adminData.pendampingan.forEach(p => { try { p.data_json = JSON.parse(p.data_laporan || '{}'); } catch(e) { p.data_json = {}; } });
             
-            setTimeout(() => renderAdminUI(session), 600); // Jeda sejenak agar Chart.js selesai dimuat
+            window.adminCurrentMonth = 'ALL'; // Default Filter Waktu
+            
+            setTimeout(() => {
+                if(vSplash) vSplash.style.display = 'none'; // Sembunyikan Splash
+                renderAdminUI(session); // Timpa body dengan UI Admin
+            }, 800); 
         } else {
             alert("❌ Gagal memuat data dari server: " + res.message); location.reload();
         }
@@ -51,39 +62,41 @@ export const initAdmin = async (session) => {
 // RENDER ANTARMUKA DESKTOP ADMIN
 // ==========================================
 const renderAdminUI = (session) => {
-    const root = document.getElementById('admin-root');
     const lvlAdmin = session.role.includes('KAB') ? 'KABUPATEN BULELENG' : `KECAMATAN ${session.kecamatan.toUpperCase()}`;
 
-    root.innerHTML = `
-        <div style="width:260px; background:#001f3f; color:white; display:flex; flex-direction:column; box-shadow: 2px 0 5px rgba(0,0,0,0.1); z-index:10;">
-            <div style="padding: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); text-align:center;">
-                <h3 style="margin:0; font-size:1.2rem; font-weight:800; color:#4ea8de;">DASHBOARD PIMPINAN</h3>
-                <div style="font-size:0.8rem; color:#adb5bd; margin-top:5px; font-weight:bold;">${lvlAdmin}</div>
-            </div>
-            
-            <div style="flex:1; padding: 20px 0; overflow-y:auto;">
-                <div class="admin-menu-item active" data-target="dash">📊 Ringkasan Eksekutif</div>
-                <div class="admin-menu-item" data-target="duplikat" style="position:relative;">
-                    ⚠️ Resolusi Duplikat
-                    <span id="badge-dup" style="background:#dc3545; color:white; padding:2px 6px; border-radius:10px; font-size:0.7rem; position:absolute; right:15px; top:12px;">0</span>
+    // Timpa seluruh body dengan Layout Desktop Admin
+    document.body.innerHTML = `
+        <div id="admin-root" style="display:flex; height:100vh; width:100vw; background:#f4f6f9; font-family: 'Segoe UI', sans-serif;">
+            <div style="width:260px; background:#001f3f; color:white; display:flex; flex-direction:column; box-shadow: 2px 0 5px rgba(0,0,0,0.1); z-index:10;">
+                <div style="padding: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); text-align:center;">
+                    <h3 style="margin:0; font-size:1.2rem; font-weight:800; color:#4ea8de;">DASHBOARD PIMPINAN</h3>
+                    <div style="font-size:0.8rem; color:#adb5bd; margin-top:5px; font-weight:bold;">${lvlAdmin}</div>
                 </div>
-                <div class="admin-menu-item" data-target="database">🗄️ Master Live Database</div>
+                
+                <div style="flex:1; padding: 20px 0; overflow-y:auto;">
+                    <div class="admin-menu-item active" data-target="dash">📊 Ringkasan Eksekutif</div>
+                    <div class="admin-menu-item" data-target="duplikat" style="position:relative;">
+                        ⚠️ Resolusi Duplikat
+                        <span id="badge-dup" style="background:#dc3545; color:white; padding:2px 6px; border-radius:10px; font-size:0.7rem; position:absolute; right:15px; top:12px;">0</span>
+                    </div>
+                    <div class="admin-menu-item" data-target="database">🗄️ Master Live Database</div>
+                </div>
+                
+                <div style="padding: 20px; border-top: 1px solid rgba(255,255,255,0.1);">
+                    <div style="font-size:0.8rem; margin-bottom:10px; color:#adb5bd;">Login sebagai: <br><b style="color:white;">${session.nama}</b></div>
+                    <button id="btn-admin-logout" style="width:100%; background:#dc3545; color:white; border:none; padding:10px; border-radius:6px; cursor:pointer; font-weight:bold;">Keluar Aplikasi</button>
+                </div>
             </div>
-            
-            <div style="padding: 20px; border-top: 1px solid rgba(255,255,255,0.1);">
-                <div style="font-size:0.8rem; margin-bottom:10px; color:#adb5bd;">Login sebagai: <br><b style="color:white;">${session.nama}</b></div>
-                <button id="btn-admin-logout" style="width:100%; background:#dc3545; color:white; border:none; padding:10px; border-radius:6px; cursor:pointer; font-weight:bold;">Keluar Aplikasi</button>
-            </div>
-        </div>
 
-        <div style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
-            <div style="background:white; padding: 15px 30px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); z-index:5; display:flex; justify-content:space-between; align-items:center;">
-                <h2 id="admin-page-title" style="margin:0; font-size:1.4rem; color:#333;">Ringkasan Eksekutif</h2>
-                <div style="font-size:0.85rem; color:#666; font-weight:bold;">Status Data: <span style="color:#198754;">🟢 Real-Time Tersinkron</span></div>
-            </div>
-            
-            <div id="admin-content" style="flex:1; padding: 30px; overflow-y:auto; background:#f4f6f9;">
+            <div style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
+                <div style="background:white; padding: 15px 30px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); z-index:5; display:flex; justify-content:space-between; align-items:center;">
+                    <h2 id="admin-page-title" style="margin:0; font-size:1.4rem; color:#333;">Ringkasan Eksekutif</h2>
+                    <div style="font-size:0.85rem; color:#666; font-weight:bold;">Status Data: <span style="color:#198754;">🟢 Real-Time Tersinkron</span></div>
                 </div>
+                
+                <div id="admin-content" style="flex:1; padding: 30px; overflow-y:auto; background:#f4f6f9;">
+                    </div>
+            </div>
         </div>
 
         <style>
@@ -111,11 +124,9 @@ const renderAdminUI = (session) => {
         };
     });
 
-    // Kalkulasi Badge Peringatan Duplikat
     const dataDup = window.adminData.registrasi.filter(r => r.status_duplikasi && r.status_duplikasi.includes('DUPLIKAT'));
     document.getElementById('badge-dup').innerText = dataDup.length;
 
-    // Load halaman awal
     renderView('dash');
 };
 
@@ -127,97 +138,127 @@ const renderView = (target) => {
     const data = window.adminData;
 
     if (target === 'dash') {
-        // 1. Hitung Statistik Utama
-        let tCatin = 0, tBumil = 0, tBufas = 0, tBaduta = 0;
-        data.registrasi.forEach(r => {
-            if(r.status_sasaran !== 'SELESAI') {
-                if(r.jenis_sasaran === 'CATIN') tCatin++; else if(r.jenis_sasaran === 'BUMIL') tBumil++; 
-                else if(r.jenis_sasaran === 'BUFAS') tBufas++; else if(r.jenis_sasaran === 'BADUTA') tBaduta++;
-            }
-        });
-        const tSasaran = tCatin + tBumil + tBufas + tBaduta;
+        // Kumpulkan Daftar Bulan untuk Filter
+        const monthSet = new Set();
+        data.registrasi.forEach(r => { if(r.created_at) monthSet.add(r.created_at.substring(0,7)); });
+        data.pendampingan.forEach(p => { let t = p.data_json?.tgl_kunjungan || p.created_at; if(t) monthSet.add(t.substring(0,7)); });
+        const monthOptions = Array.from(monthSet).sort().reverse().map(m => {
+            const date = new Date(m + '-01'); const name = date.toLocaleDateString('id-ID', {month:'long', year:'numeric'});
+            return `<option value="${m}">${name}</option>`;
+        }).join('');
 
+        // Terapkan Filter
+        const fM = window.adminCurrentMonth;
+        const regF = data.registrasi.filter(r => fM === 'ALL' || (r.created_at && r.created_at.startsWith(fM)));
+        const pendF = data.pendampingan.filter(p => { let t = p.data_json?.tgl_kunjungan || p.created_at; return fM === 'ALL' || (t && t.startsWith(fM)); });
+
+        // Kalkulasi Baris 1: Status Sasaran
+        const totalSasaran = regF.length;
+        let sasaranSelesai = 0;
+        const hI = new Date(); hI.setHours(0,0,0,0);
+        regF.forEach(r => {
+            let isExp = r.status_sasaran === 'SELESAI';
+            if (r.jenis_sasaran === 'CATIN' && r.data_json?.tanggal_pernikahan && new Date(r.data_json.tanggal_pernikahan) < hI) isExp = true;
+            if (r.jenis_sasaran === 'BUFAS' && r.data_json?.tgl_persalinan) { const tB = new Date(r.data_json.tgl_persalinan); tB.setDate(tB.getDate() + 42); if (hI > tB) isExp = true; }
+            if(isExp) sasaranSelesai++;
+        });
+        const sasaranAktif = totalSasaran - sasaranSelesai;
+        const sasaranTerdampingi = new Set(pendF.map(p => p.id_sasaran_ref)).size;
+
+        // Kalkulasi Baris 2: Kategori Sasaran
+        let tCatin = 0, tBumil = 0, tBufas = 0, tBaduta = 0;
+        regF.forEach(r => {
+            if(r.jenis_sasaran === 'CATIN') tCatin++; else if(r.jenis_sasaran === 'BUMIL') tBumil++; 
+            else if(r.jenis_sasaran === 'BUFAS') tBufas++; else if(r.jenis_sasaran === 'BADUTA') tBaduta++;
+        });
+
+        // 🔥 Layout Grid Dashboard Baru
         content.innerHTML = `
-            <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 30px;">
-                <div class="admin-card" style="border-left: 5px solid #0d6efd;">
-                    <div style="font-size:0.85rem; color:#666; font-weight:bold; text-transform:uppercase;">Total Sasaran Aktif</div>
-                    <div style="font-size:2rem; font-weight:800; color:#0d6efd; margin-top:5px;">${tSasaran}</div>
+            <div style="display:flex; justify-content:flex-end; margin-bottom: 20px;">
+                <select id="admin-dash-month" style="padding:8px 15px; border:1px solid #c6c6c6; border-radius:6px; font-weight:bold; color:#0043a8; cursor:pointer; background:#fff; box-shadow:0 1px 2px rgba(0,0,0,0.05);">
+                    <option value="ALL">📅 Tampilkan Semua Bulan</option>
+                    ${monthOptions}
+                </select>
+            </div>
+
+            <h4 style="margin:0 0 10px 0; color:#555; font-size:1rem;">Kondisi Umum Sasaran</h4>
+            <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 25px;">
+                <div class="admin-card" style="border-top: 4px solid #0043a8; text-align:center;">
+                    <div style="font-size:0.85rem; color:#666; font-weight:bold; text-transform:uppercase;">Total Sasaran Terdaftar</div>
+                    <div style="font-size:2.2rem; font-weight:800; color:#0043a8; margin-top:5px;">${totalSasaran}</div>
                 </div>
-                <div class="admin-card" style="border-left: 5px solid #d63384;">
-                    <div style="font-size:0.85rem; color:#666; font-weight:bold; text-transform:uppercase;">Ibu Hamil Aktif</div>
-                    <div style="font-size:2rem; font-weight:800; color:#d63384; margin-top:5px;">${tBumil}</div>
+                <div class="admin-card" style="border-top: 4px solid #198754; text-align:center;">
+                    <div style="font-size:0.85rem; color:#666; font-weight:bold; text-transform:uppercase;">Sasaran Aktif</div>
+                    <div style="font-size:2.2rem; font-weight:800; color:#198754; margin-top:5px;">${sasaranAktif}</div>
                 </div>
-                <div class="admin-card" style="border-left: 5px solid #fd7e14;">
-                    <div style="font-size:0.85rem; color:#666; font-weight:bold; text-transform:uppercase;">Baduta (0-23 Bln)</div>
-                    <div style="font-size:2rem; font-weight:800; color:#fd7e14; margin-top:5px;">${tBaduta}</div>
+                <div class="admin-card" style="border-top: 4px solid #6c757d; text-align:center;">
+                    <div style="font-size:0.85rem; color:#666; font-weight:bold; text-transform:uppercase;">Sasaran Selesai / Expired</div>
+                    <div style="font-size:2.2rem; font-weight:800; color:#6c757d; margin-top:5px;">${sasaranSelesai}</div>
                 </div>
-                <div class="admin-card" style="border-left: 5px solid #198754;">
-                    <div style="font-size:0.85rem; color:#666; font-weight:bold; text-transform:uppercase;">Total Pendampingan</div>
-                    <div style="font-size:2rem; font-weight:800; color:#198754; margin-top:5px;">${data.pendampingan.length}</div>
+                <div class="admin-card" style="border-top: 4px solid #fd7e14; text-align:center;">
+                    <div style="font-size:0.85rem; color:#666; font-weight:bold; text-transform:uppercase;">Sasaran Terdampingi</div>
+                    <div style="font-size:2.2rem; font-weight:800; color:#fd7e14; margin-top:5px;">${sasaranTerdampingi}</div>
                 </div>
             </div>
 
+            <h4 style="margin:0 0 10px 0; color:#555; font-size:1rem;">Distribusi Berdasarkan Jenis</h4>
+            <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 30px;">
+                <div class="admin-card" style="border-left: 4px solid #6f42c1; display:flex; justify-content:space-between; align-items:center;">
+                    <div style="font-size:0.9rem; color:#666; font-weight:bold;">CATIN</div>
+                    <div style="font-size:1.8rem; font-weight:800; color:#6f42c1;">${tCatin}</div>
+                </div>
+                <div class="admin-card" style="border-left: 4px solid #d63384; display:flex; justify-content:space-between; align-items:center;">
+                    <div style="font-size:0.9rem; color:#666; font-weight:bold;">BUMIL</div>
+                    <div style="font-size:1.8rem; font-weight:800; color:#d63384;">${tBumil}</div>
+                </div>
+                <div class="admin-card" style="border-left: 4px solid #20c997; display:flex; justify-content:space-between; align-items:center;">
+                    <div style="font-size:0.9rem; color:#666; font-weight:bold;">BUFAS</div>
+                    <div style="font-size:1.8rem; font-weight:800; color:#20c997;">${tBufas}</div>
+                </div>
+                <div class="admin-card" style="border-left: 4px solid #0dcaf0; display:flex; justify-content:space-between; align-items:center;">
+                    <div style="font-size:0.9rem; color:#666; font-weight:bold;">BADUTA</div>
+                    <div style="font-size:1.8rem; font-weight:800; color:#0dcaf0;">${tBaduta}</div>
+                </div>
+            </div>
+            
             <div style="display:grid; grid-template-columns: 1fr 2fr; gap: 20px;">
-                <div class="admin-card">
-                    <h4 style="margin:0 0 15px 0; color:#333;">Demografi Sasaran</h4>
-                    <canvas id="chartPie" height="250"></canvas>
-                </div>
-                <div class="admin-card">
-                    <h4 style="margin:0 0 15px 0; color:#333;">Distribusi Berdasarkan Area</h4>
-                    <canvas id="chartBar" height="120"></canvas>
-                </div>
+                <div class="admin-card"><h4 style="margin:0 0 15px 0; color:#333;">Proporsi Demografi</h4><canvas id="chartPie" height="200"></canvas></div>
+                <div class="admin-card"><h4 style="margin:0 0 15px 0; color:#333;">Distribusi Area (Kecamatan/Desa)</h4><canvas id="chartBar" height="100"></canvas></div>
             </div>
         `;
 
-        // Eksekusi Grafik Donat
-        new Chart(document.getElementById('chartPie'), {
-            type: 'doughnut',
-            data: { labels: ['CATIN', 'BUMIL', 'BUFAS', 'BADUTA'], datasets: [{ data: [tCatin, tBumil, tBufas, tBaduta], backgroundColor: ['#6f42c1', '#d63384', '#20c997', '#fd7e14'] }] },
+        // Event Listener Filter Bulan
+        document.getElementById('admin-dash-month').value = window.adminCurrentMonth;
+        document.getElementById('admin-dash-month').addEventListener('change', function() {
+            window.adminCurrentMonth = this.value; renderView('dash');
+        });
+
+        // Eksekusi Grafik
+        if(window.myChartPie) window.myChartPie.destroy();
+        window.myChartPie = new Chart(document.getElementById('chartPie'), {
+            type: 'doughnut', data: { labels: ['CATIN', 'BUMIL', 'BUFAS', 'BADUTA'], datasets: [{ data: [tCatin, tBumil, tBufas, tBaduta], backgroundColor: ['#6f42c1', '#d63384', '#20c997', '#0dcaf0'] }] },
             options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
         });
 
-        // Eksekusi Grafik Batang (Hitung area dinamis)
         const areaStats = {};
-        data.registrasi.forEach(r => { const a = r.sumber_kecamatan || r.desa || 'Unknown'; areaStats[a] = (areaStats[a] || 0) + 1; });
-        
-        new Chart(document.getElementById('chartBar'), {
-            type: 'bar',
-            data: { labels: Object.keys(areaStats), datasets: [{ label: 'Jumlah Sasaran', data: Object.values(areaStats), backgroundColor: '#0d6efd' }] },
+        regF.forEach(r => { const a = r.sumber_kecamatan || r.desa || 'Unknown'; areaStats[a] = (areaStats[a] || 0) + 1; });
+        if(window.myChartBar) window.myChartBar.destroy();
+        window.myChartBar = new Chart(document.getElementById('chartBar'), {
+            type: 'bar', data: { labels: Object.keys(areaStats), datasets: [{ label: 'Jumlah Sasaran', data: Object.values(areaStats), backgroundColor: '#0d6efd' }] },
             options: { responsive: true, maintainAspectRatio: false }
         });
 
     } else if (target === 'duplikat') {
         const dDup = data.registrasi.filter(r => r.status_duplikasi && r.status_duplikasi.includes('DUPLIKAT'));
-        
         let htmlTable = '';
         if (dDup.length === 0) {
             htmlTable = `<div style="text-align:center; padding: 40px; color:#198754; font-size:1.2rem; font-weight:bold;">🎉 Luar Biasa! Tidak ada indikasi data ganda di wilayah ini.</div>`;
         } else {
-            htmlTable = `
-                <table class="admin-table">
-                    <thead><tr><th>ID Sasaran</th><th>Tgl Daftar</th><th>Tim Pelapor</th><th>Nama Sasaran (Kategori)</th><th>Keterangan Peringatan</th><th>Aksi</th></tr></thead>
-                    <tbody>
-                        ${dDup.map(r => `
-                            <tr>
-                                <td><b>${r.id}</b></td>
-                                <td>${new Date(r.created_at).toLocaleDateString('id-ID')}</td>
-                                <td>${r.id_tim}</td>
-                                <td><span style="font-weight:bold; color:#0043a8;">${r.nama_sasaran}</span><br><small style="color:#666;">${r.jenis_sasaran} | NIK: ${r.data_json?.nik||'-'}</small></td>
-                                <td><div style="background:#fff3cd; color:#856404; padding:6px; border-radius:4px; font-size:0.8rem; font-weight:bold;">${r.status_duplikasi}</div></td>
-                                <td><button style="background:#0d6efd; color:white; border:none; padding:6px 12px; border-radius:4px; cursor:pointer;" onclick="alert('Fitur Resolusi & Penggabungan Data sedang dalam pengembangan.')">Tindaklanjuti</button></td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            `;
+            htmlTable = `<table class="admin-table"><thead><tr><th>ID Sasaran</th><th>Tgl Daftar</th><th>Tim Pelapor</th><th>Nama Sasaran (Kategori)</th><th>Keterangan Peringatan</th><th>Aksi</th></tr></thead><tbody>
+                        ${dDup.map(r => `<tr><td><b>${r.id}</b></td><td>${new Date(r.created_at).toLocaleDateString('id-ID')}</td><td>${r.id_tim}</td><td><span style="font-weight:bold; color:#0043a8;">${r.nama_sasaran}</span><br><small style="color:#666;">${r.jenis_sasaran} | NIK: ${r.data_json?.nik||'-'}</small></td><td><div style="background:#fff3cd; color:#856404; padding:6px; border-radius:4px; font-size:0.8rem; font-weight:bold;">${r.status_duplikasi}</div></td><td><button style="background:#0d6efd; color:white; border:none; padding:6px 12px; border-radius:4px; cursor:pointer;" onclick="alert('Fitur Resolusi & Penggabungan Data sedang dalam pengembangan.')">Tindaklanjuti</button></td></tr>`).join('')}
+                    </tbody></table>`;
         }
-
-        content.innerHTML = `
-            <div class="admin-card">
-                <p style="color:#666; margin-top:0;">Berikut adalah data yang terindikasi didaftarkan lebih dari satu kali oleh tim yang berbeda berdasarkan kecocokan NIK atau Nama/Tgl Lahir.</p>
-                ${htmlTable}
-            </div>
-        `;
+        content.innerHTML = `<div class="admin-card"><p style="color:#666; margin-top:0;">Berikut adalah data yang terindikasi didaftarkan lebih dari satu kali oleh tim yang berbeda berdasarkan kecocokan NIK atau Nama/Tgl Lahir.</p>${htmlTable}</div>`;
 
     } else if (target === 'database') {
         content.innerHTML = `
@@ -230,26 +271,14 @@ const renderView = (target) => {
                     <table class="admin-table" id="table-master">
                         <thead><tr><th>ID</th><th>Kategori</th><th>Nama Sasaran</th><th>No. KK / NIK</th><th>Desa</th><th>Status</th></tr></thead>
                         <tbody>
-                            ${data.registrasi.map(r => `
-                                <tr>
-                                    <td>${r.id}</td><td><b>${r.jenis_sasaran}</b></td>
-                                    <td>${r.nama_sasaran}</td><td>${r.data_json?.nomor_kk||'-'}<br><small>${r.data_json?.nik||'-'}</small></td>
-                                    <td>${r.desa}</td><td>${r.status_sasaran === 'SELESAI' ? '<span style="color:#dc3545; font-weight:bold;">Selesai</span>' : '<span style="color:#198754; font-weight:bold;">Aktif</span>'}</td>
-                                </tr>
-                            `).join('')}
+                            ${data.registrasi.map(r => `<tr><td>${r.id}</td><td><b>${r.jenis_sasaran}</b></td><td>${r.nama_sasaran}</td><td>${r.data_json?.nomor_kk||'-'}<br><small>${r.data_json?.nik||'-'}</small></td><td>${r.desa}</td><td>${r.status_sasaran === 'SELESAI' ? '<span style="color:#dc3545; font-weight:bold;">Selesai</span>' : '<span style="color:#198754; font-weight:bold;">Aktif</span>'}</td></tr>`).join('')}
                         </tbody>
                     </table>
                 </div>
-            </div>
-        `;
-
-        // Fitur Pencarian Live (Live Search)
+            </div>`;
         document.getElementById('admin-search').addEventListener('keyup', function() {
             const filter = this.value.toLowerCase(); const rows = document.getElementById('table-master').getElementsByTagName('tr');
-            for (let i = 1; i < rows.length; i++) {
-                const text = rows[i].innerText.toLowerCase();
-                rows[i].style.display = text.includes(filter) ? '' : 'none';
-            }
+            for (let i = 1; i < rows.length; i++) { const text = rows[i].innerText.toLowerCase(); rows[i].style.display = text.includes(filter) ? '' : 'none'; }
         });
     }
 };
