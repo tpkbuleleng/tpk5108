@@ -3,7 +3,15 @@
 // ==========================================
 import { deleteData } from './db.js';
 
+// 👉 WAJIB SAMAKAN URL INI DENGAN DI SYNC.JS
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzEmmn0wMJmC1OHij9JUxm8EIT2xW1AuV0597EYCWDIxG_nkpZYBPx1EGiNYe6OjEHniw/exec';
+
+// 🔥 Penerjemah Nama Kecamatan -> Kode 3 Huruf untuk Server
+const getKodeKecamatan = (kec) => {
+    if (!kec) return "";
+    const map = { 'GEROKGAK': 'GRK', 'SERIRIT': 'SRT', 'BUSUNGBIU': 'BSB', 'BANJAR': 'BJR', 'SUKASADA': 'SKS', 'BULELENG': 'BLL', 'SAWAN': 'SWN', 'KUBUTAMBAHAN': 'KBT', 'TEJAKULA': 'TJK' };
+    return map[kec.toUpperCase()] || kec.toUpperCase(); 
+};
 
 export const initAdmin = async (session) => {
     // 1. Tampilkan Splash Screen Bawaan agar Konsisten
@@ -28,8 +36,10 @@ export const initAdmin = async (session) => {
         document.head.appendChild(script);
     }
 
+    // 3. Tarik Data Segar dari Server (Menggunakan Kode Kecamatan yang Benar)
     try {
-        const url = `${SCRIPT_URL}?action=getAdminData&role=${session.role}&kecamatan=${session.kecamatan || ''}`;
+        const kodeKec = getKodeKecamatan(session.kecamatan);
+        const url = `${SCRIPT_URL}?action=getAdminData&role=${session.role}&kecamatan=${kodeKec}`;
         const response = await fetch(url);
         const res = await response.json();
         
@@ -128,28 +138,32 @@ const renderAdminUI = (session) => {
         item.onclick = () => {
             menuItems.forEach(m => m.classList.remove('active')); item.classList.add('active');
             document.getElementById('admin-page-title').innerText = item.innerText.replace(/[0-9]/g, '').replace('⚠️', '').trim();
-            renderView(item.getAttribute('data-target'));
+            renderView(item.getAttribute('data-target'), session); // 🔥 Pass Session ke renderView
         };
     });
 
     const dataDup = window.adminData.registrasi.filter(r => r.status_duplikasi && r.status_duplikasi.includes('DUPLIKAT'));
     document.getElementById('badge-dup').innerText = dataDup.length;
 
-    renderView('dash');
+    renderView('dash', session); // 🔥 Pass Session ke renderView awal
 };
 
 // Fungsi Pemicu Klik Kartu Metrik
 window.setAdminMetric = (metric) => {
-    window.adminFilterMetric = window.adminFilterMetric === metric ? 'ALL' : metric; // Toggle
-    renderView('dash');
+    window.adminFilterMetric = window.adminFilterMetric === metric ? 'ALL' : metric; 
+    
+    // Temukan session dari HTML jika perlu, atau andalkan re-render dari elemen aktif
+    const activeMenu = document.querySelector('.admin-menu-item.active');
+    if(activeMenu) activeMenu.click(); 
 };
 
 // ==========================================
 // RENDER HALAMAN SPESIFIK ADMIN
 // ==========================================
-const renderView = (target) => {
+const renderView = (target, session) => {
     const content = document.getElementById('admin-content');
     const data = window.adminData;
+    const isKabupaten = session.role.toUpperCase().includes('KAB'); // 🔥 Cek apakah Admin Kabupaten
 
     if (target === 'dash') {
         // --- 1. PERSIAPAN DATA FILTER DROPDOWN ---
@@ -170,6 +184,16 @@ const renderView = (target) => {
         const optKec = Array.from(kecSet).sort().map(k => `<option value="${k}">${k}</option>`).join('');
         const optDesa = Array.from(desaSet).sort().map(d => `<option value="${d}">${d}</option>`).join('');
 
+        // 🔥 LOGIKA KUNCI FILTER KECAMATAN
+        let filterKecHtml = '';
+        if (isKabupaten) {
+            filterKecHtml = `<select id="flt-kec" class="filter-select"><option value="ALL">🏛️ Semua Kecamatan</option>${optKec}</select>`;
+        } else {
+            // Tampilan Lencana Terkunci untuk Admin Kecamatan
+            filterKecHtml = `<div style="padding:8px 12px; border:1px solid #ccc; border-radius:6px; background:#e9ecef; font-weight:bold; color:#666; font-size:0.85rem; box-shadow:inset 0 1px 2px rgba(0,0,0,0.05);">🔒 KEC. ${session.kecamatan.toUpperCase()}</div>`;
+            window.adminFilterKec = 'ALL'; // Reset filter internal karena datanya sudah otomatis milik dia saja
+        }
+
         // --- 2. TERAPKAN FILTER DROPDOWN KEDUA DATA ---
         const fM = window.adminFilterMonth; const fK = window.adminFilterKec; 
         const fD = window.adminFilterDesa; const fJ = window.adminFilterJenis;
@@ -185,7 +209,7 @@ const renderView = (target) => {
 
         let pendBase = data.pendampingan.filter(p => {
             let t = String(p.data_json?.tgl_kunjungan || p.created_at || '').substring(0,7);
-            return fM === 'ALL' || t === fM; // Filter kecamatan/desa menempel ke Registrasi
+            return fM === 'ALL' || t === fM; 
         });
 
         // --- 3. KALKULASI KONDISI UMUM SASARAN (BARIS ATAS) ---
@@ -197,7 +221,7 @@ const renderView = (target) => {
             if (r.jenis_sasaran === 'CATIN' && r.data_json?.tanggal_pernikahan && new Date(r.data_json.tanggal_pernikahan) < hI) isExp = true;
             if (r.jenis_sasaran === 'BUFAS' && r.data_json?.tgl_persalinan) { const tB = new Date(r.data_json.tgl_persalinan); tB.setDate(tB.getDate() + 42); if (hI > tB) isExp = true; }
             
-            r._isExpired = isExp; // Tandai untuk filter selanjutnya
+            r._isExpired = isExp; 
             if(isExp) countSelesai++; else countAktif++;
         });
 
@@ -222,7 +246,7 @@ const renderView = (target) => {
         content.innerHTML = `
             <div style="display:flex; justify-content:flex-end; gap:10px; margin-bottom: 20px; flex-wrap:wrap;">
                 <select id="flt-bulan" class="filter-select"><option value="ALL">📅 Semua Bulan</option>${optBulan}</select>
-                <select id="flt-kec" class="filter-select"><option value="ALL">🏛️ Semua Kecamatan</option>${optKec}</select>
+                ${filterKecHtml}
                 <select id="flt-desa" class="filter-select"><option value="ALL">🏘️ Semua Desa</option>${optDesa}</select>
                 <select id="flt-jenis" class="filter-select"><option value="ALL">🎯 Semua Sasaran</option>
                     <option value="CATIN">CATIN</option><option value="BUMIL">BUMIL</option><option value="BUFAS">BUFAS</option><option value="BADUTA">BADUTA</option>
@@ -267,13 +291,13 @@ const renderView = (target) => {
             
             <div style="display:grid; grid-template-columns: 1fr 2fr; gap: 20px;">
                 <div class="admin-card"><h4 style="margin:0 0 15px 0; color:#333;">Proporsi Demografi</h4><canvas id="chartPie" height="200"></canvas></div>
-                <div class="admin-card"><h4 style="margin:0 0 15px 0; color:#333;">Distribusi Desa / Area</h4><canvas id="chartBar" height="100"></canvas></div>
+                <div class="admin-card"><h4 style="margin:0 0 15px 0; color:#333;">Distribusi Area (Kecamatan/Desa)</h4><canvas id="chartBar" height="100"></canvas></div>
             </div>
         `;
 
         // Atur nilai dropdown ke state tersimpan
         document.getElementById('flt-bulan').value = window.adminFilterMonth;
-        document.getElementById('flt-kec').value = window.adminFilterKec;
+        if(isKabupaten) document.getElementById('flt-kec').value = window.adminFilterKec;
         document.getElementById('flt-desa').value = window.adminFilterDesa;
         document.getElementById('flt-jenis').value = window.adminFilterJenis;
 
@@ -281,10 +305,12 @@ const renderView = (target) => {
         document.querySelectorAll('.filter-select').forEach(el => {
             el.addEventListener('change', function() {
                 window.adminFilterMonth = document.getElementById('flt-bulan').value;
-                window.adminFilterKec = document.getElementById('flt-kec').value;
+                if(isKabupaten) window.adminFilterKec = document.getElementById('flt-kec').value;
                 window.adminFilterDesa = document.getElementById('flt-desa').value;
                 window.adminFilterJenis = document.getElementById('flt-jenis').value;
-                renderView('dash');
+                
+                const activeMenu = document.querySelector('.admin-menu-item.active');
+                if(activeMenu) activeMenu.click(); // Re-render otomatis dengan session yg tetap
             });
         });
 
@@ -306,7 +332,6 @@ const renderView = (target) => {
         });
 
     } else if (target === 'duplikat') {
-        // [FUNGSI DUPLIKAT TETAP SAMA]
         const dDup = data.registrasi.filter(r => r.status_duplikasi && r.status_duplikasi.includes('DUPLIKAT'));
         let htmlTable = '';
         if (dDup.length === 0) {
@@ -319,7 +344,6 @@ const renderView = (target) => {
         content.innerHTML = `<div class="admin-card"><p style="color:#666; margin-top:0;">Berikut adalah data yang terindikasi didaftarkan lebih dari satu kali oleh tim yang berbeda berdasarkan kecocokan NIK atau Nama/Tgl Lahir.</p>${htmlTable}</div>`;
 
     } else if (target === 'database') {
-        // [FUNGSI DATABASE TETAP SAMA]
         content.innerHTML = `
             <div class="admin-card">
                 <div style="display:flex; justify-content:space-between; margin-bottom:15px;">
