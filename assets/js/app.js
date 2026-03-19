@@ -1,5 +1,6 @@
 import { initDB, putData, getDataById, deleteData, getAllData, clearStore } from './db.js';
 import { downloadMasterData, uploadData } from './sync.js';
+import { initAdmin } from './admin.js'; // 👈 TAMBAHKAN BARIS INI
 
 const getEl = (id) => document.getElementById(id);
 
@@ -908,10 +909,17 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                     }
 
-                    const ses = { id: 'active_user', username: id, role: role, nama: nama, id_tim: tim, nomor_tim: noTim };
+                    const ses = { id: 'active_user', username: id, role: role, nama: nama, id_tim: tim, nomor_tim: noTim, kecamatan: user.kecamatan || user.wilayah || '' }; // 👈 Tambahkan atribut kecamatan
                     await putData('kader_session', ses);
                     
-                    getEl('kader-id').value = ''; getEl('kader-pin').value = ''; masukKeAplikasi(ses);
+                    getEl('kader-id').value = ''; getEl('kader-pin').value = ''; 
+                    
+                    // 🔥 LOGIKA PERCABANGAN (RESEPSIONIS CERDAS)
+                    if (role.includes('ADMIN')) {
+                        initAdmin(ses); // Masuk ke Ruang Kontrol Eksekutif
+                    } else {
+                        masukKeAplikasi(ses); // Masuk ke Layar HP Kader
+                    }
                 } else { alert("❌ PIN yang Anda masukkan salah!"); }
             } catch (err) { console.error("Kesalahan Login:", err); alert("Kesalahan Sistem: " + err.message); } finally { if (btn) { btn.disabled = false; btn.innerText = "Masuk"; } }
         };
