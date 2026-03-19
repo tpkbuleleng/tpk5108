@@ -3,23 +3,19 @@ import { downloadMasterData, uploadData } from './sync.js';
 
 const getEl = (id) => document.getElementById(id);
 
+// Variabel Global untuk Mode Edit
+window.editModeData = null;
+
 // ==========================================
 // 0. INISIALISASI SETTING TAMPILAN
 // ==========================================
 const applySettings = () => {
-    if(localStorage.getItem('theme') === 'dark') {
-        document.body.style.backgroundColor = '#121212'; document.body.style.color = '#ffffff';
-    } else {
-        document.body.style.backgroundColor = '#f0f4f8'; document.body.style.color = '#333333';
-    }
-    let fontSize = localStorage.getItem('fontSize') || '16';
-    document.documentElement.style.fontSize = fontSize + 'px';
+    if(localStorage.getItem('theme') === 'dark') { document.body.style.backgroundColor = '#121212'; document.body.style.color = '#ffffff'; } 
+    else { document.body.style.backgroundColor = '#f0f4f8'; document.body.style.color = '#333333'; }
+    let fontSize = localStorage.getItem('fontSize') || '16'; document.documentElement.style.fontSize = fontSize + 'px';
 };
 applySettings();
 
-// ==========================================
-// 1. NAVIGASI LAYAR & JARINGAN
-// ==========================================
 const tampilkanLayar = (id) => {
     const vSplash = getEl('view-splash'); const vLogin = getEl('view-login'); const vApp = getEl('view-app');
     if (vSplash) { vSplash.classList.remove('active'); vSplash.style.display = 'none'; }
@@ -30,19 +26,13 @@ const tampilkanLayar = (id) => {
 
 const updateNetworkStatus = () => {
     const status = getEl('network-status');
-    if (status) {
-        const isOnline = navigator.onLine; status.innerText = isOnline ? 'Online' : 'Offline'; status.style.backgroundColor = isOnline ? '#198754' : '#6c757d';
-    }
+    if (status) { const isOnline = navigator.onLine; status.innerText = isOnline ? 'Online' : 'Offline'; status.style.backgroundColor = isOnline ? '#198754' : '#6c757d'; }
 };
 
-// ==========================================
-// 2. INISIALISASI APLIKASI
-// ==========================================
 const initApp = async () => {
     const logoTimeout = setTimeout(() => { tampilkanLayar('login'); }, 3500);
     try {
-        await initDB();
-        const session = await getDataById('kader_session', 'active_user').catch(() => null);
+        await initDB(); const session = await getDataById('kader_session', 'active_user').catch(() => null);
         clearTimeout(logoTimeout);
         if (session) { masukKeAplikasi(session); } 
         else { tampilkanLayar('login'); if (navigator.onLine) { const users = await getAllData('master_user').catch(() => []); if (users.length === 0) await downloadMasterData(); } }
@@ -66,17 +56,14 @@ const masukKeAplikasi = async (session) => {
     renderMenu(session.role); renderKonten('dashboard'); tampilkanLayar('app');
 };
 
-// ==========================================
-// 3. MENU & KONTEN (DASHBOARD)
-// ==========================================
 const renderMenu = (role) => {
-    const container = getEl('dynamic-menu-container');
-    if (!container) return;
+    const container = getEl('dynamic-menu-container'); if (!container) return;
 
+    // 🔥 Perubahan Nama Menu Daftar Sasaran
     const menus = [
         { id: 'dashboard', icon: '🏠', label: 'Dashboard' },
         { id: 'registrasi', icon: '📝', label: 'Registrasi Sasaran' },
-        { id: 'daftar_sasaran', icon: '📋', label: 'Daftar Sasaran' },
+        { id: 'daftar_sasaran', icon: '📋', label: 'Data Sasaran & Riwayat' },
         { id: 'pendampingan', icon: '🤝', label: 'Laporan Pendampingan' },
         { id: 'rekap_bulanan', icon: '📊', label: 'Rekap Bulanan' },
         { id: 'cetak_pdf', icon: '🖨️', label: 'Cetak PDF' },
@@ -93,29 +80,22 @@ const renderMenu = (role) => {
         item.onclick = () => {
             getEl('sidebar').classList.remove('active'); getEl('sidebar-overlay').classList.remove('active');
             const target = item.getAttribute('data-target');
-            if (target === 'reload_app') { location.reload(true); } else { renderKonten(target); }
+            if (target === 'reload_app') { location.reload(true); } 
+            else { 
+                window.editModeData = null; // Reset edit mode jika pindah menu biasa
+                renderKonten(target); 
+            }
         };
     });
 
-    if (getEl('btnLogout')) {
-        getEl('btnLogout').onclick = async () => { 
-            if (confirm("🔴 PERINGATAN: Ini akan mengeluarkan Anda dan MENGHAPUS SEMUA DATA UJI COBA (Sasaran & Laporan) di memori HP Anda.\n\nApakah Anda yakin ingin mereset aplikasi?")) { 
-                await clearStore('kader_session'); await clearStore('sync_queue'); location.reload(true); 
-            } 
-        };
-    }
+    if (getEl('btnLogout')) { getEl('btnLogout').onclick = async () => { if (confirm("🔴 PERINGATAN: Ini akan mengeluarkan Anda dan MENGHAPUS SEMUA DATA UJI COBA (Sasaran & Laporan) di memori HP Anda.\n\nApakah Anda yakin ingin mereset aplikasi?")) { await clearStore('kader_session'); await clearStore('sync_queue'); location.reload(true); } }; }
 };
 
 window.mulaiSinkronisasiDashboard = async () => {
     const icon = getEl('icon-sync-dash'); const text = getEl('text-sync-dash'); const card = getEl('card-sync-dashboard');
     if (!navigator.onLine) { alert("❌ Koneksi internet terputus! Sinkronisasi membutuhkan internet."); return; }
-    
-    if(icon) icon.innerHTML = '⏳';
-    if(text) { text.innerHTML = 'SINKRONISASI...'; text.style.color = '#dc3545'; }
-    if(card) card.style.pointerEvents = 'none'; 
-    
-    if(window.jalankanSinkronisasi) { await window.jalankanSinkronisasi(); } 
-    else { alert("Sistem sinkronisasi belum siap. Memuat ulang..."); location.reload(); }
+    if(icon) icon.innerHTML = '⏳'; if(text) { text.innerHTML = 'SINKRONISASI...'; text.style.color = '#dc3545'; } if(card) card.style.pointerEvents = 'none'; 
+    if(window.jalankanSinkronisasi) { await window.jalankanSinkronisasi(); } else { alert("Sistem sinkronisasi belum siap. Memuat ulang..."); location.reload(); }
 };
 
 window.renderKonten = async (target) => {
@@ -123,7 +103,6 @@ window.renderKonten = async (target) => {
 
     if (target === 'dashboard') {
         const session = window.currentUser;
-        
         area.innerHTML = `
             <div class="animate-fade">
                 <div class="card" style="background: linear-gradient(135deg, #0d6efd, #0043a8); color: white; border:none; margin-bottom: 20px; padding: 20px;">
@@ -132,9 +111,7 @@ window.renderKonten = async (target) => {
                     <hr style="margin-bottom: 12px; border: 0; border-top: 1px solid rgba(255,255,255,0.2);">
                     <div id="dash-detail-wilayah">Memuat detail...</div>
                 </div>
-                
                 <div id="dash-summary" style="background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; border: 1px solid #eee;">Memuat ringkasan data...</div>
-
                 <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
                     <div class="card" style="text-align:center; padding: 15px 5px; cursor:pointer; border-bottom: 4px solid #0d6efd;" onclick="renderKonten('registrasi')"><div style="font-size: 1.6rem;">📝</div><h3 style="font-size: 0.95rem; margin: 5px 0 0 0;">BARU</h3><p style="font-size: 0.65rem; color: #666; font-weight: bold; margin: 2px 0 0 0;">REGISTRASI</p></div>
                     <div class="card" id="card-sync-dashboard" style="text-align:center; padding: 15px 5px; cursor:pointer; border-bottom: 4px solid orange; background:#fffdf8;" onclick="window.mulaiSinkronisasiDashboard()"><div id="icon-sync-dash" style="font-size: 1.6rem;">🔄</div><h3 id="dash-tunda" style="font-size: 1rem; margin: 5px 0 0 0;">0/0</h3><p id="text-sync-dash" style="font-size: 0.65rem; color: #d63384; font-weight: bold; margin: 2px 0 0 0;">KLIK SINKRON</p></div>
@@ -144,19 +121,14 @@ window.renderKonten = async (target) => {
 
         try {
             const [allWil, antrean] = await Promise.all([ getAllData('master_tim_wilayah').catch(()=>[]), getAllData('sync_queue').catch(()=>[]) ]);
-            const wilayahKerja = allWil.filter(w => String(w.id_tim) === String(session.id_tim));
-            const daftarDusun = wilayahKerja.map(w => w.dusun_rw).join(', ') || '-';
-            
-            if (getEl('dash-detail-wilayah')) {
-                getEl('dash-detail-wilayah').innerHTML = `<div style="background: rgba(255,255,255,0.2); display: inline-block; padding: 4px 10px; border-radius: 6px; font-weight: bold; font-size: 0.85rem; margin-bottom: 12px;">NO. TIM: ${session.nomor_tim || session.id_tim}</div><div style="line-height: 1.25;"><div style="margin-bottom: 6px;"><span style="opacity:0.8; font-size: 0.8rem;">📍 Wilayah Tugas (Dusun/RW):</span><br><span style="font-weight: 600; font-size: 0.9rem;">${daftarDusun}</span></div><div style="margin-bottom: 6px;"><span style="opacity:0.8; font-size: 0.8rem;">🏘️ Desa/Kelurahan:</span><br><span style="font-weight: 600; font-size: 0.9rem;">${wilayahKerja[0]?.desa_kelurahan || '-'}</span></div><div><span style="opacity:0.8; font-size: 0.8rem;">🏛️ Kecamatan:</span><br><span style="font-weight: 600; font-size: 0.9rem;">${wilayahKerja[0]?.kecamatan || '-'}</span></div></div>`;
-            }
+            const wilayahKerja = allWil.filter(w => String(w.id_tim) === String(session.id_tim)); const daftarDusun = wilayahKerja.map(w => w.dusun_rw).join(', ') || '-';
+            if (getEl('dash-detail-wilayah')) { getEl('dash-detail-wilayah').innerHTML = `<div style="background: rgba(255,255,255,0.2); display: inline-block; padding: 4px 10px; border-radius: 6px; font-weight: bold; font-size: 0.85rem; margin-bottom: 12px;">NO. TIM: ${session.nomor_tim || session.id_tim}</div><div style="line-height: 1.25;"><div style="margin-bottom: 6px;"><span style="opacity:0.8; font-size: 0.8rem;">📍 Wilayah Tugas (Dusun/RW):</span><br><span style="font-weight: 600; font-size: 0.9rem;">${daftarDusun}</span></div><div style="margin-bottom: 6px;"><span style="opacity:0.8; font-size: 0.8rem;">🏘️ Desa/Kelurahan:</span><br><span style="font-weight: 600; font-size: 0.9rem;">${wilayahKerja[0]?.desa_kelurahan || '-'}</span></div><div><span style="opacity:0.8; font-size: 0.8rem;">🏛️ Kecamatan:</span><br><span style="font-weight: 600; font-size: 0.9rem;">${wilayahKerja[0]?.kecamatan || '-'}</span></div></div>`; }
             
             const queueTim = antrean.filter(a => String(a.id_tim) === String(session.id_tim));
             if (getEl('dash-tunda')) getEl('dash-tunda').innerText = `${queueTim.filter(a => a.is_synced).length}/${queueTim.filter(a => !a.is_synced).length}`;
 
             const regList = queueTim.filter(a => a.tipe_laporan === 'REGISTRASI'); const pendList = queueTim.filter(a => a.tipe_laporan === 'PENDAMPINGAN');
-            const cReg = { CATIN: 0, BUMIL: 0, BUFAS: 0, BADUTA: 0 }; const cPend = { CATIN: 0, BUMIL: 0, BUFAS: 0, BADUTA: 0 };
-            const hariIni = new Date(); hariIni.setHours(0,0,0,0);
+            const cReg = { CATIN: 0, BUMIL: 0, BUFAS: 0, BADUTA: 0 }; const cPend = { CATIN: 0, BUMIL: 0, BUFAS: 0, BADUTA: 0 }; const hariIni = new Date(); hariIni.setHours(0,0,0,0);
 
             regList.forEach(r => { 
                 let isAktif = r.status_sasaran !== 'SELESAI';
@@ -164,23 +136,24 @@ window.renderKonten = async (target) => {
                 if (r.jenis_sasaran === 'BUFAS' && r.data_laporan?.tgl_persalinan) { const tB = new Date(r.data_laporan.tgl_persalinan); tB.setDate(tB.getDate() + 42); if (hariIni > tB) isAktif = false; }
                 if(cReg[r.jenis_sasaran] !== undefined) cReg[r.jenis_sasaran]++; 
             });
-
-            pendList.forEach(p => {
-                let j = p.jenis_sasaran_saat_kunjungan || (p.id_sasaran_ref.startsWith('CTN')?'CATIN':p.id_sasaran_ref.startsWith('BML')?'BUMIL':p.id_sasaran_ref.startsWith('BFS')?'BUFAS':'BADUTA');
-                if(cPend[j] !== undefined) cPend[j]++;
-            });
-
+            pendList.forEach(p => { let j = p.jenis_sasaran_saat_kunjungan || (p.id_sasaran_ref.startsWith('CTN')?'CATIN':p.id_sasaran_ref.startsWith('BML')?'BUMIL':p.id_sasaran_ref.startsWith('BFS')?'BUFAS':'BADUTA'); if(cPend[j] !== undefined) cPend[j]++; });
             if(getEl('dash-summary')){ getEl('dash-summary').innerHTML = `<h4 style="font-size: 0.95rem; color: #555; margin-bottom: 12px; border-bottom: 1px solid #eee; padding-bottom: 8px;">📊 Total Data Kumulatif</h4><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 0.85rem;"><div><strong style="color:var(--primary);">🎯 Sasaran Terdaftar</strong><ul style="margin: 5px 0 0 15px; padding: 0; color: #444; list-style-type: square;"><li>CATIN: <b>${cReg.CATIN}</b></li><li>BUMIL: <b>${cReg.BUMIL}</b></li><li>BUFAS: <b>${cReg.BUFAS}</b></li><li>BADUTA: <b>${cReg.BADUTA}</b></li></ul></div><div><strong style="color:#198754;">🤝 Kunjungan Pendampingan</strong><ul style="margin: 5px 0 0 15px; padding: 0; color: #444; list-style-type: square;"><li>CATIN: <b>${cPend.CATIN}</b></li><li>BUMIL: <b>${cPend.BUMIL}</b></li><li>BUFAS: <b>${cPend.BUFAS}</b></li><li>BADUTA: <b>${cPend.BADUTA}</b></li></ul></div></div>`; }
-        } catch (e) { console.error(e); }
+        } catch (e) {}
 
     } else if (target === 'registrasi') {
+        // 🔥 FORM REGISTRASI SUPER CERDAS (Mendukung Edit Mode)
+        const isEdit = window.editModeData != null;
+        const eData = isEdit ? window.editModeData : null;
+        const eLabel = isEdit ? `Mengedit Data Sasaran` : `Registrasi Sasaran Baru`;
+        
         area.innerHTML = `
             <div class="animate-fade">
-                <h3 style="margin-top:0; color:var(--primary); font-size:1.3rem;">📝 Registrasi Sasaran Baru</h3>
+                <h3 style="margin-top:0; color:var(--primary); font-size:1.3rem;">📝 ${eLabel}</h3>
+                ${isEdit ? `<div style="background:#fff3cd; padding:10px; border-radius:5px; margin-bottom:15px; font-size:0.85rem; color:#856404;"><b>Info:</b> ID Sasaran dan Jenis Sasaran tidak dapat diubah.</div>` : ''}
                 <form id="form-registrasi" style="background:#fff; padding:15px; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.1);">
                     <div class="form-group">
                         <label style="font-weight:bold;">Jenis Sasaran <span style="color:red">*</span></label>
-                        <select name="jenis_sasaran" id="reg-jenis" class="form-control" required>
+                        <select name="jenis_sasaran" id="reg-jenis" class="form-control" required ${isEdit ? 'disabled' : ''}>
                             <option value="">-- Pilih Jenis Sasaran --</option>
                             <option value="CATIN">Calon Pengantin (CATIN)</option>
                             <option value="BUMIL">Ibu Hamil (BUMIL)</option>
@@ -190,51 +163,30 @@ window.renderKonten = async (target) => {
                     </div>
                     
                     <div id="form-core" style="display:none; margin-top:15px;">
-                        <div class="form-group"><label>Nama Sasaran <span style="color:red">*</span></label><input type="text" name="nama_sasaran" class="form-control" required></div>
-                        <div class="form-group"><label>NIK Sasaran <span style="color:red">*</span></label><input type="text" name="nik" class="form-control" pattern="[0-9]{16}" title="NIK harus 16 digit angka" maxlength="16" minlength="16" oninput="this.value=this.value.replace(/[^0-9]/g,'')" placeholder="16 digit angka" required></div>
-                        <div class="form-group"><label>Nama Kepala Keluarga <span style="color:red">*</span></label><input type="text" name="nama_kk" class="form-control" required></div>
-                        <div class="form-group"><label>Nomor KK <span style="color:red">*</span></label><input type="text" name="nomor_kk" class="form-control" pattern="[0-9]{16}" title="Nomor KK harus 16 digit angka" maxlength="16" minlength="16" oninput="this.value=this.value.replace(/[^0-9]/g,'')" placeholder="16 digit angka" required></div>
-                        <div class="form-group"><label>Tanggal Lahir Sasaran <span style="color:red">*</span></label><input type="date" name="tanggal_lahir" class="form-control" required></div>
+                        <div class="form-group"><label>Nama Sasaran <span style="color:red">*</span></label><input type="text" name="nama_sasaran" id="f_nama" class="form-control" required></div>
+                        <div class="form-group"><label>NIK Sasaran <span style="color:red">*</span></label><input type="text" name="nik" id="f_nik" class="form-control" pattern="[0-9]{16}" title="NIK harus 16 digit angka" maxlength="16" minlength="16" oninput="this.value=this.value.replace(/[^0-9]/g,'')" placeholder="16 digit angka" required></div>
+                        <div class="form-group"><label>Nama Kepala Keluarga <span style="color:red">*</span></label><input type="text" name="nama_kk" id="f_kk_nama" class="form-control" required></div>
+                        <div class="form-group"><label>Nomor KK <span style="color:red">*</span></label><input type="text" name="nomor_kk" id="f_kk_no" class="form-control" pattern="[0-9]{16}" title="Nomor KK harus 16 digit angka" maxlength="16" minlength="16" oninput="this.value=this.value.replace(/[^0-9]/g,'')" placeholder="16 digit angka" required></div>
+                        <div class="form-group"><label>Tanggal Lahir Sasaran <span style="color:red">*</span></label><input type="date" name="tanggal_lahir" id="f_tgl" class="form-control" required></div>
                         <div class="form-group"><label>Jenis Kelamin <span style="color:red">*</span></label><select name="jenis_kelamin" id="reg-jk" class="form-control" required><option value="">-- Pilih --</option><option value="Laki-laki">Laki-laki</option><option value="Perempuan">Perempuan</option></select></div>
                         
                         <div class="form-group"><label>Sumber Air Minum <span style="color:red">*</span></label>
-                            <select name="sumber_air_minum" class="form-control" required>
-                                <option value="">-- Pilih --</option>
-                                <option value="Air Kemasan / Isi Ulang">Air Kemasan / Isi Ulang</option>
-                                <option value="Ledeng / Pam">Ledeng / Pam</option>
-                                <option value="Sumur Bor / Pompa">Sumur Bor / Pompa</option>
-                                <option value="Sumur Terlindung">Sumur Terlindung</option>
-                                <option value="Sumur Tak Terlindung">Sumur Tak Terlindung</option>
-                                <option value="Mata Air Terlindung">Mata Air Terlindung</option>
-                                <option value="Mata Air Tak Terlindung">Mata Air Tak Terlindung</option>
-                                <option value="Air Permukaan (Sungai/Danau/Waduk/Kolam/Irigasi)">Air Permukaan (Sungai/Danau/Waduk/Kolam/Irigasi)</option>
-                                <option value="Air Hujan">Air Hujan</option>
-                                <option value="Lainnya">Lainnya</option>
+                            <select name="sumber_air_minum" id="f_air" class="form-control" required>
+                                <option value="">-- Pilih --</option><option value="Air Kemasan / Isi Ulang">Air Kemasan / Isi Ulang</option><option value="Ledeng / Pam">Ledeng / Pam</option><option value="Sumur Bor / Pompa">Sumur Bor / Pompa</option><option value="Sumur Terlindung">Sumur Terlindung</option><option value="Sumur Tak Terlindung">Sumur Tak Terlindung</option><option value="Mata Air Terlindung">Mata Air Terlindung</option><option value="Mata Air Tak Terlindung">Mata Air Tak Terlindung</option><option value="Air Permukaan (Sungai/Danau/Waduk/Kolam/Irigasi)">Air Permukaan (Sungai/Danau/Waduk/Kolam/Irigasi)</option><option value="Air Hujan">Air Hujan</option><option value="Lainnya">Lainnya</option>
                             </select>
                         </div>
-                        
                         <div class="form-group"><label>Fasilitas BAB <span style="color:red">*</span></label>
-                            <select name="fasilitas_bab" class="form-control" required>
-                                <option value="">-- Pilih --</option>
-                                <option value="Jamban Milik Sendiri Dengan Leher Angsa Dan Tangki Septik / Ipal">Jamban Milik Sendiri Dengan Leher Angsa Dan Tangki Septik / Ipal</option>
-                                <option value="Jamban Pada Mck Komunal Dengan Leher Angsa Dan Tangki Septik / Ipal">Jamban Pada Mck Komunal Dengan Leher Angsa Dan Tangki Septik / Ipal</option>
-                                <option value="Ya Lainnya">Ya Lainnya</option>
-                                <option value="Tidak Ada">Tidak Ada</option>
+                            <select name="fasilitas_bab" id="f_bab" class="form-control" required>
+                                <option value="">-- Pilih --</option><option value="Jamban Milik Sendiri Dengan Leher Angsa Dan Tangki Septik / Ipal">Jamban Milik Sendiri Dengan Leher Angsa Dan Tangki Septik / Ipal</option><option value="Jamban Pada Mck Komunal Dengan Leher Angsa Dan Tangki Septik / Ipal">Jamban Pada Mck Komunal Dengan Leher Angsa Dan Tangki Septik / Ipal</option><option value="Ya Lainnya">Ya Lainnya</option><option value="Tidak Ada">Tidak Ada</option>
                             </select>
                         </div>
-                        
                         <div class="form-group"><label>Kepemilikan Asuransi Kesehatan <span style="color:red">*</span></label>
-                            <select name="asuransi_kesehatan" class="form-control" required>
-                                <option value="">-- Pilih --</option>
-                                <option value="BPJS PBI">BPJS PBI</option>
-                                <option value="BPJS Mandiri">BPJS Mandiri</option>
-                                <option value="Swasta">Swasta</option>
-                                <option value="Tidak Memiliki">Tidak Memiliki</option>
+                            <select name="asuransi_kesehatan" id="f_asuransi" class="form-control" required>
+                                <option value="">-- Pilih --</option><option value="BPJS PBI">BPJS PBI</option><option value="BPJS Mandiri">BPJS Mandiri</option><option value="Swasta">Swasta</option><option value="Tidak Memiliki">Tidak Memiliki</option>
                             </select>
                         </div>
                         
                         <div id="specific-fields"></div>
-                        
                         <div id="pertanyaan-dinamis"></div>
 
                         <div id="wilayah-domisili" style="margin-top:15px; border-top: 1px dashed #ccc; padding-top:15px;">
@@ -256,7 +208,8 @@ window.renderKonten = async (target) => {
                             <div class="form-group"><label>Alamat Lengkap <span style="color:red">*</span></label><textarea name="catin_alamat" id="catin-alamat" class="form-control" rows="2" placeholder="Nama Jalan, Blok, dll..."></textarea></div>
                         </div>
 
-                        <button type="submit" class="btn btn-primary" style="width:100%; margin-top:15px; font-size:1.1rem; padding:12px;">💾 Simpan Sasaran</button>
+                        <button type="submit" class="btn btn-primary" style="width:100%; margin-top:15px; font-size:1.1rem; padding:12px;">💾 ${isEdit ? 'Update Data Sasaran' : 'Simpan Sasaran'}</button>
+                        ${isEdit ? `<button type="button" class="btn btn-danger" style="width:100%; margin-top:10px; font-size:1rem; padding:10px;" onclick="window.editModeData=null; renderKonten('daftar_sasaran')">❌ Batal Edit</button>` : ''}
                     </div>
                 </form>
             </div>
@@ -285,7 +238,7 @@ window.renderKonten = async (target) => {
 };
 
 // ==========================================
-// 4. LOGIKA FORM REGISTRASI (DENGAN FILTER CERDAS)
+// 4. LOGIKA FORM REGISTRASI
 // ==========================================
 const getKodeKecamatan = (kec) => {
     if (!kec) return "XXX";
@@ -295,13 +248,9 @@ const getKodeKecamatan = (kec) => {
 
 const renderPertanyaanDinamis = (jenis, modul, container, questions) => {
     if (!jenis) { container.innerHTML = ''; return; }
-    
-    // 🔥 FILTER CERDAS: Buang BPJS & Nama/NIK Calon agar tidak ganda
     const filteredQ = questions.filter(q => {
         let lbl = String(q.label_pertanyaan || '').toLowerCase();
-        if (lbl.includes('bpjs') || lbl.includes('jkn aktif')) return false;
-        if (lbl.includes('nama calon') || lbl.includes('nik calon')) return false;
-        
+        if (lbl.includes('bpjs') || lbl.includes('jkn aktif') || lbl.includes('nama calon') || lbl.includes('nik calon')) return false;
         return String(q.is_active || '').toUpperCase() === 'Y' && String(q.modul || '').toUpperCase() === modul.toUpperCase() && (String(q.jenis_sasaran || '').toUpperCase() === 'UMUM' || String(q.jenis_sasaran || '').toUpperCase() === jenis)
     }).sort((a,b)=> (parseInt(a.urutan)||0) - (parseInt(b.urutan)||0));
 
@@ -309,17 +258,14 @@ const renderPertanyaanDinamis = (jenis, modul, container, questions) => {
         let html = `<div>`; 
         filteredQ.forEach(q => {
             let lbl = String(q.label_pertanyaan || '').toLowerCase();
-            let req = String(q.is_required || '').toUpperCase() === 'Y' ? 'required' : ''; 
-            let markerReq = req ? '<span style="color:red; font-weight:bold;">*</span>' : ''; 
-            let inputHtml = '';
+            let req = String(q.is_required || '').toUpperCase() === 'Y' ? 'required' : ''; let markerReq = req ? '<span style="color:red; font-weight:bold;">*</span>' : ''; 
             
-            // Auto-Kunci NIK dari Google Sheet
             let extraAttr = ''; let tInput = q.tipe_input || 'text';
             if(lbl.includes('nik') || lbl.includes('nomor induk')) {
-                tInput = 'text'; 
-                extraAttr = 'pattern="[0-9]{16}" title="NIK harus 16 digit angka" maxlength="16" minlength="16" oninput="this.value=this.value.replace(/[^0-9]/g,\'\')"';
+                tInput = 'text'; extraAttr = 'pattern="[0-9]{16}" title="NIK harus 16 digit angka" maxlength="16" minlength="16" oninput="this.value=this.value.replace(/[^0-9]/g,\'\')"';
             }
 
+            let inputHtml = '';
             if(q.tipe_input === 'select') {
                 let opsi = []; try { opsi = JSON.parse(q.opsi_json || '[]'); } catch(e) { }
                 inputHtml = `<select name="${q.id_pertanyaan}" id="${q.id_pertanyaan}" class="form-control" ${req}><option value="">-- Pilih Jawaban --</option>${opsi.map(o => `<option value="${o}">${o}</option>`).join('')}</select>`;
@@ -356,9 +302,7 @@ const initFormRegistrasi = async () => {
         catinKab.onchange = () => {
             const fKec = allWilBali.filter(w => w.kabupaten === catinKab.value); const dKec = [...new Set(fKec.map(w => w.kecamatan))].filter(Boolean);
             catinKec.innerHTML = '<option value="">-- Pilih Kecamatan --</option>' + dKec.map(d => `<option value="${d}">${d}</option>`).join(''); catinDesa.innerHTML = '<option value="">-- Pilih Desa --</option>'; 
-            
-            catinDusunTxt.style.display = 'block'; catinDusunTxt.setAttribute('name', 'catin_dusun');
-            catinDusunSel.style.display = 'none'; catinDusunSel.removeAttribute('name');
+            catinDusunTxt.style.display = 'block'; catinDusunTxt.setAttribute('name', 'catin_dusun'); catinDusunSel.style.display = 'none'; catinDusunSel.removeAttribute('name');
         };
         catinKec.onchange = () => {
             const fDesa = allWilBali.filter(w => w.kabupaten === catinKab.value && w.kecamatan === catinKec.value); const dDesa = [...new Set(fDesa.map(w => w.desa_kelurahan))].filter(Boolean);
@@ -391,7 +335,6 @@ const initFormRegistrasi = async () => {
 
             if (selJk) { if (jenis === 'BUMIL' || jenis === 'BUFAS') { selJk.value = 'Perempuan'; selJk.style.pointerEvents = 'none'; selJk.style.backgroundColor = '#e9ecef'; } else { selJk.style.pointerEvents = 'auto'; selJk.style.backgroundColor = '#fff'; } }
             
-            // 🔥 INJEKSI PERTANYAAN KHUSUS
             let htmlSpec = '';
             if(jenis === 'CATIN') {
                 htmlSpec = `<div class="form-group"><label>Nama Calon Suami / Istri <span style="color:red">*</span></label><input type="text" name="nama_calon" class="form-control" required></div><div class="form-group"><label>NIK Calon Suami / Istri <span style="color:red">*</span></label><input type="text" name="nik_calon" class="form-control" pattern="[0-9]{16}" title="NIK harus 16 digit angka" maxlength="16" minlength="16" oninput="this.value=this.value.replace(/[^0-9]/g,'')" placeholder="16 digit angka" required></div><div class="form-group"><label>Tanggal Rencana Pernikahan <span style="color:red">*</span></label><input type="date" name="tanggal_pernikahan" class="form-control" required></div><div class="form-group"><label>Perkawinan Ke- <span style="color:red">*</span></label><input type="number" name="perkawinan_ke" class="form-control" required></div><div class="form-group"><label>Berat Badan (Kg)</label><input type="number" name="bb_catin" class="form-control" step="any" placeholder="Cth: 55"></div><div class="form-group"><label>Tinggi Badan (Cm)</label><input type="number" name="tb_catin" class="form-control" step="any" placeholder="Cth: 160"></div><div class="form-group"><label>Bekerja di Luar Negeri <span style="color:red">*</span></label><select name="kerja_luar_negeri" class="form-control" required><option value="">-- Pilih --</option><option value="Pernah">Pernah</option><option value="Sedang">Sedang</option><option value="Akan">Akan</option><option value="Tidak">Tidak</option></select></div>`;
@@ -408,20 +351,50 @@ const initFormRegistrasi = async () => {
                 if (jenis === 'CATIN') {
                     boxCatin.style.display = 'block'; boxDomisili.style.display = 'none';
                     if(selDesa) selDesa.removeAttribute('required'); if(selDusun) selDusun.removeAttribute('required'); if(regAlamat) regAlamat.removeAttribute('required');
-                    
                     if(catinKab) catinKab.setAttribute('required', 'true'); if(catinKec) catinKec.setAttribute('required', 'true'); if(catinDesa) catinDesa.setAttribute('required', 'true');
                     if(catinDusunSel.style.display === 'block') { catinDusunSel.setAttribute('required', 'true'); } else { catinDusunTxt.setAttribute('required', 'true'); }
                     if(catinAlamat) catinAlamat.setAttribute('required', 'true');
                 } else {
                     boxCatin.style.display = 'none'; boxDomisili.style.display = 'block';
                     if(selDesa) selDesa.setAttribute('required', 'true'); if(selDusun) selDusun.setAttribute('required', 'true'); if(regAlamat) regAlamat.setAttribute('required', 'true');
-                    
                     if(catinKab) catinKab.removeAttribute('required'); if(catinKec) catinKec.removeAttribute('required'); if(catinDesa) catinDesa.removeAttribute('required');
                     catinDusunSel.removeAttribute('required'); catinDusunTxt.removeAttribute('required'); if(catinAlamat) catinAlamat.removeAttribute('required');
                 }
             }
             renderPertanyaanDinamis(jenis, 'REGISTRASI', containerQ, questions);
+            
+            // 🔥 POPULATE DATA JIKA MODE EDIT
+            if(window.editModeData) {
+                setTimeout(() => {
+                    const eD = window.editModeData;
+                    if(getEl('f_nama')) getEl('f_nama').value = eD.nama_sasaran || '';
+                    if(getEl('f_nik')) getEl('f_nik').value = eD.data_laporan?.nik || '';
+                    if(getEl('f_kk_nama')) getEl('f_kk_nama').value = eD.data_laporan?.nama_kk || '';
+                    if(getEl('f_kk_no')) getEl('f_kk_no').value = eD.data_laporan?.nomor_kk || '';
+                    if(getEl('f_tgl')) getEl('f_tgl').value = eD.data_laporan?.tanggal_lahir || '';
+                    if(getEl('reg-jk')) getEl('reg-jk').value = eD.data_laporan?.jenis_kelamin || '';
+                    if(getEl('f_air')) getEl('f_air').value = eD.data_laporan?.sumber_air_minum || '';
+                    if(getEl('f_bab')) getEl('f_bab').value = eD.data_laporan?.fasilitas_bab || '';
+                    if(getEl('f_asuransi')) getEl('f_asuransi').value = eD.data_laporan?.asuransi_kesehatan || '';
+                    if(getEl('reg-desa')) getEl('reg-desa').value = eD.desa || '';
+                    if(getEl('reg-desa')) getEl('reg-desa').dispatchEvent(new Event('change'));
+                    if(getEl('reg-dusun')) setTimeout(()=> { getEl('reg-dusun').value = eD.dusun || ''; }, 100);
+                    if(getEl('reg-alamat')) getEl('reg-alamat').value = eD.data_laporan?.alamat || '';
+                    
+                    // Isi data spesifik lainnya dengan loop
+                    for (const [key, value] of Object.entries(eD.data_laporan || {})) {
+                        let field = document.querySelector(`[name="${key}"]`);
+                        if(field) field.value = value;
+                    }
+                }, 200);
+            }
         };
+        
+        // Auto trigger jika masuk mode edit
+        if(window.editModeData) {
+            selJenis.value = window.editModeData.jenis_sasaran;
+            selJenis.dispatchEvent(new Event('change'));
+        }
     }
 
     const formReg = getEl('form-registrasi');
@@ -431,9 +404,16 @@ const initFormRegistrasi = async () => {
             try {
                 const formData = new FormData(e.target); const jawaban = {}; formData.forEach((val, key) => { jawaban[key] = val; });
                 const kecamatan = tugas.length > 0 ? tugas[0].kecamatan : 'TIDAK_DIKETAHUI'; const jenisSasaran = selJenis.value;
-                let prefix = "REG"; if (jenisSasaran === 'CATIN') prefix = "CTN"; else if (jenisSasaran === 'BUMIL') prefix = "BML"; else if (jenisSasaran === 'BUFAS') prefix = "BFS"; else if (jenisSasaran === 'BADUTA') prefix = "BDT";
                 
-                const kodeKec = getKodeKecamatan(kecamatan); const angkaUnik = Math.floor(Math.random() * 1000000).toString().padStart(6, '0'); const idSasaran = `${prefix}-${kodeKec}-${angkaUnik}`;
+                let idSasaran = "";
+                if(window.editModeData) {
+                    idSasaran = window.editModeData.id; // Pertahankan ID lama jika Edit
+                } else {
+                    let prefix = "REG"; if (jenisSasaran === 'CATIN') prefix = "CTN"; else if (jenisSasaran === 'BUMIL') prefix = "BML"; else if (jenisSasaran === 'BUFAS') prefix = "BFS"; else if (jenisSasaran === 'BADUTA') prefix = "BDT";
+                    const kodeKec = getKodeKecamatan(kecamatan); const angkaUnik = Math.floor(Math.random() * 1000000).toString().padStart(6, '0'); 
+                    idSasaran = `${prefix}-${kodeKec}-${angkaUnik}`;
+                }
+                
                 const desaFinal = jenisSasaran === 'CATIN' ? '-' : selDesa.value; const dusunFinal = jenisSasaran === 'CATIN' ? '-' : selDusun.value;
 
                 if (jawaban.tanggal_lahir) {
@@ -448,10 +428,15 @@ const initFormRegistrasi = async () => {
                         jawaban.usia_saat_melahirkan_tahun = uTahun; jawaban.usia_saat_melahirkan_bulan = uBulan;
                     }
                 }
-                const laporan = { id: idSasaran, tipe_laporan: 'REGISTRASI', username: session.username, id_tim: session.id_tim, nomor_tim: session.nomor_tim, kecamatan: kecamatan, jenis_sasaran: jenisSasaran, nama_sasaran: jawaban.nama_sasaran, desa: desaFinal, dusun: dusunFinal, data_laporan: jawaban, status_sasaran: 'AKTIF', is_synced: false, created_at: new Date().toISOString() };
                 
-                await putData('sync_queue', laporan); alert(`✅ Registrasi berhasil! ID Sasaran: ${idSasaran}`); renderKonten('dashboard');
-            } catch (err) { alert("Gagal menyimpan form."); } finally { btn.disabled = false; btn.innerText = "💾 Simpan Registrasi"; }
+                const createdDate = window.editModeData ? window.editModeData.created_at : new Date().toISOString();
+                const laporan = { id: idSasaran, tipe_laporan: 'REGISTRASI', username: session.username, id_tim: session.id_tim, nomor_tim: session.nomor_tim, kecamatan: kecamatan, jenis_sasaran: jenisSasaran, nama_sasaran: jawaban.nama_sasaran, desa: desaFinal, dusun: dusunFinal, data_laporan: jawaban, status_sasaran: 'AKTIF', is_synced: false, created_at: createdDate };
+                
+                await putData('sync_queue', laporan); 
+                window.editModeData = null; // Bersihkan memori edit
+                alert(window.editModeData ? `✅ Data berhasil diperbarui!` : `✅ Registrasi berhasil! ID: ${idSasaran}`); 
+                renderKonten('daftar_sasaran');
+            } catch (err) { alert("Gagal menyimpan form."); } finally { btn.disabled = false; btn.innerText = "💾 Simpan Sasaran"; }
         };
     }
 };
@@ -459,6 +444,18 @@ const initFormRegistrasi = async () => {
 // ==========================================
 // 5. FITUR DAFTAR SASARAN & DETAIL (KIA DIGITAL)
 // ==========================================
+// 🔥 FUNGSI GLOBAL UNTUK EDIT SASARAN
+window.bukaEditSasaran = async (id) => {
+    const r = await getDataById('sync_queue', id);
+    if(r) { window.editModeData = r; renderKonten('registrasi'); } else { alert('Data tidak ditemukan'); }
+};
+
+// 🔥 FUNGSI GLOBAL UNTUK EDIT LAPORAN PENDAMPINGAN
+window.bukaEditLaporan = async (idLaporan) => {
+    const r = await getDataById('sync_queue', idLaporan);
+    if(r) { window.editModeLaporan = r; renderKonten('pendampingan'); } else { alert('Data laporan tidak ditemukan'); }
+};
+
 const initDaftarSasaran = async () => {
     const session = window.currentUser; const filterJenis = getEl('filter-jenis'); const filterStatus = getEl('filter-status'); const list = getEl('list-sasaran');
     const modal = getEl('modal-detail'); const btnTutup = getEl('btn-tutup-modal'); const kontenDetail = getEl('konten-detail');
@@ -528,7 +525,8 @@ const initDaftarSasaran = async () => {
                 let syncIcon = p.is_synced ? '<span style="color:#198754; font-size:0.7rem;">(Server)</span>' : '<span style="color:#fd7e14; font-size:0.7rem;">(Lokal)</span>';
                 let kkaStyle = (valKKA.toLowerCase().includes('terlambat') || valKKA.toLowerCase().includes('tidak')) ? 'color:#dc3545; font-weight:bold;' : 'color:#198754; font-weight:bold;';
 
-                htmlRiwayat += `<tr style="border-bottom: 1px solid #eee;"><td style="padding:10px; border:1px solid #eee;">${tglKunjungan.toLocaleDateString('id-ID', {day: 'numeric', month: 'short', year: '2-digit'})} <br>${syncIcon}</td><td style="padding:10px; border:1px solid #eee; font-weight:bold; font-size:1rem; color:var(--primary);">${umurBulan} Bln</td><td style="padding:10px; border:1px solid #eee;">${valBB}</td><td style="padding:10px; border:1px solid #eee;">${valTB}</td><td style="padding:10px; border:1px solid #eee;">${valLK}</td><td style="padding:10px; border:1px solid #eee; ${kkaStyle}">${valKKA}</td><td style="padding:10px; border:1px solid #eee; text-align:left; line-height:1.3;">${catatanLain}</td></tr>`;
+                // 🔥 Tambahkan Edit Laporan
+                htmlRiwayat += `<tr style="border-bottom: 1px solid #eee;"><td style="padding:10px; border:1px solid #eee;">${tglKunjungan.toLocaleDateString('id-ID', {day: 'numeric', month: 'short', year: '2-digit'})} <br>${syncIcon}<br><span style="color:#0d6efd; cursor:pointer; font-size:0.75rem;" onclick="window.bukaEditLaporan('${p.id}')">✏️ Edit</span></td><td style="padding:10px; border:1px solid #eee; font-weight:bold; font-size:1rem; color:var(--primary);">${umurBulan} Bln</td><td style="padding:10px; border:1px solid #eee;">${valBB}</td><td style="padding:10px; border:1px solid #eee;">${valTB}</td><td style="padding:10px; border:1px solid #eee;">${valLK}</td><td style="padding:10px; border:1px solid #eee; ${kkaStyle}">${valKKA}</td><td style="padding:10px; border:1px solid #eee; text-align:left; line-height:1.3;">${catatanLain}</td></tr>`;
             });
             htmlRiwayat += `</tbody></table></div>`;
         } else {
@@ -540,7 +538,8 @@ const initDaftarSasaran = async () => {
                     let label = foundQ ? foundQ.label_pertanyaan : key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
                     dynamicHtml += `<div style="margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #eee;"><div style="font-size: 0.75rem; color: #666; font-weight: normal;">${label}</div><div style="font-size: 0.9rem; color: #222; font-weight: 500;">${value}</div></div>`;
                 }
-                return `<div style="background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); overflow: hidden;"><div style="background: #e8f4fd; padding: 10px 15px; border-bottom: 1px solid #cfe2ff; display: flex; justify-content: space-between; align-items: center;"><span style="font-weight: bold; color: #0d6efd; font-size: 0.9rem;">📅 ${new Date(p.data_laporan?.tgl_kunjungan || p.created_at).toLocaleDateString('id-ID', {day: 'numeric', month: 'long', year: 'numeric'})}</span><span style="font-size: 0.7rem; font-weight: bold; color: ${p.is_synced ? '#198754' : '#fd7e14'}; background: #fff; padding: 3px 8px; border-radius: 12px; border: 1px solid #ddd;">${p.is_synced ? '✅ Server' : '⏳ Lokal'}</span></div><div style="padding: 15px;"><div style="font-size: 0.8rem; color: #666; margin-bottom: 4px;">Catatan Umum / Hasil:</div><div style="font-size: 0.95rem; color: #333; margin-bottom: ${dynamicHtml ? '15px' : '0'}; background: #f8f9fa; padding: 10px; border-radius: 6px; border-left: 4px solid #0d6efd;">${p.data_laporan?.catatan || '-'}</div>${dynamicHtml ? `<div style="background: #fff; border: 1px solid #f1f1f1; padding: 10px; border-radius: 6px;">${dynamicHtml}</div>` : ''}</div></div>`;
+                // 🔥 Tambahkan Edit Laporan
+                return `<div style="background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); overflow: hidden;"><div style="background: #e8f4fd; padding: 10px 15px; border-bottom: 1px solid #cfe2ff; display: flex; justify-content: space-between; align-items: center;"><span style="font-weight: bold; color: #0d6efd; font-size: 0.9rem;">📅 ${new Date(p.data_laporan?.tgl_kunjungan || p.created_at).toLocaleDateString('id-ID', {day: 'numeric', month: 'long', year: 'numeric'})}</span><div><span style="font-size: 0.7rem; font-weight: bold; color: ${p.is_synced ? '#198754' : '#fd7e14'}; background: #fff; padding: 3px 8px; border-radius: 12px; border: 1px solid #ddd; margin-right:5px;">${p.is_synced ? '✅ Server' : '⏳ Lokal'}</span><span style="font-size:0.8rem; cursor:pointer;" onclick="window.bukaEditLaporan('${p.id}')">✏️</span></div></div><div style="padding: 15px;"><div style="font-size: 0.8rem; color: #666; margin-bottom: 4px;">Catatan Umum / Hasil:</div><div style="font-size: 0.95rem; color: #333; margin-bottom: ${dynamicHtml ? '15px' : '0'}; background: #f8f9fa; padding: 10px; border-radius: 6px; border-left: 4px solid #0d6efd;">${p.data_laporan?.catatan || '-'}</div>${dynamicHtml ? `<div style="background: #fff; border: 1px solid #f1f1f1; padding: 10px; border-radius: 6px;">${dynamicHtml}</div>` : ''}</div></div>`;
             }).join('');
         }
 
@@ -551,7 +550,7 @@ const initDaftarSasaran = async () => {
                 <div style="font-size: 0.8rem; color: #666; margin-bottom: 4px;">Nama Sasaran</div>
                 <div style="font-size: 1.15rem; font-weight: bold; color: #0043a8; margin-bottom: 15px; text-transform: uppercase; background: #ffffff; padding: 10px 12px; border-radius: 6px; border: 1px solid #c6c6c6; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
                     <span>${r.nama_sasaran || '-'}</span>
-                    <span style="font-size: 0.85rem; color: #0d6efd; cursor: pointer; text-transform: none; font-weight: normal; background: #e8f4fd; padding: 4px 8px; border-radius: 4px;" onclick="alert('Fitur edit sasaran akan segera hadir pada update berikutnya!')">✏️ (edit)</span>
+                    <span style="font-size: 0.85rem; color: #0d6efd; cursor: pointer; text-transform: none; font-weight: normal; background: #e8f4fd; padding: 4px 8px; border-radius: 4px;" onclick="window.bukaEditSasaran('${r.id}')">✏️ (edit)</span>
                 </div>
                 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
@@ -593,6 +592,16 @@ const initFormPendampingan = async () => {
     const selJenis = getEl('pend-jenis'); const selSasaran = getEl('pend-sasaran');
     const infoBox = getEl('pend-info-sasaran'); const containerQ = getEl('form-pendampingan-dinamis');
     
+    // 🔥 Mode Edit Laporan
+    const isEditLaporan = window.editModeLaporan != null;
+    const eLaporan = isEditLaporan ? window.editModeLaporan : null;
+    
+    if(isEditLaporan) {
+        getEl('header-pendampingan').innerHTML = `📝 Mengedit Laporan Pendampingan`;
+        getEl('header-pendampingan').insertAdjacentHTML('afterend', `<div style="background:#fff3cd; padding:10px; border-radius:5px; margin-bottom:15px; font-size:0.85rem; color:#856404;"><b>Info:</b> Anda sedang mengedit kunjungan tanggal ${eLaporan.data_laporan.tgl_kunjungan || '-'}.</div>`);
+        if(getEl('btn-submit-pendampingan')) getEl('btn-submit-pendampingan').innerHTML = "💾 Update Laporan";
+    }
+
     const [questions, antrean, stdAntro, masterKembang] = await Promise.all([ getAllData('master_pertanyaan').catch(()=>[]), getAllData('sync_queue').catch(()=>[]), getAllData('standar_antropometri').catch(()=>[]), getAllData('master_kembang').catch(()=>[]) ]);
     const regList = antrean.filter(a => a.tipe_laporan === 'REGISTRASI' && String(a.id_tim) === String(session.id_tim) && a.status_sasaran !== 'SELESAI');
     
@@ -617,7 +626,6 @@ const initFormPendampingan = async () => {
             
             if (infoBox) {
                 infoBox.style.display = 'block';
-                // 🔥 Blok Profil Sasaran Biru Tua Putih
                 infoBox.innerHTML = `<div style="font-weight:bold; color:#0043a8; margin-bottom: 8px; background: #fff; padding: 6px 12px; border-radius: 6px; border: 1px solid #c6c6c6; text-align:center; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">📌 Profil Sasaran Terpilih</div><table style="width:100%; font-size: 0.85rem; background: #fff; padding: 12px; border-radius: 6px; border: 1px solid #ddd; line-height:1.5;"><tr><td style="width:35%; color:#555;">Nama</td><td>: <b>${sasaran.nama_sasaran}</b></td></tr><tr><td style="color:#555;">No. KK</td><td>: ${sasaran.data_laporan?.nomor_kk||'-'}</td></tr><tr><td style="color:#555;">Umur Daftar</td><td>: ${sasaran.data_laporan?.usia_saat_daftar_tahun||'-'} Tahun</td></tr></table>`;
             }
 
@@ -636,14 +644,12 @@ const initFormPendampingan = async () => {
             });
             htmlQ += `</div>`;
             
-            // LOGIKA CERDAS BADUTA (KKA + DETEKSI STUNTING)
             if (sasaran.jenis_sasaran === 'BADUTA' && sasaran.data_laporan.tanggal_lahir) {
                 const tL = new Date(sasaran.data_laporan.tanggal_lahir); const tH = new Date();
                 let uBln = (tH.getFullYear() - tL.getFullYear()) * 12; uBln -= tL.getMonth(); uBln += tH.getMonth();
                 if (tH.getDate() < tL.getDate()) uBln--; if (uBln < 0) uBln = 0;
                 let jk = sasaran.data_laporan.jenis_kelamin === 'Laki-laki' ? 'L' : 'P';
 
-                // 1. KARTU PINTAR KKA
                 const kkaData = getKkaData(uBln);
                 let listT = "", listP = "";
                 kkaData.forEach(k => {
@@ -670,26 +676,21 @@ const initFormPendampingan = async () => {
                 containerQ.innerHTML = htmlQ;
                 if(getEl('kka_eval')) getEl('kka_eval').onchange = (e) => getEl('kka_tips_box').style.display = e.target.value === 'Terlambat' ? 'block' : 'none';
 
-                // 2. DETEKTOR STUNTING OTOMATIS
                 const calcAntro = () => {
                     if(!idInputBB || !idInputTB) return;
                     let b = parseFloat(getEl(idInputBB)?.value); let t = parseFloat(getEl(idInputTB)?.value);
                     if(!b || !t) { getEl('antro_result').style.display = 'none'; return; }
 
                     let sB="Normal", cB="#198754", sT="Normal", cT="#198754", sP="Normal", cP="#198754";
-
-                    // BB/U
                     let d_bbu = stdAntro.find(s => s.jenis_kelamin === jk && s.indeks === 'BB_U' && parseInt(s.umur_bulan) === uBln);
                     if(d_bbu) { if(b < parseFloat(d_bbu.min_3_sd)) { sB="Sangat Kurang"; cB="#dc3545"; } else if(b < parseFloat(d_bbu.min_2_sd)) { sB="Kurang"; cB="#fd7e14"; } }
 
-                    // PB/U atau TB/U
                     let d_tbu = stdAntro.find(s => s.jenis_kelamin === jk && (s.indeks === 'PB_U' || s.indeks === 'TB_U') && parseInt(s.umur_bulan) === uBln);
-                    if(d_tbu) { if(t < parseFloat(d_tbu.min_3_sd)) { sT="Sangat Pendek (Severely Stunted)"; cT="#dc3545"; } else if(t < parseFloat(d_tbu.min_2_sd)) { sT="Pendek (Stunted)"; cT="#fd7e14"; } }
+                    if(d_tbu) { if(t < parseFloat(d_tbu.min_3_sd)) { sT="Sangat Pendek"; cT="#dc3545"; } else if(t < parseFloat(d_tbu.min_2_sd)) { sT="Pendek"; cT="#fd7e14"; } }
 
-                    // BB/PB atau BB/TB
                     let rTB = (Math.round(t * 2) / 2).toFixed(1);
                     let d_bbp = stdAntro.find(s => s.jenis_kelamin === jk && (s.indeks === 'BB_PB' || s.indeks === 'BB_TB') && parseFloat(s.tinggi_panjang_cm) === parseFloat(rTB));
-                    if(d_bbp) { if(b < parseFloat(d_bbp.min_3_sd)) { sP="Gizi Buruk (Severely Wasted)"; cP="#dc3545"; } else if(b < parseFloat(d_bbp.min_2_sd)) { sP="Gizi Kurang (Wasted)"; cP="#fd7e14"; } }
+                    if(d_bbp) { if(b < parseFloat(d_bbp.min_3_sd)) { sP="Gizi Buruk"; cP="#dc3545"; } else if(b < parseFloat(d_bbp.min_2_sd)) { sP="Gizi Kurang"; cP="#fd7e14"; } }
 
                     getEl('antro_result').style.display = 'block';
                     getEl('antro_result').innerHTML = `<h5 style="margin:0 0 10px 0; color:#333; text-align:center;">📊 Deteksi Dini Status Gizi</h5><div style="font-size:0.85rem;"><div style="display:flex; justify-content:space-between; border-bottom:1px solid #eee; padding-bottom:5px;"><span>Berat (BB/U):</span><b style="color:${cB};">${sB}</b></div><div style="display:flex; justify-content:space-between; border-bottom:1px solid #eee; padding:5px 0;"><span>Tinggi (PB/U):</span><b style="color:${cT};">${sT}</b></div><div style="display:flex; justify-content:space-between; padding-top:5px;"><span>Proporsi (BB/PB):</span><b style="color:${cP};">${sP}</b></div></div>`;
@@ -702,7 +703,33 @@ const initFormPendampingan = async () => {
                 containerQ.innerHTML = htmlQ;
                 if(getEl('is_melahirkan')) getEl('is_melahirkan').onchange = (e) => { if(e.target.value === 'YA') getEl('box-tgl-lahir').classList.remove('hidden'); else getEl('box-tgl-lahir').classList.add('hidden'); };
             } else { containerQ.innerHTML = htmlQ; }
+            
+            // 🔥 POPULATE DATA UNTUK EDIT LAPORAN
+            if(window.editModeLaporan) {
+                setTimeout(() => {
+                    const eL = window.editModeLaporan;
+                    for (const [key, value] of Object.entries(eL.data_laporan || {})) {
+                        let field = document.querySelector(`[name="${key}"]`);
+                        if(field) {
+                            field.value = value;
+                            field.dispatchEvent(new Event('change'));
+                            field.dispatchEvent(new Event('input')); // Triggers Antro Calc
+                        }
+                    }
+                }, 300);
+            }
         };
+
+        // Auto trigger jika masuk mode edit laporan
+        if(window.editModeLaporan) {
+            selJenis.value = window.editModeLaporan.jenis_sasaran_saat_kunjungan || (window.editModeLaporan.id_sasaran_ref.startsWith('CTN')?'CATIN':window.editModeLaporan.id_sasaran_ref.startsWith('BML')?'BUMIL':window.editModeLaporan.id_sasaran_ref.startsWith('BFS')?'BUFAS':'BADUTA');
+            selJenis.dispatchEvent(new Event('change'));
+            setTimeout(() => {
+                selSasaran.value = window.editModeLaporan.id_sasaran_ref;
+                selSasaran.dispatchEvent(new Event('change'));
+                selJenis.disabled = true; selSasaran.disabled = true; // Lock id saat edit
+            }, 100);
+        }
     }
     
     const formPend = getEl('form-pendampingan');
@@ -712,7 +739,7 @@ const initFormPendampingan = async () => {
             try {
                 const formData = new FormData(e.target); const jawaban = {}; formData.forEach((val, key) => jawaban[key] = val);
                 
-                if(jawaban.is_melahirkan === 'YA' && jawaban.tgl_persalinan) {
+                if(jawaban.is_melahirkan === 'YA' && jawaban.tgl_persalinan && !window.editModeLaporan) {
                     const oR = await getDataById('sync_queue', jawaban.id_sasaran);
                     if(oR) {
                         oR.status_sasaran = 'SELESAI'; oR.is_synced = false; await putData('sync_queue', oR);
@@ -721,8 +748,19 @@ const initFormPendampingan = async () => {
                         await putData('sync_queue', nB); alert("🎉 BUMIL telah melahirkan. Kartu BUFAS baru diterbitkan!");
                     }
                 }
-                await putData('sync_queue', { id: `PEND-${Date.now()}`, tipe_laporan: 'PENDAMPINGAN', username: session.username, id_tim: session.id_tim, id_sasaran_ref: jawaban.id_sasaran, jenis_sasaran_saat_kunjungan: selJenis.value, data_laporan: jawaban, is_synced: false, created_at: new Date().toISOString() });
-                alert("✅ Laporan Pendampingan Tersimpan!"); renderKonten('dashboard');
+                
+                let idLapor = window.editModeLaporan ? window.editModeLaporan.id : `PEND-${Date.now()}`;
+                let createdDate = window.editModeLaporan ? window.editModeLaporan.created_at : new Date().toISOString();
+                
+                // Override sasaran if disabled
+                if(window.editModeLaporan) {
+                    jawaban.id_sasaran = selSasaran.value;
+                }
+
+                await putData('sync_queue', { id: idLapor, tipe_laporan: 'PENDAMPINGAN', username: session.username, id_tim: session.id_tim, id_sasaran_ref: jawaban.id_sasaran, jenis_sasaran_saat_kunjungan: selJenis.value, data_laporan: jawaban, is_synced: false, created_at: createdDate });
+                
+                window.editModeLaporan = null;
+                alert("✅ Laporan Pendampingan Tersimpan!"); renderKonten('daftar_sasaran');
             } catch (err) { alert("Gagal menyimpan."); } finally { btn.disabled = false; }
         };
     }
