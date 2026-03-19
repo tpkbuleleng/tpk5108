@@ -3,7 +3,6 @@
 // ==========================================
 import { deleteData } from './db.js';
 
-// 👉 WAJIB SAMAKAN URL INI DENGAN DI SYNC.JS
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzEmmn0wMJmC1OHij9JUxm8EIT2xW1AuV0597EYCWDIxG_nkpZYBPx1EGiNYe6OjEHniw/exec';
 
 export const initAdmin = async (session) => {
@@ -19,19 +18,16 @@ export const initAdmin = async (session) => {
         vSplash.classList.remove('hidden'); 
         vSplash.classList.add('active'); 
         
-        // Ubah teks loading khusus Admin
         const textLoad = vSplash.querySelector('p') || vSplash.querySelector('div');
         if(textLoad) textLoad.innerHTML = "<b style='font-size:1.1rem; color:var(--primary);'>Memuat Ruang Kontrol Eksekutif...</b><br><small style='color:#666;'>Menyedot data live dari Server Google</small>";
     }
 
-    // 2. Load Chart JS secara Background
     if (!window.Chart) {
         const script = document.createElement('script');
         script.src = 'https://cdn.jsdelivr.net/npm/chart.js';
         document.head.appendChild(script);
     }
 
-    // 3. Tarik Data Segar dari Server
     try {
         const url = `${SCRIPT_URL}?action=getAdminData&role=${session.role}&kecamatan=${session.kecamatan || ''}`;
         const response = await fetch(url);
@@ -44,11 +40,16 @@ export const initAdmin = async (session) => {
             window.adminData.registrasi.forEach(r => { try { r.data_json = JSON.parse(r.data_laporan || '{}'); } catch(e) { r.data_json = {}; } });
             window.adminData.pendampingan.forEach(p => { try { p.data_json = JSON.parse(p.data_laporan || '{}'); } catch(e) { p.data_json = {}; } });
             
-            window.adminCurrentMonth = 'ALL'; // Default Filter Waktu
+            // Inisialisasi Filter Global
+            window.adminFilterMonth = 'ALL';
+            window.adminFilterKec = 'ALL';
+            window.adminFilterDesa = 'ALL';
+            window.adminFilterJenis = 'ALL';
+            window.adminFilterMetric = 'ALL'; // ALL, AKTIF, SELESAI, TERDAMPINGI
             
             setTimeout(() => {
-                if(vSplash) vSplash.style.display = 'none'; // Sembunyikan Splash
-                renderAdminUI(session); // Timpa body dengan UI Admin
+                if(vSplash) vSplash.style.display = 'none'; 
+                renderAdminUI(session); 
             }, 800); 
         } else {
             alert("❌ Gagal memuat data dari server: " + res.message); location.reload();
@@ -64,7 +65,6 @@ export const initAdmin = async (session) => {
 const renderAdminUI = (session) => {
     const lvlAdmin = session.role.includes('KAB') ? 'KABUPATEN BULELENG' : `KECAMATAN ${session.kecamatan.toUpperCase()}`;
 
-    // Timpa seluruh body dengan Layout Desktop Admin
     document.body.innerHTML = `
         <div id="admin-root" style="display:flex; height:100vh; width:100vw; background:#f4f6f9; font-family: 'Segoe UI', sans-serif;">
             <div style="width:260px; background:#001f3f; color:white; display:flex; flex-direction:column; box-shadow: 2px 0 5px rgba(0,0,0,0.1); z-index:10;">
@@ -108,6 +108,14 @@ const renderAdminUI = (session) => {
             .admin-table th { background: #0043a8; color: white; padding: 12px; text-align: left; }
             .admin-table td { padding: 12px; border-bottom: 1px solid #eee; color: #444; }
             .admin-table tr:hover td { background: #f8f9fa; }
+            
+            /* Animasi Kotak Interaktif */
+            .metric-card { cursor: pointer; transition: all 0.2s ease; opacity: 0.5; filter: grayscale(50%); border: 2px solid transparent;}
+            .metric-card:hover { opacity: 0.8; transform: translateY(-2px); }
+            .metric-card.active { opacity: 1; filter: grayscale(0%); transform: translateY(-4px); box-shadow: 0 8px 15px rgba(0,0,0,0.1); border-color: currentColor; }
+            
+            .filter-select { padding:8px 12px; border:1px solid #ccc; border-radius:6px; font-weight:bold; color:#333; cursor:pointer; background:#fff; font-size:0.85rem; box-shadow:0 1px 2px rgba(0,0,0,0.05); outline:none; }
+            .filter-select:focus { border-color: #0d6efd; }
         </style>
     `;
 
@@ -130,6 +138,12 @@ const renderAdminUI = (session) => {
     renderView('dash');
 };
 
+// Fungsi Pemicu Klik Kartu Metrik
+window.setAdminMetric = (metric) => {
+    window.adminFilterMetric = window.adminFilterMetric === metric ? 'ALL' : metric; // Toggle
+    renderView('dash');
+};
+
 // ==========================================
 // RENDER HALAMAN SPESIFIK ADMIN
 // ==========================================
@@ -138,110 +152,153 @@ const renderView = (target) => {
     const data = window.adminData;
 
     if (target === 'dash') {
-        // Kumpulkan Daftar Bulan untuk Filter
-        const monthSet = new Set();
-        data.registrasi.forEach(r => { if(r.created_at) monthSet.add(r.created_at.substring(0,7)); });
-        data.pendampingan.forEach(p => { let t = p.data_json?.tgl_kunjungan || p.created_at; if(t) monthSet.add(t.substring(0,7)); });
-        const monthOptions = Array.from(monthSet).sort().reverse().map(m => {
-            const date = new Date(m + '-01'); const name = date.toLocaleDateString('id-ID', {month:'long', year:'numeric'});
-            return `<option value="${m}">${name}</option>`;
-        }).join('');
+        // --- 1. PERSIAPAN DATA FILTER DROPDOWN ---
+        const monthSet = new Set(); const kecSet = new Set(); const desaSet = new Set();
+        
+        data.registrasi.forEach(r => { 
+            let t = String(r.created_at || '').trim(); if (t.length >= 7) monthSet.add(t.substring(0,7));
+            if(r.sumber_kecamatan) kecSet.add(r.sumber_kecamatan);
+            if(r.desa && r.desa !== '-') desaSet.add(r.desa);
+        });
+        
+        data.pendampingan.forEach(p => { 
+            let t = String(p.data_json?.tgl_kunjungan || p.created_at || '').trim(); if(t.length >= 7) monthSet.add(t.substring(0,7)); 
+        });
 
-        // Terapkan Filter
-        const fM = window.adminCurrentMonth;
-        const regF = data.registrasi.filter(r => fM === 'ALL' || (r.created_at && r.created_at.startsWith(fM)));
-        const pendF = data.pendampingan.filter(p => { let t = p.data_json?.tgl_kunjungan || p.created_at; return fM === 'ALL' || (t && t.startsWith(fM)); });
+        // Format Opsi Dropdown
+        const optBulan = Array.from(monthSet).sort().reverse().map(m => `<option value="${m}">${m}</option>`).join('');
+        const optKec = Array.from(kecSet).sort().map(k => `<option value="${k}">${k}</option>`).join('');
+        const optDesa = Array.from(desaSet).sort().map(d => `<option value="${d}">${d}</option>`).join('');
 
-        // Kalkulasi Baris 1: Status Sasaran
-        const totalSasaran = regF.length;
-        let sasaranSelesai = 0;
+        // --- 2. TERAPKAN FILTER DROPDOWN KEDUA DATA ---
+        const fM = window.adminFilterMonth; const fK = window.adminFilterKec; 
+        const fD = window.adminFilterDesa; const fJ = window.adminFilterJenis;
+
+        let regBase = data.registrasi.filter(r => {
+            let m = String(r.created_at || '').substring(0,7);
+            let matchM = (fM === 'ALL') || (m === fM);
+            let matchK = (fK === 'ALL') || (r.sumber_kecamatan === fK || r.kecamatan === fK);
+            let matchD = (fD === 'ALL') || (r.desa === fD);
+            let matchJ = (fJ === 'ALL') || (r.jenis_sasaran === fJ);
+            return matchM && matchK && matchD && matchJ;
+        });
+
+        let pendBase = data.pendampingan.filter(p => {
+            let t = String(p.data_json?.tgl_kunjungan || p.created_at || '').substring(0,7);
+            return fM === 'ALL' || t === fM; // Filter kecamatan/desa menempel ke Registrasi
+        });
+
+        // --- 3. KALKULASI KONDISI UMUM SASARAN (BARIS ATAS) ---
         const hI = new Date(); hI.setHours(0,0,0,0);
-        regF.forEach(r => {
+        let countSelesai = 0, countAktif = 0;
+        
+        regBase.forEach(r => {
             let isExp = r.status_sasaran === 'SELESAI';
             if (r.jenis_sasaran === 'CATIN' && r.data_json?.tanggal_pernikahan && new Date(r.data_json.tanggal_pernikahan) < hI) isExp = true;
             if (r.jenis_sasaran === 'BUFAS' && r.data_json?.tgl_persalinan) { const tB = new Date(r.data_json.tgl_persalinan); tB.setDate(tB.getDate() + 42); if (hI > tB) isExp = true; }
-            if(isExp) sasaranSelesai++;
+            
+            r._isExpired = isExp; // Tandai untuk filter selanjutnya
+            if(isExp) countSelesai++; else countAktif++;
         });
-        const sasaranAktif = totalSasaran - sasaranSelesai;
-        const sasaranTerdampingi = new Set(pendF.map(p => p.id_sasaran_ref)).size;
 
-        // Kalkulasi Baris 2: Kategori Sasaran
+        const idTerdampingi = new Set(pendBase.map(p => p.id_sasaran_ref));
+        let countTerdampingi = regBase.filter(r => idTerdampingi.has(r.id)).length;
+
+        // --- 4. TERAPKAN FILTER KOTAK INTERAKTIF (METRIC) KE DATA ---
+        let finalReg = regBase;
+        const actMetric = window.adminFilterMetric;
+        if (actMetric === 'AKTIF') finalReg = regBase.filter(r => !r._isExpired);
+        else if (actMetric === 'SELESAI') finalReg = regBase.filter(r => r._isExpired);
+        else if (actMetric === 'TERDAMPINGI') finalReg = regBase.filter(r => idTerdampingi.has(r.id));
+
+        // --- 5. KALKULASI DISTRIBUSI BERDASARKAN JENIS (BARIS BAWAH) DARI DATA FINAL ---
         let tCatin = 0, tBumil = 0, tBufas = 0, tBaduta = 0;
-        regF.forEach(r => {
+        finalReg.forEach(r => {
             if(r.jenis_sasaran === 'CATIN') tCatin++; else if(r.jenis_sasaran === 'BUMIL') tBumil++; 
             else if(r.jenis_sasaran === 'BUFAS') tBufas++; else if(r.jenis_sasaran === 'BADUTA') tBaduta++;
         });
 
-        // 🔥 Layout Grid Dashboard Baru
+        // 🔥 LAYOUT HTML DASHBOARD
         content.innerHTML = `
-            <div style="display:flex; justify-content:flex-end; margin-bottom: 20px;">
-                <select id="admin-dash-month" style="padding:8px 15px; border:1px solid #c6c6c6; border-radius:6px; font-weight:bold; color:#0043a8; cursor:pointer; background:#fff; box-shadow:0 1px 2px rgba(0,0,0,0.05);">
-                    <option value="ALL">📅 Tampilkan Semua Bulan</option>
-                    ${monthOptions}
+            <div style="display:flex; justify-content:flex-end; gap:10px; margin-bottom: 20px; flex-wrap:wrap;">
+                <select id="flt-bulan" class="filter-select"><option value="ALL">📅 Semua Bulan</option>${optBulan}</select>
+                <select id="flt-kec" class="filter-select"><option value="ALL">🏛️ Semua Kecamatan</option>${optKec}</select>
+                <select id="flt-desa" class="filter-select"><option value="ALL">🏘️ Semua Desa</option>${optDesa}</select>
+                <select id="flt-jenis" class="filter-select"><option value="ALL">🎯 Semua Sasaran</option>
+                    <option value="CATIN">CATIN</option><option value="BUMIL">BUMIL</option><option value="BUFAS">BUFAS</option><option value="BADUTA">BADUTA</option>
                 </select>
             </div>
 
-            <h4 style="margin:0 0 10px 0; color:#555; font-size:1rem;">Kondisi Umum Sasaran</h4>
+            <h4 style="margin:0 0 10px 0; color:#555; font-size:1rem;">Kondisi Umum Sasaran (Klik Kotak untuk Filter Data)</h4>
             <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 25px;">
-                <div class="admin-card" style="border-top: 4px solid #0043a8; text-align:center;">
-                    <div style="font-size:0.85rem; color:#666; font-weight:bold; text-transform:uppercase;">Total Sasaran Terdaftar</div>
-                    <div style="font-size:2.2rem; font-weight:800; color:#0043a8; margin-top:5px;">${totalSasaran}</div>
+                <div class="admin-card metric-card ${actMetric==='ALL'?'active':''}" style="color:#0043a8;" onclick="window.setAdminMetric('ALL')">
+                    <div style="font-size:0.85rem; font-weight:bold; text-transform:uppercase;">Total Terdaftar</div>
+                    <div style="font-size:2.2rem; font-weight:800; margin-top:5px;">${regBase.length}</div>
                 </div>
-                <div class="admin-card" style="border-top: 4px solid #198754; text-align:center;">
-                    <div style="font-size:0.85rem; color:#666; font-weight:bold; text-transform:uppercase;">Sasaran Aktif</div>
-                    <div style="font-size:2.2rem; font-weight:800; color:#198754; margin-top:5px;">${sasaranAktif}</div>
+                <div class="admin-card metric-card ${actMetric==='AKTIF'?'active':''}" style="color:#198754;" onclick="window.setAdminMetric('AKTIF')">
+                    <div style="font-size:0.85rem; font-weight:bold; text-transform:uppercase;">Sasaran Aktif</div>
+                    <div style="font-size:2.2rem; font-weight:800; margin-top:5px;">${countAktif}</div>
                 </div>
-                <div class="admin-card" style="border-top: 4px solid #6c757d; text-align:center;">
-                    <div style="font-size:0.85rem; color:#666; font-weight:bold; text-transform:uppercase;">Sasaran Selesai / Expired</div>
-                    <div style="font-size:2.2rem; font-weight:800; color:#6c757d; margin-top:5px;">${sasaranSelesai}</div>
+                <div class="admin-card metric-card ${actMetric==='SELESAI'?'active':''}" style="color:#6c757d;" onclick="window.setAdminMetric('SELESAI')">
+                    <div style="font-size:0.85rem; font-weight:bold; text-transform:uppercase;">Selesai / Expired</div>
+                    <div style="font-size:2.2rem; font-weight:800; margin-top:5px;">${countSelesai}</div>
                 </div>
-                <div class="admin-card" style="border-top: 4px solid #fd7e14; text-align:center;">
-                    <div style="font-size:0.85rem; color:#666; font-weight:bold; text-transform:uppercase;">Sasaran Terdampingi</div>
-                    <div style="font-size:2.2rem; font-weight:800; color:#fd7e14; margin-top:5px;">${sasaranTerdampingi}</div>
+                <div class="admin-card metric-card ${actMetric==='TERDAMPINGI'?'active':''}" style="color:#fd7e14;" onclick="window.setAdminMetric('TERDAMPINGI')">
+                    <div style="font-size:0.85rem; font-weight:bold; text-transform:uppercase;">Terdampingi</div>
+                    <div style="font-size:2.2rem; font-weight:800; margin-top:5px;">${countTerdampingi}</div>
                 </div>
             </div>
 
-            <h4 style="margin:0 0 10px 0; color:#555; font-size:1rem;">Distribusi Berdasarkan Jenis</h4>
+            <h4 style="margin:0 0 10px 0; color:#555; font-size:1rem;">Rincian Berdasarkan Jenis <span style="font-weight:normal; font-size:0.85rem;">(Difilter dari: ${actMetric === 'ALL' ? 'Total Terdaftar' : actMetric})</span></h4>
             <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 30px;">
                 <div class="admin-card" style="border-left: 4px solid #6f42c1; display:flex; justify-content:space-between; align-items:center;">
-                    <div style="font-size:0.9rem; color:#666; font-weight:bold;">CATIN</div>
-                    <div style="font-size:1.8rem; font-weight:800; color:#6f42c1;">${tCatin}</div>
+                    <div style="font-size:0.9rem; color:#666; font-weight:bold;">CATIN</div><div style="font-size:1.8rem; font-weight:800; color:#6f42c1;">${tCatin}</div>
                 </div>
                 <div class="admin-card" style="border-left: 4px solid #d63384; display:flex; justify-content:space-between; align-items:center;">
-                    <div style="font-size:0.9rem; color:#666; font-weight:bold;">BUMIL</div>
-                    <div style="font-size:1.8rem; font-weight:800; color:#d63384;">${tBumil}</div>
+                    <div style="font-size:0.9rem; color:#666; font-weight:bold;">BUMIL</div><div style="font-size:1.8rem; font-weight:800; color:#d63384;">${tBumil}</div>
                 </div>
                 <div class="admin-card" style="border-left: 4px solid #20c997; display:flex; justify-content:space-between; align-items:center;">
-                    <div style="font-size:0.9rem; color:#666; font-weight:bold;">BUFAS</div>
-                    <div style="font-size:1.8rem; font-weight:800; color:#20c997;">${tBufas}</div>
+                    <div style="font-size:0.9rem; color:#666; font-weight:bold;">BUFAS</div><div style="font-size:1.8rem; font-weight:800; color:#20c997;">${tBufas}</div>
                 </div>
                 <div class="admin-card" style="border-left: 4px solid #0dcaf0; display:flex; justify-content:space-between; align-items:center;">
-                    <div style="font-size:0.9rem; color:#666; font-weight:bold;">BADUTA</div>
-                    <div style="font-size:1.8rem; font-weight:800; color:#0dcaf0;">${tBaduta}</div>
+                    <div style="font-size:0.9rem; color:#666; font-weight:bold;">BADUTA</div><div style="font-size:1.8rem; font-weight:800; color:#0dcaf0;">${tBaduta}</div>
                 </div>
             </div>
             
             <div style="display:grid; grid-template-columns: 1fr 2fr; gap: 20px;">
                 <div class="admin-card"><h4 style="margin:0 0 15px 0; color:#333;">Proporsi Demografi</h4><canvas id="chartPie" height="200"></canvas></div>
-                <div class="admin-card"><h4 style="margin:0 0 15px 0; color:#333;">Distribusi Area (Kecamatan/Desa)</h4><canvas id="chartBar" height="100"></canvas></div>
+                <div class="admin-card"><h4 style="margin:0 0 15px 0; color:#333;">Distribusi Desa / Area</h4><canvas id="chartBar" height="100"></canvas></div>
             </div>
         `;
 
-        // Event Listener Filter Bulan
-        document.getElementById('admin-dash-month').value = window.adminCurrentMonth;
-        document.getElementById('admin-dash-month').addEventListener('change', function() {
-            window.adminCurrentMonth = this.value; renderView('dash');
+        // Atur nilai dropdown ke state tersimpan
+        document.getElementById('flt-bulan').value = window.adminFilterMonth;
+        document.getElementById('flt-kec').value = window.adminFilterKec;
+        document.getElementById('flt-desa').value = window.adminFilterDesa;
+        document.getElementById('flt-jenis').value = window.adminFilterJenis;
+
+        // Pasang Event Listener
+        document.querySelectorAll('.filter-select').forEach(el => {
+            el.addEventListener('change', function() {
+                window.adminFilterMonth = document.getElementById('flt-bulan').value;
+                window.adminFilterKec = document.getElementById('flt-kec').value;
+                window.adminFilterDesa = document.getElementById('flt-desa').value;
+                window.adminFilterJenis = document.getElementById('flt-jenis').value;
+                renderView('dash');
+            });
         });
 
-        // Eksekusi Grafik
+        // Eksekusi Grafik Pie
         if(window.myChartPie) window.myChartPie.destroy();
         window.myChartPie = new Chart(document.getElementById('chartPie'), {
             type: 'doughnut', data: { labels: ['CATIN', 'BUMIL', 'BUFAS', 'BADUTA'], datasets: [{ data: [tCatin, tBumil, tBufas, tBaduta], backgroundColor: ['#6f42c1', '#d63384', '#20c997', '#0dcaf0'] }] },
             options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
         });
 
+        // Eksekusi Grafik Batang
         const areaStats = {};
-        regF.forEach(r => { const a = r.sumber_kecamatan || r.desa || 'Unknown'; areaStats[a] = (areaStats[a] || 0) + 1; });
+        finalReg.forEach(r => { const a = r.desa !== '-' ? r.desa : (r.sumber_kecamatan || 'Lainnya'); areaStats[a] = (areaStats[a] || 0) + 1; });
+        
         if(window.myChartBar) window.myChartBar.destroy();
         window.myChartBar = new Chart(document.getElementById('chartBar'), {
             type: 'bar', data: { labels: Object.keys(areaStats), datasets: [{ label: 'Jumlah Sasaran', data: Object.values(areaStats), backgroundColor: '#0d6efd' }] },
@@ -249,6 +306,7 @@ const renderView = (target) => {
         });
 
     } else if (target === 'duplikat') {
+        // [FUNGSI DUPLIKAT TETAP SAMA]
         const dDup = data.registrasi.filter(r => r.status_duplikasi && r.status_duplikasi.includes('DUPLIKAT'));
         let htmlTable = '';
         if (dDup.length === 0) {
@@ -261,6 +319,7 @@ const renderView = (target) => {
         content.innerHTML = `<div class="admin-card"><p style="color:#666; margin-top:0;">Berikut adalah data yang terindikasi didaftarkan lebih dari satu kali oleh tim yang berbeda berdasarkan kecocokan NIK atau Nama/Tgl Lahir.</p>${htmlTable}</div>`;
 
     } else if (target === 'database') {
+        // [FUNGSI DATABASE TETAP SAMA]
         content.innerHTML = `
             <div class="admin-card">
                 <div style="display:flex; justify-content:space-between; margin-bottom:15px;">
