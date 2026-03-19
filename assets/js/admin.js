@@ -1,7 +1,7 @@
 // ==========================================
 // MESIN DASHBOARD ADMIN (EXECUTIVE CONTROL PANEL)
 // ==========================================
-import { deleteData } from './db.js';
+import { deleteData, putData } from './db.js';
 
 // 👉 WAJIB SAMAKAN URL INI DENGAN DI SYNC.JS
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzEmmn0wMJmC1OHij9JUxm8EIT2xW1AuV0597EYCWDIxG_nkpZYBPx1EGiNYe6OjEHniw/exec';
@@ -46,18 +46,29 @@ export const initAdmin = async (session) => {
         document.head.appendChild(script);
     }
 
-    // 2. Ekstraksi Kecamatan Kuat (Mencegah Error Data Kosong)
+    // 2. Ekstraksi Kecamatan Kuat dengan Fitur Penyelamat (Fallback)
     const isKabupaten = session.role.toUpperCase().includes('KAB');
     const textToScan = `${session.kecamatan || ''} ${session.username || ''} ${session.nama || ''}`;
-    const kodeKec = getKodeKecamatan(textToScan);
+    let kodeKec = getKodeKecamatan(textToScan);
     
+    // 🔥 JIKA SISTEM GAGAL MENEBAK, TANYAKAN LANGSUNG KE ADMIN
+    if (!isKabupaten && !kodeKec) {
+        const inputManual = prompt("Sistem tidak mendeteksi wilayah dari akun Anda.\nSilakan ketik nama Kecamatan Anda (contoh: SAWAN, SERIRIT, dll):");
+        kodeKec = getKodeKecamatan(inputManual || "");
+        
+        if(!kodeKec) {
+            alert("❌ Login dibatalkan karena wilayah kecamatan tidak valid.");
+            await deleteData('kader_session', 'active_user'); // Hapus sesi
+            location.reload(); return;
+        }
+        
+        // Simpan pilihan ke dalam memori agar tidak ditanya lagi saat Refresh (F5)
+        session.kecamatan = getNamaKecamatan(kodeKec);
+        await putData('kader_session', session);
+    }
+
     session.finalKodeKec = kodeKec;
     session.finalNamaKec = getNamaKecamatan(kodeKec);
-
-    if (!isKabupaten && !kodeKec) {
-        alert("❌ Sistem gagal mendeteksi wilayah Kecamatan Anda. Mohon periksa nama/username Anda di database Master User.");
-        location.reload(); return;
-    }
 
     // 3. Tarik Data Segar dari Server
     try {
@@ -68,7 +79,6 @@ export const initAdmin = async (session) => {
         if (res.status === 'success') {
             window.adminData = res.data;
             
-            // Ekstrak String JSON
             window.adminData.registrasi.forEach(r => { try { r.data_json = JSON.parse(r.data_laporan || '{}'); } catch(e) { r.data_json = {}; } });
             window.adminData.pendampingan.forEach(p => { try { p.data_json = JSON.parse(p.data_laporan || '{}'); } catch(e) { p.data_json = {}; } });
             
@@ -165,7 +175,6 @@ const renderView = (target, session) => {
     const isKabupaten = session.role.toUpperCase().includes('KAB'); 
 
     if (target === 'dash') {
-        // --- 1. PERSIAPAN DATA FILTER DROPDOWN ---
         const monthSet = new Set(); const kecSet = new Set(); const desaSet = new Set();
         
         data.registrasi.forEach(r => { 
@@ -177,7 +186,6 @@ const renderView = (target, session) => {
             let t = String(p.data_json?.tgl_kunjungan || p.created_at || '').trim(); if(t.length >= 7) monthSet.add(t.substring(0,7)); 
         });
 
-        // 🔥 Format Nama Bulan Cantik
         const optBulan = Array.from(monthSet).sort().reverse().map(m => {
             try { const d = new Date(m + '-01'); const n = d.toLocaleDateString('id-ID', {month:'long', year:'numeric'}); return `<option value="${m}">${n}</option>`; } 
             catch(e) { return `<option value="${m}">${m}</option>`; }
@@ -186,16 +194,14 @@ const renderView = (target, session) => {
         const optKec = Array.from(kecSet).sort().map(k => `<option value="${k}">${k}</option>`).join('');
         const optDesa = Array.from(desaSet).sort().map(d => `<option value="${d}">${d}</option>`).join('');
 
-        // 🔥 LOGIKA KUNCI FILTER KECAMATAN
         let filterKecHtml = '';
         if (isKabupaten) {
             filterKecHtml = `<select id="flt-kec" class="filter-select"><option value="ALL">🏛️ Semua Kecamatan</option>${optKec}</select>`;
         } else {
             filterKecHtml = `<div style="padding:8px 12px; border:1px solid #ccc; border-radius:6px; background:#e9ecef; font-weight:bold; color:#666; font-size:0.85rem; box-shadow:inset 0 1px 2px rgba(0,0,0,0.05);">🔒 KEC. ${session.finalNamaKec}</div>`;
-            window.adminFilterKec = 'ALL'; // Reset paksa karena datanya sudah milik dia saja
+            window.adminFilterKec = 'ALL'; 
         }
 
-        // --- 2. TERAPKAN FILTER KEDUA DATA ---
         const fM = window.adminFilterMonth; const fK = window.adminFilterKec; 
         const fD = window.adminFilterDesa; const fJ = window.adminFilterJenis;
 
@@ -213,7 +219,6 @@ const renderView = (target, session) => {
             return fM === 'ALL' || t === fM; 
         });
 
-        // --- 3. KALKULASI KONDISI UMUM ---
         const hI = new Date(); hI.setHours(0,0,0,0);
         let countSelesai = 0, countAktif = 0;
         
@@ -221,7 +226,6 @@ const renderView = (target, session) => {
             let isExp = r.status_sasaran === 'SELESAI';
             if (r.jenis_sasaran === 'CATIN' && r.data_json?.tanggal_pernikahan && new Date(r.data_json.tanggal_pernikahan) < hI) isExp = true;
             if (r.jenis_sasaran === 'BUFAS' && r.data_json?.tgl_persalinan) { const tB = new Date(r.data_json.tgl_persalinan); tB.setDate(tB.getDate() + 42); if (hI > tB) isExp = true; }
-            
             r._isExpired = isExp; 
             if(isExp) countSelesai++; else countAktif++;
         });
@@ -229,14 +233,12 @@ const renderView = (target, session) => {
         const idTerdampingi = new Set(pendBase.map(p => p.id_sasaran_ref));
         let countTerdampingi = regBase.filter(r => idTerdampingi.has(r.id)).length;
 
-        // --- 4. TERAPKAN FILTER METRIK KE FINAL DATA ---
         let finalReg = regBase;
         const actMetric = window.adminFilterMetric;
         if (actMetric === 'AKTIF') finalReg = regBase.filter(r => !r._isExpired);
         else if (actMetric === 'SELESAI') finalReg = regBase.filter(r => r._isExpired);
         else if (actMetric === 'TERDAMPINGI') finalReg = regBase.filter(r => idTerdampingi.has(r.id));
 
-        // --- 5. DISTRIBUSI BERDASARKAN JENIS ---
         let tCatin = 0, tBumil = 0, tBufas = 0, tBaduta = 0;
         finalReg.forEach(r => {
             if(r.jenis_sasaran === 'CATIN') tCatin++; else if(r.jenis_sasaran === 'BUMIL') tBumil++; 
