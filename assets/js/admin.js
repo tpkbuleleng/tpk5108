@@ -60,30 +60,23 @@ export const initAdmin = async (session) => {
         `;
 
         document.getElementById('btn-manual-logout').onclick = async () => {
-            await clearStore('kader_session'); // Hapus sesi yang error
-            window.location.reload(); // Kembali ke menu login awal
+            await clearStore('kader_session'); window.location.reload(); 
         };
 
         document.getElementById('btn-manual-lanjut').onclick = async () => {
             const val = document.getElementById('manual-kec-select').value;
             if(!val) { alert('⚠️ Silakan pilih kecamatan terlebih dahulu!'); return; }
-            
-            // Simpan pilihan ke dalam memori agar tidak ditanya lagi saat Refresh (F5)
             session.kecamatan = getNamaKecamatan(val);
             await putData('kader_session', session);
-            
-            // Panggil ulang fungsi initAdmin, sekarang dengan kecamatan yang valid
             initAdmin(session); 
         };
 
-        return; // Hentikan eksekusi di sini agar tidak memuat Dashboard kosong
+        return; 
     }
 
-    // JIKA KECAMATAN SUDAH JELAS, LANJUTKAN SEPERTI BIASA
     session.finalKodeKec = kodeKec;
     session.finalNamaKec = getNamaKecamatan(kodeKec);
 
-    // 1. Tampilkan Splash Screen Bawaan
     const vSplash = document.getElementById('view-splash');
     const vLogin = document.getElementById('view-login');
     const vApp = document.getElementById('view-app');
@@ -102,7 +95,6 @@ export const initAdmin = async (session) => {
         document.head.appendChild(script);
     }
 
-    // 2. Tarik Data Segar dari Server
     try {
         const url = `${SCRIPT_URL}?action=getAdminData&role=${session.role}&kecamatan=${kodeKec}`;
         const response = await fetch(url);
@@ -137,7 +129,7 @@ const renderAdminUI = (session) => {
         <div id="admin-root" style="display:flex; height:100vh; width:100vw; background:#f4f6f9; font-family: 'Segoe UI', sans-serif;">
             <div style="width:260px; background:#001f3f; color:white; display:flex; flex-direction:column; box-shadow: 2px 0 5px rgba(0,0,0,0.1); z-index:10;">
                 <div style="padding: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); text-align:center;">
-                    <h3 style="margin:0; font-size:1.2rem; font-weight:800; color:#4ea8de;">DASHBOARD PIMPINAN</h3>
+                    <h3 style="margin:0; font-size:1.2rem; font-weight:800; color:#4ea8de;">DASHBOARD ADMIN TPK</h3>
                     <div style="font-size:0.8rem; color:#adb5bd; margin-top:5px; font-weight:bold;">${lvlAdmin}</div>
                 </div>
                 <div style="flex:1; padding: 20px 0; overflow-y:auto;">
@@ -325,8 +317,18 @@ const renderView = (target, session) => {
             </div>
             
             <div style="display:grid; grid-template-columns: 1fr 2fr; gap: 20px;">
-                <div class="admin-card"><h4 style="margin:0 0 15px 0; color:#333;">Proporsi Demografi</h4><canvas id="chartPie" height="200"></canvas></div>
-                <div class="admin-card"><h4 style="margin:0 0 15px 0; color:#333;">Distribusi Area (Kecamatan/Desa)</h4><canvas id="chartBar" height="100"></canvas></div>
+                <div class="admin-card" style="display:flex; flex-direction:column;">
+                    <h4 style="margin:0 0 15px 0; color:#333;">Proporsi Demografi</h4>
+                    <div style="position:relative; height:250px; width:100%; display:flex; justify-content:center;">
+                        <canvas id="chartPie"></canvas>
+                    </div>
+                </div>
+                <div class="admin-card" style="display:flex; flex-direction:column;">
+                    <h4 style="margin:0 0 15px 0; color:#333;">Distribusi Area (Kecamatan/Desa)</h4>
+                    <div style="position:relative; height:250px; width:100%;">
+                        <canvas id="chartBar"></canvas>
+                    </div>
+                </div>
             </div>
         `;
 
