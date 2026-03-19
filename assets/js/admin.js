@@ -6,15 +6,28 @@ import { deleteData } from './db.js';
 // 👉 WAJIB SAMAKAN URL INI DENGAN DI SYNC.JS
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzEmmn0wMJmC1OHij9JUxm8EIT2xW1AuV0597EYCWDIxG_nkpZYBPx1EGiNYe6OjEHniw/exec';
 
-// 🔥 Penerjemah Nama Kecamatan -> Kode 3 Huruf untuk Server
-const getKodeKecamatan = (kec) => {
-    if (!kec) return "";
-    const map = { 'GEROKGAK': 'GRK', 'SERIRIT': 'SRT', 'BUSUNGBIU': 'BSB', 'BANJAR': 'BJR', 'SUKASADA': 'SKS', 'BULELENG': 'BLL', 'SAWAN': 'SWN', 'KUBUTAMBAHAN': 'KBT', 'TEJAKULA': 'TJK' };
-    return map[kec.toUpperCase()] || kec.toUpperCase(); 
+// 🔥 Radar Ekstraksi Kecamatan Super Cerdas
+const getKodeKecamatan = (text) => {
+    const t = String(text).toUpperCase();
+    if (t.includes('GEROKGAK') || t.includes('GRK')) return 'GRK';
+    if (t.includes('SERIRIT') || t.includes('SRT')) return 'SRT';
+    if (t.includes('BUSUNGBIU') || t.includes('BSB')) return 'BSB';
+    if (t.includes('BANJAR') || t.includes('BJR')) return 'BJR';
+    if (t.includes('SUKASADA') || t.includes('SKS')) return 'SKS';
+    if (t.includes('SAWAN') || t.includes('SWN')) return 'SWN';
+    if (t.includes('KUBUTAMBAHAN') || t.includes('KBT')) return 'KBT';
+    if (t.includes('TEJAKULA') || t.includes('TJK')) return 'TJK';
+    if (t.includes('BULELENG') || t.includes('BLL')) return 'BLL';
+    return ''; 
+};
+
+const getNamaKecamatan = (kode) => {
+    const map = { 'GRK':'GEROKGAK', 'SRT':'SERIRIT', 'BSB':'BUSUNGBIU', 'BJR':'BANJAR', 'SKS':'SUKASADA', 'BLL':'BULELENG', 'SWN':'SAWAN', 'KBT':'KUBUTAMBAHAN', 'TJK':'TEJAKULA' };
+    return map[kode] || kode;
 };
 
 export const initAdmin = async (session) => {
-    // 1. Tampilkan Splash Screen Bawaan agar Konsisten
+    // 1. Tampilkan Splash Screen Bawaan
     const vSplash = document.getElementById('view-splash');
     const vLogin = document.getElementById('view-login');
     const vApp = document.getElementById('view-app');
@@ -22,10 +35,7 @@ export const initAdmin = async (session) => {
     if(vLogin) vLogin.classList.add('hidden');
     if(vApp) vApp.classList.add('hidden');
     if(vSplash) { 
-        vSplash.style.display = 'flex'; 
-        vSplash.classList.remove('hidden'); 
-        vSplash.classList.add('active'); 
-        
+        vSplash.style.display = 'flex'; vSplash.classList.remove('hidden'); vSplash.classList.add('active'); 
         const textLoad = vSplash.querySelector('p') || vSplash.querySelector('div');
         if(textLoad) textLoad.innerHTML = "<b style='font-size:1.1rem; color:var(--primary);'>Memuat Ruang Kontrol Eksekutif...</b><br><small style='color:#666;'>Menyedot data live dari Server Google</small>";
     }
@@ -36,9 +46,21 @@ export const initAdmin = async (session) => {
         document.head.appendChild(script);
     }
 
-    // 3. Tarik Data Segar dari Server (Menggunakan Kode Kecamatan yang Benar)
+    // 2. Ekstraksi Kecamatan Kuat (Mencegah Error Data Kosong)
+    const isKabupaten = session.role.toUpperCase().includes('KAB');
+    const textToScan = `${session.kecamatan || ''} ${session.username || ''} ${session.nama || ''}`;
+    const kodeKec = getKodeKecamatan(textToScan);
+    
+    session.finalKodeKec = kodeKec;
+    session.finalNamaKec = getNamaKecamatan(kodeKec);
+
+    if (!isKabupaten && !kodeKec) {
+        alert("❌ Sistem gagal mendeteksi wilayah Kecamatan Anda. Mohon periksa nama/username Anda di database Master User.");
+        location.reload(); return;
+    }
+
+    // 3. Tarik Data Segar dari Server
     try {
-        const kodeKec = getKodeKecamatan(session.kecamatan);
         const url = `${SCRIPT_URL}?action=getAdminData&role=${session.role}&kecamatan=${kodeKec}`;
         const response = await fetch(url);
         const res = await response.json();
@@ -46,26 +68,18 @@ export const initAdmin = async (session) => {
         if (res.status === 'success') {
             window.adminData = res.data;
             
-            // Format string JSON
+            // Ekstrak String JSON
             window.adminData.registrasi.forEach(r => { try { r.data_json = JSON.parse(r.data_laporan || '{}'); } catch(e) { r.data_json = {}; } });
             window.adminData.pendampingan.forEach(p => { try { p.data_json = JSON.parse(p.data_laporan || '{}'); } catch(e) { p.data_json = {}; } });
             
-            // Inisialisasi Filter Global
-            window.adminFilterMonth = 'ALL';
-            window.adminFilterKec = 'ALL';
-            window.adminFilterDesa = 'ALL';
-            window.adminFilterJenis = 'ALL';
-            window.adminFilterMetric = 'ALL'; // ALL, AKTIF, SELESAI, TERDAMPINGI
+            window.adminFilterMonth = 'ALL'; window.adminFilterKec = 'ALL'; window.adminFilterDesa = 'ALL'; window.adminFilterJenis = 'ALL'; window.adminFilterMetric = 'ALL';
             
-            setTimeout(() => {
-                if(vSplash) vSplash.style.display = 'none'; 
-                renderAdminUI(session); 
-            }, 800); 
+            setTimeout(() => { if(vSplash) vSplash.style.display = 'none'; renderAdminUI(session); }, 800); 
         } else {
             alert("❌ Gagal memuat data dari server: " + res.message); location.reload();
         }
     } catch(e) {
-        alert("❌ Koneksi terputus. Pastikan internet Bapak stabil."); location.reload();
+        alert("❌ Koneksi terputus. Pastikan internet stabil."); location.reload();
     }
 };
 
@@ -73,7 +87,8 @@ export const initAdmin = async (session) => {
 // RENDER ANTARMUKA DESKTOP ADMIN
 // ==========================================
 const renderAdminUI = (session) => {
-    const lvlAdmin = session.role.includes('KAB') ? 'KABUPATEN BULELENG' : `KECAMATAN ${session.kecamatan.toUpperCase()}`;
+    const isKabupaten = session.role.toUpperCase().includes('KAB');
+    const lvlAdmin = isKabupaten ? 'KABUPATEN BULELENG' : `KECAMATAN ${session.finalNamaKec}`;
 
     document.body.innerHTML = `
         <div id="admin-root" style="display:flex; height:100vh; width:100vw; background:#f4f6f9; font-family: 'Segoe UI', sans-serif;">
@@ -82,30 +97,22 @@ const renderAdminUI = (session) => {
                     <h3 style="margin:0; font-size:1.2rem; font-weight:800; color:#4ea8de;">DASHBOARD PIMPINAN</h3>
                     <div style="font-size:0.8rem; color:#adb5bd; margin-top:5px; font-weight:bold;">${lvlAdmin}</div>
                 </div>
-                
                 <div style="flex:1; padding: 20px 0; overflow-y:auto;">
                     <div class="admin-menu-item active" data-target="dash">📊 Ringkasan Eksekutif</div>
-                    <div class="admin-menu-item" data-target="duplikat" style="position:relative;">
-                        ⚠️ Resolusi Duplikat
-                        <span id="badge-dup" style="background:#dc3545; color:white; padding:2px 6px; border-radius:10px; font-size:0.7rem; position:absolute; right:15px; top:12px;">0</span>
-                    </div>
+                    <div class="admin-menu-item" data-target="duplikat" style="position:relative;">⚠️ Resolusi Duplikat <span id="badge-dup" style="background:#dc3545; color:white; padding:2px 6px; border-radius:10px; font-size:0.7rem; position:absolute; right:15px; top:12px;">0</span></div>
                     <div class="admin-menu-item" data-target="database">🗄️ Master Live Database</div>
                 </div>
-                
                 <div style="padding: 20px; border-top: 1px solid rgba(255,255,255,0.1);">
                     <div style="font-size:0.8rem; margin-bottom:10px; color:#adb5bd;">Login sebagai: <br><b style="color:white;">${session.nama}</b></div>
                     <button id="btn-admin-logout" style="width:100%; background:#dc3545; color:white; border:none; padding:10px; border-radius:6px; cursor:pointer; font-weight:bold;">Keluar Aplikasi</button>
                 </div>
             </div>
-
             <div style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
                 <div style="background:white; padding: 15px 30px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); z-index:5; display:flex; justify-content:space-between; align-items:center;">
                     <h2 id="admin-page-title" style="margin:0; font-size:1.4rem; color:#333;">Ringkasan Eksekutif</h2>
                     <div style="font-size:0.85rem; color:#666; font-weight:bold;">Status Data: <span style="color:#198754;">🟢 Real-Time Tersinkron</span></div>
                 </div>
-                
-                <div id="admin-content" style="flex:1; padding: 30px; overflow-y:auto; background:#f4f6f9;">
-                    </div>
+                <div id="admin-content" style="flex:1; padding: 30px; overflow-y:auto; background:#f4f6f9;"></div>
             </div>
         </div>
 
@@ -118,41 +125,33 @@ const renderAdminUI = (session) => {
             .admin-table th { background: #0043a8; color: white; padding: 12px; text-align: left; }
             .admin-table td { padding: 12px; border-bottom: 1px solid #eee; color: #444; }
             .admin-table tr:hover td { background: #f8f9fa; }
-            
-            /* Animasi Kotak Interaktif */
             .metric-card { cursor: pointer; transition: all 0.2s ease; opacity: 0.5; filter: grayscale(50%); border: 2px solid transparent;}
             .metric-card:hover { opacity: 0.8; transform: translateY(-2px); }
             .metric-card.active { opacity: 1; filter: grayscale(0%); transform: translateY(-4px); box-shadow: 0 8px 15px rgba(0,0,0,0.1); border-color: currentColor; }
-            
             .filter-select { padding:8px 12px; border:1px solid #ccc; border-radius:6px; font-weight:bold; color:#333; cursor:pointer; background:#fff; font-size:0.85rem; box-shadow:0 1px 2px rgba(0,0,0,0.05); outline:none; }
             .filter-select:focus { border-color: #0d6efd; }
         </style>
     `;
 
-    document.getElementById('btn-admin-logout').onclick = async () => {
-        if(confirm("Keluar dari Dashboard Admin?")) { await deleteData('kader_session', 'active_user'); location.reload(); }
-    };
+    document.getElementById('btn-admin-logout').onclick = async () => { if(confirm("Keluar dari Dashboard Admin?")) { await deleteData('kader_session', 'active_user'); location.reload(); } };
 
     const menuItems = document.querySelectorAll('.admin-menu-item');
     menuItems.forEach(item => {
         item.onclick = () => {
             menuItems.forEach(m => m.classList.remove('active')); item.classList.add('active');
             document.getElementById('admin-page-title').innerText = item.innerText.replace(/[0-9]/g, '').replace('⚠️', '').trim();
-            renderView(item.getAttribute('data-target'), session); // 🔥 Pass Session ke renderView
+            renderView(item.getAttribute('data-target'), session);
         };
     });
 
     const dataDup = window.adminData.registrasi.filter(r => r.status_duplikasi && r.status_duplikasi.includes('DUPLIKAT'));
     document.getElementById('badge-dup').innerText = dataDup.length;
 
-    renderView('dash', session); // 🔥 Pass Session ke renderView awal
+    renderView('dash', session); 
 };
 
-// Fungsi Pemicu Klik Kartu Metrik
 window.setAdminMetric = (metric) => {
     window.adminFilterMetric = window.adminFilterMetric === metric ? 'ALL' : metric; 
-    
-    // Temukan session dari HTML jika perlu, atau andalkan re-render dari elemen aktif
     const activeMenu = document.querySelector('.admin-menu-item.active');
     if(activeMenu) activeMenu.click(); 
 };
@@ -163,7 +162,7 @@ window.setAdminMetric = (metric) => {
 const renderView = (target, session) => {
     const content = document.getElementById('admin-content');
     const data = window.adminData;
-    const isKabupaten = session.role.toUpperCase().includes('KAB'); // 🔥 Cek apakah Admin Kabupaten
+    const isKabupaten = session.role.toUpperCase().includes('KAB'); 
 
     if (target === 'dash') {
         // --- 1. PERSIAPAN DATA FILTER DROPDOWN ---
@@ -174,13 +173,16 @@ const renderView = (target, session) => {
             if(r.sumber_kecamatan) kecSet.add(r.sumber_kecamatan);
             if(r.desa && r.desa !== '-') desaSet.add(r.desa);
         });
-        
         data.pendampingan.forEach(p => { 
             let t = String(p.data_json?.tgl_kunjungan || p.created_at || '').trim(); if(t.length >= 7) monthSet.add(t.substring(0,7)); 
         });
 
-        // Format Opsi Dropdown
-        const optBulan = Array.from(monthSet).sort().reverse().map(m => `<option value="${m}">${m}</option>`).join('');
+        // 🔥 Format Nama Bulan Cantik
+        const optBulan = Array.from(monthSet).sort().reverse().map(m => {
+            try { const d = new Date(m + '-01'); const n = d.toLocaleDateString('id-ID', {month:'long', year:'numeric'}); return `<option value="${m}">${n}</option>`; } 
+            catch(e) { return `<option value="${m}">${m}</option>`; }
+        }).join('');
+        
         const optKec = Array.from(kecSet).sort().map(k => `<option value="${k}">${k}</option>`).join('');
         const optDesa = Array.from(desaSet).sort().map(d => `<option value="${d}">${d}</option>`).join('');
 
@@ -189,12 +191,11 @@ const renderView = (target, session) => {
         if (isKabupaten) {
             filterKecHtml = `<select id="flt-kec" class="filter-select"><option value="ALL">🏛️ Semua Kecamatan</option>${optKec}</select>`;
         } else {
-            // Tampilan Lencana Terkunci untuk Admin Kecamatan
-            filterKecHtml = `<div style="padding:8px 12px; border:1px solid #ccc; border-radius:6px; background:#e9ecef; font-weight:bold; color:#666; font-size:0.85rem; box-shadow:inset 0 1px 2px rgba(0,0,0,0.05);">🔒 KEC. ${session.kecamatan.toUpperCase()}</div>`;
-            window.adminFilterKec = 'ALL'; // Reset filter internal karena datanya sudah otomatis milik dia saja
+            filterKecHtml = `<div style="padding:8px 12px; border:1px solid #ccc; border-radius:6px; background:#e9ecef; font-weight:bold; color:#666; font-size:0.85rem; box-shadow:inset 0 1px 2px rgba(0,0,0,0.05);">🔒 KEC. ${session.finalNamaKec}</div>`;
+            window.adminFilterKec = 'ALL'; // Reset paksa karena datanya sudah milik dia saja
         }
 
-        // --- 2. TERAPKAN FILTER DROPDOWN KEDUA DATA ---
+        // --- 2. TERAPKAN FILTER KEDUA DATA ---
         const fM = window.adminFilterMonth; const fK = window.adminFilterKec; 
         const fD = window.adminFilterDesa; const fJ = window.adminFilterJenis;
 
@@ -212,7 +213,7 @@ const renderView = (target, session) => {
             return fM === 'ALL' || t === fM; 
         });
 
-        // --- 3. KALKULASI KONDISI UMUM SASARAN (BARIS ATAS) ---
+        // --- 3. KALKULASI KONDISI UMUM ---
         const hI = new Date(); hI.setHours(0,0,0,0);
         let countSelesai = 0, countAktif = 0;
         
@@ -228,21 +229,20 @@ const renderView = (target, session) => {
         const idTerdampingi = new Set(pendBase.map(p => p.id_sasaran_ref));
         let countTerdampingi = regBase.filter(r => idTerdampingi.has(r.id)).length;
 
-        // --- 4. TERAPKAN FILTER KOTAK INTERAKTIF (METRIC) KE DATA ---
+        // --- 4. TERAPKAN FILTER METRIK KE FINAL DATA ---
         let finalReg = regBase;
         const actMetric = window.adminFilterMetric;
         if (actMetric === 'AKTIF') finalReg = regBase.filter(r => !r._isExpired);
         else if (actMetric === 'SELESAI') finalReg = regBase.filter(r => r._isExpired);
         else if (actMetric === 'TERDAMPINGI') finalReg = regBase.filter(r => idTerdampingi.has(r.id));
 
-        // --- 5. KALKULASI DISTRIBUSI BERDASARKAN JENIS (BARIS BAWAH) DARI DATA FINAL ---
+        // --- 5. DISTRIBUSI BERDASARKAN JENIS ---
         let tCatin = 0, tBumil = 0, tBufas = 0, tBaduta = 0;
         finalReg.forEach(r => {
             if(r.jenis_sasaran === 'CATIN') tCatin++; else if(r.jenis_sasaran === 'BUMIL') tBumil++; 
             else if(r.jenis_sasaran === 'BUFAS') tBufas++; else if(r.jenis_sasaran === 'BADUTA') tBaduta++;
         });
 
-        // 🔥 LAYOUT HTML DASHBOARD
         content.innerHTML = `
             <div style="display:flex; justify-content:flex-end; gap:10px; margin-bottom: 20px; flex-wrap:wrap;">
                 <select id="flt-bulan" class="filter-select"><option value="ALL">📅 Semua Bulan</option>${optBulan}</select>
@@ -253,7 +253,7 @@ const renderView = (target, session) => {
                 </select>
             </div>
 
-            <h4 style="margin:0 0 10px 0; color:#555; font-size:1rem;">Kondisi Umum Sasaran (Klik Kotak untuk Filter Data)</h4>
+            <h4 style="margin:0 0 10px 0; color:#555; font-size:1rem;">Kondisi Umum Sasaran (Klik Kotak untuk Filter)</h4>
             <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 25px;">
                 <div class="admin-card metric-card ${actMetric==='ALL'?'active':''}" style="color:#0043a8;" onclick="window.setAdminMetric('ALL')">
                     <div style="font-size:0.85rem; font-weight:bold; text-transform:uppercase;">Total Terdaftar</div>
@@ -295,13 +295,11 @@ const renderView = (target, session) => {
             </div>
         `;
 
-        // Atur nilai dropdown ke state tersimpan
         document.getElementById('flt-bulan').value = window.adminFilterMonth;
         if(isKabupaten) document.getElementById('flt-kec').value = window.adminFilterKec;
         document.getElementById('flt-desa').value = window.adminFilterDesa;
         document.getElementById('flt-jenis').value = window.adminFilterJenis;
 
-        // Pasang Event Listener
         document.querySelectorAll('.filter-select').forEach(el => {
             el.addEventListener('change', function() {
                 window.adminFilterMonth = document.getElementById('flt-bulan').value;
@@ -310,18 +308,16 @@ const renderView = (target, session) => {
                 window.adminFilterJenis = document.getElementById('flt-jenis').value;
                 
                 const activeMenu = document.querySelector('.admin-menu-item.active');
-                if(activeMenu) activeMenu.click(); // Re-render otomatis dengan session yg tetap
+                if(activeMenu) activeMenu.click(); 
             });
         });
 
-        // Eksekusi Grafik Pie
         if(window.myChartPie) window.myChartPie.destroy();
         window.myChartPie = new Chart(document.getElementById('chartPie'), {
             type: 'doughnut', data: { labels: ['CATIN', 'BUMIL', 'BUFAS', 'BADUTA'], datasets: [{ data: [tCatin, tBumil, tBufas, tBaduta], backgroundColor: ['#6f42c1', '#d63384', '#20c997', '#0dcaf0'] }] },
             options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
         });
 
-        // Eksekusi Grafik Batang
         const areaStats = {};
         finalReg.forEach(r => { const a = r.desa !== '-' ? r.desa : (r.sumber_kecamatan || 'Lainnya'); areaStats[a] = (areaStats[a] || 0) + 1; });
         
