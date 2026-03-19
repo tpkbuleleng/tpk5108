@@ -191,6 +191,7 @@ window.renderKonten = async (target) => {
                     
                     <div id="form-core" style="display:none; margin-top:15px;">
                         <div class="form-group"><label>Nama Sasaran <span style="color:red">*</span></label><input type="text" name="nama_sasaran" class="form-control" required></div>
+                        <div class="form-group"><label>NIK Sasaran <span style="color:red">*</span></label><input type="text" name="nik" class="form-control" pattern="[0-9]{16}" title="NIK harus 16 digit angka" maxlength="16" minlength="16" oninput="this.value=this.value.replace(/[^0-9]/g,'')" placeholder="16 digit angka" required></div>
                         <div class="form-group"><label>Nama Kepala Keluarga <span style="color:red">*</span></label><input type="text" name="nama_kk" class="form-control" required></div>
                         <div class="form-group"><label>Nomor KK <span style="color:red">*</span></label><input type="text" name="nomor_kk" class="form-control" pattern="[0-9]{16}" title="Nomor KK harus 16 digit angka" maxlength="16" minlength="16" oninput="this.value=this.value.replace(/[^0-9]/g,'')" placeholder="16 digit angka" required></div>
                         <div class="form-group"><label>Tanggal Lahir Sasaran <span style="color:red">*</span></label><input type="date" name="tanggal_lahir" class="form-control" required></div>
@@ -305,14 +306,14 @@ const renderPertanyaanDinamis = (jenis, modul, container, questions) => {
     }).sort((a,b)=> (parseInt(a.urutan)||0) - (parseInt(b.urutan)||0));
 
     if (filteredQ.length > 0) {
-        let html = `<div>`; // Menyatu, tanpa judul
+        let html = `<div>`; 
         filteredQ.forEach(q => {
             let lbl = String(q.label_pertanyaan || '').toLowerCase();
             let req = String(q.is_required || '').toUpperCase() === 'Y' ? 'required' : ''; 
             let markerReq = req ? '<span style="color:red; font-weight:bold;">*</span>' : ''; 
             let inputHtml = '';
             
-            // Auto-Kunci NIK Sasaran dari Google Sheet menjadi 16 Digit
+            // Auto-Kunci NIK dari Google Sheet
             let extraAttr = ''; let tInput = q.tipe_input || 'text';
             if(lbl.includes('nik') || lbl.includes('nomor induk')) {
                 tInput = 'text'; 
@@ -363,7 +364,6 @@ const initFormRegistrasi = async () => {
             const fDesa = allWilBali.filter(w => w.kabupaten === catinKab.value && w.kecamatan === catinKec.value); const dDesa = [...new Set(fDesa.map(w => w.desa_kelurahan))].filter(Boolean);
             catinDesa.innerHTML = '<option value="">-- Pilih Desa --</option>' + dDesa.map(d => `<option value="${d}">${d}</option>`).join('');
         };
-        // 🔥 LOGIKA DROPDOWN DUSUN KHUSUS BULELENG
         catinDesa.onchange = () => {
             if (catinKab.value.toUpperCase().includes('BULELENG')) {
                 const dDusun = allWil.filter(w => w.desa_kelurahan === catinDesa.value);
@@ -555,7 +555,7 @@ const initDaftarSasaran = async () => {
                 </div>
                 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
-                    <div><div style="font-size: 0.8rem; color: #666;">ID / No KK</div><div style="font-size: 0.95rem; color: #222; font-weight: 500;">${r.id} <br> ${r.data_laporan?.nomor_kk || '-'}</div></div>
+                    <div><div style="font-size: 0.8rem; color: #666;">ID / No NIK</div><div style="font-size: 0.95rem; color: #222; font-weight: 500;">${r.id} <br> ${r.data_laporan?.nik || '-'}</div></div>
                     <div><div style="font-size: 0.8rem; color: #666;">Kategori</div><div style="font-size: 0.95rem; color: #222; font-weight: bold;">${r.textBaris2}</div></div>
                 </div>
 
