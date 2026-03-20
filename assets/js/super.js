@@ -48,10 +48,13 @@ window.renderKuesionerTable = () => {
     let tableHtml = `<table class="super-table"><thead><tr><th width="10%">ID Form</th><th width="15%">Sasaran</th><th width="35%">Teks Pertanyaan</th><th width="15%">Tipe Jawaban</th><th width="10%">Sifat</th><th width="15%">Aksi</th></tr></thead><tbody>`;
     let count = 0;
     window.superKuesionerData.forEach(q => {
-        const id = q.id_pertanyaan || q.id || '-'; const kat = String(q.kategori_sasaran || q.kategori || '-').toUpperCase(); const teks = q.teks_pertanyaan || q.pertanyaan || '-'; const tipe = String(q.tipe_jawaban || q.tipe || '-').toUpperCase();
-        const opsi = q.pilihan_jawaban ? `<div style="font-size:0.75rem; color:#888; margin-top:5px;">Opsi: ${q.pilihan_jawaban}</div>` : '';
-        const wajib = String(q.is_required || q.wajib || 'YA').toUpperCase() === 'YA' ? '<span style="color:#d63031; font-weight:bold;">Wajib *</span>' : '<span style="color:#636e72;">Opsional</span>';
-        const status = String(q.status || q.status_pertanyaan || q.is_active || 'AKTIF').toUpperCase();
+        const id = q.id_pertanyaan || q.id || '-'; 
+        const kat = String(q.jenis_sasaran || q.kategori_sasaran || q.kategori || '-').toUpperCase(); 
+        const teks = q.label_pertanyaan || q.teks_pertanyaan || q.pertanyaan || '-'; 
+        const tipe = String(q.tipe_input || q.tipe_jawaban || q.tipe || '-').toUpperCase();
+        const opsi = q.opsi_json || q.pilihan_jawaban ? `<div style="font-size:0.75rem; color:#888; margin-top:5px;">Opsi: ${q.opsi_json || q.pilihan_jawaban}</div>` : '';
+        const wajib = String(q.is_required || q.wajib || 'YA').toUpperCase() === 'Y' || String(q.is_required || q.wajib || 'YA').toUpperCase() === 'YA' ? '<span style="color:#d63031; font-weight:bold;">Wajib *</span>' : '<span style="color:#636e72;">Opsional</span>';
+        const status = String(q.is_active || q.status || q.status_pertanyaan || 'Y').toUpperCase() === 'Y' || String(q.is_active || q.status || q.status_pertanyaan || 'Y').toUpperCase() === 'AKTIF' ? 'AKTIF' : 'NONAKTIF';
         
         if (filterKat === 'ALL' || kat === filterKat) {
             count++; const isAktif = status === 'AKTIF'; const bgRow = isAktif ? 'transparent' : '#fdfaf6'; const textStatus = isAktif ? '🟢 Aktif' : '🔴 Mati'; const btnColor = isAktif ? '#ff7675' : '#00b894'; const btnText = isAktif ? 'Matikan' : 'Hidupkan';
