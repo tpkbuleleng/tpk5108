@@ -67,15 +67,10 @@ export const initAdmin = async (session) => {
         if (res.status === 'success') {
             window.adminData = res.data;
             
-            // 🔥 NORMALISASI DATA: Memperbaiki ID Undefined & Desa Kosong
             window.adminData.registrasi.forEach(r => { 
                 r.id = r.id || r.id_sasaran || '-'; 
                 try { r.data_json = JSON.parse(r.data_laporan || '{}'); } catch(e) { r.data_json = {}; } 
-                
-                // Mengganti desa "-" (biasanya Catin) dengan nama kecamatan atau desa domisili aslinya
-                if (!r.desa || r.desa === '-') {
-                    r.desa = r.data_json.catin_desa || getNamaKecamatan(r.sumber_kecamatan);
-                }
+                if (!r.desa || r.desa === '-') { r.desa = r.data_json.catin_desa || getNamaKecamatan(r.sumber_kecamatan); }
             });
             window.adminData.pendampingan.forEach(p => { 
                 p.id = p.id || p.id_laporan || '-';
@@ -175,13 +170,22 @@ const renderView = (target, session) => {
     const isKabupaten = session.role.toUpperCase().includes('KAB'); 
 
     if (target === 'dash') {
+        const fM = window.adminFilterMonth; 
+        const fK = window.adminFilterKec; 
+        const fD = window.adminFilterDesa; 
+        const fJ = window.adminFilterJenis;
+
         const monthSet = new Set(); const kecSet = new Set(); const desaSet = new Set();
         
         data.registrasi.forEach(r => { 
             let t = String(r.created_at || '').trim(); if (t.length >= 7) monthSet.add(t.substring(0,7));
             if(r.sumber_kecamatan) kecSet.add(r.sumber_kecamatan);
-            if(r.desa) desaSet.add(r.desa);
+            
+            // 🔥 CASCADING DROPDOWN: Hanya tampilkan desa yang ada di kecamatan terpilih (atau semua jika ALL)
+            let matchK = (fK === 'ALL') || (r.sumber_kecamatan === fK || r.kecamatan === fK);
+            if(matchK && r.desa) desaSet.add(r.desa);
         });
+        
         data.pendampingan.forEach(p => { 
             let t = String(p.data_json?.tgl_kunjungan || p.created_at || '').trim(); if(t.length >= 7) monthSet.add(t.substring(0,7)); 
         });
@@ -191,7 +195,8 @@ const renderView = (target, session) => {
             catch(e) { return `<option value="${m}">${m}</option>`; }
         }).join('');
         
-        const optKec = Array.from(kecSet).sort().map(k => `<option value="${k}">${k}</option>`).join('');
+        // 🔥 PERBAIKAN TEKS: Tampilkan nama panjang Kecamatan
+        const optKec = Array.from(kecSet).sort().map(k => `<option value="${k}">${getNamaKecamatan(k)}</option>`).join('');
         const optDesa = Array.from(desaSet).sort().map(d => `<option value="${d}">${d}</option>`).join('');
 
         let filterKecHtml = '';
@@ -201,9 +206,6 @@ const renderView = (target, session) => {
             filterKecHtml = `<div style="padding:8px 12px; border:1px solid #ccc; border-radius:6px; background:#e9ecef; font-weight:bold; color:#666; font-size:0.85rem; box-shadow:inset 0 1px 2px rgba(0,0,0,0.05);">🔒 KEC. ${session.finalNamaKec}</div>`;
             window.adminFilterKec = 'ALL'; 
         }
-
-        const fM = window.adminFilterMonth; const fK = window.adminFilterKec; 
-        const fD = window.adminFilterDesa; const fJ = window.adminFilterJenis;
 
         let regBase = data.registrasi.filter(r => {
             let m = String(r.created_at || '').substring(0,7);
@@ -313,10 +315,22 @@ const renderView = (target, session) => {
         document.getElementById('flt-jenis').value = window.adminFilterJenis;
 
         document.querySelectorAll('.filter-select').forEach(el => {
-            el.addEventListener('change', function() {
+            el.addEventListener('change', function(e) {
                 window.adminFilterMonth = document.getElementById('flt-bulan').value;
-                if(isKabupaten) window.adminFilterKec = document.getElementById('flt-kec').value;
-                window.adminFilterDesa = document.getElementById('flt-desa').value;
+                
+                // 🔥 LOGIKA RESET DESA OTOMATIS:
+                if(isKabupaten) {
+                    let newKec = document.getElementById('flt-kec').value;
+                    if(window.adminFilterKec !== newKec) {
+                        window.adminFilterKec = newKec;
+                        window.adminFilterDesa = 'ALL'; // Reset desa jika kecamatan berubah
+                    } else {
+                        window.adminFilterDesa = document.getElementById('flt-desa').value;
+                    }
+                } else {
+                    window.adminFilterDesa = document.getElementById('flt-desa').value;
+                }
+                
                 window.adminFilterJenis = document.getElementById('flt-jenis').value;
                 
                 const activeMenu = document.querySelector('.admin-menu-item.active');
