@@ -350,7 +350,7 @@ window.renderSuperView = async (target) => {
                 formKecSelect.addEventListener('change', () => { if(roleSelect.value === 'KADER') populateDesaDropdown(); });
                 formDesaSelect.addEventListener('change', populateTimDropdown);
 
-                // PROSES SIMPAN KE SERVER (PELURU SAPU JAGAT)
+                // PROSES SIMPAN KE SERVER (PELURU SAPU JAGAT & FORCE SYNC)
                 document.getElementById('btn-submit-add').onclick = async () => {
                     const id = document.getElementById('add-id').value.trim();
                     const nama = document.getElementById('add-nama').value.trim();
@@ -366,7 +366,6 @@ window.renderSuperView = async (target) => {
                         if(!formDesaSelect.value || !timSelect.value) { alert("⚠️ Mohon lengkapi pilihan Desa dan Tim penugasan kader!"); return; }
                         const selectedOpt = timSelect.options[timSelect.selectedIndex];
                         
-                        // Peluru untuk MASTER_KADER (Variasi Kolom)
                         payloadKader = {
                             id_kader: id, nik: id, id_pengguna: id,
                             nama: nama, nama_kader: nama, nama_lengkap: nama,
@@ -377,9 +376,8 @@ window.renderSuperView = async (target) => {
                     }
 
                     const btnSubmit = document.getElementById('btn-submit-add');
-                    btnSubmit.innerText = "Menyimpan..."; btnSubmit.disabled = true;
+                    btnSubmit.innerText = "Menyimpan & Sinkronisasi..."; btnSubmit.disabled = true;
 
-                    // Peluru untuk USER_LOGIN (Variasi Kolom & Kunci Tali Pusar 'ref_id')
                     const payloadData = { 
                         id_user: id, id_pengguna: id, username: id,
                         nama: nama, nama_lengkap: nama,
@@ -387,22 +385,29 @@ window.renderSuperView = async (target) => {
                         scope_kecamatan: kec, kecamatan: kec,
                         password: pin, password_awal_ref: pin, pin: pin,
                         status_akun: 'AKTIF', status: 'AKTIF',
-                        ref_id: id // 🔥 INI KUNCI PENGHUBUNGNYA!
+                        ref_id: id 
                     };
 
                     try {
                         const response = await fetch(SCRIPT_URL, {
                             method: 'POST',
-                            body: JSON.stringify({ 
-                                action: 'SECURE_ADD_USER', token: SUPER_TOKEN, data: payloadData, data_kader: payloadKader 
-                            })
+                            body: JSON.stringify({ action: 'SECURE_ADD_USER', token: SUPER_TOKEN, data: payloadData, data_kader: payloadKader })
                         });
                         const res = await response.json();
                         if(res.status === 'success') {
-                            alert("✅ Pengguna berhasil ditambahkan dan di-mapping!");
+                            alert("✅ Pengguna berhasil ditambahkan!");
                             modalAdd.style.display = 'none';
+                            
+                            // 🔥 FORCE SYNC: Hapus memori lama dan paksa muat ulang halaman agar menarik data segar dari server!
                             await clearStore('master_kader'); 
-                            window.renderSuperView('user_management'); 
+                            await clearStore('master_tim');
+                            document.getElementById('table-wrapper').innerHTML = `<div style="padding:50px; text-align:center; color:#0984e3;"><h3>🔄 MENYINKRONKAN DATABASE...</h3><p>Memuat data terbaru dari Google Server.</p></div>`;
+                            
+                            // Beri waktu 1 detik agar IndexedDB benar-benar bersih, lalu panggil ulang tampilan
+                            setTimeout(() => {
+                                window.renderSuperView('user_management'); 
+                            }, 1000);
+                            
                         } else { alert("❌ Gagal menyimpan: " + res.message); }
                     } catch(e) { alert("❌ Kesalahan Jaringan."); } 
                     finally { btnSubmit.innerText = "Simpan ke Server"; btnSubmit.disabled = false; }
