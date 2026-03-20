@@ -125,7 +125,7 @@ export const initSuperAdmin = async (session) => {
     window.renderSuperView('user_management');
 };
 
-// 🔥 FUNGSI FILTER & RENDER TABEL (Sangat Cepat)
+// 🔥 FUNGSI FILTER & RENDER TABEL (Sangat Cepat & Aman)
 window.renderUserTable = () => {
     const searchVal = document.getElementById('flt-search').value.toLowerCase();
     const roleVal = document.getElementById('flt-role').value;
@@ -145,7 +145,7 @@ window.renderUserTable = () => {
         // Logika Pencarian & Filter
         const matchSearch = id.toLowerCase().includes(searchVal) || nama.toLowerCase().includes(searchVal);
         const matchRole = roleVal === 'ALL' || role.includes(roleVal);
-        const matchKec = kecVal === 'ALL' || kec === kecVal || kec === 'ALL'; // Super Admin biasannya 'ALL'
+        const matchKec = kecVal === 'ALL' || kec === kecVal || kec === 'ALL';
 
         if (matchSearch && matchRole && matchKec) {
             count++;
@@ -155,15 +155,23 @@ window.renderUserTable = () => {
             const toggleText = isAktif ? 'Blokir' : 'Aktifkan';
             const toggleColor = isAktif ? '#ff7675' : '#00b894';
 
+            // 🛡️ PERISAI ANTI-BUNUH DIRI (Mencegah Super Admin diblokir)
+            let actionButtons = '';
+            if (role.includes('SUPER')) {
+                actionButtons = `<span style="font-size:0.8rem; color:#b2bec3; font-style:italic; font-weight:bold;">🛡️ Akses Dilindungi</span>`;
+            } else {
+                actionButtons = `
+                    <button class="btn-action btn-edit" onclick="window.superResetPin('${id}', '${nama}')">Reset PIN</button>
+                    <button class="btn-action" style="background:${toggleColor}; color:white;" onclick="window.superToggleStatus('${id}', '${nama}', '${currentStatus}')">${toggleText}</button>
+                `;
+            }
+
             tableHtml += `
                 <tr style="opacity: ${isAktif ? '1' : '0.6'};">
                     <td><b>${id}</b></td><td>${nama}</td><td>${kec}</td><td><span class="badge-role ${badgeClass}">${role}</span></td>
                     <td><code style="background:#eee; padding:3px 6px; border-radius:3px; color:#e94560; font-weight:bold;">${pin}</code></td>
                     <td>${statusUI}</td>
-                    <td>
-                        <button class="btn-action btn-edit" onclick="window.superResetPin('${id}', '${nama}')">Reset PIN</button>
-                        <button class="btn-action" style="background:${toggleColor}; color:white;" onclick="window.superToggleStatus('${id}', '${nama}', '${currentStatus}')">${toggleText}</button>
-                    </td>
+                    <td>${actionButtons}</td>
                 </tr>
             `;
         }
