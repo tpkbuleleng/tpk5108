@@ -1,5 +1,5 @@
 // ==========================================
-// 👑 GOD MODE: SUPER ADMIN DASHBOARD (V8.1 - Cascading Dropdown)
+// 👑 GOD MODE: SUPER ADMIN DASHBOARD (V9 - Auto-Sync Mapping)
 // ==========================================
 import { getAllData, clearStore } from './db.js';
 
@@ -201,17 +201,10 @@ window.renderSuperView = async (target) => {
 
                     <div id="panel-kader-area" style="display:block; background:#eef2f5; padding:15px; border-radius:8px; margin-bottom:15px; border:1px solid #dcdde1;">
                         <p style="margin:0 0 10px 0; font-size:0.85rem; font-weight:bold; color:#0984e3;">📍 Penempatan Tugas Kader</p>
-                        
                         <label style="display:block; font-size:0.8rem; color:#666; margin-bottom:5px;">1. Pilih Desa / Kelurahan</label>
-                        <select id="add-desa" class="filter-input" style="width:100%; box-sizing:border-box; margin-bottom:10px;">
-                            <option value="">-- Pilih Desa --</option>
-                        </select>
-
+                        <select id="add-desa" class="filter-input" style="width:100%; box-sizing:border-box; margin-bottom:10px;"><option value="">-- Pilih Desa --</option></select>
                         <label style="display:block; font-size:0.8rem; color:#666; margin-bottom:5px;">2. Pilih Tim / Dusun</label>
-                        <select id="add-tim" class="filter-input" style="width:100%; box-sizing:border-box;">
-                            <option value="">-- Pilih Tim / Dusun --</option>
-                        </select>
-
+                        <select id="add-tim" class="filter-input" style="width:100%; box-sizing:border-box;"><option value="">-- Pilih Tim / Dusun --</option></select>
                         <div style="font-size:0.7rem; color:#888; margin-top:5px; font-style:italic;">*Sistem otomatis membuat profil kader ini di MASTER_KADER.</div>
                     </div>
 
@@ -228,13 +221,26 @@ window.renderSuperView = async (target) => {
         `;
 
         try {
-            const [kaderData, timData] = await Promise.all([ getAllData('master_kader').catch(()=>[]), getAllData('master_tim').catch(()=>[]) ]);
+            let kaderData = await getAllData('master_kader').catch(()=>[]);
+            let timData = await getAllData('master_tim').catch(()=>[]);
+            
+            // 🔥 AUTO-FETCH MASTER JIKA MEMORI LOKAL SUPER ADMIN KOSONG (Solusi Layar Blank)
+            if (kaderData.length === 0 || timData.length === 0) {
+                document.getElementById('table-wrapper').innerHTML = `<div style="padding:50px; text-align:center; color:#0984e3;"><h3 style="margin:0;">📥 Mengunduh Peta Wilayah...</h3><p>Menyelaraskan data Desa dan Tim dari Server Google.</p></div>`;
+                const masterReq = await fetch(SCRIPT_URL);
+                const masterRes = await masterReq.json();
+                if(masterRes.status === 'success') {
+                    kaderData = masterRes.data.master_kader || [];
+                    timData = masterRes.data.master_tim || [];
+                }
+            }
+
             window.superTimData = timData || [];
 
             const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_ALL', token: SUPER_TOKEN, sheetName: 'USER_LOGIN' }) });
             const res = await response.json();
+            
             if (res.status === 'success') {
-                
                 window.superUsersData = res.data.map(u => {
                     let nTim = '-'; let nDesa = String(u.scope_desa || u.desa_kelurahan || u.desa || u.wilayah_desa || '-').toUpperCase();
                     const role = String(u.role_akses || u.role || 'KADER').toUpperCase();
@@ -261,7 +267,6 @@ window.renderSuperView = async (target) => {
                 clearBtn.addEventListener('click', () => { searchInput.value = ''; clearBtn.style.display = 'none'; searchInput.focus(); window.renderUserTable(); });
                 document.getElementById('flt-role').addEventListener('change', window.renderUserTable); document.getElementById('flt-kec').addEventListener('change', window.renderUserTable);
 
-                // 🔥 LOGIKA CASCADING DROPDOWN (BERTINGKAT)
                 const modalAdd = document.getElementById('modal-add-user');
                 const roleSelect = document.getElementById('add-role');
                 const formKecSelect = document.getElementById('add-kec');
@@ -269,106 +274,54 @@ window.renderSuperView = async (target) => {
                 const formDesaSelect = document.getElementById('add-desa');
                 const timSelect = document.getElementById('add-tim');
 
-                document.getElementById('btn-show-add').onclick = () => {
-                    if(roleSelect.value === 'KADER') populateDesaDropdown();
-                    modalAdd.style.display = 'flex';
-                };
+                document.getElementById('btn-show-add').onclick = () => { if(roleSelect.value === 'KADER') populateDesaDropdown(); modalAdd.style.display = 'flex'; };
                 document.getElementById('btn-close-add').onclick = () => modalAdd.style.display = 'none';
 
-                // 1. Ekstrak Desa berdasarkan Kecamatan
                 const populateDesaDropdown = () => {
-                    const selectedKec = formKecSelect.value;
-                    formDesaSelect.innerHTML = '<option value="">-- Pilih Desa / Kelurahan --</option>';
-                    timSelect.innerHTML = '<option value="">-- Pilih Tim / Dusun --</option>'; // Reset tim
-
+                    const selectedKec = formKecSelect.value; formDesaSelect.innerHTML = '<option value="">-- Pilih Desa / Kelurahan --</option>'; timSelect.innerHTML = '<option value="">-- Pilih Tim / Dusun --</option>'; 
                     if (!selectedKec || selectedKec === 'ALL') return;
-
                     const desaSet = new Set();
                     window.superTimData.forEach(t => {
                         const k = String(t.kecamatan || t.wilayah || '').toUpperCase();
-                        if (k === selectedKec) {
-                            const d = String(t.desa_kelurahan || t.desa || '').toUpperCase();
-                            if (d && d !== 'UNDEFINED' && d !== '-') desaSet.add(d);
-                        }
+                        if (k === selectedKec) { const d = String(t.desa_kelurahan || t.desa || '').toUpperCase(); if (d && d !== 'UNDEFINED' && d !== '-') desaSet.add(d); }
                     });
-
-                    Array.from(desaSet).sort().forEach(d => {
-                        const opt = document.createElement('option');
-                        opt.value = d; opt.innerText = d;
-                        formDesaSelect.appendChild(opt);
-                    });
+                    Array.from(desaSet).sort().forEach(d => { const opt = document.createElement('option'); opt.value = d; opt.innerText = d; formDesaSelect.appendChild(opt); });
                 };
 
-                // 2. Ekstrak Tim berdasarkan Desa
                 const populateTimDropdown = () => {
-                    const selectedKec = formKecSelect.value;
-                    const selectedDesa = formDesaSelect.value;
-
-                    timSelect.innerHTML = '<option value="">-- Pilih Tim / Dusun --</option>';
-                    if (!selectedDesa) return;
-
+                    const selectedKec = formKecSelect.value; const selectedDesa = formDesaSelect.value;
+                    timSelect.innerHTML = '<option value="">-- Pilih Tim / Dusun --</option>'; if (!selectedDesa) return;
                     const filteredTim = window.superTimData.filter(t => {
-                        const k = String(t.kecamatan || t.wilayah || '').toUpperCase();
-                        const d = String(t.desa_kelurahan || t.desa || '').toUpperCase();
+                        const k = String(t.kecamatan || t.wilayah || '').toUpperCase(); const d = String(t.desa_kelurahan || t.desa || '').toUpperCase();
                         return k === selectedKec && d === selectedDesa;
                     });
-
                     filteredTim.sort((a,b) => String(a.nama_tim || a.nomor_tim).localeCompare(String(b.nama_tim || b.nomor_tim)));
-
                     filteredTim.forEach(t => {
-                        const idTim = t.id_tim || t.id;
-                        const namaTim = t.nama_tim || t.nomor_tim || idTim;
-                        const dusun = t.dusun_rw || t.dusun || '-';
-                        const label = `${namaTim} (Dusun: ${dusun})`;
-                        
-                        const opt = document.createElement('option');
-                        opt.value = idTim;
-                        opt.setAttribute('data-desa', selectedDesa);
-                        opt.setAttribute('data-dusun', dusun);
-                        opt.innerText = label;
-                        timSelect.appendChild(opt);
+                        const idTim = t.id_tim || t.id; const namaTim = t.nama_tim || t.nomor_tim || idTim; const dusun = t.dusun_rw || t.dusun || '-'; const label = `${namaTim} (Dusun: ${dusun})`;
+                        const opt = document.createElement('option'); opt.value = idTim; opt.setAttribute('data-desa', selectedDesa); opt.setAttribute('data-dusun', dusun); opt.innerText = label; timSelect.appendChild(opt);
                     });
                 };
 
-                // Event Listeners untuk interaksi bertingkat
                 roleSelect.addEventListener('change', () => {
-                    if (roleSelect.value === 'ADMIN_KABUPATEN') {
-                        formKecSelect.value = 'ALL'; formKecSelect.style.backgroundColor = '#e9ecef'; formKecSelect.style.pointerEvents = 'none'; 
-                        panelKader.style.display = 'none'; 
-                    } else if (roleSelect.value === 'ADMIN_KECAMATAN') {
-                        formKecSelect.style.backgroundColor = 'white'; formKecSelect.style.pointerEvents = 'auto'; 
-                        if(formKecSelect.value === 'ALL') formKecSelect.value = 'GEROKGAK';
-                        panelKader.style.display = 'none'; 
-                    } else {
-                        formKecSelect.style.backgroundColor = 'white'; formKecSelect.style.pointerEvents = 'auto'; 
-                        if(formKecSelect.value === 'ALL') formKecSelect.value = 'GEROKGAK';
-                        panelKader.style.display = 'block'; 
-                        populateDesaDropdown();
-                    }
+                    if (roleSelect.value === 'ADMIN_KABUPATEN') { formKecSelect.value = 'ALL'; formKecSelect.style.backgroundColor = '#e9ecef'; formKecSelect.style.pointerEvents = 'none'; panelKader.style.display = 'none'; } 
+                    else if (roleSelect.value === 'ADMIN_KECAMATAN') { formKecSelect.style.backgroundColor = 'white'; formKecSelect.style.pointerEvents = 'auto'; if(formKecSelect.value === 'ALL') formKecSelect.value = 'GEROKGAK'; panelKader.style.display = 'none'; } 
+                    else { formKecSelect.style.backgroundColor = 'white'; formKecSelect.style.pointerEvents = 'auto'; if(formKecSelect.value === 'ALL') formKecSelect.value = 'GEROKGAK'; panelKader.style.display = 'block'; populateDesaDropdown(); }
                 });
 
                 formKecSelect.addEventListener('change', () => { if(roleSelect.value === 'KADER') populateDesaDropdown(); });
                 formDesaSelect.addEventListener('change', populateTimDropdown);
 
-                // PROSES SIMPAN KE SERVER (PELURU SAPU JAGAT & FORCE SYNC)
                 document.getElementById('btn-submit-add').onclick = async () => {
-                    const id = document.getElementById('add-id').value.trim();
-                    const nama = document.getElementById('add-nama').value.trim();
-                    const role = document.getElementById('add-role').value;
-                    const kec = document.getElementById('add-kec').value.trim().toUpperCase();
-                    const pin = document.getElementById('add-pin').value.trim();
+                    const id = document.getElementById('add-id').value.trim(); const nama = document.getElementById('add-nama').value.trim(); const role = document.getElementById('add-role').value; const kec = document.getElementById('add-kec').value.trim().toUpperCase(); const pin = document.getElementById('add-pin').value.trim();
 
                     if(!id || !nama || !kec || !pin) { alert("⚠️ Mohon isi semua kolom dasar!"); return; }
 
                     let payloadKader = null;
-
                     if (role === 'KADER') {
                         if(!formDesaSelect.value || !timSelect.value) { alert("⚠️ Mohon lengkapi pilihan Desa dan Tim penugasan kader!"); return; }
                         const selectedOpt = timSelect.options[timSelect.selectedIndex];
-                        
                         payloadKader = {
-                            id_kader: id, nik: id, id_pengguna: id,
-                            nama: nama, nama_kader: nama, nama_lengkap: nama,
+                            id_kader: id, nik: id, id_pengguna: id, nama: nama, nama_kader: nama, nama_lengkap: nama,
                             id_tim: timSelect.value, tim: timSelect.value,
                             desa: selectedOpt.getAttribute('data-desa'), desa_kelurahan: selectedOpt.getAttribute('data-desa'),
                             dusun: selectedOpt.getAttribute('data-dusun'), dusun_rw: selectedOpt.getAttribute('data-dusun')
@@ -379,35 +332,22 @@ window.renderSuperView = async (target) => {
                     btnSubmit.innerText = "Menyimpan & Sinkronisasi..."; btnSubmit.disabled = true;
 
                     const payloadData = { 
-                        id_user: id, id_pengguna: id, username: id,
-                        nama: nama, nama_lengkap: nama,
-                        role_akses: role, role: role,
-                        scope_kecamatan: kec, kecamatan: kec,
-                        password: pin, password_awal_ref: pin, pin: pin,
-                        status_akun: 'AKTIF', status: 'AKTIF',
-                        ref_id: id 
+                        id_user: id, id_pengguna: id, username: id, nama: nama, nama_lengkap: nama, role_akses: role, role: role,
+                        scope_kecamatan: kec, kecamatan: kec, password: pin, password_awal_ref: pin, pin: pin,
+                        status_akun: 'AKTIF', status: 'AKTIF', ref_id: id 
                     };
 
                     try {
-                        const response = await fetch(SCRIPT_URL, {
-                            method: 'POST',
-                            body: JSON.stringify({ action: 'SECURE_ADD_USER', token: SUPER_TOKEN, data: payloadData, data_kader: payloadKader })
-                        });
+                        const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_ADD_USER', token: SUPER_TOKEN, data: payloadData, data_kader: payloadKader }) });
                         const res = await response.json();
                         if(res.status === 'success') {
                             alert("✅ Pengguna berhasil ditambahkan!");
                             modalAdd.style.display = 'none';
                             
-                            // 🔥 FORCE SYNC: Hapus memori lama dan paksa muat ulang halaman agar menarik data segar dari server!
-                            await clearStore('master_kader'); 
-                            await clearStore('master_tim');
+                            // 🔥 FORCE SYNC
+                            await clearStore('master_kader'); await clearStore('master_tim');
                             document.getElementById('table-wrapper').innerHTML = `<div style="padding:50px; text-align:center; color:#0984e3;"><h3>🔄 MENYINKRONKAN DATABASE...</h3><p>Memuat data terbaru dari Google Server.</p></div>`;
-                            
-                            // Beri waktu 1 detik agar IndexedDB benar-benar bersih, lalu panggil ulang tampilan
-                            setTimeout(() => {
-                                window.renderSuperView('user_management'); 
-                            }, 1000);
-                            
+                            setTimeout(() => { window.renderSuperView('user_management'); }, 1000);
                         } else { alert("❌ Gagal menyimpan: " + res.message); }
                     } catch(e) { alert("❌ Kesalahan Jaringan."); } 
                     finally { btnSubmit.innerText = "Simpan ke Server"; btnSubmit.disabled = false; }
