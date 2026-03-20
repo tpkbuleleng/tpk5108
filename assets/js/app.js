@@ -38,24 +38,47 @@ const updateNetworkStatus = () => {
 // 2. INISIALISASI APLIKASI & ROUTER (ANTI-F5)
 // ==========================================
 const initApp = async () => {
-    const logoTimeout = setTimeout(() => { tampilkanLayar('login'); }, 3500);
     try {
         await initDB();
-        const session = await getDataById('kader_session', 'active_user').catch(() => null);
-        clearTimeout(logoTimeout);
+        const session = await getDataById('kader_session', 'active_user');
+        
+        const vSplash = document.getElementById('view-splash');
+        const vLogin = document.getElementById('view-login');
+        const vApp = document.getElementById('view-app');
 
         if (session) {
-            if (session.role && session.role.includes('ADMIN')) {
-                initAdmin(session);
-            } else {
+            // 🔥 PERBAIKAN BUG REFRESH: Cek SUPER dulu sebelum ADMIN!
+            if (String(session.role).toUpperCase().includes('SUPER')) {
+                // Panggil modul rahasia Super Admin
+                import('./super.js').then(module => {
+                    module.initSuperAdmin(session);
+                }).catch(err => {
+                    console.error("Gagal load super.js:", err);
+                    alert("Modul Super Admin tidak ditemukan!");
+                });
+            } 
+            else if (String(session.role).toUpperCase().includes('ADMIN')) {
+                // Panggil modul Admin biasa (jika menggunakan import statis, panggil langsung fungsinya)
+                if (typeof initAdmin === 'function') {
+                    initAdmin(session);
+                } else {
+                    // Fallback jika admin.js menggunakan dynamic import
+                    import('./admin.js').then(module => module.initAdmin(session));
+                }
+            } 
+            else {
+                // Panggil modul Kader biasa
                 masukKeAplikasi(session);
             }
+        } else {
+            // Jika tidak ada sesi, tampilkan form Login
+            if(vSplash) vSplash.style.display = 'none';
+            if(vApp) vApp.classList.add('hidden');
+            if(vLogin) vLogin.classList.remove('hidden');
         }
-        else {
-            tampilkanLayar('login');
-            if (navigator.onLine) { const users = await getAllData('master_user').catch(() => []); if (users.length === 0) await downloadMasterData(); }
-        }
-    } catch (err) { clearTimeout(logoTimeout); tampilkanLayar('login'); }
+    } catch (e) {
+        console.error("Kesalahan saat inisialisasi aplikasi:", e);
+    }
 };
 
 const masukKeAplikasi = async (session) => {
