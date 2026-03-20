@@ -174,17 +174,60 @@ window.renderSuperView = async (target) => {
 
                 tipeSelect.addEventListener('change', () => { panelOpsi.style.display = tipeSelect.value === 'PILIHAN' ? 'block' : 'none'; });
 
+                // 🔥 LOGIKA SUBMIT KUESIONER YANG DISENGAJA SESUAI SHEET
                 document.getElementById('btn-submit-q').onclick = async () => {
-                    const id = document.getElementById('q-id').value; const kat = document.getElementById('q-kat').value; const teks = document.getElementById('q-teks').value.trim(); const tipe = document.getElementById('q-tipe').value; const wajib = document.getElementById('q-wajib').value; const opsi = tipe === 'PILIHAN' ? document.getElementById('q-opsi').value.trim() : '';
-                    if(!teks) { alert("⚠️ Teks Pertanyaan tidak boleh kosong!"); return; } if(tipe === 'PILIHAN' && !opsi) { alert("⚠️ Karena tipenya PILIHAN, Anda harus memasukkan opsi jawabannya!"); return; }
-                    const btnSubmit = document.getElementById('btn-submit-q'); btnSubmit.innerText = "Menembak ke Server..."; btnSubmit.disabled = true;
+                    const id = document.getElementById('q-id').value; 
+                    const kat = document.getElementById('q-kat').value; 
+                    const teks = document.getElementById('q-teks').value.trim(); 
+                    const tipe = document.getElementById('q-tipe').value; 
+                    const wajib = document.getElementById('q-wajib').value; 
+                    const opsiRaw = tipe === 'PILIHAN' ? document.getElementById('q-opsi').value.trim() : '';
+                    
+                    if(!teks) { alert("⚠️ Teks Pertanyaan tidak boleh kosong!"); return; } 
+                    if(tipe === 'PILIHAN' && !opsiRaw) { alert("⚠️ Karena tipenya PILIHAN, Anda harus memasukkan opsi jawabannya!"); return; }
+                    
+                    const btnSubmit = document.getElementById('btn-submit-q'); 
+                    btnSubmit.innerText = "Menembak ke Server..."; btnSubmit.disabled = true;
 
-                    const payloadQ = { id_pertanyaan: id, id: id, kategori_sasaran: kat, kategori: kat, teks_pertanyaan: teks, pertanyaan: teks, tipe_jawaban: tipe, tipe: tipe, pilihan_jawaban: opsi, opsi: opsi, is_required: wajib, wajib: wajib, status_pertanyaan: 'AKTIF', status: 'AKTIF', is_active: 'AKTIF' };
+                    // 1. Tentukan Modul (Ini Penting!)
+                    const modul = (kat === 'CATIN' || kat === 'UMUM') ? 'REGISTRASI' : 'PENDAMPINGAN';
+
+                    // 2. Tentukan Tipe Input Asli Sheet (select, number, text)
+                    let tipeInputSheet = 'text';
+                    if (tipe === 'PILIHAN') tipeInputSheet = 'select';
+                    if (tipe === 'ANGKA') tipeInputSheet = 'number';
+                    if (tipe === 'TANGGAL') tipeInputSheet = 'date';
+
+                    // 3. Konversi Opsi menjadi Array JSON: "Ya, Tidak" -> '["Ya", "Tidak"]'
+                    let jsonOpsi = '';
+                    if (tipe === 'PILIHAN' && opsiRaw) {
+                        const arrOpsi = opsiRaw.split(',').map(item => item.trim()).filter(item => item !== '');
+                        jsonOpsi = JSON.stringify(arrOpsi);
+                    }
+
+                    // 4. Payload Ekstra Akurat!
+                    const payloadQ = { 
+                        id_pertanyaan: id, 
+                        modul: modul,
+                        jenis_sasaran: kat, 
+                        grup_pertanyaan: 'Tambahan Baru', // Default grup
+                        label_pertanyaan: teks, 
+                        tipe_input: tipeInputSheet, 
+                        opsi_json: jsonOpsi, 
+                        is_required: (wajib === 'YA' ? 'Y' : 'N'), 
+                        is_active: 'Y' 
+                    };
 
                     try {
                         const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_ADD_QUESTION', token: SUPER_TOKEN, data: payloadQ }) });
                         const res = await response.json();
-                        if(res.status === 'success') { alert("✅ Kuesioner baru berhasil mengudara!"); modalQ.style.display = 'none'; await clearStore('master_pertanyaan'); window.renderSuperView('kuesioner'); } else { alert("❌ Gagal menyimpan: " + res.message); }
+                        if(res.status === 'success') { 
+                            alert("✅ Kuesioner baru berhasil mengudara!"); 
+                            modalQ.style.display = 'none'; 
+                            document.getElementById('table-wrapper-q').innerHTML = `<div style="padding:50px; text-align:center; color:#0984e3;"><h3>🔄 MENYINKRONKAN KUESIONER...</h3></div>`;
+                            await clearStore('master_pertanyaan'); 
+                            setTimeout(() => { window.renderSuperView('kuesioner'); }, 1000);
+                        } else { alert("❌ Gagal menyimpan: " + res.message); }
                     } catch(e) { alert("❌ Kesalahan Jaringan."); } finally { btnSubmit.innerText = "Rakitan Selesai (Simpan)"; btnSubmit.disabled = false; }
                 };
             } else { document.getElementById('table-wrapper-q').innerHTML = `<div style="padding:50px; text-align:center; color:#e94560;"><h3>❌ Gagal Membaca Kuesioner</h3><p>${res.message}</p></div>`; }
