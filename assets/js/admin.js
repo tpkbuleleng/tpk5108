@@ -6,7 +6,6 @@ import { deleteData, putData, clearStore } from './db.js';
 // 👉 WAJIB SAMAKAN URL INI DENGAN DI SYNC.JS
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzEmmn0wMJmC1OHij9JUxm8EIT2xW1AuV0597EYCWDIxG_nkpZYBPx1EGiNYe6OjEHniw/exec';
 
-// 🔥 Radar Ekstraksi Kecamatan Super Cerdas
 const getKodeKecamatan = (text) => {
     const t = String(text).toUpperCase();
     if (t.includes('GEROKGAK') || t.includes('GRK')) return 'GRK';
@@ -28,50 +27,17 @@ const getNamaKecamatan = (kode) => {
 
 export const initAdmin = async (session) => {
     const isKabupaten = session.role.toUpperCase().includes('KAB');
-    const textToScan = `${session.kecamatan || ''} ${session.username || ''} ${session.nama || ''}`;
-    let kodeKec = getKodeKecamatan(textToScan);
+    
+    // 🔥 Berkat MASTER_ADMIN, session.kecamatan sekarang akurat 100%
+    let kodeKec = getKodeKecamatan(session.kecamatan);
 
-    // 🛑 SOLUSI ANTI INFINITE LOOP: Tampilkan Layar Pemilihan Wilayah Jika Gagal Deteksi
     if (!isKabupaten && !kodeKec) {
-        document.body.innerHTML = `
-            <div style="display:flex; height:100vh; width:100vw; background:#f4f6f9; align-items:center; justify-content:center; font-family: 'Segoe UI', sans-serif;">
-                <div style="background:white; padding:30px; border-radius:8px; box-shadow:0 4px 15px rgba(0,0,0,0.1); text-align:center; max-width:400px; width:90%;">
-                    <div style="font-size: 3rem; margin-bottom:10px;">📍</div>
-                    <h3 style="color:#0043a8; margin-top:0;">Pilih Wilayah Tugas</h3>
-                    <p style="color:#666; font-size:0.9rem; margin-bottom:20px;">Sistem tidak dapat mendeteksi kecamatan dari akun Anda. Silakan pilih wilayah Anda secara manual:</p>
-                    <select id="manual-kec-select" style="width:100%; padding:12px; border:1px solid #ccc; border-radius:6px; margin-bottom:20px; font-weight:bold; color:#333;">
-                        <option value="">-- Pilih Kecamatan Anda --</option>
-                        <option value="GRK">KEC. GEROKGAK</option>
-                        <option value="SRT">KEC. SERIRIT</option>
-                        <option value="BSB">KEC. BUSUNGBIU</option>
-                        <option value="BJR">KEC. BANJAR</option>
-                        <option value="SKS">KEC. SUKASADA</option>
-                        <option value="BLL">KEC. BULELENG</option>
-                        <option value="SWN">KEC. SAWAN</option>
-                        <option value="KBT">KEC. KUBUTAMBAHAN</option>
-                        <option value="TJK">KEC. TEJAKULA</option>
-                    </select>
-                    <div style="display:flex; gap:10px;">
-                        <button id="btn-manual-logout" style="flex:1; padding:12px; border:none; background:#dc3545; color:white; border-radius:6px; cursor:pointer; font-weight:bold;">Batal / Keluar</button>
-                        <button id="btn-manual-lanjut" style="flex:1; padding:12px; border:none; background:#198754; color:white; border-radius:6px; cursor:pointer; font-weight:bold;">Masuk Ruang Kontrol</button>
-                    </div>
-                </div>
-            </div>
-        `;
-
-        document.getElementById('btn-manual-logout').onclick = async () => {
-            await clearStore('kader_session'); window.location.reload(); 
-        };
-
-        document.getElementById('btn-manual-lanjut').onclick = async () => {
-            const val = document.getElementById('manual-kec-select').value;
-            if(!val) { alert('⚠️ Silakan pilih kecamatan terlebih dahulu!'); return; }
-            session.kecamatan = getNamaKecamatan(val);
-            await putData('kader_session', session);
-            initAdmin(session); 
-        };
-
-        return; 
+        document.body.innerHTML = `<div style="text-align:center; padding:50px; font-family:sans-serif;">
+            <h2>⚠️ Akses Ditolak</h2>
+            <p>Wilayah tugas Anda belum diatur di database <b>MASTER_ADMIN</b>.<br>Silakan hubungi Administrator Kabupaten.</p>
+            <button onclick="localStorage.clear(); location.reload()" style="padding:10px 20px; cursor:pointer;">Kembali ke Login</button>
+        </div>`;
+        return;
     }
 
     session.finalKodeKec = kodeKec;
@@ -118,9 +84,6 @@ export const initAdmin = async (session) => {
     }
 };
 
-// ==========================================
-// RENDER ANTARMUKA DESKTOP ADMIN
-// ==========================================
 const renderAdminUI = (session) => {
     const isKabupaten = session.role.toUpperCase().includes('KAB');
     const lvlAdmin = isKabupaten ? 'KABUPATEN BULELENG' : `KEC. ${session.finalNamaKec}`;
@@ -130,7 +93,6 @@ const renderAdminUI = (session) => {
             <div style="width:260px; background:#001f3f; color:white; display:flex; flex-direction:column; box-shadow: 2px 0 5px rgba(0,0,0,0.1); z-index:10;">
                 <div style="padding: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); text-align:center;">
                     <img src="assets/img/logo.png" alt="Logo TPK" style="height: 65px; margin-bottom: 15px; object-fit: contain;" onerror="this.style.display='none'">
-                    
                     <h3 style="margin:0; font-weight:800; line-height:1;">
                         <span style="font-size:1.4rem; color:#4ea8de; display:block; letter-spacing:1px;">DASHBOARD</span>
                         <span style="font-size:1rem; color:#ffffff; display:block; margin-top:4px;">ADMIN TPK</span>
@@ -196,9 +158,6 @@ window.setAdminMetric = (metric) => {
     if(activeMenu) activeMenu.click(); 
 };
 
-// ==========================================
-// RENDER HALAMAN SPESIFIK ADMIN
-// ==========================================
 const renderView = (target, session) => {
     const content = document.getElementById('admin-content');
     const data = window.adminData;
