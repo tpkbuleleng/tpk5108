@@ -27,8 +27,6 @@ const getNamaKecamatan = (kode) => {
 
 export const initAdmin = async (session) => {
     const isKabupaten = session.role.toUpperCase().includes('KAB');
-    
-    // 🔥 Berkat MASTER_ADMIN, session.kecamatan sekarang akurat 100%
     let kodeKec = getKodeKecamatan(session.kecamatan);
 
     if (!isKabupaten && !kodeKec) {
@@ -69,8 +67,21 @@ export const initAdmin = async (session) => {
         if (res.status === 'success') {
             window.adminData = res.data;
             
-            window.adminData.registrasi.forEach(r => { try { r.data_json = JSON.parse(r.data_laporan || '{}'); } catch(e) { r.data_json = {}; } });
-            window.adminData.pendampingan.forEach(p => { try { p.data_json = JSON.parse(p.data_laporan || '{}'); } catch(e) { p.data_json = {}; } });
+            // 🔥 NORMALISASI DATA: Memperbaiki ID Undefined & Desa Kosong
+            window.adminData.registrasi.forEach(r => { 
+                r.id = r.id || r.id_sasaran || '-'; 
+                try { r.data_json = JSON.parse(r.data_laporan || '{}'); } catch(e) { r.data_json = {}; } 
+                
+                // Mengganti desa "-" (biasanya Catin) dengan nama kecamatan atau desa domisili aslinya
+                if (!r.desa || r.desa === '-') {
+                    r.desa = r.data_json.catin_desa || getNamaKecamatan(r.sumber_kecamatan);
+                }
+            });
+            window.adminData.pendampingan.forEach(p => { 
+                p.id = p.id || p.id_laporan || '-';
+                p.id_sasaran_ref = p.id_sasaran_ref || p.id_sasaran || '-';
+                try { p.data_json = JSON.parse(p.data_laporan || '{}'); } catch(e) { p.data_json = {}; } 
+            });
             
             window.adminFilterMonth = 'ALL'; window.adminFilterKec = 'ALL'; window.adminFilterDesa = 'ALL'; window.adminFilterJenis = 'ALL'; window.adminFilterMetric = 'ALL';
             
@@ -169,7 +180,7 @@ const renderView = (target, session) => {
         data.registrasi.forEach(r => { 
             let t = String(r.created_at || '').trim(); if (t.length >= 7) monthSet.add(t.substring(0,7));
             if(r.sumber_kecamatan) kecSet.add(r.sumber_kecamatan);
-            if(r.desa && r.desa !== '-') desaSet.add(r.desa);
+            if(r.desa) desaSet.add(r.desa);
         });
         data.pendampingan.forEach(p => { 
             let t = String(p.data_json?.tgl_kunjungan || p.created_at || '').trim(); if(t.length >= 7) monthSet.add(t.substring(0,7)); 
@@ -320,7 +331,7 @@ const renderView = (target, session) => {
         });
 
         const areaStats = {};
-        finalReg.forEach(r => { const a = r.desa !== '-' ? r.desa : (r.sumber_kecamatan || 'Lainnya'); areaStats[a] = (areaStats[a] || 0) + 1; });
+        finalReg.forEach(r => { const a = r.desa || 'Lainnya'; areaStats[a] = (areaStats[a] || 0) + 1; });
         
         if(window.myChartBar) window.myChartBar.destroy();
         window.myChartBar = new Chart(document.getElementById('chartBar'), {
