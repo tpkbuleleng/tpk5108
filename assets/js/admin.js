@@ -95,8 +95,11 @@ const renderAdminUI = (session) => {
     const lvlAdmin = isKabupaten ? 'KABUPATEN BULELENG' : `KEC. ${session.finalNamaKec}`;
 
     document.body.innerHTML = `
-        <div id="admin-root" style="display:flex; height:100vh; width:100vw; background:#f4f6f9; font-family: 'Segoe UI', sans-serif;">
-            <div style="width:260px; background:#001f3f; color:white; display:flex; flex-direction:column; box-shadow: 2px 0 5px rgba(0,0,0,0.1); z-index:10;">
+        <div id="admin-root" style="position:absolute; top:0; left:0; right:0; bottom:0; display:flex; background:#f4f6f9; font-family: 'Segoe UI', sans-serif; overflow: hidden;">
+            
+            <div id="admin-sidebar-overlay" style="display:none; position:absolute; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:9;"></div>
+            
+            <div id="admin-sidebar" style="width:260px; background:#001f3f; color:white; display:flex; flex-direction:column; box-shadow: 2px 0 5px rgba(0,0,0,0.1); z-index:10; flex-shrink: 0;">
                 <div style="padding: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); text-align:center;">
                     <img src="assets/img/logo.png" alt="Logo TPK" style="height: 65px; margin-bottom: 15px; object-fit: contain;" onerror="this.style.display='none'">
                     <h3 style="margin:0; font-weight:800; line-height:1;">
@@ -105,7 +108,7 @@ const renderAdminUI = (session) => {
                     </h3>
                     <div style="font-size:0.75rem; color:#adb5bd; margin-top:12px; padding-top:12px; border-top: 1px dashed rgba(255,255,255,0.2); font-weight:bold; letter-spacing:0.5px;">${lvlAdmin}</div>
                 </div>
-                <div style="flex:1; padding: 20px 0; overflow-y:auto;">
+                <div style="flex:1; padding: 20px 0; overflow-y:auto; min-height:0;">
                     <div class="admin-menu-item active" data-target="dash">📊 Ringkasan Eksekutif</div>
                     <div class="admin-menu-item" data-target="duplikat" style="position:relative;">⚠️ Resolusi Duplikat <span id="badge-dup" style="background:#dc3545; color:white; padding:2px 6px; border-radius:10px; font-size:0.7rem; position:absolute; right:15px; top:12px;">0</span></div>
                     <div class="admin-menu-item" data-target="database">🗄️ Master Live Database</div>
@@ -115,12 +118,16 @@ const renderAdminUI = (session) => {
                     <button id="btn-admin-logout" style="width:100%; background:#dc3545; color:white; border:none; padding:10px; border-radius:6px; cursor:pointer; font-weight:bold;">Keluar Aplikasi</button>
                 </div>
             </div>
-            <div style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
-                <div style="background:white; padding: 15px 30px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); z-index:5; display:flex; justify-content:space-between; align-items:center;">
-                    <h2 id="admin-page-title" style="margin:0; font-size:1.4rem; color:#333;">Ringkasan Eksekutif</h2>
+            
+            <div style="flex:1; display:flex; flex-direction:column; overflow:hidden; width:100%;">
+                <div style="background:white; padding: 15px 25px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); z-index:5; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                    <div style="display:flex; align-items:center; gap:15px;">
+                        <button id="btn-toggle-sidebar" style="background:none; border:none; font-size:1.6rem; cursor:pointer; color:#333; padding:0; line-height:1;">☰</button>
+                        <h2 id="admin-page-title" style="margin:0; font-size:1.4rem; color:#333;">Ringkasan Eksekutif</h2>
+                    </div>
                     <div style="font-size:0.85rem; color:#666; font-weight:bold;">Status Data: <span style="color:#198754;">🟢 Real-Time Tersinkron</span></div>
                 </div>
-                <div id="admin-content" style="flex:1; padding: 30px; overflow-y:auto; background:#f4f6f9;"></div>
+                <div id="admin-content" style="flex:1; padding: 25px; overflow-y:auto; background:#f4f6f9;"></div>
             </div>
         </div>
 
@@ -128,8 +135,8 @@ const renderAdminUI = (session) => {
             .admin-menu-item { padding: 12px 20px; color: #adb5bd; font-weight: 600; cursor: pointer; transition: all 0.3s; border-left: 4px solid transparent; }
             .admin-menu-item:hover { background: rgba(255,255,255,0.05); color: #fff; }
             .admin-menu-item.active { background: rgba(255,255,255,0.1); color: #fff; border-left: 4px solid #4ea8de; }
-            .admin-card { background: white; border-radius: 8px; padding: 20px; box-shadow: 0 2px 6px rgba(0,0,0,0.04); border: 1px solid #e9ecef; }
-            .admin-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+            .admin-card { background: white; border-radius: 8px; padding: 20px; box-shadow: 0 2px 6px rgba(0,0,0,0.04); border: 1px solid #e9ecef; overflow-x:auto; }
+            .admin-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; min-width:600px; }
             .admin-table th { background: #0043a8; color: white; padding: 12px; text-align: left; }
             .admin-table td { padding: 12px; border-bottom: 1px solid #eee; color: #444; }
             .admin-table tr:hover td { background: #f8f9fa; }
@@ -138,8 +145,47 @@ const renderAdminUI = (session) => {
             .metric-card.active { opacity: 1; filter: grayscale(0%); transform: translateY(-4px); box-shadow: 0 8px 15px rgba(0,0,0,0.1); border-color: currentColor; }
             .filter-select { padding:8px 12px; border:1px solid #ccc; border-radius:6px; font-weight:bold; color:#333; cursor:pointer; background:#fff; font-size:0.85rem; box-shadow:0 1px 2px rgba(0,0,0,0.05); outline:none; }
             .filter-select:focus { border-color: #0d6efd; }
+            
+            /* 🔥 RESPONSIVE GRID UNTUK TABLET/MOBILE */
+            .admin-grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 25px; }
+            .admin-grid-2 { display: grid; grid-template-columns: 1fr 2fr; gap: 20px; }
+            
+            /* 🔥 LOGIKA SEMBUNYIKAN SIDEBAR */
+            #admin-sidebar { transition: transform 0.3s ease, margin-left 0.3s ease; }
+            
+            @media (max-width: 1024px) {
+                .admin-grid-4 { grid-template-columns: repeat(2, 1fr); }
+                .admin-grid-2 { grid-template-columns: 1fr; }
+                /* Sidebar Off-Canvas di Layar Kecil */
+                #admin-sidebar { position: absolute; top:0; bottom:0; left:0; transform: translateX(-100%); }
+                #admin-sidebar.mobile-active { transform: translateX(0); }
+                #admin-sidebar-overlay.mobile-active { display: block !important; }
+            }
+            @media (max-width: 600px) {
+                .admin-grid-4 { grid-template-columns: 1fr; }
+            }
+            @media (min-width: 1025px) {
+                /* Sidebar Collapse di Layar Besar */
+                #admin-sidebar.desktop-collapsed { margin-left: -260px; }
+            }
         </style>
     `;
+
+    // 🔥 LOGIKA TOMBOL HAMBURGER
+    document.getElementById('btn-toggle-sidebar').onclick = () => {
+        const sidebar = document.getElementById('admin-sidebar');
+        const overlay = document.getElementById('admin-sidebar-overlay');
+        if (window.innerWidth <= 1024) {
+            sidebar.classList.toggle('mobile-active');
+            overlay.classList.toggle('mobile-active');
+        } else {
+            sidebar.classList.toggle('desktop-collapsed');
+        }
+    };
+    document.getElementById('admin-sidebar-overlay').onclick = () => {
+        document.getElementById('admin-sidebar').classList.remove('mobile-active');
+        document.getElementById('admin-sidebar-overlay').classList.remove('mobile-active');
+    };
 
     document.getElementById('btn-admin-logout').onclick = async () => { if(confirm("Keluar dari Dashboard Admin?")) { await clearStore('kader_session'); location.reload(); } };
 
@@ -148,6 +194,13 @@ const renderAdminUI = (session) => {
         item.onclick = () => {
             menuItems.forEach(m => m.classList.remove('active')); item.classList.add('active');
             document.getElementById('admin-page-title').innerText = item.innerText.replace(/[0-9]/g, '').replace('⚠️', '').trim();
+            
+            // Tutup sidebar otomatis di mobile setelah pilih menu
+            if (window.innerWidth <= 1024) {
+                document.getElementById('admin-sidebar').classList.remove('mobile-active');
+                document.getElementById('admin-sidebar-overlay').classList.remove('mobile-active');
+            }
+            
             renderView(item.getAttribute('data-target'), session);
         };
     });
@@ -180,8 +233,6 @@ const renderView = (target, session) => {
         data.registrasi.forEach(r => { 
             let t = String(r.created_at || '').trim(); if (t.length >= 7) monthSet.add(t.substring(0,7));
             if(r.sumber_kecamatan) kecSet.add(r.sumber_kecamatan);
-            
-            // 🔥 CASCADING DROPDOWN: Hanya tampilkan desa yang ada di kecamatan terpilih (atau semua jika ALL)
             let matchK = (fK === 'ALL') || (r.sumber_kecamatan === fK || r.kecamatan === fK);
             if(matchK && r.desa) desaSet.add(r.desa);
         });
@@ -195,7 +246,6 @@ const renderView = (target, session) => {
             catch(e) { return `<option value="${m}">${m}</option>`; }
         }).join('');
         
-        // 🔥 PERBAIKAN TEKS: Tampilkan nama panjang Kecamatan
         const optKec = Array.from(kecSet).sort().map(k => `<option value="${k}">${getNamaKecamatan(k)}</option>`).join('');
         const optDesa = Array.from(desaSet).sort().map(d => `<option value="${d}">${d}</option>`).join('');
 
@@ -247,6 +297,7 @@ const renderView = (target, session) => {
             else if(r.jenis_sasaran === 'BUFAS') tBufas++; else if(r.jenis_sasaran === 'BADUTA') tBaduta++;
         });
 
+        // 🔥 PENGGUNAAN CLASS GRID RESPONSIF
         content.innerHTML = `
             <div style="display:flex; justify-content:flex-end; gap:10px; margin-bottom: 20px; flex-wrap:wrap;">
                 <select id="flt-bulan" class="filter-select"><option value="ALL">📅 Semua Bulan</option>${optBulan}</select>
@@ -258,7 +309,7 @@ const renderView = (target, session) => {
             </div>
 
             <h4 style="margin:0 0 10px 0; color:#555; font-size:1rem;">Kondisi Umum Sasaran (Klik Kotak untuk Filter)</h4>
-            <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 25px;">
+            <div class="admin-grid-4">
                 <div class="admin-card metric-card ${actMetric==='ALL'?'active':''}" style="color:#0043a8;" onclick="window.setAdminMetric('ALL')">
                     <div style="font-size:0.85rem; font-weight:bold; text-transform:uppercase;">Total Terdaftar</div>
                     <div style="font-size:2.2rem; font-weight:800; margin-top:5px;">${regBase.length}</div>
@@ -278,7 +329,7 @@ const renderView = (target, session) => {
             </div>
 
             <h4 style="margin:0 0 10px 0; color:#555; font-size:1rem;">Rincian Berdasarkan Jenis <span style="font-weight:normal; font-size:0.85rem;">(Difilter dari: ${actMetric === 'ALL' ? 'Total Terdaftar' : actMetric})</span></h4>
-            <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 30px;">
+            <div class="admin-grid-4" style="margin-bottom: 30px;">
                 <div class="admin-card" style="border-left: 4px solid #6f42c1; display:flex; justify-content:space-between; align-items:center;">
                     <div style="font-size:0.9rem; color:#666; font-weight:bold;">CATIN</div><div style="font-size:1.8rem; font-weight:800; color:#6f42c1;">${tCatin}</div>
                 </div>
@@ -293,7 +344,7 @@ const renderView = (target, session) => {
                 </div>
             </div>
             
-            <div style="display:grid; grid-template-columns: 1fr 2fr; gap: 20px;">
+            <div class="admin-grid-2">
                 <div class="admin-card" style="display:flex; flex-direction:column;">
                     <h4 style="margin:0 0 15px 0; color:#333;">Proporsi Demografi</h4>
                     <div style="position:relative; height:250px; width:100%; display:flex; justify-content:center;">
@@ -317,24 +368,15 @@ const renderView = (target, session) => {
         document.querySelectorAll('.filter-select').forEach(el => {
             el.addEventListener('change', function(e) {
                 window.adminFilterMonth = document.getElementById('flt-bulan').value;
-                
-                // 🔥 LOGIKA RESET DESA OTOMATIS:
                 if(isKabupaten) {
                     let newKec = document.getElementById('flt-kec').value;
-                    if(window.adminFilterKec !== newKec) {
-                        window.adminFilterKec = newKec;
-                        window.adminFilterDesa = 'ALL'; // Reset desa jika kecamatan berubah
-                    } else {
-                        window.adminFilterDesa = document.getElementById('flt-desa').value;
-                    }
+                    if(window.adminFilterKec !== newKec) { window.adminFilterKec = newKec; window.adminFilterDesa = 'ALL'; } 
+                    else { window.adminFilterDesa = document.getElementById('flt-desa').value; }
                 } else {
                     window.adminFilterDesa = document.getElementById('flt-desa').value;
                 }
-                
                 window.adminFilterJenis = document.getElementById('flt-jenis').value;
-                
-                const activeMenu = document.querySelector('.admin-menu-item.active');
-                if(activeMenu) activeMenu.click(); 
+                const activeMenu = document.querySelector('.admin-menu-item.active'); if(activeMenu) activeMenu.click(); 
             });
         });
 
@@ -368,9 +410,9 @@ const renderView = (target, session) => {
     } else if (target === 'database') {
         content.innerHTML = `
             <div class="admin-card">
-                <div style="display:flex; justify-content:space-between; margin-bottom:15px;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:15px; flex-wrap:wrap; gap:10px;">
                     <h4 style="margin:0; color:#333;">Tabel Registrasi Sasaran Master</h4>
-                    <input type="text" id="admin-search" placeholder="Cari Nama atau NIK..." style="padding:6px 12px; border:1px solid #ccc; border-radius:4px; width:250px;">
+                    <input type="text" id="admin-search" placeholder="Cari Nama atau NIK..." style="padding:6px 12px; border:1px solid #ccc; border-radius:4px; width:250px; max-width:100%;">
                 </div>
                 <div style="overflow-x:auto;">
                     <table class="admin-table" id="table-master">
