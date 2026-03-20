@@ -1,23 +1,55 @@
 // ==========================================
 // 👑 GOD MODE: SUPER ADMIN DASHBOARD
-// File Siluman - Hanya dipanggil jika Role = SUPER_ADMIN
 // ==========================================
 import { getAllData, clearStore } from './db.js';
 
-// 👉 WAJIB SAMA DENGAN URL WEB APP BAPAK
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzEmmn0wMJmC1OHij9JUxm8EIT2xW1AuV0597EYCWDIxG_nkpZYBPx1EGiNYe6OjEHniw/exec';
-
-// 🗝️ MASTER KEY (Wajib sama dengan Properties di Google Script)
 const SUPER_TOKEN = 'MasterKeyKubuSecure!001';
 
-export const initSuperAdmin = async (session) => {
-    const vSplash = document.getElementById('view-splash');
-    const vLogin = document.getElementById('view-login');
-    const vApp = document.getElementById('view-app');
+// 🔥 FUNGSI SAKTI 1: RESET PIN 
+window.superResetPin = async (idUser, namaUser) => {
+    const newPin = prompt(`🔐 Reset PIN untuk Pengguna:\nID: ${idUser}\nNama: ${namaUser}\n\nMasukkan PIN Baru (Min 6 karakter):`);
+    if (!newPin) return;
+    if (newPin.length < 5) { alert("❌ PIN terlalu pendek!"); return; }
+
+    const confirmReset = confirm(`Anda yakin mengubah PIN ${namaUser} menjadi: ${newPin} ?`);
+    if (!confirmReset) return;
+
+    try {
+        const response = await fetch(SCRIPT_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'SECURE_UPDATE_USER', token: SUPER_TOKEN, id_user: idUser, updateType: 'PIN', newPin: newPin })
+        });
+        const res = await response.json();
+        if (res.status === 'success') { alert(`✅ PIN berhasil direset! ${namaUser} sekarang dapat login menggunakan PIN baru.`); renderSuperView('user_management'); } 
+        else { alert("❌ Gagal mereset PIN: " + res.message); }
+    } catch (e) { alert("❌ Kesalahan Jaringan."); }
+};
+
+// 🔥 FUNGSI SAKTI 2: BLOKIR / AKTIFKAN (SOFT DELETE)
+window.superToggleStatus = async (idUser, namaUser, currentStatus) => {
+    const isAktif = (currentStatus || 'AKTIF').toUpperCase() === 'AKTIF';
+    const newStatus = isAktif ? 'NONAKTIF' : 'AKTIF';
+    const actionText = isAktif ? 'MEMBLOKIR' : 'MENGAKTIFKAN KEMBALI';
     
-    if(vLogin) vLogin.classList.add('hidden');
-    if(vApp) vApp.classList.add('hidden');
-    if(vSplash) vSplash.style.display = 'none';
+    const confirmToggle = confirm(`⚠️ PERINGATAN!\nAnda akan ${actionText} akses login untuk:\nNama: ${namaUser}\n\nLanjutkan?`);
+    if (!confirmToggle) return;
+
+    try {
+        const response = await fetch(SCRIPT_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'SECURE_UPDATE_USER', token: SUPER_TOKEN, id_user: idUser, updateType: 'STATUS', newStatus: newStatus })
+        });
+        const res = await response.json();
+        if (res.status === 'success') { alert(`✅ Status akun berhasil diubah menjadi ${newStatus}!`); renderSuperView('user_management'); } 
+        else { alert("❌ Gagal merubah status: " + res.message); }
+    } catch (e) { alert("❌ Kesalahan Jaringan."); }
+};
+
+
+export const initSuperAdmin = async (session) => {
+    const vSplash = document.getElementById('view-splash'); const vLogin = document.getElementById('view-login'); const vApp = document.getElementById('view-app');
+    if(vLogin) vLogin.classList.add('hidden'); if(vApp) vApp.classList.add('hidden'); if(vSplash) vSplash.style.display = 'none';
 
     document.body.innerHTML = `
         <div id="super-root" style="position:absolute; top:0; left:0; right:0; bottom:0; display:flex; background:#eef2f5; font-family: 'Segoe UI', sans-serif; overflow: hidden;">
@@ -58,250 +90,95 @@ export const initSuperAdmin = async (session) => {
             </div>
         </div>
 
-        <div id="super-modal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.7); z-index:1000; align-items:center; justify-content:center;">
-            <div style="background:white; padding:30px; border-radius:10px; width:90%; max-width:500px; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
-                <h3 id="modal-title" style="margin-top:0; color:#1a1a2e;">Tambah Pengguna Baru</h3>
-                <form id="form-super-user">
-                    <div style="margin-bottom:15px;">
-                        <label style="display:block; font-size:0.85rem; font-weight:bold; color:#666; margin-bottom:5px;">ID Pengguna / Username</label>
-                        <input type="text" id="inp-id" required style="width:100%; padding:10px; border:1px solid #ccc; border-radius:5px; box-sizing:border-box;">
-                    </div>
-                    <div style="margin-bottom:15px;">
-                        <label style="display:block; font-size:0.85rem; font-weight:bold; color:#666; margin-bottom:5px;">Nama Lengkap</label>
-                        <input type="text" id="inp-nama" required style="width:100%; padding:10px; border:1px solid #ccc; border-radius:5px; box-sizing:border-box;">
-                    </div>
-                    <div style="margin-bottom:15px;">
-                        <label style="display:block; font-size:0.85rem; font-weight:bold; color:#666; margin-bottom:5px;">PIN / Password Baru</label>
-                        <input type="text" id="inp-pin" required style="width:100%; padding:10px; border:1px solid #ccc; border-radius:5px; box-sizing:border-box;">
-                    </div>
-                    <div style="margin-bottom:15px;">
-                        <label style="display:block; font-size:0.85rem; font-weight:bold; color:#666; margin-bottom:5px;">Role Akses</label>
-                        <select id="inp-role" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:5px; box-sizing:border-box;">
-                            <option value="KADER">KADER TPK</option>
-                            <option value="ADMIN_KECAMATAN">ADMIN KECAMATAN</option>
-                            <option value="ADMIN_KABUPATEN">ADMIN KABUPATEN</option>
-                        </select>
-                    </div>
-                    <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:25px;">
-                        <button type="button" id="btn-close-modal" style="padding:10px 20px; border:none; background:#ccc; color:#333; border-radius:5px; cursor:pointer; font-weight:bold;">Batal</button>
-                        <button type="submit" id="btn-save-user" style="padding:10px 20px; border:none; background:#0984e3; color:white; border-radius:5px; cursor:pointer; font-weight:bold;">Simpan Pengguna</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-
         <style>
             .super-menu-item { padding: 14px 25px; color: #a5b1c2; font-weight: 600; cursor: pointer; transition: all 0.3s; border-left: 4px solid transparent; font-size: 0.95rem; }
             .super-menu-item:hover { background: rgba(255,255,255,0.05); color: #fff; }
             .super-menu-item.active { background: rgba(233, 69, 96, 0.1); color: #fff; border-left: 4px solid #e94560; }
             .super-card { background: white; border-radius: 10px; padding: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); border: 1px solid #e1e8ed; }
             #btn-super-logout:hover { background: #e94560; color: white; }
-            
-            /* Tampilan Tabel Super Admin */
             .super-table-container { overflow-x: auto; border-radius: 8px; border: 1px solid #eee; }
-            .super-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; min-width: 800px; background:white; }
+            .super-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; min-width: 900px; background:white; }
             .super-table th { background: #1a1a2e; color: white; padding: 15px; text-align: left; font-weight:600; }
             .super-table td { padding: 12px 15px; border-bottom: 1px solid #eee; color: #444; }
             .super-table tr:hover td { background: #f8f9fa; }
-            
             .badge-role { padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; }
             .role-kader { background: #e8f4fd; color: #0984e3; }
             .role-admin { background: #fdf3e8; color: #d35400; }
             .role-super { background: #fbebf0; color: #e94560; }
-            
-            .btn-action { padding: 6px 12px; border: none; border-radius: 4px; font-size: 0.8rem; font-weight: bold; cursor: pointer; margin-right: 5px; }
+            .btn-action { padding: 6px 12px; border: none; border-radius: 4px; font-size: 0.8rem; font-weight: bold; cursor: pointer; margin-right: 5px; transition: opacity 0.2s;}
+            .btn-action:hover { opacity: 0.8; }
             .btn-edit { background: #fdcb6e; color: #2d3436; }
-            .btn-delete { background: #ff7675; color: white; }
-
-            @media (max-width: 1024px) {
-                #super-sidebar { position: absolute; top:0; bottom:0; left:0; transform: translateX(-100%); }
-                #super-sidebar.mobile-active { transform: translateX(0); }
-                #super-sidebar-overlay.mobile-active { display: block !important; }
-            }
-            @media (min-width: 1025px) {
-                #super-sidebar.desktop-collapsed { margin-left: -280px; }
-            }
+            
+            @media (max-width: 1024px) { #super-sidebar { position: absolute; top:0; bottom:0; left:0; transform: translateX(-100%); } #super-sidebar.mobile-active { transform: translateX(0); } #super-sidebar-overlay.mobile-active { display: block !important; } }
+            @media (min-width: 1025px) { #super-sidebar.desktop-collapsed { margin-left: -280px; } }
         </style>
     `;
 
-    document.getElementById('btn-toggle-super').onclick = () => {
-        const sidebar = document.getElementById('super-sidebar');
-        const overlay = document.getElementById('super-sidebar-overlay');
-        if (window.innerWidth <= 1024) { sidebar.classList.toggle('mobile-active'); overlay.classList.toggle('mobile-active'); } 
-        else { sidebar.classList.toggle('desktop-collapsed'); }
-    };
-    
-    document.getElementById('super-sidebar-overlay').onclick = () => {
-        document.getElementById('super-sidebar').classList.remove('mobile-active');
-        document.getElementById('super-sidebar-overlay').classList.remove('mobile-active');
-    };
-
-    document.getElementById('btn-super-logout').onclick = async () => { 
-        if(confirm("Tutup Sesi Super Admin dan kunci sistem?")) { 
-            await clearStore('kader_session'); location.reload(); 
-        } 
-    };
+    document.getElementById('btn-toggle-super').onclick = () => { const s = document.getElementById('super-sidebar'); const o = document.getElementById('super-sidebar-overlay'); if (window.innerWidth <= 1024) { s.classList.toggle('mobile-active'); o.classList.toggle('mobile-active'); } else { s.classList.toggle('desktop-collapsed'); } };
+    document.getElementById('super-sidebar-overlay').onclick = () => { document.getElementById('super-sidebar').classList.remove('mobile-active'); document.getElementById('super-sidebar-overlay').classList.remove('mobile-active'); };
+    document.getElementById('btn-super-logout').onclick = async () => { if(confirm("Tutup Sesi Super Admin dan kunci sistem?")) { await clearStore('kader_session'); location.reload(); } };
 
     const menuItems = document.querySelectorAll('.super-menu-item');
-    menuItems.forEach(item => {
-        item.onclick = () => {
-            menuItems.forEach(m => m.classList.remove('active')); item.classList.add('active');
-            document.getElementById('super-page-title').innerText = item.innerText.replace(/[^\w\s]/gi, '').trim();
-            if (window.innerWidth <= 1024) {
-                document.getElementById('super-sidebar').classList.remove('mobile-active');
-                document.getElementById('super-sidebar-overlay').classList.remove('mobile-active');
-            }
-            renderSuperView(item.getAttribute('data-target'));
-        };
-    });
+    menuItems.forEach(item => { item.onclick = () => { menuItems.forEach(m => m.classList.remove('active')); item.classList.add('active'); document.getElementById('super-page-title').innerText = item.innerText.replace(/[^\w\s]/gi, '').trim(); if (window.innerWidth <= 1024) { document.getElementById('super-sidebar').classList.remove('mobile-active'); document.getElementById('super-sidebar-overlay').classList.remove('mobile-active'); } window.renderSuperView(item.getAttribute('data-target')); }; });
 
-    renderSuperView('user_management');
+    window.renderSuperView('user_management');
 };
 
-const renderSuperView = async (target) => {
+window.renderSuperView = async (target) => {
     const content = document.getElementById('super-content');
     
     if (target === 'dashboard') {
-        content.innerHTML = `<div class="super-card"><h3>Dashboard sedang disiapkan...</h3><p>Silakan buka menu <b>Manajemen Pengguna</b> untuk mencoba API Secure Token.</p></div>`;
+        content.innerHTML = `<div class="super-card"><h3>Dashboard sedang disiapkan...</h3><p>Silakan buka menu <b>Manajemen Pengguna</b> untuk mencoba fitur Eksekutif (Reset PIN & Blokir).</p></div>`;
     } 
     else if (target === 'user_management') {
         content.innerHTML = `
             <div class="super-card" style="margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px;">
-                <div>
-                    <h3 style="margin:0; color:#1a1a2e;">Database Pengguna Aktif</h3>
-                    <p style="margin:5px 0 0 0; color:#666; font-size:0.9rem;">Menampilkan data langsung dari Google Sheet melalui Secure API.</p>
-                </div>
-                <button id="btn-add-user" style="background:#0984e3; color:white; border:none; padding:10px 20px; border-radius:6px; font-weight:bold; cursor:pointer; box-shadow: 0 4px 6px rgba(9, 132, 227, 0.3);">
-                    + Tambah Pengguna
-                </button>
+                <div><h3 style="margin:0; color:#1a1a2e;">Database Pengguna Aktif</h3><p style="margin:5px 0 0 0; color:#666; font-size:0.9rem;">Menampilkan data langsung dari Google Sheet melalui Secure API.</p></div>
+                <button onclick="alert('Fitur Tambah segera aktif setelah revisi tabel.')" style="background:#0984e3; color:white; border:none; padding:10px 20px; border-radius:6px; font-weight:bold; cursor:pointer;">+ Tambah Pengguna</button>
             </div>
             <div class="super-card" id="table-user-container" style="padding:0; overflow:hidden;">
-                <div style="padding:50px; text-align:center; color:#666;">
-                    <h3 style="margin:0;">⏳ Menghubungi Server...</h3>
-                    <p style="font-size:0.9rem;">Membuka gembok dengan Secure Token...</p>
-                </div>
+                <div style="padding:50px; text-align:center; color:#666;"><h3 style="margin:0;">⏳ Menghubungi Server...</h3></div>
             </div>
         `;
 
-        // 🔥 FUNGSI SAKTI: MENGAMBIL DATA DARI SERVER DENGAN TOKEN
         try {
-            const response = await fetch(SCRIPT_URL, {
-                method: 'POST',
-                body: JSON.stringify({
-                    action: 'SECURE_GET_ALL',
-                    token: SUPER_TOKEN,
-                    sheetName: 'USER_LOGIN'
-                })
-            });
+            const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_ALL', token: SUPER_TOKEN, sheetName: 'USER_LOGIN' }) });
             const res = await response.json();
             
             if (res.status === 'success') {
                 const users = res.data;
-                
-                let tableHtml = `
-                    <div class="super-table-container">
-                        <table class="super-table">
-                            <thead>
-                                <tr>
-                                    <th>ID / Username</th>
-                                    <th>Nama Pengguna</th>
-                                    <th>Role Akses</th>
-                                    <th>PIN / Password</th>
-                                    <th>Aksi Eksekutif</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                `;
+                let tableHtml = `<div class="super-table-container"><table class="super-table"><thead><tr><th>ID / Username</th><th>Nama Pengguna</th><th>Role Akses</th><th>PIN / Password</th><th>Status Akun</th><th>Aksi Eksekutif</th></tr></thead><tbody>`;
 
-                users.forEach((u, index) => {
+                users.forEach((u) => {
                     const role = String(u.role_akses || u.role || 'KADER').toUpperCase();
-                    let badgeClass = 'role-kader';
-                    if(role.includes('ADMIN')) badgeClass = 'role-admin';
-                    if(role.includes('SUPER')) badgeClass = 'role-super';
+                    let badgeClass = role.includes('ADMIN') ? 'role-admin' : (role.includes('SUPER') ? 'role-super' : 'role-kader');
                     
                     const pin = u.password_awal_ref || u.password || u.pin || '***';
                     const id = u.id_pengguna || u.id_user || u.username || '-';
                     const nama = u.nama || u.username || '-';
+                    
+                    // Logika Status Aktif / Non-Aktif
+                    const currentStatus = String(u.status_akun || 'AKTIF').toUpperCase();
+                    const isAktif = currentStatus === 'AKTIF';
+                    const statusUI = isAktif ? '<span style="color:#00b894; font-weight:bold;">🟢 Aktif</span>' : '<span style="color:#ff7675; font-weight:bold;">🔴 Diblokir</span>';
+                    const toggleText = isAktif ? 'Blokir Akses' : 'Aktifkan';
+                    const toggleColor = isAktif ? '#ff7675' : '#00b894';
 
                     tableHtml += `
-                        <tr>
-                            <td><b>${id}</b></td>
-                            <td>${nama}</td>
-                            <td><span class="badge-role ${badgeClass}">${role}</span></td>
+                        <tr style="opacity: ${isAktif ? '1' : '0.6'};">
+                            <td><b>${id}</b></td><td>${nama}</td><td><span class="badge-role ${badgeClass}">${role}</span></td>
                             <td><code style="background:#eee; padding:3px 6px; border-radius:3px; color:#e94560; font-weight:bold;">${pin}</code></td>
+                            <td>${statusUI}</td>
                             <td>
-                                <button class="btn-action btn-edit" onclick="alert('Fitur Reset PIN untuk ${id} segera hadir di Update V3!')">Reset PIN</button>
-                                <button class="btn-action btn-delete" onclick="alert('Fitur Hapus Akun untuk ${id} segera hadir di Update V3!')">Hapus</button>
+                                <button class="btn-action btn-edit" onclick="window.superResetPin('${id}', '${nama}')">Reset PIN</button>
+                                <button class="btn-action" style="background:${toggleColor}; color:white;" onclick="window.superToggleStatus('${id}', '${nama}', '${currentStatus}')">${toggleText}</button>
                             </td>
                         </tr>
                     `;
                 });
-
                 tableHtml += `</tbody></table></div>`;
                 document.getElementById('table-user-container').innerHTML = tableHtml;
-
-            } else {
-                document.getElementById('table-user-container').innerHTML = `
-                    <div style="padding:50px; text-align:center; color:#e94560;">
-                        <h3>❌ Akses Ditolak oleh Server</h3>
-                        <p>${res.message}</p>
-                        <small>Pastikan SUPER_ADMIN_TOKEN di Code.gs benar-benar sama dengan di super.js</small>
-                    </div>
-                `;
-            }
-        } catch (error) {
-            document.getElementById('table-user-container').innerHTML = `<div style="padding:50px; text-align:center; color:#e94560;"><h3>❌ Gagal Terhubung ke Server</h3><p>Periksa koneksi internet Bapak.</p></div>`;
-        }
-
-        // FUNGSI MODAL TAMBAH PENGGUNA
-        const modal = document.getElementById('super-modal');
-        document.getElementById('btn-add-user').onclick = () => { modal.style.display = 'flex'; };
-        document.getElementById('btn-close-modal').onclick = () => { modal.style.display = 'none'; };
-
-        document.getElementById('form-super-user').onsubmit = async (e) => {
-            e.preventDefault();
-            const btnSave = document.getElementById('btn-save-user');
-            btnSave.disabled = true; btnSave.innerText = "Menyimpan...";
-
-            const id = document.getElementById('inp-id').value;
-            const nama = document.getElementById('inp-nama').value;
-            const pin = document.getElementById('inp-pin').value;
-            const role = document.getElementById('inp-role').value;
-
-            // Baris data sesuai susunan kolom USER_LOGIN Bapak
-            // Susunan umum: id_pengguna, username, ref_type, ref_id, role_akses, scope_kecamatan, scope_desa, status_akun, password_awal_ref
-            // Kita kirim data mentah untuk ditambah oleh API
-            const newRowData = [id, nama, 'KADER', id, role, 'ALL', 'ALL', 'AKTIF', pin]; 
-
-            try {
-                const response = await fetch(SCRIPT_URL, {
-                    method: 'POST',
-                    body: JSON.stringify({
-                        action: 'SECURE_ADD',
-                        token: SUPER_TOKEN,
-                        sheetName: 'USER_LOGIN',
-                        data: newRowData
-                    })
-                });
-                const res = await response.json();
-                if(res.status === 'success') {
-                    alert("✅ Pengguna berhasil ditambahkan ke Server Google!");
-                    modal.style.display = 'none';
-                    document.getElementById('form-super-user').reset();
-                    // Render ulang halaman untuk melihat data baru
-                    renderSuperView('user_management'); 
-                } else {
-                    alert("❌ Gagal menyimpan: " + res.message);
-                }
-            } catch (err) {
-                alert("❌ Terjadi kesalahan jaringan.");
-            } finally {
-                btnSave.disabled = false; btnSave.innerText = "Simpan Pengguna";
-            }
-        };
-
-    }
-    else {
-        content.innerHTML = `<div class="super-card"><h3 style="color:#666; text-align:center; margin: 40px 0;">Menu "${target}" sedang dalam tahap konstruksi... 🚧</h3></div>`;
+            } else { document.getElementById('table-user-container').innerHTML = `<div style="padding:50px; text-align:center; color:#e94560;"><h3>❌ Akses Ditolak</h3><p>${res.message}</p></div>`; }
+        } catch (error) { document.getElementById('table-user-container').innerHTML = `<div style="padding:50px; text-align:center; color:#e94560;"><h3>❌ Gagal Terhubung</h3></div>`; }
     }
 };
