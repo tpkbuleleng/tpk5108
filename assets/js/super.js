@@ -1,5 +1,5 @@
 // ==========================================
-// 👑 GOD MODE: SUPER ADMIN DASHBOARD (V6 - Full Relational Mapping)
+// 👑 GOD MODE: SUPER ADMIN DASHBOARD (V6.1 - Fix Mapping Desa)
 // ==========================================
 import { getAllData, clearStore } from './db.js';
 
@@ -88,7 +88,6 @@ export const initSuperAdmin = async (session) => {
 
         <style>
             .super-menu-item { padding: 14px 25px; color: #a5b1c2; font-weight: 600; cursor: pointer; transition: all 0.3s; border-left: 4px solid transparent; font-size: 0.95rem; } .super-menu-item:hover { background: rgba(255,255,255,0.05); color: #fff; } .super-menu-item.active { background: rgba(233, 69, 96, 0.1); color: #fff; border-left: 4px solid #e94560; } .super-card { background: white; border-radius: 10px; padding: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); border: 1px solid #e1e8ed; } #btn-super-logout:hover { background: #e94560; color: white; }
-            /* Pelebaran min-width karena ada kolom baru */
             .super-table-container { max-height: calc(100vh - 340px); overflow-y: auto; border-radius: 8px; border: 1px solid #eee; background:white; } .super-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; min-width: 1100px; } .super-table th { position: sticky; top: 0; z-index: 10; background: #1a1a2e; color: white; padding: 15px; text-align: left; font-weight:600; box-shadow: 0 2px 4px rgba(0,0,0,0.1); } .super-table td { padding: 12px 15px; border-bottom: 1px solid #eee; color: #444; } .super-table tr:hover td { background: #f8f9fa; }
             .badge-role { padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; } .role-kader { background: #e8f4fd; color: #0984e3; } .role-admin { background: #fdf3e8; color: #d35400; } .role-super { background: #fbebf0; color: #e94560; }
             .btn-action { padding: 6px 12px; border: none; border-radius: 4px; font-size: 0.8rem; font-weight: bold; cursor: pointer; margin-right: 5px; transition: opacity 0.2s;} .btn-action:hover { opacity: 0.8; } .btn-edit { background: #fdcb6e; color: #2d3436; } .filter-input { padding:8px 12px; border:1px solid #ccc; border-radius:6px; outline:none; font-family:inherit; } .filter-input:focus { border-color:#0984e3; box-shadow: 0 0 0 2px rgba(9, 132, 227, 0.2); }
@@ -113,10 +112,9 @@ window.renderUserTable = () => {
     const roleVal = document.getElementById('flt-role').value; 
     const kecVal = document.getElementById('flt-kec').value;
     
-    // 🔥 HEADER TABEL BARU (Menambahkan No. Tim & Desa)
     let tableHtml = `<table class="super-table"><thead><tr>
         <th style="text-align:center; width:40px;"><input type="checkbox" id="chk-all-users" title="Pilih Semua yang Tampil"></th>
-        <th>ID / Username</th><th>Nama Pengguna</th><th>No. Tim</th><th>Desa</th><th>Wilayah/Kecamatan</th><th>Role Akses</th><th>PIN / Password</th><th>Status Akun</th><th>Aksi Eksekutif</th>
+        <th>ID / Username</th><th>Nama Pengguna</th><th>No. Tim</th><th>Desa/Kelurahan</th><th>Wilayah/Kecamatan</th><th>Role Akses</th><th>PIN / Password</th><th>Status Akun</th><th>Aksi Eksekutif</th>
     </tr></thead><tbody>`;
 
     let count = 0;
@@ -130,11 +128,9 @@ window.renderUserTable = () => {
         const kec = String(u.scope_kecamatan || u.kecamatan || u.wilayah || 'ALL').toUpperCase(); 
         const currentStatus = String(u.status_akun || 'AKTIF').toUpperCase();
         
-        // Ambil data yang sudah di-mapping
         const tim = u._nomor_tim || '-';
         const desa = u._desa || '-';
 
-        // 🔥 SEARCH PINTAR (Sekarang bisa cari berdasarkan Tim atau Desa)
         const matchSearch = id.toLowerCase().includes(searchVal) || 
                             nama.toLowerCase().includes(searchVal) || 
                             tim.toLowerCase().includes(searchVal) || 
@@ -216,28 +212,34 @@ window.renderSuperView = async (target) => {
         `;
 
         try {
-            // 🔥 Ambil Data Master dari IndexedDB untuk di-Mapping dengan USER_LOGIN
             const [kaderData, timData] = await Promise.all([ getAllData('master_kader').catch(()=>[]), getAllData('master_tim').catch(()=>[]) ]);
             
             const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_ALL', token: SUPER_TOKEN, sheetName: 'USER_LOGIN' }) });
             const res = await response.json();
             if (res.status === 'success') {
                 
-                // Proses Mapping Nomor Tim dan Desa ke dalam Data User
+                // 🔥 LOGIKA MAPPING DESA YANG DIPERBAIKI
                 window.superUsersData = res.data.map(u => {
-                    let nTim = '-'; let nDesa = String(u.scope_desa || u.desa || u.wilayah_desa || '-').toUpperCase();
+                    let nTim = '-'; 
+                    let nDesa = String(u.scope_desa || u.desa_kelurahan || u.desa || u.wilayah_desa || '-').toUpperCase();
                     const role = String(u.role_akses || u.role || 'KADER').toUpperCase();
                     const refId = u.ref_id || u.id_pengguna || u.id_user || u.username;
 
                     if (role.includes('KADER')) {
-                        const k = kaderData.find(kd => kd.id_kader === refId || kd.nik === refId);
+                        const k = kaderData.find(kd => String(kd.id_kader) === String(refId) || String(kd.nik) === String(refId));
                         if (k) {
                             const idTim = k.id_tim || k.tim;
-                            const t = timData.find(td => td.id_tim === idTim || td.id === idTim);
-                            if (t) nTim = String(t.nomor_tim || t.nama_tim || idTim);
-                            if (nDesa === '-' || nDesa === 'ALL') nDesa = String(k.desa || t.desa || nDesa).toUpperCase();
+                            const t = timData.find(td => String(td.id_tim) === String(idTim) || String(td.id) === String(idTim));
+                            if (t) {
+                                nTim = String(t.nomor_tim || t.nama_tim || idTim);
+                                // Prioritaskan cari kolom desa_kelurahan, lalu desa
+                                let d = t.desa_kelurahan || t.desa || k.desa_kelurahan || k.desa || nDesa;
+                                nDesa = String(d).toUpperCase();
+                            }
                         }
                     }
+                    if (nDesa === 'UNDEFINED' || nDesa === '') nDesa = '-';
+                    
                     u._nomor_tim = nTim; u._desa = nDesa;
                     return u;
                 });
