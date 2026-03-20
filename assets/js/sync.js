@@ -1,56 +1,71 @@
-import { putData, getAllData, clearStore } from './db.js';
+import { putData, getAllData } from './db.js';
 
-// 👉 WAJIB GANTI URL DI BAWAH INI DENGAN URL DEPLOY TERBARU GOOGLE SCRIPT BAPAK!
+// 👉 WAJIB SAMA DENGAN URL DI admin.js dan Code.gs
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzEmmn0wMJmC1OHij9JUxm8EIT2xW1AuV0597EYCWDIxG_nkpZYBPx1EGiNYe6OjEHniw/exec';
 
 export const downloadMasterData = async () => {
     try {
-        if (!navigator.onLine) return false;
         const response = await fetch(SCRIPT_URL);
-        const result = await response.json();
-
-        if (result.status === 'success') {
-            const d = result.data;
-            await clearStore('master_user'); await Promise.all((d.master_user||[]).map(item => putData('master_user', item)));
-            await clearStore('master_kader'); await Promise.all((d.master_kader||[]).map(item => putData('master_kader', item)));
-            await clearStore('master_tim'); await Promise.all((d.master_tim||[]).map(item => putData('master_tim', item)));
-            await clearStore('master_tim_wilayah'); await Promise.all((d.master_tim_wilayah||[]).map(item => putData('master_tim_wilayah', item)));
-            await clearStore('master_pertanyaan'); await Promise.all((d.master_pertanyaan||[]).map(item => putData('master_pertanyaan', item)));
-            await clearStore('master_wilayah_bali'); await Promise.all((d.master_wilayah_bali||[]).map(item => putData('master_wilayah_bali', item)));
+        const res = await response.json();
+        if (res.status === 'success') {
+            const d = res.data;
+            // 🔥 Ambil 10 Sheet sekaligus
+            const stores = [
+                'master_user', 'master_kader', 'master_tim', 'master_tim_wilayah', 
+                'master_pertanyaan', 'master_wilayah_bali', 'standar_antropometri', 
+                'master_kembang', 'master_wilayah', 'master_admin'
+            ];
             
-            // Simpan Data Cerdas
-            await clearStore('standar_antropometri'); await Promise.all((d.standar_antropometri||[]).map(item => putData('standar_antropometri', item)));
-            await clearStore('master_kembang'); await Promise.all((d.master_kembang||[]).map(item => putData('master_kembang', item)));
-            
+            for (let s of stores) {
+                if (d[s] && d[s].length > 0) {
+                    await putData(s, d[s]);
+                }
+            }
+            console.log("Sinkronisasi Master Berhasil");
             return true;
-        } else { return false; }
-    } catch (error) { return false; }
+        }
+        return false;
+    } catch (error) {
+        console.error("Gagal sinkron:", error);
+        throw error;
+    }
 };
 
 export const uploadData = async () => {
-    if (!navigator.onLine) return;
     try {
-        const queue = await getAllData('sync_queue');
-        const pending = queue.filter(q => !q.is_synced);
-        if (pending.length === 0) return;
-
-        const response = await fetch(SCRIPT_URL, {
-            method: 'POST', body: JSON.stringify(pending), headers: { 'Content-Type': 'text/plain;charset=utf-8' } 
-        });
-        const result = await response.json();
+        const antrean = await getAllData('sync_queue');
+        const dataUnsynced = antrean.filter(a => !a.is_synced);
+        if(dataUnsynced.length === 0) return true;
         
-        if (result.status === 'success') {
-            await Promise.all(pending.map(data => { data.is_synced = true; return putData('sync_queue', data); }));
+        const response = await fetch(SCRIPT_URL, {
+            method: 'POST',
+            body: JSON.stringify(dataUnsynced)
+        });
+        const res = await response.json();
+        if(res.status === 'success') {
+            for(let d of dataUnsynced) {
+                d.is_synced = true;
+                await putData('sync_queue', d);
+            }
+            return true;
         }
-    } catch (error) { console.error("Error upload:", error); }
+        return false;
+    } catch(e) {
+        console.error("Gagal upload:", e);
+        throw e;
+    }
 };
 
 window.jalankanSinkronisasi = async () => {
-    const btn = document.querySelector('[data-target="sync_manual"]');
-    if(btn) btn.innerHTML = '<span class="icon">⏳</span> Mengunggah Laporan...';
-    await uploadData(); 
-    if(btn) btn.innerHTML = '<span class="icon">⏳</span> Mengunduh Data Cerdas...';
-    await downloadMasterData(); 
-    if(btn) btn.innerHTML = '<span class="icon">✅</span> Selesai!';
-    setTimeout(() => { location.reload(true); }, 800); 
+    try {
+        const dl = await downloadMasterData();
+        const ul = await uploadData();
+        if(dl) {
+            alert("✅ Sinkronisasi Berhasil!");
+            location.reload();
+        }
+    } catch (e) {
+        alert("❌ Gagal Sinkronisasi. Pastikan internet Bapak stabil.");
+        location.reload();
+    }
 };
