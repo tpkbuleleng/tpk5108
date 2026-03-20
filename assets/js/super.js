@@ -1,5 +1,5 @@
 // ==========================================
-// 👑 GOD MODE: SUPER ADMIN DASHBOARD (V6.1 - Fix Mapping Desa)
+// 👑 GOD MODE: SUPER ADMIN DASHBOARD (V6.2 - Clear Search Button)
 // ==========================================
 import { getAllData, clearStore } from './db.js';
 
@@ -93,6 +93,10 @@ export const initSuperAdmin = async (session) => {
             .btn-action { padding: 6px 12px; border: none; border-radius: 4px; font-size: 0.8rem; font-weight: bold; cursor: pointer; margin-right: 5px; transition: opacity 0.2s;} .btn-action:hover { opacity: 0.8; } .btn-edit { background: #fdcb6e; color: #2d3436; } .filter-input { padding:8px 12px; border:1px solid #ccc; border-radius:6px; outline:none; font-family:inherit; } .filter-input:focus { border-color:#0984e3; box-shadow: 0 0 0 2px rgba(9, 132, 227, 0.2); }
             .btn-mass { padding: 8px 15px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; color: white; display: flex; align-items: center; gap: 5px; font-size:0.85rem;}
             .chk-user { cursor:pointer; transform:scale(1.3); accent-color: #0984e3; } #chk-all-users { cursor:pointer; transform:scale(1.3); accent-color: #e94560; }
+            
+            /* CSS Tombol Clear X */
+            #btn-clear-search:hover { color: #e94560 !important; }
+
             @media (max-width: 1024px) { #super-sidebar { position: absolute; top:0; bottom:0; left:0; transform: translateX(-100%); } #super-sidebar.mobile-active { transform: translateX(0); } #super-sidebar-overlay.mobile-active { display: block !important; } } @media (min-width: 1025px) { #super-sidebar.desktop-collapsed { margin-left: -280px; } }
         </style>
     `;
@@ -192,7 +196,12 @@ window.renderSuperView = async (target) => {
             
             <div class="super-card" style="padding:0; overflow:hidden;">
                 <div style="background:#f8f9fa; padding:15px; border-bottom:1px solid #eee; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
-                    <input type="text" id="flt-search" class="filter-input" placeholder="🔍 Cari ID/Nama/Desa/Tim..." style="flex:1; min-width:200px;">
+                    
+                    <div style="position: relative; flex: 1; min-width: 200px;">
+                        <input type="text" id="flt-search" class="filter-input" placeholder="🔍 Cari ID/Nama/Desa/Tim..." style="width: 100%; padding-right: 35px; box-sizing: border-box;">
+                        <button id="btn-clear-search" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; font-size: 1.3rem; font-weight: bold; color: #aaa; cursor: pointer; display: none; padding: 0;" title="Bersihkan Pencarian">&times;</button>
+                    </div>
+
                     <select id="flt-role" class="filter-input"><option value="ALL">📋 Semua Role</option><option value="KADER">KADER</option><option value="ADMIN">ADMIN</option></select>
                     <select id="flt-kec" class="filter-input" id="flt-kec-container"><option value="ALL">🌍 Semua Wilayah</option></select>
                     <div style="font-size:0.85rem; font-weight:bold; color:#666; background:#fff; padding:8px 12px; border:1px solid #ddd; border-radius:6px;" id="lbl-count">0 Pengguna</div>
@@ -218,10 +227,8 @@ window.renderSuperView = async (target) => {
             const res = await response.json();
             if (res.status === 'success') {
                 
-                // 🔥 LOGIKA MAPPING DESA YANG DIPERBAIKI
                 window.superUsersData = res.data.map(u => {
-                    let nTim = '-'; 
-                    let nDesa = String(u.scope_desa || u.desa_kelurahan || u.desa || u.wilayah_desa || '-').toUpperCase();
+                    let nTim = '-'; let nDesa = String(u.scope_desa || u.desa_kelurahan || u.desa || u.wilayah_desa || '-').toUpperCase();
                     const role = String(u.role_akses || u.role || 'KADER').toUpperCase();
                     const refId = u.ref_id || u.id_pengguna || u.id_user || u.username;
 
@@ -232,23 +239,36 @@ window.renderSuperView = async (target) => {
                             const t = timData.find(td => String(td.id_tim) === String(idTim) || String(td.id) === String(idTim));
                             if (t) {
                                 nTim = String(t.nomor_tim || t.nama_tim || idTim);
-                                // Prioritaskan cari kolom desa_kelurahan, lalu desa
                                 let d = t.desa_kelurahan || t.desa || k.desa_kelurahan || k.desa || nDesa;
                                 nDesa = String(d).toUpperCase();
                             }
                         }
                     }
                     if (nDesa === 'UNDEFINED' || nDesa === '') nDesa = '-';
-                    
-                    u._nomor_tim = nTim; u._desa = nDesa;
-                    return u;
+                    u._nomor_tim = nTim; u._desa = nDesa; return u;
                 });
 
                 const kecSet = new Set(); window.superUsersData.forEach(u => { const k = String(u.scope_kecamatan || u.kecamatan || u.wilayah || '').toUpperCase().trim(); if(k && k !== 'ALL' && k !== 'SEMUA' && k !== '-') kecSet.add(k); });
                 const selectKec = document.getElementById('flt-kec'); Array.from(kecSet).sort().forEach(k => { const opt = document.createElement('option'); opt.value = k; opt.innerText = k; selectKec.appendChild(opt); });
                 
+                // 🔥 SETUP EVENT LISTENER UNTUK TOMBOL CLEAR (X)
+                const searchInput = document.getElementById('flt-search');
+                const clearBtn = document.getElementById('btn-clear-search');
+                
                 window.renderUserTable();
-                document.getElementById('flt-search').addEventListener('input', window.renderUserTable);
+                
+                searchInput.addEventListener('input', () => {
+                    clearBtn.style.display = searchInput.value ? 'block' : 'none'; // Munculkan X jika ada teks
+                    window.renderUserTable();
+                });
+                
+                clearBtn.addEventListener('click', () => {
+                    searchInput.value = ''; // Kosongkan input
+                    clearBtn.style.display = 'none'; // Sembunyikan X
+                    searchInput.focus(); // Kembalikan kursor ke kotak
+                    window.renderUserTable(); // Refresh tabel kembali full
+                });
+
                 document.getElementById('flt-role').addEventListener('change', window.renderUserTable);
                 document.getElementById('flt-kec').addEventListener('change', window.renderUserTable);
             } else { document.getElementById('table-wrapper').innerHTML = `<div style="padding:50px; text-align:center; color:#e94560;"><h3>❌ Akses Ditolak</h3><p>${res.message}</p></div>`; }
