@@ -1,5 +1,5 @@
 // ==========================================
-// 👑 GOD MODE: SUPER ADMIN DASHBOARD (V6.2 - Clear Search Button)
+// 👑 GOD MODE: SUPER ADMIN DASHBOARD (V7 - Form Tambah Pengguna)
 // ==========================================
 import { getAllData, clearStore } from './db.js';
 
@@ -9,6 +9,7 @@ const SUPER_TOKEN = 'MasterKeyKubuSecure!001';
 window.superUsersData = [];
 window.currentFilteredIds = [];
 
+// FUNGSI UMUM TABEL EKSEKUTIF
 window.superResetPin = async (idUser, namaUser) => {
     const newPin = prompt(`🔐 Reset PIN untuk Pengguna:\nID: ${idUser}\nNama: ${namaUser}\n\nMasukkan PIN Baru (Min 5 karakter):`);
     if (!newPin || newPin.length < 5) return;
@@ -93,10 +94,7 @@ export const initSuperAdmin = async (session) => {
             .btn-action { padding: 6px 12px; border: none; border-radius: 4px; font-size: 0.8rem; font-weight: bold; cursor: pointer; margin-right: 5px; transition: opacity 0.2s;} .btn-action:hover { opacity: 0.8; } .btn-edit { background: #fdcb6e; color: #2d3436; } .filter-input { padding:8px 12px; border:1px solid #ccc; border-radius:6px; outline:none; font-family:inherit; } .filter-input:focus { border-color:#0984e3; box-shadow: 0 0 0 2px rgba(9, 132, 227, 0.2); }
             .btn-mass { padding: 8px 15px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; color: white; display: flex; align-items: center; gap: 5px; font-size:0.85rem;}
             .chk-user { cursor:pointer; transform:scale(1.3); accent-color: #0984e3; } #chk-all-users { cursor:pointer; transform:scale(1.3); accent-color: #e94560; }
-            
-            /* CSS Tombol Clear X */
             #btn-clear-search:hover { color: #e94560 !important; }
-
             @media (max-width: 1024px) { #super-sidebar { position: absolute; top:0; bottom:0; left:0; transform: translateX(-100%); } #super-sidebar.mobile-active { transform: translateX(0); } #super-sidebar-overlay.mobile-active { display: block !important; } } @media (min-width: 1025px) { #super-sidebar.desktop-collapsed { margin-left: -280px; } }
         </style>
     `;
@@ -112,34 +110,16 @@ export const initSuperAdmin = async (session) => {
 };
 
 window.renderUserTable = () => {
-    const searchVal = document.getElementById('flt-search').value.toLowerCase(); 
-    const roleVal = document.getElementById('flt-role').value; 
-    const kecVal = document.getElementById('flt-kec').value;
+    const searchVal = document.getElementById('flt-search').value.toLowerCase(); const roleVal = document.getElementById('flt-role').value; const kecVal = document.getElementById('flt-kec').value;
     
-    let tableHtml = `<table class="super-table"><thead><tr>
-        <th style="text-align:center; width:40px;"><input type="checkbox" id="chk-all-users" title="Pilih Semua yang Tampil"></th>
-        <th>ID / Username</th><th>Nama Pengguna</th><th>No. Tim</th><th>Desa/Kelurahan</th><th>Wilayah/Kecamatan</th><th>Role Akses</th><th>PIN / Password</th><th>Status Akun</th><th>Aksi Eksekutif</th>
-    </tr></thead><tbody>`;
+    let tableHtml = `<table class="super-table"><thead><tr><th style="text-align:center; width:40px;"><input type="checkbox" id="chk-all-users" title="Pilih Semua yang Tampil"></th><th>ID / Username</th><th>Nama Pengguna</th><th>No. Tim</th><th>Desa/Kelurahan</th><th>Wilayah/Kecamatan</th><th>Role Akses</th><th>PIN / Password</th><th>Status Akun</th><th>Aksi Eksekutif</th></tr></thead><tbody>`;
 
-    let count = 0;
-    window.currentFilteredIds = [];
-
+    let count = 0; window.currentFilteredIds = [];
     window.superUsersData.forEach((u) => {
-        const role = String(u.role_akses || u.role || 'KADER').toUpperCase(); 
-        const pin = u.password_awal_ref || u.password || u.pin || '***'; 
-        const id = u.id_pengguna || u.id_user || u.username || '-'; 
-        const nama = u.nama || u.username || '-'; 
-        const kec = String(u.scope_kecamatan || u.kecamatan || u.wilayah || 'ALL').toUpperCase(); 
-        const currentStatus = String(u.status_akun || 'AKTIF').toUpperCase();
-        
-        const tim = u._nomor_tim || '-';
-        const desa = u._desa || '-';
+        const role = String(u.role_akses || u.role || 'KADER').toUpperCase(); const pin = u.password_awal_ref || u.password || u.pin || '***'; const id = u.id_pengguna || u.id_user || u.username || '-'; const nama = u.nama || u.username || '-'; const kec = String(u.scope_kecamatan || u.kecamatan || u.wilayah || 'ALL').toUpperCase(); const currentStatus = String(u.status_akun || 'AKTIF').toUpperCase();
+        const tim = u._nomor_tim || '-'; const desa = u._desa || '-';
 
-        const matchSearch = id.toLowerCase().includes(searchVal) || 
-                            nama.toLowerCase().includes(searchVal) || 
-                            tim.toLowerCase().includes(searchVal) || 
-                            desa.toLowerCase().includes(searchVal);
-                            
+        const matchSearch = id.toLowerCase().includes(searchVal) || nama.toLowerCase().includes(searchVal) || tim.toLowerCase().includes(searchVal) || desa.toLowerCase().includes(searchVal);
         const matchRole = roleVal === 'ALL' || role.includes(roleVal);
         const matchKec = kecVal === 'ALL' || kec === kecVal || kec === 'ALL';
 
@@ -154,24 +134,10 @@ window.renderUserTable = () => {
             const toggleColor = isAktif ? '#ff7675' : '#00b894';
 
             let chkBox = ''; let actionButtons = '';
-            if (role.includes('SUPER')) { 
-                chkBox = `🔒`; actionButtons = `<span style="font-size:0.8rem; color:#b2bec3; font-style:italic; font-weight:bold;">🛡️ Akses Dilindungi</span>`; 
-            } else { 
-                chkBox = `<input type="checkbox" class="chk-user" value="${id}">`; 
-                actionButtons = `<button class="btn-action btn-edit" onclick="window.superResetPin('${id}', '${nama}')">Reset PIN</button><button class="btn-action" style="background:${toggleColor}; color:white;" onclick="window.superToggleStatus('${id}', '${nama}', '${currentStatus}')">${toggleText}</button>`; 
-            }
+            if (role.includes('SUPER')) { chkBox = `🔒`; actionButtons = `<span style="font-size:0.8rem; color:#b2bec3; font-style:italic; font-weight:bold;">🛡️ Akses Dilindungi</span>`; } 
+            else { chkBox = `<input type="checkbox" class="chk-user" value="${id}">`; actionButtons = `<button class="btn-action btn-edit" onclick="window.superResetPin('${id}', '${nama}')">Reset PIN</button><button class="btn-action" style="background:${toggleColor}; color:white;" onclick="window.superToggleStatus('${id}', '${nama}', '${currentStatus}')">${toggleText}</button>`; }
 
-            tableHtml += `
-                <tr style="opacity: ${isAktif ? '1' : '0.6'};">
-                    <td style="text-align:center;">${chkBox}</td>
-                    <td><b>${id}</b></td><td>${nama}</td>
-                    <td><b style="color:#0984e3;">${tim}</b></td>
-                    <td>${desa}</td>
-                    <td>${kec}</td>
-                    <td><span class="badge-role ${badgeClass}">${role}</span></td>
-                    <td><code style="background:#eee; padding:3px 6px; border-radius:3px; color:#e94560; font-weight:bold;">${pin}</code></td>
-                    <td>${statusUI}</td><td>${actionButtons}</td>
-                </tr>`;
+            tableHtml += `<tr style="opacity: ${isAktif ? '1' : '0.6'};"><td style="text-align:center;">${chkBox}</td><td><b>${id}</b></td><td>${nama}</td><td><b style="color:#0984e3;">${tim}</b></td><td>${desa}</td><td>${kec}</td><td><span class="badge-role ${badgeClass}">${role}</span></td><td><code style="background:#eee; padding:3px 6px; border-radius:3px; color:#e94560; font-weight:bold;">${pin}</code></td><td>${statusUI}</td><td>${actionButtons}</td></tr>`;
         }
     });
 
@@ -191,18 +157,16 @@ window.renderSuperView = async (target) => {
         content.innerHTML = `
             <div class="super-card" style="margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px;">
                 <div><h3 style="margin:0; color:#1a1a2e;">Database Pengguna Aktif</h3><p style="margin:5px 0 0 0; color:#666; font-size:0.9rem;">Menampilkan data langsung dari Google Sheet melalui Secure API.</p></div>
-                <button onclick="alert('Fitur Tambah segera aktif setelah revisi tabel.')" style="background:#0984e3; color:white; border:none; padding:10px 20px; border-radius:6px; font-weight:bold; cursor:pointer;">+ Tambah Pengguna</button>
+                <button id="btn-show-add" style="background:#0984e3; color:white; border:none; padding:10px 20px; border-radius:6px; font-weight:bold; cursor:pointer; box-shadow: 0 4px 6px rgba(9, 132, 227, 0.3);">+ Tambah Pengguna</button>
             </div>
             
             <div class="super-card" style="padding:0; overflow:hidden;">
                 <div style="background:#f8f9fa; padding:15px; border-bottom:1px solid #eee; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
-                    
                     <div style="position: relative; flex: 1; min-width: 200px;">
                         <input type="text" id="flt-search" class="filter-input" placeholder="🔍 Cari ID/Nama/Desa/Tim..." style="width: 100%; padding-right: 35px; box-sizing: border-box;">
                         <button id="btn-clear-search" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; font-size: 1.3rem; font-weight: bold; color: #aaa; cursor: pointer; display: none; padding: 0;" title="Bersihkan Pencarian">&times;</button>
                     </div>
-
-                    <select id="flt-role" class="filter-input"><option value="ALL">📋 Semua Role</option><option value="KADER">KADER</option><option value="ADMIN">ADMIN</option></select>
+                    <select id="flt-role" class="filter-input"><option value="ALL">📋 Semua Role</option><option value="KADER">KADER</option><option value="ADMIN_KECAMATAN">ADMIN KECAMATAN</option><option value="ADMIN_KABUPATEN">ADMIN KABUPATEN</option></select>
                     <select id="flt-kec" class="filter-input" id="flt-kec-container"><option value="ALL">🌍 Semua Wilayah</option></select>
                     <div style="font-size:0.85rem; font-weight:bold; color:#666; background:#fff; padding:8px 12px; border:1px solid #ddd; border-radius:6px;" id="lbl-count">0 Pengguna</div>
                 </div>
@@ -218,30 +182,61 @@ window.renderSuperView = async (target) => {
 
                 <div id="table-wrapper" class="super-table-container"><div style="padding:50px; text-align:center; color:#666;"><h3 style="margin:0;">⏳ Menghubungi Server & Mapping Data...</h3></div></div>
             </div>
+
+            <div id="modal-add-user" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.7); z-index:1000; align-items:center; justify-content:center;">
+                <div style="background:white; padding:30px; border-radius:10px; width:90%; max-width:450px; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+                    <h3 style="margin-top:0; color:#1a1a2e; border-bottom:2px solid #eee; padding-bottom:10px;">➕ Tambah Pengguna Baru</h3>
+                    
+                    <div style="margin-bottom:15px;">
+                        <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:5px;">ID Pengguna / Kunci Masuk</label>
+                        <input type="text" id="add-id" class="filter-input" placeholder="Cth: TPK9999 / ADM-SGR" style="width:100%; box-sizing:border-box;" required>
+                    </div>
+                    <div style="margin-bottom:15px;">
+                        <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:5px;">Nama Lengkap Pengguna</label>
+                        <input type="text" id="add-nama" class="filter-input" placeholder="Nama Asli" style="width:100%; box-sizing:border-box;" required>
+                    </div>
+                    <div style="display:flex; gap:10px; margin-bottom:15px;">
+                        <div style="flex:1;">
+                            <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:5px;">Role Akses</label>
+                            <select id="add-role" class="filter-input" style="width:100%; box-sizing:border-box;">
+                                <option value="KADER">KADER TPK</option>
+                                <option value="ADMIN_KECAMATAN">ADMIN KECAMATAN</option>
+                                <option value="ADMIN_KABUPATEN">ADMIN KABUPATEN</option>
+                            </select>
+                        </div>
+                        <div style="flex:1;">
+                            <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:5px;">Cakupan Wilayah</label>
+                            <input type="text" id="add-kec" class="filter-input" placeholder="Cth: GEROKGAK / ALL" style="width:100%; box-sizing:border-box;" required>
+                        </div>
+                    </div>
+                    <div style="margin-bottom:25px;">
+                        <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:5px;">PIN / Password Awal</label>
+                        <input type="text" id="add-pin" class="filter-input" placeholder="Minimal 5 karakter" style="width:100%; box-sizing:border-box;" required>
+                    </div>
+                    <div style="display:flex; justify-content:flex-end; gap:10px;">
+                        <button type="button" id="btn-close-add" style="padding:10px 20px; border:none; background:#eee; color:#333; border-radius:5px; cursor:pointer; font-weight:bold;">Batal</button>
+                        <button type="button" id="btn-submit-add" style="padding:10px 20px; border:none; background:#0984e3; color:white; border-radius:5px; cursor:pointer; font-weight:bold;">Simpan ke Server</button>
+                    </div>
+                </div>
+            </div>
         `;
 
         try {
             const [kaderData, timData] = await Promise.all([ getAllData('master_kader').catch(()=>[]), getAllData('master_tim').catch(()=>[]) ]);
-            
             const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_ALL', token: SUPER_TOKEN, sheetName: 'USER_LOGIN' }) });
             const res = await response.json();
+            
             if (res.status === 'success') {
-                
                 window.superUsersData = res.data.map(u => {
                     let nTim = '-'; let nDesa = String(u.scope_desa || u.desa_kelurahan || u.desa || u.wilayah_desa || '-').toUpperCase();
                     const role = String(u.role_akses || u.role || 'KADER').toUpperCase();
                     const refId = u.ref_id || u.id_pengguna || u.id_user || u.username;
-
                     if (role.includes('KADER')) {
                         const k = kaderData.find(kd => String(kd.id_kader) === String(refId) || String(kd.nik) === String(refId));
                         if (k) {
                             const idTim = k.id_tim || k.tim;
                             const t = timData.find(td => String(td.id_tim) === String(idTim) || String(td.id) === String(idTim));
-                            if (t) {
-                                nTim = String(t.nomor_tim || t.nama_tim || idTim);
-                                let d = t.desa_kelurahan || t.desa || k.desa_kelurahan || k.desa || nDesa;
-                                nDesa = String(d).toUpperCase();
-                            }
+                            if (t) { nTim = String(t.nomor_tim || t.nama_tim || idTim); let d = t.desa_kelurahan || t.desa || k.desa_kelurahan || k.desa || nDesa; nDesa = String(d).toUpperCase(); }
                         }
                     }
                     if (nDesa === 'UNDEFINED' || nDesa === '') nDesa = '-';
@@ -251,26 +246,53 @@ window.renderSuperView = async (target) => {
                 const kecSet = new Set(); window.superUsersData.forEach(u => { const k = String(u.scope_kecamatan || u.kecamatan || u.wilayah || '').toUpperCase().trim(); if(k && k !== 'ALL' && k !== 'SEMUA' && k !== '-') kecSet.add(k); });
                 const selectKec = document.getElementById('flt-kec'); Array.from(kecSet).sort().forEach(k => { const opt = document.createElement('option'); opt.value = k; opt.innerText = k; selectKec.appendChild(opt); });
                 
-                // 🔥 SETUP EVENT LISTENER UNTUK TOMBOL CLEAR (X)
-                const searchInput = document.getElementById('flt-search');
-                const clearBtn = document.getElementById('btn-clear-search');
-                
+                const searchInput = document.getElementById('flt-search'); const clearBtn = document.getElementById('btn-clear-search');
                 window.renderUserTable();
-                
-                searchInput.addEventListener('input', () => {
-                    clearBtn.style.display = searchInput.value ? 'block' : 'none'; // Munculkan X jika ada teks
-                    window.renderUserTable();
-                });
-                
-                clearBtn.addEventListener('click', () => {
-                    searchInput.value = ''; // Kosongkan input
-                    clearBtn.style.display = 'none'; // Sembunyikan X
-                    searchInput.focus(); // Kembalikan kursor ke kotak
-                    window.renderUserTable(); // Refresh tabel kembali full
-                });
+                searchInput.addEventListener('input', () => { clearBtn.style.display = searchInput.value ? 'block' : 'none'; window.renderUserTable(); });
+                clearBtn.addEventListener('click', () => { searchInput.value = ''; clearBtn.style.display = 'none'; searchInput.focus(); window.renderUserTable(); });
+                document.getElementById('flt-role').addEventListener('change', window.renderUserTable); document.getElementById('flt-kec').addEventListener('change', window.renderUserTable);
 
-                document.getElementById('flt-role').addEventListener('change', window.renderUserTable);
-                document.getElementById('flt-kec').addEventListener('change', window.renderUserTable);
+                // 🔥 EVENT LISTENER MODAL TAMBAH USER
+                document.getElementById('btn-show-add').onclick = () => document.getElementById('modal-add-user').style.display = 'flex';
+                document.getElementById('btn-close-add').onclick = () => document.getElementById('modal-add-user').style.display = 'none';
+                
+                document.getElementById('btn-submit-add').onclick = async () => {
+                    const id = document.getElementById('add-id').value.trim();
+                    const nama = document.getElementById('add-nama').value.trim();
+                    const role = document.getElementById('add-role').value;
+                    const kec = document.getElementById('add-kec').value.trim().toUpperCase();
+                    const pin = document.getElementById('add-pin').value.trim();
+
+                    if(!id || !nama || !kec || !pin) { alert("⚠️ Mohon isi semua kolom!"); return; }
+
+                    const btnSubmit = document.getElementById('btn-submit-add');
+                    btnSubmit.innerText = "Menyimpan ke Google..."; btnSubmit.disabled = true;
+
+                    // Data dalam format JSON Object (Server akan memetakannya otomatis ke kolom yang benar)
+                    const payloadData = {
+                        id_user: id,
+                        username: nama,
+                        role_akses: role,
+                        scope_kecamatan: kec,
+                        password: pin,
+                        status_akun: 'AKTIF'
+                    };
+
+                    try {
+                        const response = await fetch(SCRIPT_URL, {
+                            method: 'POST',
+                            body: JSON.stringify({ action: 'SECURE_ADD_USER', token: SUPER_TOKEN, data: payloadData })
+                        });
+                        const res = await response.json();
+                        if(res.status === 'success') {
+                            alert("✅ Pengguna berhasil ditambahkan!");
+                            document.getElementById('modal-add-user').style.display = 'none';
+                            window.renderSuperView('user_management'); // Refresh otomatis tabel
+                        } else { alert("❌ Gagal menyimpan: " + res.message); }
+                    } catch(e) { alert("❌ Kesalahan Jaringan."); } 
+                    finally { btnSubmit.innerText = "Simpan ke Server"; btnSubmit.disabled = false; }
+                };
+
             } else { document.getElementById('table-wrapper').innerHTML = `<div style="padding:50px; text-align:center; color:#e94560;"><h3>❌ Akses Ditolak</h3><p>${res.message}</p></div>`; }
         } catch (error) { document.getElementById('table-wrapper').innerHTML = `<div style="padding:50px; text-align:center; color:#e94560;"><h3>❌ Gagal Terhubung</h3></div>`; }
     }
