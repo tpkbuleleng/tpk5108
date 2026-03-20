@@ -741,14 +741,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (res.status === 'success') {
                     await initDB();
-                    // Simpan tiket sesi lokal
                     await putData('kader_session', res.session);
 
                     getEl('kader-id').value = ''; getEl('kader-pin').value = '';
 
-                    if (res.session.role.includes('ADMIN') || res.session.role.includes('SUPER')) { 
+                    // 🔥 PINTU RAHASIA: DYNAMIC IMPORT KHUSUS SUPER ADMIN
+                    if (res.session.role.includes('SUPER')) {
+                        import('./super.js').then(module => {
+                            module.initSuperAdmin(res.session);
+                        }).catch(err => {
+                            console.error("Akses Super Admin Gagal:", err);
+                            alert("❌ Peringatan Keamanan: Modul Super Admin tidak ditemukan di server!");
+                        });
+                    } 
+                    // PINTU ADMIN BIASA
+                    else if (res.session.role.includes('ADMIN')) { 
                         initAdmin(res.session); 
-                    } else { 
+                    } 
+                    // PINTU KADER
+                    else { 
                         masukKeAplikasi(res.session); 
                     }
                 } else { 
