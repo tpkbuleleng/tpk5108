@@ -1,6 +1,6 @@
 import { initDB, putData, getDataById, deleteData, getAllData, clearStore } from './db.js';
 import { downloadMasterData, uploadData } from './sync.js';
-import { initAdmin } from './admin.js'; // 🔥 WAJIB ADA UNTUK ROUTING ADMIN
+import { initAdmin } from './admin.js'; 
 
 const getEl = (id) => document.getElementById(id);
 
@@ -31,9 +31,7 @@ const tampilkanLayar = (id) => {
 
 const updateNetworkStatus = () => {
     const status = getEl('network-status');
-    if (status) {
-        const isOnline = navigator.onLine; status.innerText = isOnline ? 'Online' : 'Offline'; status.style.backgroundColor = isOnline ? '#198754' : '#6c757d';
-    }
+    if (status) { const isOnline = navigator.onLine; status.innerText = isOnline ? 'Online' : 'Offline'; status.style.backgroundColor = isOnline ? '#198754' : '#6c757d'; }
 };
 
 // ==========================================
@@ -47,11 +45,10 @@ const initApp = async () => {
         clearTimeout(logoTimeout);
         
         if (session) { 
-            // 🔥 LOGIKA PERCABANGAN (ANTI-F5): Cek Role Saat Refresh
             if (session.role && session.role.includes('ADMIN')) {
-                initAdmin(session); // Lempar ke Dashboard Eksekutif
+                initAdmin(session); 
             } else {
-                masukKeAplikasi(session); // Lempar ke Layar HP Kader
+                masukKeAplikasi(session); 
             }
         } 
         else { 
@@ -82,41 +79,27 @@ const masukKeAplikasi = async (session) => {
 // 3. MENU & KONTEN (DASHBOARD KADER)
 // ==========================================
 const renderMenu = (role) => {
-    const container = getEl('dynamic-menu-container');
-    if (!container) return;
-
+    const container = getEl('dynamic-menu-container'); if (!container) return;
     const menus = [
-        { id: 'dashboard', icon: '🏠', label: 'Dashboard' },
-        { id: 'registrasi', icon: '📝', label: 'Registrasi Sasaran' },
-        { id: 'daftar_sasaran', icon: '📋', label: 'Data Sasaran & Riwayat' },
-        { id: 'pendampingan', icon: '🤝', label: 'Laporan Pendampingan' },
-        { id: 'rekap_bulanan', icon: '📊', label: 'Rekap Bulanan' },
-        { id: 'cetak_pdf', icon: '🖨️', label: 'Cetak PDF' },
-        { id: 'bantuan', icon: '🆘', label: 'Bantuan & Edukasi' },
-        { id: 'setting', icon: '⚙️', label: 'Pengaturan' },
+        { id: 'dashboard', icon: '🏠', label: 'Dashboard' }, { id: 'registrasi', icon: '📝', label: 'Registrasi Sasaran' },
+        { id: 'daftar_sasaran', icon: '📋', label: 'Data Sasaran & Riwayat' }, { id: 'pendampingan', icon: '🤝', label: 'Laporan Pendampingan' },
+        { id: 'rekap_bulanan', icon: '📊', label: 'Rekap Bulanan' }, { id: 'cetak_pdf', icon: '🖨️', label: 'Cetak PDF' },
+        { id: 'bantuan', icon: '🆘', label: 'Bantuan & Edukasi' }, { id: 'setting', icon: '⚙️', label: 'Pengaturan' },
         { id: 'reload_app', icon: '🔁', label: 'Muat Ulang / Reset Layar' }
     ];
 
     container.innerHTML = menus.map(m => `<a class="menu-item" data-target="${m.id}"><span class="icon">${m.icon}</span> ${m.label}</a>`).join('') + `<hr><a class="menu-item text-danger" id="btnLogout">🚪 Keluar (Hapus Sesi Lokal)</a>`;
-    
     container.style.overflowY = 'auto'; container.style.maxHeight = 'calc(100vh - 180px)'; container.style.paddingBottom = '20px';
 
     document.querySelectorAll('.menu-item[data-target]').forEach(item => {
         item.onclick = () => {
             getEl('sidebar').classList.remove('active'); getEl('sidebar-overlay').classList.remove('active');
             const target = item.getAttribute('data-target');
-            if (target === 'reload_app') { location.reload(true); } 
-            else { window.editModeData = null; window.editModeLaporan = null; renderKonten(target); }
+            if (target === 'reload_app') { location.reload(true); } else { window.editModeData = null; window.editModeLaporan = null; renderKonten(target); }
         };
     });
 
-    if (getEl('btnLogout')) {
-        getEl('btnLogout').onclick = async () => { 
-            if (confirm("🔴 PERINGATAN: Ini akan mengeluarkan Anda dan MENGHAPUS SEMUA DATA UJI COBA (Sasaran & Laporan) di memori HP Anda.\n\nApakah Anda yakin ingin mereset aplikasi?")) { 
-                await clearStore('kader_session'); await clearStore('sync_queue'); location.reload(true); 
-            } 
-        };
-    }
+    if (getEl('btnLogout')) { getEl('btnLogout').onclick = async () => { if (confirm("🔴 PERINGATAN: Ini akan mengeluarkan Anda dan MENGHAPUS SEMUA DATA UJI COBA (Sasaran & Laporan) di memori HP Anda.\n\nApakah Anda yakin ingin mereset aplikasi?")) { await clearStore('kader_session'); await clearStore('sync_queue'); location.reload(true); } }; }
 };
 
 window.mulaiSinkronisasiDashboard = async () => {
@@ -134,10 +117,7 @@ window.renderKonten = async (target) => {
         area.innerHTML = `
             <div class="animate-fade">
                 <div class="card" style="background: linear-gradient(135deg, #0d6efd, #0043a8); color: white; border:none; margin-bottom: 20px; padding: 20px;">
-                    <p style="margin:0; opacity: 0.9; font-weight: 800; font-size: 0.85rem;">SELAMAT DATANG,</p>
-                    <h2 style="margin: 3px 0 10px 0; font-size: 1.4rem; font-weight: 700; line-height: 1.2;">${session.nama}</h2>
-                    <hr style="margin-bottom: 12px; border: 0; border-top: 1px solid rgba(255,255,255,0.2);">
-                    <div id="dash-detail-wilayah">Memuat detail...</div>
+                    <p style="margin:0; opacity: 0.9; font-weight: 800; font-size: 0.85rem;">SELAMAT DATANG,</p><h2 style="margin: 3px 0 10px 0; font-size: 1.4rem; font-weight: 700; line-height: 1.2;">${session.nama}</h2><hr style="margin-bottom: 12px; border: 0; border-top: 1px solid rgba(255,255,255,0.2);"><div id="dash-detail-wilayah">Memuat detail...</div>
                 </div>
                 <div id="dash-summary" style="background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; border: 1px solid #eee;">Memuat ringkasan data...</div>
                 <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
@@ -172,7 +152,7 @@ window.renderKonten = async (target) => {
         const isEdit = window.editModeData != null; const eLabel = isEdit ? `Mengedit Data Sasaran` : `Registrasi Sasaran Baru`;
         area.innerHTML = `
             <div class="animate-fade">
-                <h3 style="margin-top:0; color:var(--primary); font-size:1.3rem;">📝 ${eLabel}</h3>
+                <h3 style="margin:0; color:var(--primary); font-size:1.3rem;">📝 ${eLabel}</h3>
                 ${isEdit ? `<div style="background:#fff3cd; padding:10px; border-radius:5px; margin-bottom:15px; font-size:0.85rem; color:#856404;"><b>Info:</b> ID Sasaran dan Jenis Sasaran tidak dapat diubah.</div>` : ''}
                 <form id="form-registrasi" style="background:#fff; padding:15px; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.1);">
                     <div class="form-group">
@@ -192,13 +172,20 @@ window.renderKonten = async (target) => {
                         <div class="form-group"><label>Fasilitas BAB <span style="color:red">*</span></label><select name="fasilitas_bab" id="f_bab" class="form-control" required><option value="">-- Pilih --</option><option value="Jamban Milik Sendiri Dengan Leher Angsa Dan Tangki Septik / Ipal">Jamban Milik Sendiri Dengan Leher Angsa Dan Tangki Septik / Ipal</option><option value="Jamban Pada Mck Komunal Dengan Leher Angsa Dan Tangki Septik / Ipal">Jamban Pada Mck Komunal Dengan Leher Angsa Dan Tangki Septik / Ipal</option><option value="Ya Lainnya">Ya Lainnya</option><option value="Tidak Ada">Tidak Ada</option></select></div>
                         <div class="form-group"><label>Kepemilikan Asuransi Kesehatan <span style="color:red">*</span></label><select name="asuransi_kesehatan" id="f_asuransi" class="form-control" required><option value="">-- Pilih --</option><option value="BPJS PBI">BPJS PBI</option><option value="BPJS Mandiri">BPJS Mandiri</option><option value="Swasta">Swasta</option><option value="Tidak Memiliki">Tidak Memiliki</option></select></div>
                         <div id="specific-fields"></div><div id="pertanyaan-dinamis"></div>
+                        
                         <div id="wilayah-domisili" style="margin-top:15px; border-top: 1px dashed #ccc; padding-top:15px;">
                             <div class="form-group"><label>Desa / Kelurahan <span style="color:red">*</span></label><select name="desa" id="reg-desa" class="form-control"></select></div><div class="form-group"><label>Dusun / RW <span style="color:red">*</span></label><select name="dusun" id="reg-dusun" class="form-control"></select></div><div class="form-group"><label>Alamat Lengkap <span style="color:red">*</span></label><textarea name="alamat" id="reg-alamat" class="form-control" rows="2"></textarea></div>
                         </div>
+                        
                         <div id="wilayah-catin" style="display:none; padding:10px; background:#e8f4fd; border-radius:6px; border:1px solid #b6d4fe; margin-top:15px;">
                             <label style="font-weight:bold; color:var(--primary); margin-bottom:10px; display:block;">📍 Alamat Domisili Setelah Menikah</label>
-                            <div class="form-group"><label>Kabupaten/Kota <span style="color:red">*</span></label><select name="catin_kab" id="catin-kab" class="form-control"></select></div><div class="form-group"><label>Kecamatan <span style="color:red">*</span></label><select name="catin_kec" id="catin-kec" class="form-control"></select></div><div class="form-group"><label>Desa/Kelurahan <span style="color:red">*</span></label><select name="catin_desa" id="catin-desa" class="form-control"></select></div><div class="form-group"><label>Dusun / RW <span style="color:red">*</span></label><select id="catin-dusun-sel" class="form-control" style="display:none;"></select><input type="text" id="catin-dusun-txt" class="form-control" placeholder="Ketik nama Dusun/RW..."></div><div class="form-group"><label>Alamat Lengkap <span style="color:red">*</span></label><textarea name="catin_alamat" id="catin-alamat" class="form-control" rows="2"></textarea></div>
+                            <div class="form-group"><label>Kabupaten/Kota <span style="color:red">*</span></label><select name="catin_kab" id="catin-kab" class="form-control"></select></div>
+                            <div class="form-group"><label>Kecamatan <span style="color:red">*</span></label><select name="catin_kec" id="catin-kec" class="form-control"></select></div>
+                            <div class="form-group"><label>Desa/Kelurahan <span style="color:red">*</span></label><select name="catin_desa" id="catin-desa" class="form-control"></select></div>
+                            <div class="form-group"><label>Dusun / RW <span style="color:red">*</span></label><select id="catin-dusun-sel" class="form-control" style="display:none;"></select><input type="text" id="catin-dusun-txt" class="form-control" placeholder="Ketik nama Dusun/RW..."></div>
+                            <div class="form-group"><label>Alamat Lengkap <span style="color:red">*</span></label><textarea name="catin_alamat" id="catin-alamat" class="form-control" rows="2"></textarea></div>
                         </div>
+
                         <button type="submit" class="btn btn-primary" style="width:100%; margin-top:15px; font-size:1.1rem; padding:12px;">💾 ${isEdit ? 'Update Data Sasaran' : 'Simpan Sasaran'}</button>
                         ${isEdit ? `<button type="button" class="btn btn-danger" style="width:100%; margin-top:10px; font-size:1rem; padding:10px;" onclick="window.editModeData=null; renderKonten('daftar_sasaran')">❌ Batal Edit</button>` : ''}
                     </div>
@@ -216,7 +203,7 @@ window.renderKonten = async (target) => {
 };
 
 // ==========================================
-// 4. LOGIKA FORM REGISTRASI
+// 4. LOGIKA FORM REGISTRASI (TERMASUK MASTER_WILAYAH)
 // ==========================================
 const getKodeKecamatan = (kec) => {
     if (!kec) return "XXX";
@@ -257,7 +244,10 @@ const renderPertanyaanDinamis = (jenis, modul, container, questions) => {
 
 const initFormRegistrasi = async () => {
     const session = window.currentUser;
-    const allWil = await getAllData('master_tim_wilayah').catch(()=>[]); const allWilBali = await getAllData('master_wilayah_bali').catch(()=>[]); 
+    const allWil = await getAllData('master_tim_wilayah').catch(()=>[]); 
+    const allWilBali = await getAllData('master_wilayah_bali').catch(()=>[]); 
+    const masterWilayah = await getAllData('master_wilayah').catch(()=>[]); // 🔥 INTEGRASI MASTER_WILAYAH
+
     const tugas = allWil.filter(w => String(w.id_tim) === String(session.id_tim));
     
     const selJenis = getEl('reg-jenis'); const containerQ = getEl('pertanyaan-dinamis'); const boxCatin = getEl('wilayah-catin'); const boxDomisili = getEl('wilayah-domisili');
@@ -275,18 +265,23 @@ const initFormRegistrasi = async () => {
     if (catinKab && allWilBali.length > 0) {
         const dKab = [...new Set(allWilBali.map(w => w.kabupaten))].filter(Boolean);
         catinKab.innerHTML = '<option value="">-- Pilih Kabupaten --</option>' + dKab.map(d => `<option value="${d}">${d}</option>`).join('');
+        
         catinKab.onchange = () => {
             const fKec = allWilBali.filter(w => w.kabupaten === catinKab.value); const dKec = [...new Set(fKec.map(w => w.kecamatan))].filter(Boolean);
             catinKec.innerHTML = '<option value="">-- Pilih Kecamatan --</option>' + dKec.map(d => `<option value="${d}">${d}</option>`).join(''); catinDesa.innerHTML = '<option value="">-- Pilih Desa --</option>'; 
             catinDusunTxt.style.display = 'block'; catinDusunTxt.setAttribute('name', 'catin_dusun'); catinDusunSel.style.display = 'none'; catinDusunSel.removeAttribute('name');
         };
+        
         catinKec.onchange = () => {
             const fDesa = allWilBali.filter(w => w.kabupaten === catinKab.value && w.kecamatan === catinKec.value); const dDesa = [...new Set(fDesa.map(w => w.desa_kelurahan))].filter(Boolean);
             catinDesa.innerHTML = '<option value="">-- Pilih Desa --</option>' + dDesa.map(d => `<option value="${d}">${d}</option>`).join('');
         };
+        
         catinDesa.onchange = () => {
+            // 🔥 LOGIKA CERDAS: JIKA KABUPATEN BULELENG, GUNAKAN MASTER_WILAYAH
             if (catinKab.value.toUpperCase().includes('BULELENG')) {
-                const dDusun = allWil.filter(w => w.desa_kelurahan === catinDesa.value);
+                const dDusun = masterWilayah.filter(w => String(w.desa_kelurahan).toUpperCase() === String(catinDesa.value).toUpperCase());
+                
                 if(dDusun.length > 0) {
                     const uniqueDusun = [...new Set(dDusun.map(w => w.dusun_rw))].filter(Boolean);
                     catinDusunSel.innerHTML = '<option value="">-- Pilih Dusun --</option>' + uniqueDusun.map(d => `<option value="${d}">${d}</option>`).join('');
@@ -331,7 +326,6 @@ const initFormRegistrasi = async () => {
             }
             renderPertanyaanDinamis(jenis, 'REGISTRASI', containerQ, questions);
             
-            // PREFILL UNTUK EDIT MODE
             if(window.editModeData) {
                 setTimeout(() => {
                     const eD = window.editModeData;
@@ -510,7 +504,7 @@ const initDaftarSasaran = async () => {
 };
 
 // ==========================================
-// 6. FORM PENDAMPINGAN (DENGAN KECERDASAN BUATAN KKA & ANTROPOMETRI)
+// 6. FORM PENDAMPINGAN 
 // ==========================================
 const initFormPendampingan = async () => {
     const session = window.currentUser;
@@ -659,7 +653,7 @@ const initFormPendampingan = async () => {
 };
 
 // ==========================================
-// 7. FUNGSI REKAP BULANAN
+// 7. FUNGSI REKAP & KALKULATOR
 // ==========================================
 const initRekap = async () => {
     const session = window.currentUser; const antrean = await getAllData('sync_queue').catch(()=>[]);
@@ -691,9 +685,6 @@ const initRekap = async () => {
     if (getEl('tbody-rekap-tim')) getEl('tbody-rekap-tim').innerHTML = renderTableRows(statsTim);
 };
 
-// ==========================================
-// 8. FUNGSI KALKULATOR CERDAS
-// ==========================================
 const initKalkulator = () => {
     const sel = getEl('calc-selector'); const boxHPL = getEl('box-calc-hpl'); const boxIMT = getEl('box-calc-imt'); const boxKKA = getEl('box-calc-kka');
     if (sel) { sel.onchange = () => { boxHPL.style.display = sel.value === 'HPL' ? 'block' : 'none'; boxIMT.style.display = sel.value === 'IMT' ? 'block' : 'none'; boxKKA.style.display = sel.value === 'KKA' ? 'block' : 'none'; }; }
@@ -704,7 +695,7 @@ const initKalkulator = () => {
 };
 
 // ==========================================
-// 9. PENGATURAN
+// 8. PENGATURAN
 // ==========================================
 const initSetting = () => { 
     const session = window.currentUser; if(getEl('set-nama')) getEl('set-nama').value = session.nama; if(getEl('set-id')) getEl('set-id').value = session.username;
@@ -715,7 +706,7 @@ const initSetting = () => {
 };
 
 // ==========================================
-// 10. LOGIN PINTAR
+// 9. LOGIN PINTAR (MEMBACA MASTER_ADMIN) 🔥
 // ==========================================
 document.addEventListener('DOMContentLoaded', () => {
     initApp();
@@ -738,7 +729,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 const pinBenar = String(user.password_awal_ref || user.password || user.pin || "");
                 if (pinBenar === pin) {
-                    let nama = user.nama || user.nama_lengkap || user.username || id; let role = String(user.role_akses || user.role || 'KADER').toUpperCase(); let ref_id = user.ref_id || user.id_kader || user.nik || ''; let tim = '-', noTim = '-';
+                    let nama = user.nama || user.nama_lengkap || user.username || id; 
+                    let role = String(user.role_akses || user.role || 'KADER').toUpperCase(); 
+                    let ref_id = user.ref_id || user.id_kader || user.nik || ''; 
+                    let tim = '-', noTim = '-';
+                    let scopeKec = user.kecamatan || user.wilayah || '';
                     
                     if (role.includes('KADER') && ref_id) {
                         const allKader = await getAllData('master_kader').catch(() => []);
@@ -751,29 +746,27 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                     }
 
-                    const ses = { id: 'active_user', username: id, role: role, nama: nama, id_tim: tim, nomor_tim: noTim, kecamatan: user.kecamatan || user.wilayah || '' };
+                    // 🔥 BACA HAK AKSES ABSOLUT DARI MASTER_ADMIN
+                    if (role.includes('ADMIN')) {
+                        const allAdmin = await getAllData('master_admin').catch(() => []);
+                        const admData = allAdmin.find(a => String(a.id_admin) === id || String(a.nama_admin).toLowerCase() === nama.toLowerCase());
+                        if (admData) {
+                            scopeKec = admData.scope_kecamatan || scopeKec;
+                            role = admData.role_admin || role;
+                        }
+                    }
+
+                    const ses = { id: 'active_user', username: id, role: role, nama: nama, id_tim: tim, nomor_tim: noTim, kecamatan: scopeKec };
                     await putData('kader_session', ses);
                     
                     getEl('kader-id').value = ''; getEl('kader-pin').value = ''; 
                     
-                    // 🔥 PERCABANGAN ROUTER ADMIN SETELAH KLIK TOMBOL MASUK
-                    if (role.includes('ADMIN')) {
-                        initAdmin(ses);
-                    } else {
-                        masukKeAplikasi(ses);
-                    }
+                    if (role.includes('ADMIN')) { initAdmin(ses); } else { masukKeAplikasi(ses); }
                 } else { alert("❌ PIN yang Anda masukkan salah!"); }
             } catch (err) { console.error("Kesalahan Login:", err); alert("Kesalahan Sistem: " + err.message); } finally { if (btn) { btn.disabled = false; btn.innerText = "Masuk"; } }
         };
     }
 });
 
-// ==========================================
-// 11. SIDEBAR KADER MENU
-// ==========================================
 const btnMenu = getEl('btn-menu'); const sidebar = getEl('sidebar'); const overlay = getEl('sidebar-overlay');
-
-if (btnMenu && sidebar && overlay) {
-    btnMenu.addEventListener('click', () => { sidebar.classList.add('active'); overlay.classList.add('active'); });
-    overlay.addEventListener('click', () => { sidebar.classList.remove('active'); overlay.classList.remove('active'); });
-}
+if (btnMenu && sidebar && overlay) { btnMenu.addEventListener('click', () => { sidebar.classList.add('active'); overlay.classList.add('active'); }); overlay.addEventListener('click', () => { sidebar.classList.remove('active'); overlay.classList.remove('active'); }); }
