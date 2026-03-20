@@ -1,5 +1,5 @@
 // ==========================================
-// 👑 GOD MODE: SUPER ADMIN DASHBOARD (V8 - Smart Dual-Injection Form)
+// 👑 GOD MODE: SUPER ADMIN DASHBOARD (V8.1 - Cascading Dropdown)
 // ==========================================
 import { getAllData, clearStore } from './db.js';
 
@@ -7,10 +7,9 @@ const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzEmmn0wMJmC1OHij9JU
 const SUPER_TOKEN = 'MasterKeyKubuSecure!001';
 
 window.superUsersData = [];
-window.superTimData = []; // Menyimpan master_tim di memori untuk dropdown form
+window.superTimData = []; 
 window.currentFilteredIds = [];
 
-// Fungsi CRUD Tabel... (Disembunyikan untuk kerapian logika, tetap ada)
 window.superResetPin = async (idUser, namaUser) => {
     const newPin = prompt(`🔐 Reset PIN untuk Pengguna:\nID: ${idUser}\nNama: ${namaUser}\n\nMasukkan PIN Baru (Min 5 karakter):`);
     if (!newPin || newPin.length < 5) return;
@@ -202,10 +201,17 @@ window.renderSuperView = async (target) => {
 
                     <div id="panel-kader-area" style="display:block; background:#eef2f5; padding:15px; border-radius:8px; margin-bottom:15px; border:1px solid #dcdde1;">
                         <p style="margin:0 0 10px 0; font-size:0.85rem; font-weight:bold; color:#0984e3;">📍 Penempatan Tugas Kader</p>
-                        <label style="display:block; font-size:0.8rem; color:#666; margin-bottom:5px;">Pilih Tim & Wilayah (Desa - Dusun)</label>
-                        <select id="add-tim" class="filter-input" style="width:100%; box-sizing:border-box;">
-                            <option value="">-- Memuat Data Tim... --</option>
+                        
+                        <label style="display:block; font-size:0.8rem; color:#666; margin-bottom:5px;">1. Pilih Desa / Kelurahan</label>
+                        <select id="add-desa" class="filter-input" style="width:100%; box-sizing:border-box; margin-bottom:10px;">
+                            <option value="">-- Pilih Desa --</option>
                         </select>
+
+                        <label style="display:block; font-size:0.8rem; color:#666; margin-bottom:5px;">2. Pilih Tim / Dusun</label>
+                        <select id="add-tim" class="filter-input" style="width:100%; box-sizing:border-box;">
+                            <option value="">-- Pilih Tim / Dusun --</option>
+                        </select>
+
                         <div style="font-size:0.7rem; color:#888; margin-top:5px; font-style:italic;">*Sistem otomatis membuat profil kader ini di MASTER_KADER.</div>
                     </div>
 
@@ -223,8 +229,6 @@ window.renderSuperView = async (target) => {
 
         try {
             const [kaderData, timData] = await Promise.all([ getAllData('master_kader').catch(()=>[]), getAllData('master_tim').catch(()=>[]) ]);
-            
-            // Simpan master_tim ke memori untuk dipakai di Form Dropdown
             window.superTimData = timData || [];
 
             const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_ALL', token: SUPER_TOKEN, sheetName: 'USER_LOGIN' }) });
@@ -241,11 +245,7 @@ window.renderSuperView = async (target) => {
                         if (k) {
                             const idTim = k.id_tim || k.tim;
                             const t = timData.find(td => String(td.id_tim) === String(idTim) || String(td.id) === String(idTim));
-                            if (t) {
-                                nTim = String(t.nomor_tim || t.nama_tim || idTim);
-                                let d = t.desa_kelurahan || t.desa || k.desa_kelurahan || k.desa || nDesa;
-                                nDesa = String(d).toUpperCase();
-                            }
+                            if (t) { nTim = String(t.nomor_tim || t.nama_tim || idTim); let d = t.desa_kelurahan || t.desa || k.desa_kelurahan || k.desa || nDesa; nDesa = String(d).toUpperCase(); }
                         }
                     }
                     if (nDesa === 'UNDEFINED' || nDesa === '') nDesa = '-';
@@ -261,75 +261,96 @@ window.renderSuperView = async (target) => {
                 clearBtn.addEventListener('click', () => { searchInput.value = ''; clearBtn.style.display = 'none'; searchInput.focus(); window.renderUserTable(); });
                 document.getElementById('flt-role').addEventListener('change', window.renderUserTable); document.getElementById('flt-kec').addEventListener('change', window.renderUserTable);
 
-                // 🔥 LOGIKA MODAL TAMBAH USER & DROPDOWN CERDAS
+                // 🔥 LOGIKA CASCADING DROPDOWN (BERTINGKAT)
                 const modalAdd = document.getElementById('modal-add-user');
                 const roleSelect = document.getElementById('add-role');
                 const formKecSelect = document.getElementById('add-kec');
                 const panelKader = document.getElementById('panel-kader-area');
+                const formDesaSelect = document.getElementById('add-desa');
                 const timSelect = document.getElementById('add-tim');
 
                 document.getElementById('btn-show-add').onclick = () => {
-                    populateTimDropdown(); // Isi list saat pertama dibuka
+                    if(roleSelect.value === 'KADER') populateDesaDropdown();
                     modalAdd.style.display = 'flex';
                 };
                 document.getElementById('btn-close-add').onclick = () => modalAdd.style.display = 'none';
 
-                // Fungsi mengisi list Tim berdasarkan Kecamatan yang dipilih
-                const populateTimDropdown = () => {
+                // 1. Ekstrak Desa berdasarkan Kecamatan
+                const populateDesaDropdown = () => {
                     const selectedKec = formKecSelect.value;
-                    timSelect.innerHTML = '<option value="">-- Pilih Tim / Dusun Penugasan --</option>';
-                    
-                    const filteredTim = window.superTimData.filter(t => {
+                    formDesaSelect.innerHTML = '<option value="">-- Pilih Desa / Kelurahan --</option>';
+                    timSelect.innerHTML = '<option value="">-- Pilih Tim / Dusun --</option>'; // Reset tim
+
+                    if (!selectedKec || selectedKec === 'ALL') return;
+
+                    const desaSet = new Set();
+                    window.superTimData.forEach(t => {
                         const k = String(t.kecamatan || t.wilayah || '').toUpperCase();
-                        return selectedKec === 'ALL' || k === selectedKec || k === ''; 
+                        if (k === selectedKec) {
+                            const d = String(t.desa_kelurahan || t.desa || '').toUpperCase();
+                            if (d && d !== 'UNDEFINED' && d !== '-') desaSet.add(d);
+                        }
                     });
 
-                    // Urutkan berdasarkan Nama Desa
-                    filteredTim.sort((a,b) => String(a.desa_kelurahan || a.desa).localeCompare(String(b.desa_kelurahan || b.desa)));
+                    Array.from(desaSet).sort().forEach(d => {
+                        const opt = document.createElement('option');
+                        opt.value = d; opt.innerText = d;
+                        formDesaSelect.appendChild(opt);
+                    });
+                };
+
+                // 2. Ekstrak Tim berdasarkan Desa
+                const populateTimDropdown = () => {
+                    const selectedKec = formKecSelect.value;
+                    const selectedDesa = formDesaSelect.value;
+
+                    timSelect.innerHTML = '<option value="">-- Pilih Tim / Dusun --</option>';
+                    if (!selectedDesa) return;
+
+                    const filteredTim = window.superTimData.filter(t => {
+                        const k = String(t.kecamatan || t.wilayah || '').toUpperCase();
+                        const d = String(t.desa_kelurahan || t.desa || '').toUpperCase();
+                        return k === selectedKec && d === selectedDesa;
+                    });
+
+                    filteredTim.sort((a,b) => String(a.nama_tim || a.nomor_tim).localeCompare(String(b.nama_tim || b.nomor_tim)));
 
                     filteredTim.forEach(t => {
                         const idTim = t.id_tim || t.id;
                         const namaTim = t.nama_tim || t.nomor_tim || idTim;
-                        const desa = t.desa_kelurahan || t.desa || '-';
                         const dusun = t.dusun_rw || t.dusun || '-';
-                        const label = `Desa ${desa} - ${namaTim} (Dusun: ${dusun})`;
+                        const label = `${namaTim} (Dusun: ${dusun})`;
                         
                         const opt = document.createElement('option');
                         opt.value = idTim;
-                        opt.setAttribute('data-desa', desa);
+                        opt.setAttribute('data-desa', selectedDesa);
                         opt.setAttribute('data-dusun', dusun);
                         opt.innerText = label;
                         timSelect.appendChild(opt);
                     });
                 };
 
-                // Ubah tampilan form berdasarkan Role
+                // Event Listeners untuk interaksi bertingkat
                 roleSelect.addEventListener('change', () => {
                     if (roleSelect.value === 'ADMIN_KABUPATEN') {
-                        formKecSelect.value = 'ALL';
-                        formKecSelect.style.backgroundColor = '#e9ecef'; 
-                        formKecSelect.style.pointerEvents = 'none'; 
-                        panelKader.style.display = 'none'; // Sembunyikan pilih tim
+                        formKecSelect.value = 'ALL'; formKecSelect.style.backgroundColor = '#e9ecef'; formKecSelect.style.pointerEvents = 'none'; 
+                        panelKader.style.display = 'none'; 
                     } else if (roleSelect.value === 'ADMIN_KECAMATAN') {
-                        formKecSelect.style.backgroundColor = 'white';
-                        formKecSelect.style.pointerEvents = 'auto'; 
+                        formKecSelect.style.backgroundColor = 'white'; formKecSelect.style.pointerEvents = 'auto'; 
                         if(formKecSelect.value === 'ALL') formKecSelect.value = 'GEROKGAK';
-                        panelKader.style.display = 'none'; // Sembunyikan pilih tim
+                        panelKader.style.display = 'none'; 
                     } else {
-                        // KADER TPK
-                        formKecSelect.style.backgroundColor = 'white';
-                        formKecSelect.style.pointerEvents = 'auto'; 
+                        formKecSelect.style.backgroundColor = 'white'; formKecSelect.style.pointerEvents = 'auto'; 
                         if(formKecSelect.value === 'ALL') formKecSelect.value = 'GEROKGAK';
-                        panelKader.style.display = 'block'; // Tampilkan pilih tim
-                        populateTimDropdown();
+                        panelKader.style.display = 'block'; 
+                        populateDesaDropdown();
                     }
                 });
 
-                formKecSelect.addEventListener('change', () => {
-                    if(roleSelect.value === 'KADER') populateTimDropdown();
-                });
+                formKecSelect.addEventListener('change', () => { if(roleSelect.value === 'KADER') populateDesaDropdown(); });
+                formDesaSelect.addEventListener('change', populateTimDropdown);
 
-                // PROSES SIMPAN KE SERVER (DUAL INJECTION)
+                // PROSES SIMPAN KE SERVER
                 document.getElementById('btn-submit-add').onclick = async () => {
                     const id = document.getElementById('add-id').value.trim();
                     const nama = document.getElementById('add-nama').value.trim();
@@ -341,14 +362,12 @@ window.renderSuperView = async (target) => {
 
                     let payloadKader = null;
 
-                    // Validasi ekstra jika dia KADER
                     if (role === 'KADER') {
-                        if(!timSelect.value) { alert("⚠️ Mohon pilih Tim & Wilayah penugasan kader!"); return; }
+                        if(!formDesaSelect.value || !timSelect.value) { alert("⚠️ Mohon lengkapi pilihan Desa dan Tim penugasan kader!"); return; }
                         const selectedOpt = timSelect.options[timSelect.selectedIndex];
                         
-                        // Data yang akan diinjeksi ke MASTER_KADER
                         payloadKader = {
-                            id_kader: id,  // NIK / ID Kader
+                            id_kader: id,  
                             nama: nama,
                             id_tim: timSelect.value,
                             desa: selectedOpt.getAttribute('data-desa'),
@@ -357,7 +376,7 @@ window.renderSuperView = async (target) => {
                     }
 
                     const btnSubmit = document.getElementById('btn-submit-add');
-                    btnSubmit.innerText = "Menyimpan ke Google..."; btnSubmit.disabled = true;
+                    btnSubmit.innerText = "Menyimpan..."; btnSubmit.disabled = true;
 
                     const payloadData = { id_user: id, username: nama, role_akses: role, scope_kecamatan: kec, password: pin, status_akun: 'AKTIF' };
 
@@ -365,17 +384,13 @@ window.renderSuperView = async (target) => {
                         const response = await fetch(SCRIPT_URL, {
                             method: 'POST',
                             body: JSON.stringify({ 
-                                action: 'SECURE_ADD_USER', 
-                                token: SUPER_TOKEN, 
-                                data: payloadData,         // Kirim ke USER_LOGIN
-                                data_kader: payloadKader   // Kirim ke MASTER_KADER
+                                action: 'SECURE_ADD_USER', token: SUPER_TOKEN, data: payloadData, data_kader: payloadKader 
                             })
                         });
                         const res = await response.json();
                         if(res.status === 'success') {
                             alert("✅ Pengguna berhasil ditambahkan dan di-mapping!");
                             modalAdd.style.display = 'none';
-                            // Bersihkan IDB agar master termutakhirkan saat direfresh
                             await clearStore('master_kader'); 
                             window.renderSuperView('user_management'); 
                         } else { alert("❌ Gagal menyimpan: " + res.message); }
