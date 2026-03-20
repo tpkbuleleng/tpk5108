@@ -1,5 +1,5 @@
 // ==========================================
-// 👑 GOD MODE: SUPER ADMIN DASHBOARD (V5 - Checkbox Selection)
+// 👑 GOD MODE: SUPER ADMIN DASHBOARD (V6 - Full Relational Mapping)
 // ==========================================
 import { getAllData, clearStore } from './db.js';
 
@@ -7,6 +7,7 @@ const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzEmmn0wMJmC1OHij9JU
 const SUPER_TOKEN = 'MasterKeyKubuSecure!001';
 
 window.superUsersData = [];
+window.currentFilteredIds = [];
 
 window.superResetPin = async (idUser, namaUser) => {
     const newPin = prompt(`🔐 Reset PIN untuk Pengguna:\nID: ${idUser}\nNama: ${namaUser}\n\nMasukkan PIN Baru (Min 5 karakter):`);
@@ -28,31 +29,20 @@ window.superToggleStatus = async (idUser, namaUser, currentStatus) => {
     } catch (e) { alert("❌ Kesalahan Jaringan."); }
 };
 
-// 🔥 FUNGSI SAKTI 3: AKSI MASSAL BERDASARKAN CHECKBOX
 window.superBulkAction = async (actionType) => {
-    // 1. Ambil semua ID dari Checkbox yang sedang dicentang
     const checkedBoxes = document.querySelectorAll('.chk-user:checked');
     const targetIds = Array.from(checkedBoxes).map(cb => cb.value);
     const totalTarget = targetIds.length;
 
-    if (totalTarget === 0) { 
-        alert("Pilih minimal 1 pengguna dengan mencentang kotak di sebelah kiri tabel!"); 
-        return; 
-    }
+    if (totalTarget === 0) { alert("Pilih minimal 1 pengguna dengan mencentang kotak di sebelah kiri tabel!"); return; }
 
     let confirmMsg = ""; let updateType = ""; let newValue = "";
-
-    if (actionType === 'BLOKIR') {
-        confirmMsg = `⚠️ BAHAYA: Anda akan MEMBLOKIR ${totalTarget} akun yang DICENTANG.\n\nKetik kata "YAKIN" (huruf besar) untuk mengeksekusi:`;
-        updateType = 'STATUS'; newValue = 'NONAKTIF';
-    } else if (actionType === 'AKTIFKAN') {
-        confirmMsg = `Anda akan MENGAKTIFKAN KEMBALI ${totalTarget} akun yang DICENTANG.\n\nKetik kata "YAKIN" untuk mengeksekusi:`;
-        updateType = 'STATUS'; newValue = 'AKTIF';
-    } else if (actionType === 'RESETPIN') {
+    if (actionType === 'BLOKIR') { confirmMsg = `⚠️ BAHAYA: Anda akan MEMBLOKIR ${totalTarget} akun yang DICENTANG.\n\nKetik kata "YAKIN" (huruf besar) untuk mengeksekusi:`; updateType = 'STATUS'; newValue = 'NONAKTIF'; } 
+    else if (actionType === 'AKTIFKAN') { confirmMsg = `Anda akan MENGAKTIFKAN KEMBALI ${totalTarget} akun yang DICENTANG.\n\nKetik kata "YAKIN" untuk mengeksekusi:`; updateType = 'STATUS'; newValue = 'AKTIF'; } 
+    else if (actionType === 'RESETPIN') {
         const pinMasal = prompt(`Masukkan PIN BARU untuk ${totalTarget} akun yang DICENTANG (Semua akan memiliki PIN yang sama):`);
         if (!pinMasal || pinMasal.length < 5) { alert("PIN batal / terlalu pendek!"); return; }
-        confirmMsg = `⚠️ BAHAYA: Anda akan MERESET PIN ${totalTarget} akun menjadi "${pinMasal}".\n\nKetik kata "YAKIN" (huruf besar) untuk mengeksekusi:`;
-        updateType = 'PIN'; newValue = pinMasal;
+        confirmMsg = `⚠️ BAHAYA: Anda akan MERESET PIN ${totalTarget} akun menjadi "${pinMasal}".\n\nKetik kata "YAKIN" (huruf besar) untuk mengeksekusi:`; updateType = 'PIN'; newValue = pinMasal;
     }
 
     const konfirmasi = prompt(confirmMsg);
@@ -61,10 +51,7 @@ window.superBulkAction = async (actionType) => {
     document.getElementById('table-wrapper').innerHTML = `<div style="padding:50px; text-align:center; color:#e94560;"><h3>🚀 MENGEKSEKUSI AKSI MASSAL...</h3><p>Memproses ${totalTarget} data di Google Server. Mohon tunggu...</p></div>`;
 
     try {
-        const response = await fetch(SCRIPT_URL, { 
-            method: 'POST', 
-            body: JSON.stringify({ action: 'SECURE_BULK_UPDATE_USER', token: SUPER_TOKEN, ids: targetIds, updateType: updateType, newValue: newValue }) 
-        });
+        const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_BULK_UPDATE_USER', token: SUPER_TOKEN, ids: targetIds, updateType: updateType, newValue: newValue }) });
         const res = await response.json();
         if (res.status === 'success') { alert(`✅ SUKSES! ${res.count} Akun berhasil diperbarui!`); window.renderSuperView('user_management'); } 
         else { alert("❌ Gagal: " + res.message); window.renderSuperView('user_management'); }
@@ -101,14 +88,12 @@ export const initSuperAdmin = async (session) => {
 
         <style>
             .super-menu-item { padding: 14px 25px; color: #a5b1c2; font-weight: 600; cursor: pointer; transition: all 0.3s; border-left: 4px solid transparent; font-size: 0.95rem; } .super-menu-item:hover { background: rgba(255,255,255,0.05); color: #fff; } .super-menu-item.active { background: rgba(233, 69, 96, 0.1); color: #fff; border-left: 4px solid #e94560; } .super-card { background: white; border-radius: 10px; padding: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); border: 1px solid #e1e8ed; } #btn-super-logout:hover { background: #e94560; color: white; }
-            .super-table-container { max-height: calc(100vh - 340px); overflow-y: auto; border-radius: 8px; border: 1px solid #eee; background:white; } .super-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; min-width: 900px; } .super-table th { position: sticky; top: 0; z-index: 10; background: #1a1a2e; color: white; padding: 15px; text-align: left; font-weight:600; box-shadow: 0 2px 4px rgba(0,0,0,0.1); } .super-table td { padding: 12px 15px; border-bottom: 1px solid #eee; color: #444; } .super-table tr:hover td { background: #f8f9fa; }
+            /* Pelebaran min-width karena ada kolom baru */
+            .super-table-container { max-height: calc(100vh - 340px); overflow-y: auto; border-radius: 8px; border: 1px solid #eee; background:white; } .super-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; min-width: 1100px; } .super-table th { position: sticky; top: 0; z-index: 10; background: #1a1a2e; color: white; padding: 15px; text-align: left; font-weight:600; box-shadow: 0 2px 4px rgba(0,0,0,0.1); } .super-table td { padding: 12px 15px; border-bottom: 1px solid #eee; color: #444; } .super-table tr:hover td { background: #f8f9fa; }
             .badge-role { padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; } .role-kader { background: #e8f4fd; color: #0984e3; } .role-admin { background: #fdf3e8; color: #d35400; } .role-super { background: #fbebf0; color: #e94560; }
             .btn-action { padding: 6px 12px; border: none; border-radius: 4px; font-size: 0.8rem; font-weight: bold; cursor: pointer; margin-right: 5px; transition: opacity 0.2s;} .btn-action:hover { opacity: 0.8; } .btn-edit { background: #fdcb6e; color: #2d3436; } .filter-input { padding:8px 12px; border:1px solid #ccc; border-radius:6px; outline:none; font-family:inherit; } .filter-input:focus { border-color:#0984e3; box-shadow: 0 0 0 2px rgba(9, 132, 227, 0.2); }
             .btn-mass { padding: 8px 15px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; color: white; display: flex; align-items: center; gap: 5px; font-size:0.85rem;}
-            /* Style khusus Checkbox */
-            .chk-user { cursor:pointer; transform:scale(1.3); accent-color: #0984e3; }
-            #chk-all-users { cursor:pointer; transform:scale(1.3); accent-color: #e94560; }
-            
+            .chk-user { cursor:pointer; transform:scale(1.3); accent-color: #0984e3; } #chk-all-users { cursor:pointer; transform:scale(1.3); accent-color: #e94560; }
             @media (max-width: 1024px) { #super-sidebar { position: absolute; top:0; bottom:0; left:0; transform: translateX(-100%); } #super-sidebar.mobile-active { transform: translateX(0); } #super-sidebar-overlay.mobile-active { display: block !important; } } @media (min-width: 1025px) { #super-sidebar.desktop-collapsed { margin-left: -280px; } }
         </style>
     `;
@@ -124,35 +109,53 @@ export const initSuperAdmin = async (session) => {
 };
 
 window.renderUserTable = () => {
-    const searchVal = document.getElementById('flt-search').value.toLowerCase(); const roleVal = document.getElementById('flt-role').value; const kecVal = document.getElementById('flt-kec').value;
+    const searchVal = document.getElementById('flt-search').value.toLowerCase(); 
+    const roleVal = document.getElementById('flt-role').value; 
+    const kecVal = document.getElementById('flt-kec').value;
     
-    // 🔥 TAMBAH KOLOM CHECKBOX DI HEADER
+    // 🔥 HEADER TABEL BARU (Menambahkan No. Tim & Desa)
     let tableHtml = `<table class="super-table"><thead><tr>
         <th style="text-align:center; width:40px;"><input type="checkbox" id="chk-all-users" title="Pilih Semua yang Tampil"></th>
-        <th>ID / Username</th><th>Nama Pengguna</th><th>Wilayah/Kecamatan</th><th>Role Akses</th><th>PIN / Password</th><th>Status Akun</th><th>Aksi Eksekutif</th>
+        <th>ID / Username</th><th>Nama Pengguna</th><th>No. Tim</th><th>Desa</th><th>Wilayah/Kecamatan</th><th>Role Akses</th><th>PIN / Password</th><th>Status Akun</th><th>Aksi Eksekutif</th>
     </tr></thead><tbody>`;
 
     let count = 0;
-    window.superUsersData.forEach((u) => {
-        const role = String(u.role_akses || u.role || 'KADER').toUpperCase(); const pin = u.password_awal_ref || u.password || u.pin || '***'; const id = u.id_pengguna || u.id_user || u.username || '-'; const nama = u.nama || u.username || '-'; const kec = String(u.scope_kecamatan || u.kecamatan || u.wilayah || 'ALL').toUpperCase(); const currentStatus = String(u.status_akun || 'AKTIF').toUpperCase();
+    window.currentFilteredIds = [];
 
-        const matchSearch = id.toLowerCase().includes(searchVal) || nama.toLowerCase().includes(searchVal);
+    window.superUsersData.forEach((u) => {
+        const role = String(u.role_akses || u.role || 'KADER').toUpperCase(); 
+        const pin = u.password_awal_ref || u.password || u.pin || '***'; 
+        const id = u.id_pengguna || u.id_user || u.username || '-'; 
+        const nama = u.nama || u.username || '-'; 
+        const kec = String(u.scope_kecamatan || u.kecamatan || u.wilayah || 'ALL').toUpperCase(); 
+        const currentStatus = String(u.status_akun || 'AKTIF').toUpperCase();
+        
+        // Ambil data yang sudah di-mapping
+        const tim = u._nomor_tim || '-';
+        const desa = u._desa || '-';
+
+        // 🔥 SEARCH PINTAR (Sekarang bisa cari berdasarkan Tim atau Desa)
+        const matchSearch = id.toLowerCase().includes(searchVal) || 
+                            nama.toLowerCase().includes(searchVal) || 
+                            tim.toLowerCase().includes(searchVal) || 
+                            desa.toLowerCase().includes(searchVal);
+                            
         const matchRole = roleVal === 'ALL' || role.includes(roleVal);
         const matchKec = kecVal === 'ALL' || kec === kecVal || kec === 'ALL';
 
         if (matchSearch && matchRole && matchKec) {
             count++;
+            if (!role.includes('SUPER')) { window.currentFilteredIds.push(id); }
+
             let badgeClass = role.includes('ADMIN') ? 'role-admin' : (role.includes('SUPER') ? 'role-super' : 'role-kader');
             const isAktif = currentStatus === 'AKTIF';
             const statusUI = isAktif ? '<span style="color:#00b894; font-weight:bold;">🟢 Aktif</span>' : '<span style="color:#ff7675; font-weight:bold;">🔴 Diblokir</span>';
             const toggleText = isAktif ? 'Blokir' : 'Aktifkan';
             const toggleColor = isAktif ? '#ff7675' : '#00b894';
 
-            // 🛡️ Sembunyikan Checkbox dan Tombol Aksi jika Role-nya SUPER
             let chkBox = ''; let actionButtons = '';
             if (role.includes('SUPER')) { 
-                chkBox = `🔒`; 
-                actionButtons = `<span style="font-size:0.8rem; color:#b2bec3; font-style:italic; font-weight:bold;">🛡️ Akses Dilindungi</span>`; 
+                chkBox = `🔒`; actionButtons = `<span style="font-size:0.8rem; color:#b2bec3; font-style:italic; font-weight:bold;">🛡️ Akses Dilindungi</span>`; 
             } else { 
                 chkBox = `<input type="checkbox" class="chk-user" value="${id}">`; 
                 actionButtons = `<button class="btn-action btn-edit" onclick="window.superResetPin('${id}', '${nama}')">Reset PIN</button><button class="btn-action" style="background:${toggleColor}; color:white;" onclick="window.superToggleStatus('${id}', '${nama}', '${currentStatus}')">${toggleText}</button>`; 
@@ -161,28 +164,24 @@ window.renderUserTable = () => {
             tableHtml += `
                 <tr style="opacity: ${isAktif ? '1' : '0.6'};">
                     <td style="text-align:center;">${chkBox}</td>
-                    <td><b>${id}</b></td><td>${nama}</td><td>${kec}</td><td><span class="badge-role ${badgeClass}">${role}</span></td>
+                    <td><b>${id}</b></td><td>${nama}</td>
+                    <td><b style="color:#0984e3;">${tim}</b></td>
+                    <td>${desa}</td>
+                    <td>${kec}</td>
+                    <td><span class="badge-role ${badgeClass}">${role}</span></td>
                     <td><code style="background:#eee; padding:3px 6px; border-radius:3px; color:#e94560; font-weight:bold;">${pin}</code></td>
                     <td>${statusUI}</td><td>${actionButtons}</td>
                 </tr>`;
         }
     });
 
-    if(count === 0) { tableHtml += `<tr><td colspan="8" style="text-align:center; padding:30px; color:#666;">Tidak ada pengguna yang cocok dengan filter.</td></tr>`; }
+    if(count === 0) { tableHtml += `<tr><td colspan="10" style="text-align:center; padding:30px; color:#666;">Tidak ada pengguna yang cocok dengan filter.</td></tr>`; }
     tableHtml += `</tbody></table>`;
     document.getElementById('table-wrapper').innerHTML = tableHtml;
     
-    // Fitur Checkbox "Pilih Semua"
     const chkAll = document.getElementById('chk-all-users');
-    if (chkAll) {
-        chkAll.addEventListener('change', (e) => {
-            const boxes = document.querySelectorAll('.chk-user');
-            boxes.forEach(b => b.checked = e.target.checked);
-        });
-    }
-
-    const lblCount = document.getElementById('lbl-count');
-    if(lblCount) lblCount.innerText = `${count} Pengguna`;
+    if (chkAll) { chkAll.addEventListener('change', (e) => { const boxes = document.querySelectorAll('.chk-user'); boxes.forEach(b => b.checked = e.target.checked); }); }
+    const lblCount = document.getElementById('lbl-count'); if(lblCount) lblCount.innerText = `${count} Pengguna`;
 };
 
 window.renderSuperView = async (target) => {
@@ -197,7 +196,7 @@ window.renderSuperView = async (target) => {
             
             <div class="super-card" style="padding:0; overflow:hidden;">
                 <div style="background:#f8f9fa; padding:15px; border-bottom:1px solid #eee; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
-                    <input type="text" id="flt-search" class="filter-input" placeholder="🔍 Cari ID/Nama..." style="flex:1; min-width:200px;">
+                    <input type="text" id="flt-search" class="filter-input" placeholder="🔍 Cari ID/Nama/Desa/Tim..." style="flex:1; min-width:200px;">
                     <select id="flt-role" class="filter-input"><option value="ALL">📋 Semua Role</option><option value="KADER">KADER</option><option value="ADMIN">ADMIN</option></select>
                     <select id="flt-kec" class="filter-input" id="flt-kec-container"><option value="ALL">🌍 Semua Wilayah</option></select>
                     <div style="font-size:0.85rem; font-weight:bold; color:#666; background:#fff; padding:8px 12px; border:1px solid #ddd; border-radius:6px;" id="lbl-count">0 Pengguna</div>
@@ -212,15 +211,37 @@ window.renderSuperView = async (target) => {
                     </div>
                 </div>
 
-                <div id="table-wrapper" class="super-table-container"><div style="padding:50px; text-align:center; color:#666;"><h3 style="margin:0;">⏳ Menghubungi Server...</h3></div></div>
+                <div id="table-wrapper" class="super-table-container"><div style="padding:50px; text-align:center; color:#666;"><h3 style="margin:0;">⏳ Menghubungi Server & Mapping Data...</h3></div></div>
             </div>
         `;
 
         try {
+            // 🔥 Ambil Data Master dari IndexedDB untuk di-Mapping dengan USER_LOGIN
+            const [kaderData, timData] = await Promise.all([ getAllData('master_kader').catch(()=>[]), getAllData('master_tim').catch(()=>[]) ]);
+            
             const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_ALL', token: SUPER_TOKEN, sheetName: 'USER_LOGIN' }) });
             const res = await response.json();
             if (res.status === 'success') {
-                window.superUsersData = res.data;
+                
+                // Proses Mapping Nomor Tim dan Desa ke dalam Data User
+                window.superUsersData = res.data.map(u => {
+                    let nTim = '-'; let nDesa = String(u.scope_desa || u.desa || u.wilayah_desa || '-').toUpperCase();
+                    const role = String(u.role_akses || u.role || 'KADER').toUpperCase();
+                    const refId = u.ref_id || u.id_pengguna || u.id_user || u.username;
+
+                    if (role.includes('KADER')) {
+                        const k = kaderData.find(kd => kd.id_kader === refId || kd.nik === refId);
+                        if (k) {
+                            const idTim = k.id_tim || k.tim;
+                            const t = timData.find(td => td.id_tim === idTim || td.id === idTim);
+                            if (t) nTim = String(t.nomor_tim || t.nama_tim || idTim);
+                            if (nDesa === '-' || nDesa === 'ALL') nDesa = String(k.desa || t.desa || nDesa).toUpperCase();
+                        }
+                    }
+                    u._nomor_tim = nTim; u._desa = nDesa;
+                    return u;
+                });
+
                 const kecSet = new Set(); window.superUsersData.forEach(u => { const k = String(u.scope_kecamatan || u.kecamatan || u.wilayah || '').toUpperCase().trim(); if(k && k !== 'ALL' && k !== 'SEMUA' && k !== '-') kecSet.add(k); });
                 const selectKec = document.getElementById('flt-kec'); Array.from(kecSet).sort().forEach(k => { const opt = document.createElement('option'); opt.value = k; opt.innerText = k; selectKec.appendChild(opt); });
                 
