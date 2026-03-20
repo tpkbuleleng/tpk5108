@@ -1,5 +1,5 @@
 // ==========================================
-// 👑 GOD MODE: SUPER ADMIN DASHBOARD (V4 - Bulk Actions)
+// 👑 GOD MODE: SUPER ADMIN DASHBOARD (V5 - Checkbox Selection)
 // ==========================================
 import { getAllData, clearStore } from './db.js';
 
@@ -7,7 +7,6 @@ const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzEmmn0wMJmC1OHij9JU
 const SUPER_TOKEN = 'MasterKeyKubuSecure!001';
 
 window.superUsersData = [];
-window.currentFilteredIds = []; // 👈 Variabel penampung ID yang sedang difilter
 
 window.superResetPin = async (idUser, namaUser) => {
     const newPin = prompt(`🔐 Reset PIN untuk Pengguna:\nID: ${idUser}\nNama: ${namaUser}\n\nMasukkan PIN Baru (Min 5 karakter):`);
@@ -29,40 +28,45 @@ window.superToggleStatus = async (idUser, namaUser, currentStatus) => {
     } catch (e) { alert("❌ Kesalahan Jaringan."); }
 };
 
-// 🔥 FUNGSI SAKTI 3: AKSI MASSAL (BULK UPDATE)
+// 🔥 FUNGSI SAKTI 3: AKSI MASSAL BERDASARKAN CHECKBOX
 window.superBulkAction = async (actionType) => {
-    const totalTarget = window.currentFilteredIds.length;
-    if (totalTarget === 0) { alert("Pilih filter terlebih dahulu. Tidak ada data di tabel untuk dieksekusi."); return; }
+    // 1. Ambil semua ID dari Checkbox yang sedang dicentang
+    const checkedBoxes = document.querySelectorAll('.chk-user:checked');
+    const targetIds = Array.from(checkedBoxes).map(cb => cb.value);
+    const totalTarget = targetIds.length;
+
+    if (totalTarget === 0) { 
+        alert("Pilih minimal 1 pengguna dengan mencentang kotak di sebelah kiri tabel!"); 
+        return; 
+    }
 
     let confirmMsg = ""; let updateType = ""; let newValue = "";
 
     if (actionType === 'BLOKIR') {
-        confirmMsg = `⚠️ BAHAYA: Anda akan MEMBLOKIR MASSAL ${totalTarget} akun yang sedang tampil di layar ini.\n\nKetik kata "YAKIN" (huruf besar) untuk mengeksekusi:`;
+        confirmMsg = `⚠️ BAHAYA: Anda akan MEMBLOKIR ${totalTarget} akun yang DICENTANG.\n\nKetik kata "YAKIN" (huruf besar) untuk mengeksekusi:`;
         updateType = 'STATUS'; newValue = 'NONAKTIF';
     } else if (actionType === 'AKTIFKAN') {
-        confirmMsg = `Anda akan MENGAKTIFKAN KEMBALI ${totalTarget} akun.\n\nKetik kata "YAKIN" untuk mengeksekusi:`;
+        confirmMsg = `Anda akan MENGAKTIFKAN KEMBALI ${totalTarget} akun yang DICENTANG.\n\nKetik kata "YAKIN" untuk mengeksekusi:`;
         updateType = 'STATUS'; newValue = 'AKTIF';
     } else if (actionType === 'RESETPIN') {
-        const pinMasal = prompt(`Masukkan PIN BARU untuk ${totalTarget} akun ini (Semua akan memiliki PIN yang sama):`);
+        const pinMasal = prompt(`Masukkan PIN BARU untuk ${totalTarget} akun yang DICENTANG (Semua akan memiliki PIN yang sama):`);
         if (!pinMasal || pinMasal.length < 5) { alert("PIN batal / terlalu pendek!"); return; }
         confirmMsg = `⚠️ BAHAYA: Anda akan MERESET PIN ${totalTarget} akun menjadi "${pinMasal}".\n\nKetik kata "YAKIN" (huruf besar) untuk mengeksekusi:`;
         updateType = 'PIN'; newValue = pinMasal;
     }
 
     const konfirmasi = prompt(confirmMsg);
-    if (konfirmasi !== "YAKIN") { alert("❌ Aksi Massal Dibatalkan. Keamanan sistem diutamakan."); return; }
+    if (konfirmasi !== "YAKIN") { alert("❌ Aksi Massal Dibatalkan."); return; }
 
     document.getElementById('table-wrapper').innerHTML = `<div style="padding:50px; text-align:center; color:#e94560;"><h3>🚀 MENGEKSEKUSI AKSI MASSAL...</h3><p>Memproses ${totalTarget} data di Google Server. Mohon tunggu...</p></div>`;
 
     try {
         const response = await fetch(SCRIPT_URL, { 
             method: 'POST', 
-            body: JSON.stringify({ 
-                action: 'SECURE_BULK_UPDATE_USER', token: SUPER_TOKEN, ids: window.currentFilteredIds, updateType: updateType, newValue: newValue 
-            }) 
+            body: JSON.stringify({ action: 'SECURE_BULK_UPDATE_USER', token: SUPER_TOKEN, ids: targetIds, updateType: updateType, newValue: newValue }) 
         });
         const res = await response.json();
-        if (res.status === 'success') { alert(`✅ SUKSES! ${res.count} Akun berhasil diperbarui dalam 1 detik!`); window.renderSuperView('user_management'); } 
+        if (res.status === 'success') { alert(`✅ SUKSES! ${res.count} Akun berhasil diperbarui!`); window.renderSuperView('user_management'); } 
         else { alert("❌ Gagal: " + res.message); window.renderSuperView('user_management'); }
     } catch (e) { alert("❌ Kesalahan Jaringan."); window.renderSuperView('user_management'); }
 };
@@ -101,6 +105,10 @@ export const initSuperAdmin = async (session) => {
             .badge-role { padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; } .role-kader { background: #e8f4fd; color: #0984e3; } .role-admin { background: #fdf3e8; color: #d35400; } .role-super { background: #fbebf0; color: #e94560; }
             .btn-action { padding: 6px 12px; border: none; border-radius: 4px; font-size: 0.8rem; font-weight: bold; cursor: pointer; margin-right: 5px; transition: opacity 0.2s;} .btn-action:hover { opacity: 0.8; } .btn-edit { background: #fdcb6e; color: #2d3436; } .filter-input { padding:8px 12px; border:1px solid #ccc; border-radius:6px; outline:none; font-family:inherit; } .filter-input:focus { border-color:#0984e3; box-shadow: 0 0 0 2px rgba(9, 132, 227, 0.2); }
             .btn-mass { padding: 8px 15px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; color: white; display: flex; align-items: center; gap: 5px; font-size:0.85rem;}
+            /* Style khusus Checkbox */
+            .chk-user { cursor:pointer; transform:scale(1.3); accent-color: #0984e3; }
+            #chk-all-users { cursor:pointer; transform:scale(1.3); accent-color: #e94560; }
+            
             @media (max-width: 1024px) { #super-sidebar { position: absolute; top:0; bottom:0; left:0; transform: translateX(-100%); } #super-sidebar.mobile-active { transform: translateX(0); } #super-sidebar-overlay.mobile-active { display: block !important; } } @media (min-width: 1025px) { #super-sidebar.desktop-collapsed { margin-left: -280px; } }
         </style>
     `;
@@ -117,11 +125,14 @@ export const initSuperAdmin = async (session) => {
 
 window.renderUserTable = () => {
     const searchVal = document.getElementById('flt-search').value.toLowerCase(); const roleVal = document.getElementById('flt-role').value; const kecVal = document.getElementById('flt-kec').value;
-    let tableHtml = `<table class="super-table"><thead><tr><th>ID / Username</th><th>Nama Pengguna</th><th>Wilayah/Kecamatan</th><th>Role Akses</th><th>PIN / Password</th><th>Status Akun</th><th>Aksi Eksekutif</th></tr></thead><tbody>`;
+    
+    // 🔥 TAMBAH KOLOM CHECKBOX DI HEADER
+    let tableHtml = `<table class="super-table"><thead><tr>
+        <th style="text-align:center; width:40px;"><input type="checkbox" id="chk-all-users" title="Pilih Semua yang Tampil"></th>
+        <th>ID / Username</th><th>Nama Pengguna</th><th>Wilayah/Kecamatan</th><th>Role Akses</th><th>PIN / Password</th><th>Status Akun</th><th>Aksi Eksekutif</th>
+    </tr></thead><tbody>`;
 
     let count = 0;
-    window.currentFilteredIds = []; // 👈 Kosongkan id penampung setiap filter diketik
-
     window.superUsersData.forEach((u) => {
         const role = String(u.role_akses || u.role || 'KADER').toUpperCase(); const pin = u.password_awal_ref || u.password || u.pin || '***'; const id = u.id_pengguna || u.id_user || u.username || '-'; const nama = u.nama || u.username || '-'; const kec = String(u.scope_kecamatan || u.kecamatan || u.wilayah || 'ALL').toUpperCase(); const currentStatus = String(u.status_akun || 'AKTIF').toUpperCase();
 
@@ -131,29 +142,45 @@ window.renderUserTable = () => {
 
         if (matchSearch && matchRole && matchKec) {
             count++;
-            
-            // 🛡️ Masukkan ke daftar aksi massal JIKA BUKAN Super Admin
-            if (!role.includes('SUPER')) { window.currentFilteredIds.push(id); }
-
             let badgeClass = role.includes('ADMIN') ? 'role-admin' : (role.includes('SUPER') ? 'role-super' : 'role-kader');
             const isAktif = currentStatus === 'AKTIF';
             const statusUI = isAktif ? '<span style="color:#00b894; font-weight:bold;">🟢 Aktif</span>' : '<span style="color:#ff7675; font-weight:bold;">🔴 Diblokir</span>';
             const toggleText = isAktif ? 'Blokir' : 'Aktifkan';
             const toggleColor = isAktif ? '#ff7675' : '#00b894';
 
-            let actionButtons = '';
-            if (role.includes('SUPER')) { actionButtons = `<span style="font-size:0.8rem; color:#b2bec3; font-style:italic; font-weight:bold;">🛡️ Akses Dilindungi</span>`; } 
-            else { actionButtons = `<button class="btn-action btn-edit" onclick="window.superResetPin('${id}', '${nama}')">Reset PIN</button><button class="btn-action" style="background:${toggleColor}; color:white;" onclick="window.superToggleStatus('${id}', '${nama}', '${currentStatus}')">${toggleText}</button>`; }
+            // 🛡️ Sembunyikan Checkbox dan Tombol Aksi jika Role-nya SUPER
+            let chkBox = ''; let actionButtons = '';
+            if (role.includes('SUPER')) { 
+                chkBox = `🔒`; 
+                actionButtons = `<span style="font-size:0.8rem; color:#b2bec3; font-style:italic; font-weight:bold;">🛡️ Akses Dilindungi</span>`; 
+            } else { 
+                chkBox = `<input type="checkbox" class="chk-user" value="${id}">`; 
+                actionButtons = `<button class="btn-action btn-edit" onclick="window.superResetPin('${id}', '${nama}')">Reset PIN</button><button class="btn-action" style="background:${toggleColor}; color:white;" onclick="window.superToggleStatus('${id}', '${nama}', '${currentStatus}')">${toggleText}</button>`; 
+            }
 
-            tableHtml += `<tr style="opacity: ${isAktif ? '1' : '0.6'};"><td><b>${id}</b></td><td>${nama}</td><td>${kec}</td><td><span class="badge-role ${badgeClass}">${role}</span></td><td><code style="background:#eee; padding:3px 6px; border-radius:3px; color:#e94560; font-weight:bold;">${pin}</code></td><td>${statusUI}</td><td>${actionButtons}</td></tr>`;
+            tableHtml += `
+                <tr style="opacity: ${isAktif ? '1' : '0.6'};">
+                    <td style="text-align:center;">${chkBox}</td>
+                    <td><b>${id}</b></td><td>${nama}</td><td>${kec}</td><td><span class="badge-role ${badgeClass}">${role}</span></td>
+                    <td><code style="background:#eee; padding:3px 6px; border-radius:3px; color:#e94560; font-weight:bold;">${pin}</code></td>
+                    <td>${statusUI}</td><td>${actionButtons}</td>
+                </tr>`;
         }
     });
 
-    if(count === 0) { tableHtml += `<tr><td colspan="7" style="text-align:center; padding:30px; color:#666;">Tidak ada pengguna yang cocok dengan filter.</td></tr>`; }
+    if(count === 0) { tableHtml += `<tr><td colspan="8" style="text-align:center; padding:30px; color:#666;">Tidak ada pengguna yang cocok dengan filter.</td></tr>`; }
     tableHtml += `</tbody></table>`;
     document.getElementById('table-wrapper').innerHTML = tableHtml;
     
-    // Update tombol masal
+    // Fitur Checkbox "Pilih Semua"
+    const chkAll = document.getElementById('chk-all-users');
+    if (chkAll) {
+        chkAll.addEventListener('change', (e) => {
+            const boxes = document.querySelectorAll('.chk-user');
+            boxes.forEach(b => b.checked = e.target.checked);
+        });
+    }
+
     const lblCount = document.getElementById('lbl-count');
     if(lblCount) lblCount.innerText = `${count} Pengguna`;
 };
@@ -177,11 +204,11 @@ window.renderSuperView = async (target) => {
                 </div>
 
                 <div style="background:#fff3cd; padding:10px 15px; border-bottom:1px solid #ffeeba; display:flex; justify-content:space-between; align-items:center;">
-                    <span style="font-size:0.85rem; color:#856404; font-weight:bold;">⚠️ AKSI MASSAL (Berlaku untuk semua akun yang tampil di tabel bawah):</span>
+                    <span style="font-size:0.85rem; color:#856404; font-weight:bold;">⚠️ AKSI MASSAL (Centang kotak di tabel, lalu klik tombol):</span>
                     <div style="display:flex; gap:8px;">
-                        <button class="btn-mass" style="background:#e94560;" onclick="window.superBulkAction('BLOKIR')">🛑 Blokir Semua</button>
-                        <button class="btn-mass" style="background:#00b894;" onclick="window.superBulkAction('AKTIFKAN')">🟢 Aktifkan Semua</button>
-                        <button class="btn-mass" style="background:#fdcb6e; color:#333;" onclick="window.superBulkAction('RESETPIN')">🔑 Reset PIN Semua</button>
+                        <button class="btn-mass" style="background:#e94560;" onclick="window.superBulkAction('BLOKIR')">🛑 Blokir Terpilih</button>
+                        <button class="btn-mass" style="background:#00b894;" onclick="window.superBulkAction('AKTIFKAN')">🟢 Aktifkan Terpilih</button>
+                        <button class="btn-mass" style="background:#fdcb6e; color:#333;" onclick="window.superBulkAction('RESETPIN')">🔑 Reset PIN Terpilih</button>
                     </div>
                 </div>
 
