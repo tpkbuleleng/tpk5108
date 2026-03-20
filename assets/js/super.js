@@ -350,7 +350,7 @@ window.renderSuperView = async (target) => {
                 formKecSelect.addEventListener('change', () => { if(roleSelect.value === 'KADER') populateDesaDropdown(); });
                 formDesaSelect.addEventListener('change', populateTimDropdown);
 
-                // PROSES SIMPAN KE SERVER
+                // PROSES SIMPAN KE SERVER (PELURU SAPU JAGAT)
                 document.getElementById('btn-submit-add').onclick = async () => {
                     const id = document.getElementById('add-id').value.trim();
                     const nama = document.getElementById('add-nama').value.trim();
@@ -366,19 +366,29 @@ window.renderSuperView = async (target) => {
                         if(!formDesaSelect.value || !timSelect.value) { alert("⚠️ Mohon lengkapi pilihan Desa dan Tim penugasan kader!"); return; }
                         const selectedOpt = timSelect.options[timSelect.selectedIndex];
                         
+                        // Peluru untuk MASTER_KADER (Variasi Kolom)
                         payloadKader = {
-                            id_kader: id,  
-                            nama: nama,
-                            id_tim: timSelect.value,
-                            desa: selectedOpt.getAttribute('data-desa'),
-                            dusun: selectedOpt.getAttribute('data-dusun')
+                            id_kader: id, nik: id, id_pengguna: id,
+                            nama: nama, nama_kader: nama, nama_lengkap: nama,
+                            id_tim: timSelect.value, tim: timSelect.value,
+                            desa: selectedOpt.getAttribute('data-desa'), desa_kelurahan: selectedOpt.getAttribute('data-desa'),
+                            dusun: selectedOpt.getAttribute('data-dusun'), dusun_rw: selectedOpt.getAttribute('data-dusun')
                         };
                     }
 
                     const btnSubmit = document.getElementById('btn-submit-add');
                     btnSubmit.innerText = "Menyimpan..."; btnSubmit.disabled = true;
 
-                    const payloadData = { id_user: id, username: nama, role_akses: role, scope_kecamatan: kec, password: pin, status_akun: 'AKTIF' };
+                    // Peluru untuk USER_LOGIN (Variasi Kolom & Kunci Tali Pusar 'ref_id')
+                    const payloadData = { 
+                        id_user: id, id_pengguna: id, username: id,
+                        nama: nama, nama_lengkap: nama,
+                        role_akses: role, role: role,
+                        scope_kecamatan: kec, kecamatan: kec,
+                        password: pin, password_awal_ref: pin, pin: pin,
+                        status_akun: 'AKTIF', status: 'AKTIF',
+                        ref_id: id // 🔥 INI KUNCI PENGHUBUNGNYA!
+                    };
 
                     try {
                         const response = await fetch(SCRIPT_URL, {
