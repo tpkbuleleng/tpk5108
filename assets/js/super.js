@@ -206,7 +206,18 @@ window.renderSuperView = async (target) => {
                         </div>
                         <div style="flex:1;">
                             <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:5px;">Cakupan Wilayah</label>
-                            <input type="text" id="add-kec" class="filter-input" placeholder="Cth: GEROKGAK / ALL" style="width:100%; box-sizing:border-box;" required>
+                            <select id="add-kec" class="filter-input" style="width:100%; box-sizing:border-box;">
+                                <option value="GEROKGAK">GEROKGAK</option>
+                                <option value="SERIRIT">SERIRIT</option>
+                                <option value="BUSUNGBIU">BUSUNGBIU</option>
+                                <option value="BANJAR">BANJAR</option>
+                                <option value="BULELENG">BULELENG</option>
+                                <option value="SUKASADA">SUKASADA</option>
+                                <option value="SAWAN">SAWAN</option>
+                                <option value="KUBUTAMBAHAN">KUBUTAMBAHAN</option>
+                                <option value="TEJAKULA">TEJAKULA</option>
+                                <option value="ALL">ALL (Semua Wilayah)</option>
+                            </select>
                         </div>
                     </div>
                     <div style="margin-bottom:25px;">
@@ -252,6 +263,21 @@ window.renderSuperView = async (target) => {
                 clearBtn.addEventListener('click', () => { searchInput.value = ''; clearBtn.style.display = 'none'; searchInput.focus(); window.renderUserTable(); });
                 document.getElementById('flt-role').addEventListener('change', window.renderUserTable); document.getElementById('flt-kec').addEventListener('change', window.renderUserTable);
 
+                // 🔥 LOGIKA DROPDOWN CERDAS
+                const roleSelect = document.getElementById('add-role');
+                const kecSelect = document.getElementById('add-kec');
+                roleSelect.addEventListener('change', () => {
+                    if (roleSelect.value === 'ADMIN_KABUPATEN') {
+                        kecSelect.value = 'ALL';
+                        kecSelect.style.backgroundColor = '#e9ecef'; // Beri warna abu-abu
+                        kecSelect.style.pointerEvents = 'none'; // Kunci dropdown
+                    } else {
+                        kecSelect.style.backgroundColor = 'white';
+                        kecSelect.style.pointerEvents = 'auto'; // Buka kunci
+                        if(kecSelect.value === 'ALL') kecSelect.value = 'GEROKGAK'; // Reset default
+                    }
+                });
+                
                 // 🔥 EVENT LISTENER MODAL TAMBAH USER
                 document.getElementById('btn-show-add').onclick = () => document.getElementById('modal-add-user').style.display = 'flex';
                 document.getElementById('btn-close-add').onclick = () => document.getElementById('modal-add-user').style.display = 'none';
