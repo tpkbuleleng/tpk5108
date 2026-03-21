@@ -1,5 +1,5 @@
 // ==========================================
-// 👑 GOD MODE: SUPER ADMIN DASHBOARD (V18 - NO-CODE VISUAL BUILDER)
+// 👑 GOD MODE: SUPER ADMIN DASHBOARD (V18.1 - NO-CODE VISUAL BUILDER PATCH)
 // ==========================================
 import { getAllData, clearStore } from './db.js';
 
@@ -25,18 +25,12 @@ window.superEditMenu = (id) => {
     
     document.getElementById('m-icon').value = menu.icon || ''; document.getElementById('m-label').value = menu.label_menu || '';
     
-    // Dropdown Pintar Target View
-    const targetSel = document.getElementById('m-target-sel');
-    const targetCus = document.getElementById('m-target-custom');
+    const targetSel = document.getElementById('m-target-sel'); const targetCus = document.getElementById('m-target-custom');
     const opts = Array.from(targetSel.options).map(o => o.value);
-    if (opts.includes(menu.target_view)) {
-        targetSel.value = menu.target_view; targetCus.style.display = 'none'; targetCus.value = '';
-    } else {
-        targetSel.value = 'CUSTOM'; targetCus.style.display = 'block'; targetCus.value = menu.target_view || '';
-    }
+    if (opts.includes(menu.target_view)) { targetSel.value = menu.target_view; targetCus.style.display = 'none'; targetCus.value = ''; } else { targetSel.value = 'CUSTOM'; targetCus.style.display = 'block'; targetCus.value = menu.target_view || ''; }
 
     document.getElementById('m-urut').value = menu.urutan || '';
-    const parentSelect = document.getElementById('m-parent'); parentSelect.innerHTML = '<option value="">-- Tidak Ada (Menu Utama) --</option>';
+    const parentSelect = document.getElementById('m-parent'); parentSelect.innerHTML = '<option value="">-- Bukan Sub-Menu --</option>';
     window.superMenuData.forEach(m => { if ((!m.parent_id || m.parent_id === '') && m.id_menu !== id) { parentSelect.innerHTML += `<option value="${m.id_menu}">${m.icon || ''} ${m.label_menu}</option>`; } });
     if(menu.parent_id) parentSelect.value = menu.parent_id;
 
@@ -46,22 +40,23 @@ window.superEditMenu = (id) => {
 
 window.superEditWidget = (id) => {
     const widget = window.superWidgetData.find(w => w.id_widget === id); if(!widget) return; window.currentEditWidgetId = id;
-    document.getElementById('modal-w-title').innerHTML = "✏️ Edit Widget Injector"; document.getElementById('btn-submit-w').innerText = "Update Widget";
+    document.getElementById('modal-w-title').innerHTML = "✏️ Edit Komponen Halaman"; document.getElementById('btn-submit-w').innerText = "Update Komponen";
     
     // Refresh Target Halaman Dropdown
-    const tHalaman = document.getElementById('w-target-sel'); tHalaman.innerHTML = '<option value="">-- Pilih Halaman --</option>';
-    const uniqueTargets = [...new Set(window.superMenuData.map(m => m.target_view).filter(Boolean))];
+    const tHalaman = document.getElementById('w-target-sel'); tHalaman.innerHTML = '<option value="">-- Pilih Halaman / Menu --</option>';
+    const defaultTargets = ['dashboard', 'registrasi', 'daftar_sasaran', 'pendampingan', 'rekap_bulanan', 'cetak_pdf', 'bantuan', 'setting'];
+    const dynamicTargets = window.superMenuData.map(m => m.target_view).filter(Boolean);
+    const uniqueTargets = [...new Set([...defaultTargets, ...dynamicTargets])];
     uniqueTargets.forEach(t => tHalaman.innerHTML += `<option value="${t}">${t}</option>`);
     
     tHalaman.value = widget.target_halaman || '';
     document.getElementById('w-posisi').value = widget.posisi || 'atas';
     
-    // Smart Editor Mode (Paksa ke mode HTML jika diedit agar layout tidak rusak)
+    // Smart Editor Mode
     document.getElementById('w-tipe').value = 'html';
+    document.querySelectorAll('.widget-panel').forEach(p => p.style.display = 'none');
     document.getElementById('panel-html').style.display = 'block';
-    document.getElementById('panel-tombol').style.display = 'none';
-    document.getElementById('panel-teks').style.display = 'none';
-    document.getElementById('panel-banner').style.display = 'none';
+    
     document.getElementById('w-konten-html').value = widget.isi_konten || '';
     
     document.getElementById('modal-add-w').style.display = 'flex';
@@ -202,12 +197,12 @@ window.renderSuperView = async (target) => {
     const content = document.getElementById('super-content');
     if (target === 'dashboard') { content.innerHTML = `<div class="super-card"><h3>Dashboard sedang disiapkan...</h3><p>Silakan buka menu lain.</p></div>`; } 
     
-    // --- 🧩 PABRIK HALAMAN & WIDGET (V18 - VISUAL BUILDER) ---
+    // --- 🧩 PABRIK HALAMAN & WIDGET (V18.1 - VISUAL BUILDER PATCH) ---
     else if (target === 'widget_management') {
         content.innerHTML = `
             <div class="super-card" style="margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px;">
                 <div><h3 style="margin:0; color:#1a1a2e;">Pabrik Halaman & Widget</h3><p style="margin:5px 0 0 0; color:#666; font-size:0.9rem;">Rakut halaman dari nol, sisipkan tombol cetak, banner, atau teks pengumuman ke halaman manapun.</p></div>
-                <button id="btn-show-add-w" style="background:#e94560; color:white; border:none; padding:10px 20px; border-radius:6px; font-weight:bold; cursor:pointer; box-shadow: 0 4px 6px rgba(233, 69, 96, 0.3);">+ Tambah Widget Baru</button>
+                <button id="btn-show-add-w" style="background:#e94560; color:white; border:none; padding:10px 20px; border-radius:6px; font-weight:bold; cursor:pointer; box-shadow: 0 4px 6px rgba(233, 69, 96, 0.3);">+ Tambah Komponen Baru</button>
             </div>
             <div class="super-card" style="padding:0; overflow:hidden;">
                 <div style="background:#f8f9fa; padding:15px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
@@ -219,7 +214,7 @@ window.renderSuperView = async (target) => {
 
             <div id="modal-add-w" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.7); z-index:1000; align-items:center; justify-content:center;">
                 <div style="background:white; padding:30px; border-radius:10px; width:90%; max-width:650px; max-height:90vh; overflow-y:auto; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
-                    <h3 id="modal-w-title" style="margin-top:0; color:#1a1a2e; border-bottom:2px solid #eee; padding-bottom:10px;">➕ Buat Widget / Komponen Halaman</h3>
+                    <h3 id="modal-w-title" style="margin-top:0; color:#1a1a2e; border-bottom:2px solid #eee; padding-bottom:10px;">➕ Buat Komponen Halaman</h3>
                     
                     <div style="display:flex; gap:10px; margin-bottom:15px; background:#f8f9fa; padding:15px; border-radius:8px; border:1px solid #ddd;">
                         <div style="flex:2;">
@@ -284,10 +279,16 @@ window.renderSuperView = async (target) => {
         `;
 
         try {
-            const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_ALL', token: SUPER_TOKEN, sheetName: 'MASTER_WIDGET' }) });
-            const res = await response.json();
-            if (res.status === 'success') {
-                window.superWidgetData = res.data;
+            // 🔥 SEDOT WIDGET DAN MENU SEKALIGUS (FIX V18.1)
+            const [resW, resM] = await Promise.all([
+                fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_ALL', token: SUPER_TOKEN, sheetName: 'MASTER_WIDGET' }) }).then(r => r.json()),
+                fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_ALL', token: SUPER_TOKEN, sheetName: 'MASTER_MENU' }) }).then(r => r.json())
+            ]);
+            
+            if (resW.status === 'success') {
+                window.superWidgetData = resW.data;
+                if(resM.status === 'success') window.superMenuData = resM.data; // Simpan data menu untuk dropdown
+
                 window.renderWidgetTable();
                 
                 const modalW = document.getElementById('modal-add-w'); 
@@ -295,13 +296,16 @@ window.renderSuperView = async (target) => {
                 const wTipe = document.getElementById('w-tipe');
                 const panels = document.querySelectorAll('.widget-panel');
                 
-                // Populate Target Halaman from Menu Data
+                // Populate Target Halaman from Menu Data + Default
                 const populateTarget = () => {
                     tHalaman.innerHTML = '<option value="">-- Pilih Halaman / Menu --</option>';
-                    const uniqueTargets = [...new Set(window.superMenuData.map(m => m.target_view).filter(Boolean))];
+                    const defaultTargets = ['dashboard', 'registrasi', 'daftar_sasaran', 'pendampingan', 'rekap_bulanan', 'cetak_pdf', 'bantuan', 'setting'];
+                    const dynamicTargets = window.superMenuData.map(m => m.target_view).filter(Boolean);
+                    const uniqueTargets = [...new Set([...defaultTargets, ...dynamicTargets])];
+                    
                     uniqueTargets.forEach(t => tHalaman.innerHTML += `<option value="${t}">${t}</option>`);
                 };
-                if(window.superMenuData.length > 0) populateTarget();
+                populateTarget(); // Langsung panggil karena data sudah pasti siap
 
                 wTipe.onchange = () => {
                     panels.forEach(p => p.style.display = 'none');
@@ -313,7 +317,7 @@ window.renderSuperView = async (target) => {
                 
                 document.getElementById('btn-show-add-w').onclick = () => { 
                     window.currentEditWidgetId = null; 
-                    if(window.superMenuData.length > 0) populateTarget();
+                    populateTarget(); // Refresh target saat klik tambah
                     document.getElementById('modal-w-title').innerText = "➕ Buat Komponen Halaman";
                     document.getElementById('btn-submit-w').innerText = "Generate & Simpan";
                     tHalaman.value = ''; document.getElementById('w-posisi').value = 'atas';
@@ -399,7 +403,7 @@ window.renderSuperView = async (target) => {
         } catch (error) { document.getElementById('table-wrapper-w').innerHTML = `<div style="padding:50px; text-align:center; color:#e94560;"><h3>❌ Gagal Terhubung</h3></div>`; }
     }
 
-    // --- 🎚️ MENU MANAJEMEN MENU (V18 - SMART DROPDOWN & EMOJI PICKER) ---
+    // --- 🎚️ MENU MANAJEMEN MENU (V18.1 - SMART DROPDOWN) ---
     else if (target === 'menu_management') {
         content.innerHTML = `
             <div class="super-card" style="margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px;">
@@ -567,6 +571,7 @@ window.renderSuperView = async (target) => {
     }
 
     // --- 📋 MENU MASTER KUESIONER (SAMA SEPERTI SEBELUMNYA) ---
+    // ... [Sisa kode kuesioner dan user_management di bawahnya tetap sama persis dan tidak saya kurangi] ...
     else if (target === 'kuesioner') {
         content.innerHTML = `
             <div class="super-card" style="margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px;">
