@@ -60,23 +60,41 @@ window.superEditWidget = (id) => {
 };
 
 // ==========================================
-// 2. FUNGSI RENDER TABEL
+// 2. FUNGSI RENDER TABEL (DIPERBARUI UNTUK MENAMPILKAN LAST LOGIN)
 // ==========================================
 window.renderUserTable = () => {
     const searchVal = document.getElementById('flt-search').value.toLowerCase(); const roleVal = document.getElementById('flt-role').value; const kecVal = document.getElementById('flt-kec').value;
-    let tableHtml = `<table class="super-table"><thead><tr><th style="text-align:center; width:40px;"><input type="checkbox" id="chk-all-users" title="Pilih Semua yang Tampil"></th><th>ID / Username</th><th>Nama Pengguna</th><th>No. Tim</th><th>Desa/Kelurahan</th><th>Wilayah/Kecamatan</th><th>Role Akses</th><th>PIN / Password</th><th>Status Akun</th><th>Aksi Eksekutif</th></tr></thead><tbody>`;
+    
+    // 🔥 Tambahkan Header "Aktivitas Terakhir"
+    let tableHtml = `<table class="super-table"><thead><tr><th style="text-align:center; width:40px;"><input type="checkbox" id="chk-all-users" title="Pilih Semua yang Tampil"></th><th>ID / Username</th><th>Nama Pengguna</th><th>No. Tim</th><th>Desa/Kelurahan</th><th>Wilayah/Kecamatan</th><th>Role Akses</th><th>PIN / Password</th><th>Aktivitas Terakhir</th><th>Status & Aksi</th></tr></thead><tbody>`;
+    
     let count = 0; window.currentFilteredIds = [];
     window.superUsersData.forEach((u) => {
         const role = String(u.role_akses || u.role || 'KADER').toUpperCase(); const pin = u.password_awal_ref || u.password || u.pin || '***'; const id = u.id_pengguna || u.id_user || u.username || '-'; const nama = u.nama || u.username || '-'; const kec = String(u.scope_kecamatan || u.kecamatan || u.wilayah || 'ALL').toUpperCase(); const currentStatus = String(u.status_akun || 'AKTIF').toUpperCase(); const tim = u._nomor_tim || '-'; const desa = u._desa || '-';
+        
+        // 🔥 Tangkap data login_terakhir dan jumlah_gagal
+        const lastLoginRaw = u.login_terakhir || u.last_login;
+        let lastLoginText = '<span style="color:#aaa; font-style:italic;">Belum pernah login</span>';
+        if (lastLoginRaw && String(lastLoginRaw).trim() !== '') {
+            const dateObj = new Date(lastLoginRaw);
+            if (!isNaN(dateObj.getTime())) {
+                lastLoginText = `<span style="color:#0984e3; font-weight:bold;">${dateObj.toLocaleDateString('id-ID', {day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'})}</span>`;
+            }
+        }
+        const failCount = parseInt(u.jumlah_gagal_login) || 0;
+        const failText = failCount > 0 ? `<br><span style="color:#e94560; font-size:0.75rem; font-weight:bold;">⚠️ ${failCount}x Gagal Login</span>` : '';
+
         const matchSearch = id.toLowerCase().includes(searchVal) || nama.toLowerCase().includes(searchVal) || tim.toLowerCase().includes(searchVal) || desa.toLowerCase().includes(searchVal);
         const matchRole = roleVal === 'ALL' || role.includes(roleVal); const matchKec = kecVal === 'ALL' || kec === kecVal || kec === 'ALL';
+        
         if (matchSearch && matchRole && matchKec) {
             count++; if (!role.includes('SUPER')) { window.currentFilteredIds.push(id); }
             let badgeClass = role.includes('ADMIN') ? 'role-admin' : (role.includes('SUPER') ? 'role-super' : 'role-kader');
-            const isAktif = currentStatus === 'AKTIF'; const statusUI = isAktif ? '<span style="color:#00b894; font-weight:bold;">🟢 Aktif</span>' : '<span style="color:#ff7675; font-weight:bold;">🔴 Diblokir</span>'; const toggleText = isAktif ? 'Blokir' : 'Aktifkan'; const toggleColor = isAktif ? '#ff7675' : '#00b894';
+            const isAktif = currentStatus === 'AKTIF'; const statusUI = isAktif ? '<span style="color:#00b894; font-weight:bold; display:block; margin-bottom:5px;">🟢 Aktif</span>' : '<span style="color:#ff7675; font-weight:bold; display:block; margin-bottom:5px;">🔴 Diblokir</span>'; const toggleText = isAktif ? 'Blokir' : 'Aktifkan'; const toggleColor = isAktif ? '#ff7675' : '#00b894';
             let chkBox = ''; let actionButtons = '';
-            if (role.includes('SUPER')) { chkBox = `🔒`; actionButtons = `<span style="font-size:0.8rem; color:#b2bec3; font-style:italic; font-weight:bold;">🛡️ Akses Dilindungi</span>`; } else { chkBox = `<input type="checkbox" class="chk-user" value="${id}">`; actionButtons = `<button class="btn-action btn-edit" onclick="window.superResetPin('${id}', '${nama}')">Reset PIN</button><button class="btn-action" style="background:${toggleColor}; color:white;" onclick="window.superToggleStatus('${id}', '${nama}', '${currentStatus}')">${toggleText}</button>`; }
-            tableHtml += `<tr style="opacity: ${isAktif ? '1' : '0.6'};"><td style="text-align:center;">${chkBox}</td><td><b>${id}</b></td><td>${nama}</td><td><b style="color:#0984e3;">${tim}</b></td><td>${desa}</td><td>${kec}</td><td><span class="badge-role ${badgeClass}">${role}</span></td><td><code style="background:#eee; padding:3px 6px; border-radius:3px; color:#e94560; font-weight:bold;">${pin}</code></td><td>${statusUI}</td><td>${actionButtons}</td></tr>`;
+            if (role.includes('SUPER')) { chkBox = `🔒`; actionButtons = `<span style="font-size:0.8rem; color:#b2bec3; font-style:italic; font-weight:bold;">🛡️ Akses Dilindungi</span>`; } else { chkBox = `<input type="checkbox" class="chk-user" value="${id}">`; actionButtons = `<button class="btn-action btn-edit" style="width:100%; margin-bottom:3px;" onclick="window.superResetPin('${id}', '${nama}')">Reset PIN</button><button class="btn-action" style="background:${toggleColor}; color:white; width:100%;" onclick="window.superToggleStatus('${id}', '${nama}', '${currentStatus}')">${toggleText}</button>`; }
+            
+            tableHtml += `<tr style="opacity: ${isAktif ? '1' : '0.6'};"><td style="text-align:center;">${chkBox}</td><td><b>${id}</b></td><td>${nama}</td><td><b style="color:#0984e3;">${tim}</b></td><td>${desa}</td><td>${kec}</td><td><span class="badge-role ${badgeClass}">${role}</span></td><td><code style="background:#eee; padding:3px 6px; border-radius:3px; color:#e94560; font-weight:bold;">${pin}</code></td><td>${lastLoginText}${failText}</td><td>${statusUI}${actionButtons}</td></tr>`;
         }
     });
     if(count === 0) { tableHtml += `<tr><td colspan="10" style="text-align:center; padding:30px; color:#666;">Tidak ada pengguna yang cocok dengan filter.</td></tr>`; }
