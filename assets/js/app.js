@@ -22,6 +22,31 @@ const applySettings = () => {
 applySettings();
 
 // ==========================================
+// 0.5. 🛰️ FUNGSI PELACAK SATELIT (GEOTAGGING)
+// ==========================================
+const dapatkanLokasiGPS = async () => {
+    return new Promise((resolve) => {
+        if (!navigator.geolocation) {
+            resolve("Browser tidak mendukung GPS");
+            return;
+        }
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                resolve(`${position.coords.latitude}, ${position.coords.longitude}`);
+            },
+            (error) => {
+                let msg = "Gagal (Tidak Diketahui)";
+                if (error.code === 1) msg = "Ditolak Pengguna";
+                else if (error.code === 2) msg = "Sinyal GPS Hilang";
+                else if (error.code === 3) msg = "Timeout Pencarian Satelit";
+                resolve(msg);
+            },
+            { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 } // Maksimal cari sinyal 8 detik
+        );
+    });
+};
+
+// ==========================================
 // 1. NAVIGASI LAYAR & JARINGAN
 // ==========================================
 const tampilkanLayar = (id) => {
@@ -480,7 +505,13 @@ const initFormRegistrasi = async () => {
     const formReg = getEl('form-registrasi');
     if (formReg) {
         formReg.onsubmit = async (e) => {
-            e.preventDefault(); const btn = e.target.querySelector('button'); btn.disabled = true; btn.innerText = "Menyimpan...";
+            e.preventDefault(); const btn = e.target.querySelector('button'); btn.disabled = true; 
+            
+            // 🔥 V23: CEK SATELIT SEBELUM MENYIMPAN!
+            btn.innerText = "📍 Mencari Titik Koordinat...";
+            const gpsLocation = await dapatkanLokasiGPS();
+            btn.innerText = "⏳ Membungkus Data...";
+
             try {
                 const formData = new FormData(e.target); const jawaban = {}; formData.forEach((val, key) => { jawaban[key] = val; });
                 const kecamatan = session.kecamatan || 'BULELENG'; const jenisSasaran = selJenis.value;
@@ -495,7 +526,9 @@ const initFormRegistrasi = async () => {
                     jawaban.usia_saat_daftar_tahun = umurTahun; jawaban.usia_saat_daftar_bulan = umurBulan;
                 }
                 const createdDate = window.editModeData ? window.editModeData.created_at : new Date().toISOString();
-                const laporan = { id: idSasaran, tipe_laporan: 'REGISTRASI', username: session.username, id_tim: session.id_tim, nomor_tim: session.nomor_tim, kecamatan: kecamatan, jenis_sasaran: jenisSasaran, nama_sasaran: jawaban.nama_sasaran, desa: desaFinal, dusun: dusunFinal, data_laporan: jawaban, status_sasaran: 'AKTIF', is_synced: false, created_at: createdDate };
+                
+                // Masukkan lokasi_gps ke payload
+                const laporan = { id: idSasaran, tipe_laporan: 'REGISTRASI', username: session.username, id_tim: session.id_tim, nomor_tim: session.nomor_tim, kecamatan: kecamatan, jenis_sasaran: jenisSasaran, nama_sasaran: jawaban.nama_sasaran, desa: desaFinal, dusun: dusunFinal, data_laporan: jawaban, status_sasaran: 'AKTIF', is_synced: false, created_at: createdDate, lokasi_gps: gpsLocation };
 
                 await putData('sync_queue', laporan); window.editModeData = null; alert(window.editModeData ? `✅ Data berhasil diperbarui!` : `✅ Registrasi berhasil! ID: ${idSasaran}`); renderKonten('daftar_sasaran');
             } catch (err) { alert("Gagal menyimpan form."); } finally { btn.disabled = false; btn.innerText = "💾 Simpan Sasaran"; }
@@ -765,6 +798,12 @@ const initFormPendampingan = async () => {
     if (formPend) {
         formPend.onsubmit = async (e) => {
             e.preventDefault(); const btn = e.target.querySelector('button'); btn.disabled = true;
+            
+            // 🔥 V23: CEK SATELIT SEBELUM MENYIMPAN!
+            btn.innerText = "📍 Mencari Titik Koordinat...";
+            const gpsLocation = await dapatkanLokasiGPS();
+            btn.innerText = "⏳ Membungkus Data...";
+
             try {
                 const formData = new FormData(e.target); const jawaban = {}; formData.forEach((val, key) => jawaban[key] = val);
                 if(jawaban.is_melahirkan === 'YA' && jawaban.tgl_persalinan && !window.editModeLaporan) {
@@ -779,7 +818,9 @@ const initFormPendampingan = async () => {
                 let idLapor = window.editModeLaporan ? window.editModeLaporan.id : `PEND-${Date.now()}`;
                 let createdDate = window.editModeLaporan ? window.editModeLaporan.created_at : new Date().toISOString();
                 if(window.editModeLaporan) { jawaban.id_sasaran = selSasaran.value; }
-                await putData('sync_queue', { id: idLapor, tipe_laporan: 'PENDAMPINGAN', username: session.username, id_tim: session.id_tim, id_sasaran_ref: jawaban.id_sasaran || selSasaran.value, jenis_sasaran_saat_kunjungan: selJenis.value, data_laporan: jawaban, is_synced: false, created_at: createdDate });
+                
+                // Masukkan lokasi_gps ke payload
+                await putData('sync_queue', { id: idLapor, tipe_laporan: 'PENDAMPINGAN', username: session.username, id_tim: session.id_tim, id_sasaran_ref: jawaban.id_sasaran || selSasaran.value, jenis_sasaran_saat_kunjungan: selJenis.value, data_laporan: jawaban, is_synced: false, created_at: createdDate, lokasi_gps: gpsLocation });
 
                 window.editModeLaporan = null; alert("✅ Laporan Pendampingan Tersimpan!"); renderKonten('daftar_sasaran');
             } catch (err) { alert("Gagal menyimpan."); } finally { btn.disabled = false; }
@@ -844,7 +885,7 @@ const initSetting = () => {
 };
 
 // ==========================================
-// 10. LOGIN PINTAR VIA SERVER (V22)
+// 10. LOGIN PINTAR VIA SERVER
 // ==========================================
 const SCRIPT_URL_LOGIN = 'https://script.google.com/macros/s/AKfycbzEmmn0wMJmC1OHij9JUxm8EIT2xW1AuV0597EYCWDIxG_nkpZYBPx1EGiNYe6OjEHniw/exec';
 
@@ -865,18 +906,13 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 if (!navigator.onLine) { alert("❌ Anda harus terhubung ke Internet untuk melakukan Login Otentikasi!"); if (btn) { btn.disabled = false; btn.innerText = "Masuk"; } return; }
 
-                // 🔥 V22: Sembunyikan GPS, tangkap KTP Perangkat (Browser/HP)
                 const infoPerangkat = navigator.userAgent;
-                const infoLokasi = "Lokasi Disembunyikan"; // Untuk menjaga kecepatan login dan privasi
+                const infoLokasi = "Lokasi Disembunyikan"; 
 
                 const response = await fetch(SCRIPT_URL_LOGIN, { 
                     method: 'POST', 
                     body: JSON.stringify({ 
-                        action: 'LOGIN', 
-                        id: id, 
-                        pin: pin,
-                        perangkat: infoPerangkat,
-                        lokasi: infoLokasi
+                        action: 'LOGIN', id: id, pin: pin, perangkat: infoPerangkat, lokasi: infoLokasi
                     }) 
                 });
                 
