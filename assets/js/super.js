@@ -1,5 +1,5 @@
 // ==========================================
-// 👑 GOD MODE: SUPER ADMIN DASHBOARD (V25 - ANALYTICAL DASHBOARD)
+// 👑 GOD MODE: SUPER ADMIN DASHBOARD (V26 - AUDIT DRILL-DOWN & FILTERS)
 // ==========================================
 import { getAllData, clearStore } from './db.js';
 
@@ -8,7 +8,8 @@ const SUPER_TOKEN = 'MasterKeyKubuSecure!001';
 
 window.superUsersData = []; window.superTimData = []; window.currentFilteredIds = [];
 window.superKuesionerData = []; window.superMenuData = []; window.superWidgetData = [];
-window.superAuditData = []; window.currentUser = null;
+window.superAuditData = []; window.dashAnalyticData = { users: [], logs: [] };
+window.currentUser = null;
 
 // ==========================================
 // 1. FUNGSI AKSI SUPER ADMIN (GLOBAL)
@@ -52,7 +53,7 @@ window.superEditWidget = (id) => {
 };
 
 // ==========================================
-// 2. FUNGSI RENDER TABEL USER
+// 2. FUNGSI RENDER TABEL (USER & AUDIT)
 // ==========================================
 window.renderUserTable = () => {
     const searchVal = document.getElementById('flt-search').value.toLowerCase(); const roleVal = document.getElementById('flt-role').value; const kecVal = document.getElementById('flt-kec').value;
@@ -68,14 +69,12 @@ window.renderUserTable = () => {
 
         const matchSearch = id.toLowerCase().includes(searchVal) || nama.toLowerCase().includes(searchVal) || tim.toLowerCase().includes(searchVal) || desa.toLowerCase().includes(searchVal);
         const matchRole = roleVal === 'ALL' || role.includes(roleVal); const matchKec = kecVal === 'ALL' || kec === kecVal || kec === 'ALL';
-        
         if (matchSearch && matchRole && matchKec) {
             count++; if (!role.includes('SUPER')) { window.currentFilteredIds.push(id); }
             let badgeClass = role.includes('ADMIN') ? 'role-admin' : (role.includes('SUPER') ? 'role-super' : 'role-kader');
             const isAktif = currentStatus === 'AKTIF'; const statusUI = isAktif ? '<span style="color:#00b894; font-weight:bold; display:block; margin-bottom:5px;">🟢 Aktif</span>' : '<span style="color:#ff7675; font-weight:bold; display:block; margin-bottom:5px;">🔴 Diblokir</span>'; const toggleText = isAktif ? 'Blokir' : 'Aktifkan'; const toggleColor = isAktif ? '#ff7675' : '#00b894';
             let chkBox = ''; let actionButtons = '';
             if (role.includes('SUPER')) { chkBox = `🔒`; actionButtons = `<span style="font-size:0.8rem; color:#b2bec3; font-style:italic; font-weight:bold;">🛡️ Akses Dilindungi</span>`; } else { chkBox = `<input type="checkbox" class="chk-user" value="${id}">`; actionButtons = `<button class="btn-action btn-edit" style="width:100%; margin-bottom:3px;" onclick="window.superResetPin('${id}', '${nama}')">Reset PIN</button><button class="btn-action" style="background:${toggleColor}; color:white; width:100%;" onclick="window.superToggleStatus('${id}', '${nama}', '${currentStatus}')">${toggleText}</button>`; }
-            
             tableHtml += `<tr style="opacity: ${isAktif ? '1' : '0.6'};"><td style="text-align:center;">${chkBox}</td><td><b>${id}</b></td><td>${nama}</td><td><b style="color:#0984e3;">${tim}</b></td><td>${desa}</td><td>${kec}</td><td><span class="badge-role ${badgeClass}">${role}</span></td><td><code style="background:#eee; padding:3px 6px; border-radius:3px; color:#e94560; font-weight:bold;">${pin}</code></td><td>${lastLoginText}${failText}</td><td>${statusUI}${actionButtons}</td></tr>`;
         }
     });
@@ -83,6 +82,124 @@ window.renderUserTable = () => {
     tableHtml += `</tbody></table>`; document.getElementById('table-wrapper').innerHTML = tableHtml;
     const chkAll = document.getElementById('chk-all-users'); if (chkAll) { chkAll.addEventListener('change', (e) => { const boxes = document.querySelectorAll('.chk-user'); boxes.forEach(b => b.checked = e.target.checked); }); }
     const lblCount = document.getElementById('lbl-count'); if(lblCount) lblCount.innerText = `${count} Pengguna`;
+};
+
+window.renderKuesionerTable = () => {
+    const filterKat = document.getElementById('flt-kategori-q').value.toUpperCase();
+    let tableHtml = `<table class="super-table"><thead><tr><th width="12%">ID Form</th><th width="15%">Posisi (Modul -> Sasaran)</th><th width="15%">Grup & Urutan</th><th width="30%">Teks Pertanyaan</th><th width="10%">Tipe Jawaban</th><th width="8%">Sifat</th><th width="10%">Aksi</th></tr></thead><tbody>`;
+    let count = 0;
+    window.superKuesionerData.forEach(q => {
+        const id = q.id_pertanyaan || q.id || '-'; const modul = String(q.modul || '-').toUpperCase(); const kat = String(q.jenis_sasaran || q.kategori_sasaran || q.kategori || '-').toUpperCase(); const grup = q.grup_pertanyaan || '-'; const urutG = q.urutan_grup || '-'; const teks = q.label_pertanyaan || q.teks_pertanyaan || q.pertanyaan || '-'; const tipe = String(q.tipe_input || q.tipe_jawaban || q.tipe || '-').toUpperCase();
+        const opsi = q.opsi_json || q.pilihan_jawaban ? `<div style="font-size:0.75rem; color:#888; margin-top:5px; background:#f1f2f6; padding:4px; border-radius:4px;">Opsi: ${q.opsi_json || q.pilihan_jawaban}</div>` : '';
+        const wajib = String(q.is_required || q.wajib || 'Y').toUpperCase() === 'Y' || String(q.is_required || q.wajib || 'Y').toUpperCase() === 'YA' ? '<span style="color:#d63031; font-weight:bold;">Wajib *</span>' : '<span style="color:#636e72;">Opsional</span>';
+        const status = String(q.is_active || q.status || q.status_pertanyaan || 'Y').toUpperCase();
+        const kondisiLabel = q.kondisi_tampil ? `<div style="font-size:0.75rem; color:#d35400; margin-top:5px; padding:4px; background:#fdf3e8; border-radius:4px; border:1px dashed #fadbd8;">👁️ Muncul Jika: <b>${q.kondisi_tampil}</b></div>` : '';
+        if (filterKat === 'ALL' || kat === filterKat) { count++; const isAktif = status === 'AKTIF' || status === 'Y'; const bgRow = isAktif ? 'transparent' : '#fdfaf6'; const textStatus = isAktif ? '🟢 Aktif' : '🔴 Mati'; const btnColor = isAktif ? '#ff7675' : '#00b894'; const btnText = isAktif ? 'Matikan' : 'Hidupkan';
+            tableHtml += `<tr style="background:${bgRow}; opacity: ${isAktif ? '1' : '0.6'};"><td><code>${id}</code></td><td><span class="badge-role role-kader" style="display:block; margin-bottom:3px; text-align:center;">${modul}</span><span class="badge-role role-admin" style="display:block; text-align:center;">${kat}</span></td><td><span style="font-size:0.7rem; color:#666; font-weight:bold;">Urutan Tampil: ${urutG}</span><br><b>${grup}</b></td><td><b>${teks}</b>${opsi}${kondisiLabel}</td><td><code style="color:#0984e3;">${tipe}</code></td><td>${wajib}</td><td><div style="font-size:0.7rem; font-weight:bold; margin-bottom:5px;">${textStatus}</div><button class="btn-action" style="background:${btnColor}; color:white; width:100%;" onclick="window.superToggleQuestion('${id}', '${status}')">${btnText}</button></td></tr>`;
+        }
+    });
+    if(count === 0) tableHtml += `<tr><td colspan="7" style="text-align:center; padding:30px; color:#666;">Belum ada pertanyaan untuk kategori ini.</td></tr>`;
+    tableHtml += `</tbody></table>`; document.getElementById('table-wrapper-q').innerHTML = tableHtml; document.getElementById('lbl-count-q').innerText = `${count} Pertanyaan`;
+};
+
+window.renderMenuTable = () => {
+    let tableHtml = `<table class="super-table"><thead><tr><th width="10%">Urutan</th><th width="20%">Nama Menu</th><th width="15%">Aksi Aplikasi (ID)</th><th width="35%">Target Role (Bisa Melihat)</th><th width="10%">Status</th><th width="10%">Aksi</th></tr></thead><tbody>`;
+    let count = 0;
+    let sortedMenus = [...window.superMenuData].sort((a,b) => { if(a.parent_id === b.parent_id) return (parseInt(a.urutan)||0) - (parseInt(b.urutan)||0); return (a.parent_id || '').localeCompare(b.parent_id || ''); });
+    sortedMenus.forEach(m => {
+        if(!m.id_menu) return; count++; const id = m.id_menu; const isChild = m.parent_id && m.parent_id !== ''; const parentName = isChild ? (window.superMenuData.find(p => p.id_menu === m.parent_id)?.label_menu || 'Induk Unknown') : '';
+        const label = isChild ? `<span style="color:#aaa;">↳ (Anak dari ${parentName})</span><br>${m.icon || '📌'} ${m.label_menu}` : `<b style="font-size:1.05rem;">${m.icon || '📌'} ${m.label_menu}</b>`;
+        const target = m.target_view || '-'; const role = (m.role_akses || 'KADER').toUpperCase().replace(/,/g, ', '); const status = String(m.is_active || 'Y').toUpperCase();
+        const isAktif = status === 'Y'; const bgRow = isChild ? (isAktif ? '#f8fafd' : '#f1f2f6') : (isAktif ? 'transparent' : '#fdfaf6'); const textStatus = isAktif ? '🟢 Muncul' : '🔴 Sembunyi'; const btnColor = isAktif ? '#ff7675' : '#00b894'; const btnText = isAktif ? 'Sembunyikan' : 'Munculkan';
+        tableHtml += `<tr style="background:${bgRow}; opacity: ${isAktif ? '1' : '0.6'};"><td style="font-weight:bold; font-size:1.1rem; color:#0984e3; text-align:center;">${m.urutan || 0}</td><td style="color:#2c3e50;">${label}</td><td><code>${target}</code></td><td><div style="font-size:0.75rem; background:#eef2f5; padding:4px 8px; border-radius:4px; display:inline-block; border:1px solid #dcdde1;">${role}</div></td><td><b>${textStatus}</b></td><td style="display:flex; flex-direction:column; gap:5px;"><button class="btn-action btn-edit" style="width:100%;" onclick="window.superEditMenu('${id}')">✏️ Edit</button><button class="btn-action" style="background:${btnColor}; color:white; width:100%;" onclick="window.superToggleMenu('${id}', '${status}')">${btnText}</button></td></tr>`;
+    });
+    if(count === 0) tableHtml += `<tr><td colspan="6" style="text-align:center; padding:30px; color:#666;">Database Menu masih kosong.</td></tr>`; tableHtml += `</tbody></table>`; document.getElementById('table-wrapper-m').innerHTML = tableHtml; document.getElementById('lbl-count-m').innerText = `${count} Menu Aktif`;
+};
+
+window.renderWidgetTable = () => {
+    let tableHtml = `<table class="super-table"><thead><tr><th width="15%">Target Halaman</th><th width="10%">Posisi</th><th width="15%">Tipe Terbaca</th><th width="40%">Isi Konten (Preview)</th><th width="10%">Status</th><th width="10%">Aksi</th></tr></thead><tbody>`;
+    let count = 0;
+    window.superWidgetData.forEach(w => {
+        if(!w.id_widget) return; count++; const id = w.id_widget; const target = w.target_halaman || '-'; const posisi = w.posisi || '-'; const tipe = w.tipe || 'html';
+        const konten = (w.isi_konten || '').substring(0, 80) + '...'; const status = String(w.is_active || 'Y').toUpperCase();
+        const isAktif = status === 'Y'; const bgRow = isAktif ? 'transparent' : '#fdfaf6'; const textStatus = isAktif ? '🟢 Aktif' : '🔴 Mati'; const btnColor = isAktif ? '#ff7675' : '#00b894'; const btnText = isAktif ? 'Matikan' : 'Hidupkan';
+        tableHtml += `<tr style="background:${bgRow}; opacity: ${isAktif ? '1' : '0.6'};"><td><b><code style="color:#e94560;">${target}</code></b></td><td><span style="background:#e8f4fd; color:#0984e3; padding:3px 8px; border-radius:4px; font-size:0.8rem; font-weight:bold;">${posisi.toUpperCase()}</span></td><td>${tipe.toUpperCase()}</td><td><div style="font-size:0.8rem; background:#eee; padding:5px; border-radius:4px; font-family:monospace; color:#555; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${konten.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div></td><td><b>${textStatus}</b></td><td style="display:flex; flex-direction:column; gap:5px;"><button class="btn-action btn-edit" style="width:100%;" onclick="window.superEditWidget('${id}')">✏️ Edit</button><button class="btn-action" style="background:${btnColor}; color:white; width:100%;" onclick="window.superToggleWidget('${id}', '${status}')">${btnText}</button></td></tr>`;
+    });
+    if(count === 0) tableHtml += `<tr><td colspan="6" style="text-align:center; padding:30px; color:#666;">Database Widget Injeksi masih kosong.</td></tr>`; tableHtml += `</tbody></table>`; document.getElementById('table-wrapper-w').innerHTML = tableHtml; document.getElementById('lbl-count-w').innerText = `${count} Widget Aktif`;
+};
+
+// 🔥 V26: RENDER TABEL AUDIT LOG (DRILL-DOWN TERPERINCI)
+window.renderAuditTable = () => {
+    const fltWaktu = document.getElementById('log-flt-waktu').value;
+    const fltAksi = document.getElementById('log-flt-aksi').value;
+    const searchVal = document.getElementById('log-flt-search').value.toLowerCase();
+
+    // Hitung batas waktu filter
+    const now = new Date();
+    let limitDate = new Date('2000-01-01');
+    if (fltWaktu === 'TODAY') limitDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    else if (fltWaktu === '7D') limitDate = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
+    else if (fltWaktu === '30D') limitDate = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
+
+    let tableHtml = `<table class="super-table"><thead><tr><th width="15%">Waktu Sistem</th><th width="25%">Pengguna & Wilayah (Cross-Ref)</th><th width="15%">Aksi / Status</th><th width="45%">Detail Keterangan</th></tr></thead><tbody>`;
+    let count = 0;
+
+    const sortedLog = [...window.superAuditData].sort((a,b) => new Date(b.waktu) - new Date(a.waktu));
+
+    sortedLog.forEach(log => {
+        const dt = new Date(log.waktu);
+        if (isNaN(dt.getTime()) || dt < limitDate) return; // Lewati jika di luar filter waktu
+
+        const aksi = String(log.aksi).toUpperCase();
+        
+        // Filter Jenis Aksi
+        if (fltAksi !== 'ALL') {
+            if (fltAksi === 'LOGIN_SUKSES' && !aksi.includes('SUKSES')) return;
+            if (fltAksi === 'LOGIN_GAGAL' && !aksi.includes('GAGAL')) return;
+            if (fltAksi === 'ADMIN' && aksi.includes('LOGIN')) return;
+        }
+
+        // Tautkan dengan data User (Cross-Reference)
+        let userName = log.target || '-';
+        let userWilayah = '-';
+        const u = window.superUsersData.find(x => x.id_pengguna === log.target || x.username === log.target || x.id_user === log.target);
+        if (u) {
+            userName = `<b>${u.nama || u.username}</b><br><code style="font-size:0.75rem; background:#eee; padding:2px 4px; border-radius:3px; color:#555;">ID: ${log.target}</code>`;
+            userWilayah = `${u._desa || '-'}, ${u._kecamatan || '-'}`;
+        } else {
+            userName = `<b>ID Tidak Dikenal</b><br><code style="font-size:0.75rem; background:#eee; padding:2px 4px; border-radius:3px; color:#555;">${log.target}</code>`;
+        }
+
+        const detailStr = String(log.detail || '').toLowerCase();
+        const targetStr = String(log.target || '').toLowerCase();
+        // Fitur Pencarian
+        if (searchVal && !detailStr.includes(searchVal) && !targetStr.includes(searchVal) && !userName.toLowerCase().includes(searchVal) && !userWilayah.toLowerCase().includes(searchVal)) return;
+
+        count++;
+        let badgeColor = '#0984e3'; 
+        if(aksi.includes('TAMBAH') || aksi.includes('SUKSES')) badgeColor = '#198754';
+        else if(aksi.includes('STATUS') || aksi.includes('RESET')) badgeColor = '#fdcb6e';
+        else if(aksi.includes('HAPUS') || aksi.includes('BLOKIR') || aksi.includes('GAGAL')) badgeColor = '#e94560';
+
+        tableHtml += `
+            <tr>
+                <td style="color:#666; font-size:0.85rem;">${dt.toLocaleString('id-ID')}</td>
+                <td><div style="line-height:1.3;">${userName}</div><div style="font-size:0.75rem; color:#888; margin-top:5px; font-weight:bold;">📍 ${userWilayah}</div></td>
+                <td><span style="background:${badgeColor}; color:${badgeColor==='#fdcb6e'?'#333':'white'}; padding:3px 8px; border-radius:4px; font-size:0.7rem; font-weight:bold;">${aksi}</span></td>
+                <td style="color:#444; font-size:0.85rem; line-height:1.4;">${log.detail || '-'}</td>
+            </tr>
+        `;
+    });
+
+    if (count === 0) tableHtml += `<tr><td colspan="4" style="text-align:center; padding:30px; color:#666;">Tidak ada log yang cocok dengan pencarian/filter.</td></tr>`;
+    
+    tableHtml += `</tbody></table>`;
+    
+    const wrp = document.getElementById('table-wrapper-log');
+    if(wrp) wrp.innerHTML = tableHtml;
+    
+    const lbl = document.getElementById('lbl-count-log');
+    if(lbl) lbl.innerText = `${count} Log Ditemukan`;
 };
 
 // ==========================================
@@ -149,7 +266,7 @@ const EMOJI_LIST = ['📊','🏠','📝','🤝','🖨️','🆘','⚙️','🔁'
 window.renderSuperView = async (target) => {
     const content = document.getElementById('super-content');
     
-    // --- 🎛️ DASHBOARD UTAMA (V25 - ANALYTICAL FILTERS) ---
+    // --- 🎛️ DASHBOARD UTAMA ---
     if (target === 'dashboard') { 
         content.innerHTML = `
             <div class="animate-fade">
@@ -198,7 +315,7 @@ window.renderSuperView = async (target) => {
                     <div class="super-card">
                         <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee; padding-bottom:10px; margin-bottom:15px;">
                             <h3 style="margin:0; color:#1a1a2e;">🛡️ Log Keamanan Terakhir (CCTV)</h3>
-                            <button style="background:none; border:none; color:#0984e3; cursor:pointer; font-weight:bold; font-size:0.85rem;" onclick="document.querySelector('[data-target=audit_trail]').click()">Lihat Semua</button>
+                            <button style="background:none; border:none; color:#0984e3; cursor:pointer; font-weight:bold; font-size:0.85rem;" onclick="document.querySelector('[data-target=audit_trail]').click()">Lihat Detail & Filter</button>
                         </div>
                         <div id="dash-audit-list"><div style="text-align:center; color:#999; padding:20px;">Menarik data CCTV dari satelit... ⏳</div></div>
                     </div>
@@ -214,86 +331,39 @@ window.renderSuperView = async (target) => {
             </div>
         `;
 
-        // =====================================
-        // 🔥 V25: MESIN ANALITIK JAVASCRIPT
-        // =====================================
-        window.dashAnalyticData = { users: [], logs: [] };
-
         const renderAnalytics = () => {
             if (window.dashAnalyticData.users.length === 0) return;
+            const fltWaktu = document.getElementById('dash-flt-waktu').value; const fltRole = document.getElementById('dash-flt-role').value; const fltKec = document.getElementById('dash-flt-kec').value; const fltDesa = document.getElementById('dash-flt-desa').value;
+            const now = new Date(); let limitDate = new Date('2000-01-01');
+            if (fltWaktu === 'TODAY') limitDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            else if (fltWaktu === '7D') limitDate = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
+            else if (fltWaktu === '30D') limitDate = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
 
-            const fltWaktu = document.getElementById('dash-flt-waktu').value;
-            const fltRole = document.getElementById('dash-flt-role').value;
-            const fltKec = document.getElementById('dash-flt-kec').value;
-            const fltDesa = document.getElementById('dash-flt-desa').value;
-
-            // 1. Tentukan Batas Waktu
-            const now = new Date();
-            let limitDate = new Date('2000-01-01'); // ALL
-            if (fltWaktu === 'TODAY') { limitDate = new Date(now.getFullYear(), now.getMonth(), now.getDate()); }
-            else if (fltWaktu === '7D') { limitDate = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000)); }
-            else if (fltWaktu === '30D') { limitDate = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000)); }
-
-            // 2. Saring Data Pengguna
             let filteredUsers = window.dashAnalyticData.users.filter(u => {
-                const r = String(u.role_akses || u.role || '').toUpperCase();
-                const k = String(u._kecamatan || u.scope_kecamatan || u.kecamatan || '').toUpperCase();
-                const d = String(u._desa || u.scope_desa || u.desa_kelurahan || '').toUpperCase();
-                
-                let matchRole = fltRole === 'ALL' || r.includes(fltRole);
-                let matchKec = fltKec === 'ALL' || k === fltKec;
-                let matchDesa = fltDesa === 'ALL' || d === fltDesa;
+                const r = String(u.role_akses || u.role || '').toUpperCase(); const k = String(u._kecamatan || u.scope_kecamatan || u.kecamatan || '').toUpperCase(); const d = String(u._desa || u.scope_desa || u.desa_kelurahan || '').toUpperCase();
+                let matchRole = fltRole === 'ALL' || r.includes(fltRole); let matchKec = fltKec === 'ALL' || k === fltKec; let matchDesa = fltDesa === 'ALL' || d === fltDesa;
                 return matchRole && matchKec && matchDesa;
             });
 
-            // 3. Hitung Aktif / Pasif
             let cAktif = 0; let cPasif = 0;
-            filteredUsers.forEach(u => {
-                const tLogin = u.login_terakhir || u.last_login;
-                if (tLogin && String(tLogin).trim() !== '') {
-                    const dt = new Date(tLogin);
-                    if (!isNaN(dt.getTime()) && dt >= limitDate) cAktif++; else cPasif++;
-                } else { cPasif++; }
-            });
+            filteredUsers.forEach(u => { const tLogin = u.login_terakhir || u.last_login; if (tLogin && String(tLogin).trim() !== '') { const dt = new Date(tLogin); if (!isNaN(dt.getTime()) && dt >= limitDate) cAktif++; else cPasif++; } else { cPasif++; } });
 
-            // 4. Saring & Hitung Log CCTV (Sukses/Gagal)
             let cSukses = 0; let cGagal = 0;
-            // Buat Set ID User yang lolos filter Role & Wilayah agar pencarian log cepat
             const validUserIds = new Set(filteredUsers.map(u => String(u.id_user || u.id_pengguna || u.username)));
-            
             window.dashAnalyticData.logs.forEach(log => {
                 const act = String(log.aksi).toUpperCase();
-                // Hanya hitung jika log adalah proses LOGIN
-                if (act.includes('LOGIN')) {
-                    const dt = new Date(log.waktu);
-                    if (!isNaN(dt.getTime()) && dt >= limitDate) {
-                        if (validUserIds.has(String(log.target))) {
-                            if (act.includes('SUKSES')) cSukses++;
-                            else if (act.includes('GAGAL')) cGagal++;
-                        }
-                    }
-                }
+                if (act.includes('LOGIN')) { const dt = new Date(log.waktu); if (!isNaN(dt.getTime()) && dt >= limitDate) { if (validUserIds.has(String(log.target))) { if (act.includes('SUKSES')) cSukses++; else if (act.includes('GAGAL')) cGagal++; } } }
             });
 
-            // 5. Tampilkan ke Layar
-            document.getElementById('dash-count-user').innerText = filteredUsers.length;
-            document.getElementById('st-aktif').innerText = cAktif;
-            document.getElementById('st-pasif').innerText = cPasif;
-            document.getElementById('st-sukses').innerText = cSukses;
-            document.getElementById('st-gagal').innerText = cGagal;
+            document.getElementById('dash-count-user').innerText = filteredUsers.length; document.getElementById('st-aktif').innerText = cAktif; document.getElementById('st-pasif').innerText = cPasif; document.getElementById('st-sukses').innerText = cSukses; document.getElementById('st-gagal').innerText = cGagal;
         };
 
         const loadDashboardData = async () => {
-            // A. Tarik Data Aset Sistem
             const sheetsAset = [ { name: 'MASTER_PERTANYAAN', id: 'dash-count-q' }, { name: 'MASTER_MENU', id: 'dash-count-m' }, { name: 'MASTER_WIDGET', id: 'dash-count-w' } ];
-            sheetsAset.forEach(s => {
-                fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_ALL', token: SUPER_TOKEN, sheetName: s.name }) })
-                .then(r => r.json()).then(res => { if(res.status === 'success') { let el = document.getElementById(s.id); if(el) el.innerText = res.data.length; } }).catch(e => {});
-            });
+            sheetsAset.forEach(s => { fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_ALL', token: SUPER_TOKEN, sheetName: s.name }) }).then(r => r.json()).then(res => { if(res.status === 'success') { let el = document.getElementById(s.id); if(el) el.innerText = res.data.length; } }).catch(e => {}); });
 
-            // B. Tarik Data Analitik (Users & Audit)
             try {
-                const [resU, resT, resW, resA] = await Promise.all([
+                const [resU, resT, resK, resA] = await Promise.all([
                     fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_ALL', token: SUPER_TOKEN, sheetName: 'USER_LOGIN' }) }).then(r => r.json()),
                     fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_ALL', token: SUPER_TOKEN, sheetName: 'MASTER_TIM' }) }).then(r => r.json()),
                     fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_ALL', token: SUPER_TOKEN, sheetName: 'MASTER_KADER' }) }).then(r => r.json()),
@@ -301,120 +371,100 @@ window.renderSuperView = async (target) => {
                 ]);
 
                 if (resU.status === 'success') {
-                    const rawUsers = resU.data || []; const tims = resT.data || []; const kaders = resW.data || [];
-                    
-                    // Mapping Wilayah yang akurat (seperti di Manajemen Pengguna)
+                    const rawUsers = resU.data || []; const tims = resT.data || []; const kaders = resK.data || [];
                     window.dashAnalyticData.users = rawUsers.map(u => {
-                        let nKec = String(u.scope_kecamatan || u.kecamatan || 'ALL').toUpperCase();
-                        let nDesa = String(u.scope_desa || u.desa_kelurahan || u.desa || '-').toUpperCase();
-                        const role = String(u.role_akses || u.role || 'KADER').toUpperCase();
-                        const refId = u.ref_id || u.id_pengguna || u.id_user || u.username;
-                        
-                        if (role.includes('KADER')) { 
-                            const k = kaders.find(kd => String(kd.id_kader) === String(refId) || String(kd.nik) === String(refId)); 
-                            if (k) { 
-                                const idTim = k.id_tim || k.tim; const t = tims.find(td => String(td.id_tim) === String(idTim) || String(td.id) === String(idTim)); 
-                                if (t) { 
-                                    let d = t.desa_kelurahan || t.desa || k.desa_kelurahan || k.desa || nDesa; nDesa = String(d).toUpperCase(); 
-                                    let c = t.kecamatan || t.wilayah || k.kecamatan || nKec; nKec = String(c).toUpperCase(); 
-                                } 
-                            } 
-                        }
-                        if (nDesa === 'UNDEFINED' || nDesa === '') nDesa = '-';
-                        u._desa = nDesa; u._kecamatan = nKec;
-                        return u;
+                        let nKec = String(u.scope_kecamatan || u.kecamatan || 'ALL').toUpperCase(); let nDesa = String(u.scope_desa || u.desa_kelurahan || u.desa || '-').toUpperCase(); const role = String(u.role_akses || u.role || 'KADER').toUpperCase(); const refId = u.ref_id || u.id_pengguna || u.id_user || u.username;
+                        if (role.includes('KADER')) { const k = kaders.find(kd => String(kd.id_kader) === String(refId) || String(kd.nik) === String(refId)); if (k) { const idTim = k.id_tim || k.tim; const t = tims.find(td => String(td.id_tim) === String(idTim) || String(td.id) === String(idTim)); if (t) { let d = t.desa_kelurahan || t.desa || k.desa_kelurahan || k.desa || nDesa; nDesa = String(d).toUpperCase(); let c = t.kecamatan || t.wilayah || k.kecamatan || nKec; nKec = String(c).toUpperCase(); } } }
+                        if (nDesa === 'UNDEFINED' || nDesa === '') nDesa = '-'; u._desa = nDesa; u._kecamatan = nKec; return u;
                     });
 
-                    // Siapkan Dropdown Filter Kecamatan
-                    const kecSet = new Set(); 
-                    window.dashAnalyticData.users.forEach(u => { const k = u._kecamatan.trim(); if(k && k !== 'ALL' && k !== 'SEMUA' && k !== '-') kecSet.add(k); });
-                    const selKec = document.getElementById('dash-flt-kec');
-                    Array.from(kecSet).sort().forEach(k => { selKec.innerHTML += `<option value="${k}">${k}</option>`; });
+                    window.superUsersData = window.dashAnalyticData.users; // Simpan ke global untuk dipakai Menu Audit
 
-                    // Logika Dropdown Filter Desa bergantung pada Kecamatan
+                    const kecSet = new Set(); window.dashAnalyticData.users.forEach(u => { const k = u._kecamatan.trim(); if(k && k !== 'ALL' && k !== 'SEMUA' && k !== '-') kecSet.add(k); });
+                    const selKec = document.getElementById('dash-flt-kec'); Array.from(kecSet).sort().forEach(k => { selKec.innerHTML += `<option value="${k}">${k}</option>`; });
                     const selDesa = document.getElementById('dash-flt-desa');
                     selKec.onchange = () => {
-                        selDesa.innerHTML = '<option value="ALL">🏘️ Semua Desa</option>';
-                        const valKec = selKec.value;
-                        if (valKec !== 'ALL') {
-                            const dSet = new Set();
-                            window.dashAnalyticData.users.forEach(u => { if(u._kecamatan === valKec && u._desa !== '-') dSet.add(u._desa); });
-                            Array.from(dSet).sort().forEach(d => { selDesa.innerHTML += `<option value="${d}">${d}</option>`; });
-                        }
-                        renderAnalytics(); // Trigger update grafik
+                        selDesa.innerHTML = '<option value="ALL">🏘️ Semua Desa</option>'; const valKec = selKec.value;
+                        if (valKec !== 'ALL') { const dSet = new Set(); window.dashAnalyticData.users.forEach(u => { if(u._kecamatan === valKec && u._desa !== '-') dSet.add(u._desa); }); Array.from(dSet).sort().forEach(d => { selDesa.innerHTML += `<option value="${d}">${d}</option>`; }); }
+                        renderAnalytics(); 
                     };
 
-                    // Pasang trigger di dropdown lain
-                    document.getElementById('dash-flt-waktu').onchange = renderAnalytics;
-                    document.getElementById('dash-flt-role').onchange = renderAnalytics;
-                    selDesa.onchange = renderAnalytics;
+                    document.getElementById('dash-flt-waktu').onchange = renderAnalytics; document.getElementById('dash-flt-role').onchange = renderAnalytics; selDesa.onchange = renderAnalytics;
 
-                    // Masukkan data log
                     if(resA.status === 'success') {
                         window.dashAnalyticData.logs = resA.data || [];
-                        
-                        // Render CCTV List
                         const dashList = document.getElementById('dash-audit-list');
                         if(dashList) {
-                            if(window.dashAnalyticData.logs.length === 0) {
-                                dashList.innerHTML = `<div style="text-align:center; color:#999; padding:20px;">Belum ada rekaman aktivitas.</div>`;
-                            } else {
+                            if(window.dashAnalyticData.logs.length === 0) { dashList.innerHTML = `<div style="text-align:center; color:#999; padding:20px;">Belum ada rekaman aktivitas.</div>`; } else {
                                 const top5 = [...window.dashAnalyticData.logs].slice(0, 5);
                                 dashList.innerHTML = top5.map(log => {
-                                    const time = new Date(log.waktu).toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'});
-                                    const aksi = String(log.aksi).toUpperCase();
-                                    let badgeColor = '#0984e3'; 
-                                    if(aksi.includes('TAMBAH') || aksi.includes('SUKSES')) badgeColor = '#198754';
-                                    else if(aksi.includes('STATUS') || aksi.includes('RESET')) badgeColor = '#fdcb6e';
-                                    else if(aksi.includes('HAPUS') || aksi.includes('BLOKIR') || aksi.includes('GAGAL')) badgeColor = '#e94560';
-
+                                    const time = new Date(log.waktu).toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'}); const aksi = String(log.aksi).toUpperCase(); let badgeColor = '#0984e3'; if(aksi.includes('TAMBAH') || aksi.includes('SUKSES')) badgeColor = '#198754'; else if(aksi.includes('STATUS') || aksi.includes('RESET')) badgeColor = '#fdcb6e'; else if(aksi.includes('HAPUS') || aksi.includes('BLOKIR') || aksi.includes('GAGAL')) badgeColor = '#e94560';
                                     return `<div style="display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid #f1f1f1;"><div><b style="font-size:0.75rem; color:${badgeColor};">[${aksi}]</b> <span style="font-size:0.9rem; color:#333; margin-left:5px; font-weight:bold;">${log.target}</span><div style="font-size:0.75rem; color:#888; margin-top:2px;">${log.detail}</div></div><div style="font-size:0.8rem; color:#aaa; font-weight:bold;">${time}</div></div>`;
                                 }).join('');
                             }
                         }
                     }
-
-                    // Panggilan Pertama Render Grafik
                     renderAnalytics();
                 }
-            } catch (e) {
-                console.error("Dashboard Analytics Error:", e);
-            }
+            } catch (e) { console.error("Dashboard Analytics Error:", e); }
         };
         loadDashboardData();
     }
 
-    // --- 🛡️ MENU AUDIT LOG ---
+    // --- 🛡️ MENU AUDIT LOG (V26 DRILL-DOWN) ---
     else if (target === 'audit_trail') {
         content.innerHTML = `
-            <div class="super-card" style="margin-bottom:20px;">
-                <h3 style="margin:0; color:#1a1a2e;">🛡️ Audit Log & CCTV Keamanan</h3>
-                <p style="margin:5px 0 0 0; color:#666; font-size:0.9rem;">Merekam setiap aktivitas vital (Aksi Super Admin & Login Kader).</p>
+            <div class="super-card" style="margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px;">
+                <div><h3 style="margin:0; color:#1a1a2e;">🛡️ Audit Log & Rincian CCTV</h3><p style="margin:5px 0 0 0; color:#666; font-size:0.9rem;">Rincian aktivitas pengguna dan log keamanan sistem.</p></div>
             </div>
+            
             <div class="super-card" style="padding:0; overflow:hidden;">
-                <div style="background:#fdf3e8; padding:15px; border-bottom:1px solid #ffeeba; border-left:4px solid #fdcb6e;">
-                    <span style="font-size:0.85rem; color:#856404; font-weight:bold;">⚠️ CATATAN: Ini adalah gabungan log dari Database Master dan Database Log Eksternal.</span>
+                <div style="background:#f8f9fa; padding:15px; border-bottom:1px solid #eee; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+                    <div style="position: relative; flex: 1; min-width: 200px;"><input type="text" id="log-flt-search" class="filter-input" placeholder="🔍 Cari Nama / ID / Keterangan..." style="width: 100%; box-sizing: border-box;"></div>
+                    <select id="log-flt-waktu" class="filter-input"><option value="ALL">🗓️ Sepanjang Masa</option><option value="TODAY">⏳ Hari Ini</option><option value="7D">📅 7 Hari Terakhir</option><option value="30D">📆 30 Hari Terakhir</option></select>
+                    <select id="log-flt-aksi" class="filter-input"><option value="ALL">⚡ Semua Aktivitas</option><option value="LOGIN_SUKSES">✅ Login Berhasil</option><option value="LOGIN_GAGAL">❌ Login Gagal</option><option value="ADMIN">🛡️ Aksi Super Admin</option></select>
+                    <div style="font-size:0.85rem; font-weight:bold; color:#666; background:#fff; padding:8px 12px; border:1px solid #ddd; border-radius:6px;" id="lbl-count-log">0 Log</div>
                 </div>
-                <div id="table-wrapper-log" class="super-table-container"><div style="padding:50px; text-align:center; color:#666;"><h3>⏳ Mengunduh Arsip Keamanan...</h3></div></div>
+                <div id="table-wrapper-log" class="super-table-container"><div style="padding:50px; text-align:center; color:#666;"><h3>⏳ Menyedot Rekaman CCTV...</h3></div></div>
             </div>
         `;
 
         try {
-            const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_AUDIT', token: SUPER_TOKEN }) });
-            const res = await response.json();
-            if(res.status === 'success') {
-                window.superAuditData = res.data || [];
+            // Paralel Fetch agar tidak Timeout
+            const [resA, resU, resT, resK] = await Promise.all([
+                fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_AUDIT', token: SUPER_TOKEN }) }).then(r => r.json()),
+                fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_ALL', token: SUPER_TOKEN, sheetName: 'USER_LOGIN' }) }).then(r => r.json()),
+                fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_ALL', token: SUPER_TOKEN, sheetName: 'MASTER_TIM' }) }).then(r => r.json()),
+                fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_ALL', token: SUPER_TOKEN, sheetName: 'MASTER_KADER' }) }).then(r => r.json())
+            ]);
+
+            if(resA.status === 'success' && resU.status === 'success') {
+                window.superAuditData = resA.data || [];
+                
+                // Petakan Wilayah User untuk Referensi Log
+                const rawUsers = resU.data || []; const tims = resT.data || []; const kaders = resK.data || [];
+                window.superUsersData = rawUsers.map(u => {
+                    let nKec = String(u.scope_kecamatan || u.kecamatan || 'ALL').toUpperCase(); let nDesa = String(u.scope_desa || u.desa_kelurahan || u.desa || '-').toUpperCase(); const role = String(u.role_akses || u.role || 'KADER').toUpperCase(); const refId = u.ref_id || u.id_pengguna || u.id_user || u.username;
+                    if (role.includes('KADER')) { const k = kaders.find(kd => String(kd.id_kader) === String(refId) || String(kd.nik) === String(refId)); if (k) { const idTim = k.id_tim || k.tim; const t = tims.find(td => String(td.id_tim) === String(idTim) || String(td.id) === String(idTim)); if (t) { let d = t.desa_kelurahan || t.desa || k.desa_kelurahan || k.desa || nDesa; nDesa = String(d).toUpperCase(); let c = t.kecamatan || t.wilayah || k.kecamatan || nKec; nKec = String(c).toUpperCase(); } } }
+                    if (nDesa === 'UNDEFINED' || nDesa === '') nDesa = '-'; u._desa = nDesa; u._kecamatan = nKec; return u;
+                });
+
                 window.renderAuditTable();
+                document.getElementById('log-flt-waktu').addEventListener('change', window.renderAuditTable);
+                document.getElementById('log-flt-aksi').addEventListener('change', window.renderAuditTable);
+                document.getElementById('log-flt-search').addEventListener('input', window.renderAuditTable);
+
             } else {
-                document.getElementById('table-wrapper-log').innerHTML = `<div style="padding:50px; text-align:center; color:#e94560;"><h3>❌ Gagal Mengunduh Log</h3><p>${res.message}</p></div>`;
+                document.getElementById('table-wrapper-log').innerHTML = `<div style="padding:50px; text-align:center; color:#e94560;"><h3>❌ Gagal Mengunduh Log</h3><p>Server menolak koneksi. Coba Muat Ulang.</p></div>`;
             }
         } catch(e) {
-            document.getElementById('table-wrapper-log').innerHTML = `<div style="padding:50px; text-align:center; color:#e94560;"><h3>❌ Koneksi Terputus</h3></div>`;
+            document.getElementById('table-wrapper-log').innerHTML = `<div style="padding:50px; text-align:center; color:#e94560;"><h3>❌ Izin Akses Tertahan (Koneksi Terputus)</h3><p>Google meminta Otorisasi Izin Ulang untuk mengakses Database CCTV Bapak.<br><br><b>Solusi Cepat:</b> Buka Tab <code>Code.gs</code> di App Script, klik <b>Jalankan</b>, lalu klik <b>Tinjau Izin</b> (Review Permissions).</p></div>`;
         }
     }
     
     // --- 🧩 PABRIK HALAMAN & WIDGET ---
     else if (target === 'widget_management') {
+        // [KODE WIDGET SAMA DENGAN V25, DISINGKAT UNTUK EFISIENSI]
         content.innerHTML = `
             <div class="super-card" style="margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px;">
                 <div><h3 style="margin:0; color:#1a1a2e;">Pabrik Halaman & Widget</h3><p style="margin:5px 0 0 0; color:#666; font-size:0.9rem;">Rakut halaman dari nol, sisipkan tombol cetak, banner, atau teks pengumuman ke halaman manapun.</p></div>
@@ -617,6 +667,7 @@ window.renderSuperView = async (target) => {
 
     // --- 🎚️ MENU MANAJEMEN MENU ---
     else if (target === 'menu_management') {
+        // [KODE MANAJEMEN MENU TETAP SAMA]
         content.innerHTML = `
             <div class="super-card" style="margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px;">
                 <div><h3 style="margin:0; color:#1a1a2e;">Pabrik Menu (Hak Akses)</h3><p style="margin:5px 0 0 0; color:#666; font-size:0.9rem;">Buat, atur urutan, dan tentukan siapa yang boleh melihat menu ini.</p></div>
@@ -781,6 +832,7 @@ window.renderSuperView = async (target) => {
 
     // --- 📋 MENU MASTER KUESIONER ---
     else if (target === 'kuesioner') {
+        // [KODE KUESIONER TETAP SAMA]
         content.innerHTML = `
             <div class="super-card" style="margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px;">
                 <div><h3 style="margin:0; color:#1a1a2e;">Pabrik Kuesioner Dinamis</h3><p style="margin:5px 0 0 0; color:#666; font-size:0.9rem;">Ubah form di sini, dan form di HP seluruh kader akan berubah otomatis.</p></div>
@@ -866,6 +918,7 @@ window.renderSuperView = async (target) => {
 
     // --- 👥 MENU MANAJEMEN PENGGUNA ---
     else if (target === 'user_management') {
+        // [KODE MANAJEMEN PENGGUNA TETAP SAMA]
         content.innerHTML = `
             <div class="super-card" style="margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px;">
                 <div><h3 style="margin:0; color:#1a1a2e;">Database Pengguna Aktif</h3><p style="margin:5px 0 0 0; color:#666; font-size:0.9rem;">Menampilkan data langsung dari Google Sheet melalui Secure API.</p></div>
