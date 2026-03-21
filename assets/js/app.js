@@ -78,19 +78,37 @@ const masukKeAplikasi = async (session) => {
 };
 
 // ==========================================
-// 3. MENU & KONTEN (DASHBOARD KADER)
+// 3. MENU & KONTEN (PABRIK MENU DINAMIS V15)
 // ==========================================
-const renderMenu = (role) => {
+const renderMenu = async (role) => {
     const container = getEl('dynamic-menu-container'); if (!container) return;
-    const menus = [
-        { id: 'dashboard', icon: '🏠', label: 'Dashboard' }, { id: 'registrasi', icon: '📝', label: 'Registrasi Sasaran' },
-        { id: 'daftar_sasaran', icon: '📋', label: 'Data Sasaran & Riwayat' }, { id: 'pendampingan', icon: '🤝', label: 'Laporan Pendampingan' },
-        { id: 'rekap_bulanan', icon: '📊', label: 'Rekap Bulanan' }, { id: 'cetak_pdf', icon: '🖨️', label: 'Cetak PDF' },
-        { id: 'bantuan', icon: '🆘', label: 'Bantuan & Edukasi' }, { id: 'setting', icon: '⚙️', label: 'Pengaturan' },
-        { id: 'reload_app', icon: '🔁', label: 'Muat Ulang / Reset Layar' }
-    ];
+    
+    // 🔥 Sedot data menu dari memori HP
+    let allMenu = await getAllData('master_menu').catch(()=>[]);
+    
+    // Fallback darurat jika Kader belum menekan tombol sinkronisasi untuk pertama kali
+    if (allMenu.length === 0) {
+        allMenu = [
+            { id_menu: 'M1', label_menu: 'Dashboard', icon: '🏠', target_view: 'dashboard', role_akses: 'KADER', urutan: 1, is_active: 'Y' },
+            { id_menu: 'M2', label_menu: 'Registrasi Sasaran', icon: '📝', target_view: 'registrasi', role_akses: 'KADER', urutan: 2, is_active: 'Y' },
+            { id_menu: 'M3', label_menu: 'Data Sasaran & Riwayat', icon: '📋', target_view: 'daftar_sasaran', role_akses: 'KADER', urutan: 3, is_active: 'Y' },
+            { id_menu: 'M4', label_menu: 'Laporan Pendampingan', icon: '🤝', target_view: 'pendampingan', role_akses: 'KADER', urutan: 4, is_active: 'Y' },
+            { id_menu: 'M5', label_menu: 'Rekap Bulanan', icon: '📊', target_view: 'rekap_bulanan', role_akses: 'KADER', urutan: 5, is_active: 'Y' },
+            { id_menu: 'M6', label_menu: 'Cetak PDF', icon: '🖨️', target_view: 'cetak_pdf', role_akses: 'KADER', urutan: 6, is_active: 'Y' },
+            { id_menu: 'M7', label_menu: 'Bantuan & Edukasi', icon: '🆘', target_view: 'bantuan', role_akses: 'KADER', urutan: 7, is_active: 'Y' },
+            { id_menu: 'M8', label_menu: 'Pengaturan', icon: '⚙️', target_view: 'setting', role_akses: 'KADER', urutan: 8, is_active: 'Y' },
+            { id_menu: 'M9', label_menu: 'Muat Ulang / Reset Layar', icon: '🔁', target_view: 'reload_app', role_akses: 'KADER', urutan: 9, is_active: 'Y' }
+        ];
+    }
 
-    container.innerHTML = menus.map(m => `<a class="menu-item" data-target="${m.id}"><span class="icon">${m.icon}</span> ${m.label}</a>`).join('') + `<hr><a class="menu-item text-danger" id="btnLogout">🚪 Keluar (Hapus Sesi Lokal)</a>`;
+    // 🎯 Filter Menu berdasarkan Role & Status Aktif
+    const filteredMenu = allMenu.filter(m => {
+        const roles = String(m.role_akses || '').toUpperCase();
+        const isActive = String(m.is_active || 'Y').toUpperCase() === 'Y';
+        return isActive && roles.includes(String(role).toUpperCase());
+    }).sort((a,b) => (parseInt(a.urutan)||0) - (parseInt(b.urutan)||0));
+
+    container.innerHTML = filteredMenu.map(m => `<a class="menu-item" data-target="${m.target_view}"><span class="icon">${m.icon || '📌'}</span> ${m.label_menu}</a>`).join('') + `<hr><a class="menu-item text-danger" id="btnLogout">🚪 Keluar (Hapus Sesi Lokal)</a>`;
     container.style.overflowY = 'auto'; container.style.maxHeight = 'calc(100vh - 180px)'; container.style.paddingBottom = '20px';
 
     document.querySelectorAll('.menu-item[data-target]').forEach(item => {
@@ -227,7 +245,6 @@ const getKodeKecamatan = (kec) => {
 const renderPertanyaanDinamis = (jenis, modul, container, questions) => {
     if (!jenis) { container.innerHTML = ''; return; }
     
-    // 1. Ambil pertanyaan sesuai Modul & Jenis Sasaran
     const filteredQ = questions.filter(q => {
         let status = String(q.is_active || q.status || 'Y').toUpperCase();
         let sasaran = String(q.jenis_sasaran || '').toUpperCase();
@@ -238,23 +255,19 @@ const renderPertanyaanDinamis = (jenis, modul, container, questions) => {
     }).sort((a,b)=> (parseInt(a.urutan)||0) - (parseInt(b.urutan)||0));
 
     if (filteredQ.length > 0) {
-        // 2. Kelompokkan berdasarkan 'grup_pertanyaan'
         const grouped = {};
         filteredQ.forEach(q => {
             let grup = q.grup_pertanyaan || 'Informasi Tambahan';
             let urutG = parseInt(q.urutan_grup); 
             if (isNaN(urutG)) urutG = 999; 
 
-            if(!grouped[grup]) {
-                grouped[grup] = { urutan_grup: urutG, questions: [] };
-            }
+            if(!grouped[grup]) { grouped[grup] = { urutan_grup: urutG, questions: [] }; }
             grouped[grup].questions.push(q);
         });
 
         const groupArray = Object.keys(grouped).map(k => ({ nama_grup: k, ...grouped[k] }));
         groupArray.sort((a, b) => a.urutan_grup - b.urutan_grup);
 
-        // 3. Render HTML
         let html = ``;
         groupArray.forEach(g => {
             html += `<div style="background:#fff; border:1px solid #e1e8ed; padding:15px; border-radius:8px; margin-bottom:15px; box-shadow:0 1px 2px rgba(0,0,0,0.05);">`;
@@ -265,10 +278,9 @@ const renderPertanyaanDinamis = (jenis, modul, container, questions) => {
                 let isReq = String(q.is_required || q.wajib || 'Y').toUpperCase() === 'Y' || String(q.is_required || q.wajib || 'Y').toUpperCase() === 'YA';
                 let req = isReq ? 'required' : ''; 
                 let markerReq = req ? '<span style="color:red; font-weight:bold;">*</span>' : '';
-
                 let tInput = String(q.tipe_input || q.tipe_jawaban || 'text').toLowerCase();
-                
                 let inputHtml = '';
+                
                 if(tInput === 'select' || tInput === 'pilihan') {
                     let opsi = []; 
                     try { 
@@ -276,7 +288,6 @@ const renderPertanyaanDinamis = (jenis, modul, container, questions) => {
                         if(opsiRaw.startsWith('[')) { opsi = JSON.parse(opsiRaw); } 
                         else { opsi = opsiRaw.split(',').map(s=>s.trim()); }
                     } catch(e) {}
-                    
                     inputHtml = `<select name="${q.id_pertanyaan}" id="${q.id_pertanyaan}" class="form-control" ${req}><option value="">-- Pilih Jawaban --</option>${opsi.map(o => `<option value="${o}">${o}</option>`).join('')}</select>`;
                 } else if(tInput === 'date' || tInput === 'tanggal') {
                     inputHtml = `<input type="date" name="${q.id_pertanyaan}" id="${q.id_pertanyaan}" class="form-control" ${req}>`;
@@ -286,7 +297,7 @@ const renderPertanyaanDinamis = (jenis, modul, container, questions) => {
                     inputHtml = `<input type="${typeReal}" name="${q.id_pertanyaan}" id="${q.id_pertanyaan}" class="form-control" placeholder="${pHolder}" step="any" ${req}>`;
                 }
 
-                // 🔥 LOGIKA PERCABANGAN: Tambahkan Atribut Kondisi
+                // 🔥 LOGIKA PERCABANGAN: Atribut Kondisi
                 let kondisiTampil = q.kondisi_tampil ? q.kondisi_tampil.trim() : '';
                 let displayStyle = kondisiTampil ? 'display:none;' : 'display:block;';
                 
@@ -326,8 +337,8 @@ const renderPertanyaanDinamis = (jenis, modul, container, questions) => {
                         if (inputElement) {
                             inputElement.removeAttribute('required');
                             if(inputElement.value !== '') {
-                                inputElement.value = ''; // Kosongkan nilainya agar tak tersimpan!
-                                inputElement.dispatchEvent(new Event('change')); // Memicu domino efek jika ada anak di dalam anak
+                                inputElement.value = ''; 
+                                inputElement.dispatchEvent(new Event('change')); 
                             }
                         }
                     }
@@ -335,11 +346,8 @@ const renderPertanyaanDinamis = (jenis, modul, container, questions) => {
             });
         };
 
-        // Pasang kuping pendengar ke seluruh container
         container.addEventListener('change', evaluateConditions);
         container.addEventListener('input', evaluateConditions);
-
-        // Panggil evaluasi pertama kali saat layar dimuat (Penting untuk mode Edit!)
         setTimeout(evaluateConditions, 400);
 
     } else { container.innerHTML = ''; }
@@ -650,7 +658,7 @@ const initFormPendampingan = async () => {
             // PANGGIL MESIN PERAKIT FORM (Grup & Dinamis V14)
             renderPertanyaanDinamis(sasaran.jenis_sasaran, 'PENDAMPINGAN', containerQ, questions);
 
-            // LOGIKA SPESIFIK KALKULATOR BADUTA (Disuntikkan setelah form dirender)
+            // LOGIKA SPESIFIK KALKULATOR BADUTA
             setTimeout(() => {
                 if (sasaran.jenis_sasaran === 'BADUTA' && sasaran.data_laporan.tanggal_lahir) {
                     const tL = new Date(sasaran.data_laporan.tanggal_lahir); const tH = new Date();
