@@ -1,5 +1,5 @@
 // ==========================================
-// 👑 GOD MODE: SUPER ADMIN DASHBOARD (V16 - SMART EDIT MENU)
+// 👑 GOD MODE: SUPER ADMIN DASHBOARD (V17 - CMS WIDGET & SUB-MENU)
 // ==========================================
 import { getAllData, clearStore } from './db.js';
 
@@ -7,7 +7,7 @@ const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzEmmn0wMJmC1OHij9JU
 const SUPER_TOKEN = 'MasterKeyKubuSecure!001';
 
 window.superUsersData = []; window.superTimData = []; window.currentFilteredIds = [];
-window.superKuesionerData = []; window.superMenuData = [];
+window.superKuesionerData = []; window.superMenuData = []; window.superWidgetData = [];
 
 // ==========================================
 // 1. FUNGSI AKSI SUPER ADMIN (GLOBAL)
@@ -17,30 +17,34 @@ window.superToggleStatus = async (idUser, namaUser, currentStatus) => { const is
 window.superBulkAction = async (actionType) => { const checkedBoxes = document.querySelectorAll('.chk-user:checked'); const targetIds = Array.from(checkedBoxes).map(cb => cb.value); const totalTarget = targetIds.length; if (totalTarget === 0) { alert("Pilih minimal 1 pengguna!"); return; } let confirmMsg = ""; let updateType = ""; let newValue = ""; if (actionType === 'BLOKIR') { confirmMsg = `⚠️ MEMBLOKIR ${totalTarget} akun. Ketik "YAKIN":`; updateType = 'STATUS'; newValue = 'NONAKTIF'; } else if (actionType === 'AKTIFKAN') { confirmMsg = `MENGAKTIFKAN ${totalTarget} akun. Ketik "YAKIN":`; updateType = 'STATUS'; newValue = 'AKTIF'; } else if (actionType === 'RESETPIN') { const pinMasal = prompt(`PIN BARU untuk ${totalTarget} akun:`); if (!pinMasal || pinMasal.length < 5) return; confirmMsg = `⚠️ MERESET PIN ${totalTarget} akun menjadi "${pinMasal}". Ketik "YAKIN":`; updateType = 'PIN'; newValue = pinMasal; } if (prompt(confirmMsg) !== "YAKIN") return; document.getElementById('table-wrapper').innerHTML = `<div style="padding:50px; text-align:center;"><h3>🚀 MENGEKSEKUSI...</h3></div>`; try { const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_BULK_UPDATE_USER', token: SUPER_TOKEN, ids: targetIds, updateType: updateType, newValue: newValue }) }); const res = await response.json(); if (res.status === 'success') { alert(`✅ SUKSES! ${res.count} Akun diperbarui!`); } else { alert("❌ Gagal: " + res.message); } window.renderSuperView('user_management'); } catch (e) { alert("❌ Kesalahan."); window.renderSuperView('user_management'); } };
 window.superToggleQuestion = async (idPertanyaan, statusSaatIni) => { const isAktif = (statusSaatIni || 'AKTIF').toUpperCase() === 'AKTIF' || statusSaatIni === 'Y'; const newStatus = isAktif ? 'N' : 'Y'; const aksi = isAktif ? 'MEMATIKAN' : 'MENGHIDUPKAN'; if(!confirm(`⚠️ PERINGATAN!\nAnda akan ${aksi} pertanyaan ini dari HP Kader.\nLanjutkan?`)) return; try { document.getElementById('table-wrapper-q').innerHTML = `<div style="padding:30px; text-align:center;">⏳ Memproses...</div>`; const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_UPDATE_QUESTION', token: SUPER_TOKEN, id_pertanyaan: idPertanyaan, newStatus: newStatus }) }); const res = await response.json(); if (res.status === 'success') { alert(`✅ Pertanyaan berhasil diupdate!`); await clearStore('master_pertanyaan'); window.renderSuperView('kuesioner'); } else { alert("❌ Gagal: " + res.message); window.renderSuperView('kuesioner');} } catch(e) { alert("❌ Kesalahan Jaringan."); window.renderSuperView('kuesioner');} };
 window.superToggleMenu = async (idMenu, statusSaatIni) => { const isAktif = (statusSaatIni || 'Y').toUpperCase() === 'Y'; const newStatus = isAktif ? 'N' : 'Y'; const aksi = isAktif ? 'MENYEMBUNYIKAN' : 'MEMUNCULKAN'; if(!confirm(`⚠️ PERINGATAN!\nAnda akan ${aksi} menu ini dari Aplikasi.\nLanjutkan?`)) return; try { document.getElementById('table-wrapper-m').innerHTML = `<div style="padding:30px; text-align:center;">⏳ Memproses...</div>`; const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_UPDATE_MENU', token: SUPER_TOKEN, id_menu: idMenu, newStatus: newStatus }) }); const res = await response.json(); if (res.status === 'success') { alert(`✅ Status menu berhasil diubah!`); await clearStore('master_menu'); window.renderSuperView('menu_management'); } else { alert("❌ Gagal: " + res.message); window.renderSuperView('menu_management');} } catch(e) { alert("❌ Kesalahan Jaringan."); window.renderSuperView('menu_management');} };
+window.superToggleWidget = async (idWidget, statusSaatIni) => { const isAktif = (statusSaatIni || 'Y').toUpperCase() === 'Y'; const newStatus = isAktif ? 'N' : 'Y'; const aksi = isAktif ? 'MENYEMBUNYIKAN' : 'MEMUNCULKAN'; if(!confirm(`⚠️ PERINGATAN!\nAnda akan ${aksi} widget ini dari Aplikasi.\nLanjutkan?`)) return; try { document.getElementById('table-wrapper-w').innerHTML = `<div style="padding:30px; text-align:center;">⏳ Memproses...</div>`; const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_UPDATE_WIDGET', token: SUPER_TOKEN, id_widget: idWidget, newStatus: newStatus }) }); const res = await response.json(); if (res.status === 'success') { alert(`✅ Status widget berhasil diubah!`); await clearStore('master_widget'); window.renderSuperView('widget_management'); } else { alert("❌ Gagal: " + res.message); window.renderSuperView('widget_management');} } catch(e) { alert("❌ Kesalahan Jaringan."); window.renderSuperView('widget_management');} };
 
-// 🔥 FUNGSI BARU: BUKA MODAL EDIT MENU (V16)
 window.superEditMenu = (id) => {
-    const menu = window.superMenuData.find(m => m.id_menu === id);
-    if(!menu) return;
+    const menu = window.superMenuData.find(m => m.id_menu === id); if(!menu) return; window.currentEditMenuId = id;
+    document.getElementById('modal-m-title').innerHTML = "✏️ Edit Menu Navigasi"; document.getElementById('btn-submit-m').innerText = "Update Menu";
     
-    window.currentEditMenuId = id; // Simpan ID yang sedang diedit di memori
+    document.getElementById('m-icon').value = menu.icon || ''; document.getElementById('m-label').value = menu.label_menu || '';
+    document.getElementById('m-target').value = menu.target_view || ''; document.getElementById('m-urut').value = menu.urutan || '';
     
-    document.getElementById('modal-m-title').innerHTML = "✏️ Edit Menu Navigasi";
-    document.getElementById('btn-submit-m').innerText = "Update Menu";
-    
-    // Isi data ke dalam form
-    document.getElementById('m-icon').value = menu.icon || '';
-    document.getElementById('m-label').value = menu.label_menu || '';
-    document.getElementById('m-target').value = menu.target_view || '';
-    document.getElementById('m-urut').value = menu.urutan || '';
+    // Load Parent Options
+    const parentSelect = document.getElementById('m-parent'); parentSelect.innerHTML = '<option value="">-- Tidak Ada (Menu Utama) --</option>';
+    window.superMenuData.forEach(m => { if ((!m.parent_id || m.parent_id === '') && m.id_menu !== id) { parentSelect.innerHTML += `<option value="${m.id_menu}">${m.icon || ''} ${m.label_menu}</option>`; } });
+    if(menu.parent_id) parentSelect.value = menu.parent_id;
 
-    // Centang Role yang sesuai
-    const roles = (menu.role_akses || '').split(',');
-    document.querySelectorAll('.m-role-chk').forEach(cb => {
-        cb.checked = roles.includes(cb.value);
-    });
-
+    const roles = (menu.role_akses || '').split(','); document.querySelectorAll('.m-role-chk').forEach(cb => { cb.checked = roles.includes(cb.value); });
     document.getElementById('modal-add-m').style.display = 'flex';
+};
+
+window.superEditWidget = (id) => {
+    const widget = window.superWidgetData.find(w => w.id_widget === id); if(!widget) return; window.currentEditWidgetId = id;
+    document.getElementById('modal-w-title').innerHTML = "✏️ Edit Widget Injector"; document.getElementById('btn-submit-w').innerText = "Update Widget";
+    
+    document.getElementById('w-target').value = widget.target_halaman || 'dashboard'; 
+    document.getElementById('w-posisi').value = widget.posisi || 'atas';
+    document.getElementById('w-tipe').value = widget.tipe || 'html';
+    document.getElementById('w-konten').value = widget.isi_konten || '';
+    
+    document.getElementById('modal-add-w').style.display = 'flex';
 };
 
 // ==========================================
@@ -91,28 +95,34 @@ window.renderMenuTable = () => {
     let tableHtml = `<table class="super-table"><thead><tr><th width="10%">Urutan</th><th width="20%">Nama Menu</th><th width="15%">Aksi Aplikasi (ID)</th><th width="35%">Target Role (Bisa Melihat)</th><th width="10%">Status</th><th width="10%">Aksi</th></tr></thead><tbody>`;
     let count = 0;
     
-    let sortedMenus = [...window.superMenuData].sort((a,b) => (parseInt(a.urutan)||0) - (parseInt(b.urutan)||0));
+    let sortedMenus = [...window.superMenuData].sort((a,b) => {
+        // Sort by parent first, then by order
+        if(a.parent_id === b.parent_id) return (parseInt(a.urutan)||0) - (parseInt(b.urutan)||0);
+        return (a.parent_id || '').localeCompare(b.parent_id || '');
+    });
     
     sortedMenus.forEach(m => {
         if(!m.id_menu) return;
         count++;
         const id = m.id_menu;
-        const label = `${m.icon || '📌'} ${m.label_menu || 'Tanpa Nama'}`;
+        const isChild = m.parent_id && m.parent_id !== '';
+        const parentName = isChild ? (window.superMenuData.find(p => p.id_menu === m.parent_id)?.label_menu || 'Induk Unknown') : '';
+        const label = isChild ? `<span style="color:#aaa;">↳ (Anak dari ${parentName})</span><br>${m.icon || '📌'} ${m.label_menu}` : `<b style="font-size:1.05rem;">${m.icon || '📌'} ${m.label_menu}</b>`;
+        
         const target = m.target_view || '-';
         const role = (m.role_akses || 'KADER').toUpperCase().replace(/,/g, ', ');
         const status = String(m.is_active || 'Y').toUpperCase();
         
         const isAktif = status === 'Y'; 
-        const bgRow = isAktif ? 'transparent' : '#fdfaf6'; 
+        const bgRow = isChild ? (isAktif ? '#f8fafd' : '#f1f2f6') : (isAktif ? 'transparent' : '#fdfaf6'); 
         const textStatus = isAktif ? '🟢 Muncul' : '🔴 Sembunyi'; 
         const btnColor = isAktif ? '#ff7675' : '#00b894'; 
         const btnText = isAktif ? 'Sembunyikan' : 'Munculkan';
         
-        // 🔥 TOMBOL EDIT DITAMBAHKAN DI SINI
         tableHtml += `
             <tr style="background:${bgRow}; opacity: ${isAktif ? '1' : '0.6'};">
                 <td style="font-weight:bold; font-size:1.1rem; color:#0984e3; text-align:center;">${m.urutan || 0}</td>
-                <td style="font-weight:bold; color:#2c3e50;">${label}</td>
+                <td style="color:#2c3e50;">${label}</td>
                 <td><code>${target}</code></td>
                 <td><div style="font-size:0.75rem; background:#eef2f5; padding:4px 8px; border-radius:4px; display:inline-block; border:1px solid #dcdde1;">${role}</div></td>
                 <td><b>${textStatus}</b></td>
@@ -126,6 +136,45 @@ window.renderMenuTable = () => {
     if(count === 0) tableHtml += `<tr><td colspan="6" style="text-align:center; padding:30px; color:#666;">Database Menu masih kosong.</td></tr>`;
     tableHtml += `</tbody></table>`; document.getElementById('table-wrapper-m').innerHTML = tableHtml;
     document.getElementById('lbl-count-m').innerText = `${count} Menu Aktif`;
+};
+
+window.renderWidgetTable = () => {
+    let tableHtml = `<table class="super-table"><thead><tr><th width="15%">Target Halaman</th><th width="10%">Posisi</th><th width="15%">Tipe</th><th width="40%">Isi Konten (Preview)</th><th width="10%">Status</th><th width="10%">Aksi</th></tr></thead><tbody>`;
+    let count = 0;
+    
+    window.superWidgetData.forEach(w => {
+        if(!w.id_widget) return;
+        count++;
+        const id = w.id_widget;
+        const target = w.target_halaman || '-';
+        const posisi = w.posisi || '-';
+        const tipe = w.tipe || 'html';
+        const konten = (w.isi_konten || '').substring(0, 50) + '...';
+        const status = String(w.is_active || 'Y').toUpperCase();
+        
+        const isAktif = status === 'Y'; 
+        const bgRow = isAktif ? 'transparent' : '#fdfaf6'; 
+        const textStatus = isAktif ? '🟢 Aktif' : '🔴 Mati'; 
+        const btnColor = isAktif ? '#ff7675' : '#00b894'; 
+        const btnText = isAktif ? 'Matikan' : 'Hidupkan';
+        
+        tableHtml += `
+            <tr style="background:${bgRow}; opacity: ${isAktif ? '1' : '0.6'};">
+                <td><b><code style="color:#e94560;">${target}</code></b></td>
+                <td><span style="background:#e8f4fd; color:#0984e3; padding:3px 8px; border-radius:4px; font-size:0.8rem; font-weight:bold;">${posisi.toUpperCase()}</span></td>
+                <td>${tipe.toUpperCase()}</td>
+                <td><div style="font-size:0.8rem; background:#eee; padding:5px; border-radius:4px; font-family:monospace; color:#555;">${konten.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div></td>
+                <td><b>${textStatus}</b></td>
+                <td style="display:flex; flex-direction:column; gap:5px;">
+                    <button class="btn-action btn-edit" style="width:100%;" onclick="window.superEditWidget('${id}')">✏️ Edit</button>
+                    <button class="btn-action" style="background:${btnColor}; color:white; width:100%;" onclick="window.superToggleWidget('${id}', '${status}')">${btnText}</button>
+                </td>
+            </tr>`;
+    });
+
+    if(count === 0) tableHtml += `<tr><td colspan="6" style="text-align:center; padding:30px; color:#666;">Database Widget Injeksi masih kosong.</td></tr>`;
+    tableHtml += `</tbody></table>`; document.getElementById('table-wrapper-w').innerHTML = tableHtml;
+    document.getElementById('lbl-count-w').innerText = `${count} Widget Aktif`;
 };
 
 // ==========================================
@@ -145,6 +194,7 @@ export const initSuperAdmin = async (session) => {
                     <div class="super-menu-item active" data-target="user_management">👥 Manajemen Pengguna</div>
                     <div class="super-menu-item" data-target="kuesioner">📋 Master Kuesioner (Form)</div>
                     <div class="super-menu-item" data-target="menu_management">🎚️ Manajemen Menu (RBAC)</div>
+                    <div class="super-menu-item" data-target="widget_management">🧩 Manajemen Widget (Injeksi)</div>
                     <div class="super-menu-item" data-target="referensi">🏗️ Master Wilayah & Referensi</div>
                     <div class="super-menu-item" data-target="audit_trail">🛡️ Audit Log & Keamanan</div>
                 </div>
@@ -185,10 +235,124 @@ export const initSuperAdmin = async (session) => {
 // ==========================================
 window.renderSuperView = async (target) => {
     const content = document.getElementById('super-content');
-    
     if (target === 'dashboard') { content.innerHTML = `<div class="super-card"><h3>Dashboard sedang disiapkan...</h3><p>Silakan buka menu lain.</p></div>`; } 
     
-    // --- 🎚️ MENU MANAJEMEN MENU (V16 - SMART EDIT) ---
+    // --- 🧩 MENU MANAJEMEN WIDGET (V17 - WIDGET INJECTOR) ---
+    else if (target === 'widget_management') {
+        content.innerHTML = `
+            <div class="super-card" style="margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px;">
+                <div><h3 style="margin:0; color:#1a1a2e;">Pabrik Widget (Injeksi Visual)</h3><p style="margin:5px 0 0 0; color:#666; font-size:0.9rem;">Sisipkan tombol cetak, banner, atau teks pengumuman ke halaman manapun secara gaib.</p></div>
+                <button id="btn-show-add-w" style="background:#e94560; color:white; border:none; padding:10px 20px; border-radius:6px; font-weight:bold; cursor:pointer; box-shadow: 0 4px 6px rgba(233, 69, 96, 0.3);">+ Tambah Widget Baru</button>
+            </div>
+            <div class="super-card" style="padding:0; overflow:hidden;">
+                <div style="background:#f8f9fa; padding:15px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
+                    <div style="font-size:0.85rem; color:#856404; font-weight:bold;">💡 Widget ini akan menempel otomatis di bagian Atas/Bawah halaman yang dituju.</div>
+                    <div style="font-size:0.85rem; font-weight:bold; color:#666; background:#fff; padding:8px 12px; border:1px solid #ddd; border-radius:6px;" id="lbl-count-w">0 Widget</div>
+                </div>
+                <div id="table-wrapper-w" class="super-table-container"><div style="padding:50px; text-align:center; color:#666;"><h3>⏳ Menyedot Data Widget...</h3></div></div>
+            </div>
+
+            <div id="modal-add-w" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.7); z-index:1000; align-items:center; justify-content:center;">
+                <div style="background:white; padding:30px; border-radius:10px; width:90%; max-width:600px; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+                    <h3 id="modal-w-title" style="margin-top:0; color:#1a1a2e; border-bottom:2px solid #eee; padding-bottom:10px;">➕ Buat Widget Baru</h3>
+                    
+                    <div style="display:flex; gap:10px; margin-bottom:15px;">
+                        <div style="flex:2;">
+                            <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:5px;">Target Halaman (Kode)</label>
+                            <input type="text" id="w-target" class="filter-input" placeholder="Cth: rekap_bulanan" style="width:100%; box-sizing:border-box;" required>
+                            <div style="font-size:0.7rem; color:#888; margin-top:3px;">*Kode halaman di sistem (cth: dashboard, pendampingan).</div>
+                        </div>
+                        <div style="flex:1;">
+                            <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:5px;">Posisi Tempel</label>
+                            <select id="w-posisi" class="filter-input" style="width:100%; box-sizing:border-box;">
+                                <option value="atas">ATAS (Sebelum Konten)</option>
+                                <option value="bawah">BAWAH (Setelah Konten)</option>
+                            </select>
+                        </div>
+                        <div style="flex:1;">
+                            <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:5px;">Tipe Widget</label>
+                            <select id="w-tipe" class="filter-input" style="width:100%; box-sizing:border-box;">
+                                <option value="html">Kode HTML</option>
+                                <option value="teks">Teks Biasa</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div style="margin-bottom:20px;">
+                        <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:5px; color:#0984e3;">Isi Konten (Tombol / Banner / Teks)</label>
+                        <textarea id="w-konten" class="filter-input" rows="6" placeholder='Contoh Tombol Cetak:\n<button class="btn btn-success" style="width:100%; margin-bottom:15px;" onclick="window.print()">🖨️ Cetak Halaman Ini</button>' style="width:100%; box-sizing:border-box; font-family:monospace; background:#f8f9fa;"></textarea>
+                    </div>
+
+                    <div style="display:flex; justify-content:flex-end; gap:10px;">
+                        <button type="button" id="btn-close-w" style="padding:10px 20px; border:none; background:#eee; color:#333; border-radius:5px; cursor:pointer; font-weight:bold;">Batal</button>
+                        <button type="button" id="btn-submit-w" style="padding:10px 20px; border:none; background:#e94560; color:white; border-radius:5px; cursor:pointer; font-weight:bold;">Simpan Widget</button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        try {
+            const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_ALL', token: SUPER_TOKEN, sheetName: 'MASTER_WIDGET' }) });
+            const res = await response.json();
+            if (res.status === 'success') {
+                window.superWidgetData = res.data;
+                window.renderWidgetTable();
+                
+                const modalW = document.getElementById('modal-add-w'); 
+                
+                document.getElementById('btn-show-add-w').onclick = () => { 
+                    window.currentEditWidgetId = null; 
+                    document.getElementById('modal-w-title').innerText = "➕ Buat Widget Baru";
+                    document.getElementById('btn-submit-w').innerText = "Simpan Widget";
+                    document.getElementById('w-target').value = '';
+                    document.getElementById('w-posisi').value = 'atas';
+                    document.getElementById('w-tipe').value = 'html';
+                    document.getElementById('w-konten').value = '';
+                    modalW.style.display = 'flex'; 
+                };
+
+                document.getElementById('btn-close-w').onclick = () => modalW.style.display = 'none';
+
+                document.getElementById('btn-submit-w').onclick = async () => {
+                    const target = document.getElementById('w-target').value.trim().toLowerCase();
+                    const posisi = document.getElementById('w-posisi').value;
+                    const tipe = document.getElementById('w-tipe').value;
+                    const konten = document.getElementById('w-konten').value.trim();
+
+                    if(!target || !konten) { alert("⚠️ Mohon isi Target Halaman dan Isi Konten!"); return; }
+
+                    const btnSubmit = document.getElementById('btn-submit-w'); 
+                    btnSubmit.innerText = "Menyimpan..."; btnSubmit.disabled = true;
+
+                    const isEdit = window.currentEditWidgetId != null;
+                    const newId = isEdit ? window.currentEditWidgetId : `WIDGET-${Date.now().toString().slice(-5)}`;
+                    const actionType = isEdit ? 'SECURE_EDIT_WIDGET_DATA' : 'SECURE_ADD_WIDGET';
+
+                    const payloadW = { id_widget: newId, target_halaman: target, posisi: posisi, tipe: tipe, isi_konten: konten, is_active: 'Y' };
+
+                    if (isEdit) {
+                        const origW = window.superWidgetData.find(w => w.id_widget === newId);
+                        payloadW.is_active = origW ? origW.is_active : 'Y';
+                    }
+
+                    try {
+                        const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: actionType, token: SUPER_TOKEN, data: payloadW }) });
+                        const res = await response.json();
+                        if(res.status === 'success') { 
+                            alert(isEdit ? "✅ Widget berhasil diupdate!" : "✅ Widget baru berhasil dipasang!"); 
+                            modalW.style.display = 'none'; 
+                            document.getElementById('table-wrapper-w').innerHTML = `<div style="padding:50px; text-align:center; color:#e94560;"><h3>🔄 MENYINKRONKAN...</h3></div>`;
+                            await clearStore('master_widget'); 
+                            setTimeout(() => { window.renderSuperView('widget_management'); }, 1000);
+                        } else { alert("❌ Gagal menyimpan: " + res.message); }
+                    } catch(e) { alert("❌ Kesalahan Jaringan."); } finally { btnSubmit.innerText = "Simpan Widget"; btnSubmit.disabled = false; }
+                };
+
+            } else { document.getElementById('table-wrapper-w').innerHTML = `<div style="padding:50px; text-align:center; color:#e94560;"><h3>❌ Gagal Membaca Widget</h3><p>${res.message}</p></div>`; }
+        } catch (error) { document.getElementById('table-wrapper-w').innerHTML = `<div style="padding:50px; text-align:center; color:#e94560;"><h3>❌ Gagal Terhubung</h3></div>`; }
+    }
+
+    // --- 🎚️ MENU MANAJEMEN MENU (V17 - SMART EDIT & SUB-MENU) ---
     else if (target === 'menu_management') {
         content.innerHTML = `
             <div class="super-card" style="margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px;">
@@ -205,7 +369,7 @@ window.renderSuperView = async (target) => {
             </div>
 
             <div id="modal-add-m" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.7); z-index:1000; align-items:center; justify-content:center;">
-                <div style="background:white; padding:30px; border-radius:10px; width:90%; max-width:500px; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+                <div style="background:white; padding:30px; border-radius:10px; width:90%; max-width:600px; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
                     <h3 id="modal-m-title" style="margin-top:0; color:#1a1a2e; border-bottom:2px solid #eee; padding-bottom:10px;">➕ Buat Menu Navigasi Baru</h3>
                     
                     <div style="display:flex; gap:10px; margin-bottom:15px;">
@@ -225,9 +389,15 @@ window.renderSuperView = async (target) => {
                             <input type="text" id="m-target" class="filter-input" placeholder="Cth: rekap_bulanan" style="width:100%; box-sizing:border-box;" required>
                             <div style="font-size:0.7rem; color:#888; margin-top:3px;">*Kode aksi di sistem (tanpa spasi).</div>
                         </div>
+                        <div style="flex:2;">
+                            <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:5px;">Menu Induk (Sub-Menu)</label>
+                            <select id="m-parent" class="filter-input" style="width:100%; box-sizing:border-box;">
+                                <option value="">-- Tidak Ada (Menu Utama) --</option>
+                            </select>
+                        </div>
                         <div style="flex:1;">
                             <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:5px;">Urutan</label>
-                            <input type="number" id="m-urut" class="filter-input" placeholder="1, 2, 3..." style="width:100%; box-sizing:border-box;" required>
+                            <input type="number" id="m-urut" class="filter-input" placeholder="1, 2.." style="width:100%; box-sizing:border-box;" required>
                         </div>
                     </div>
 
@@ -258,9 +428,8 @@ window.renderSuperView = async (target) => {
                 
                 const modalM = document.getElementById('modal-add-m'); 
                 
-                // 🔥 Tombol Tambah Menu Baru (Reset Form)
                 document.getElementById('btn-show-add-m').onclick = () => { 
-                    window.currentEditMenuId = null; // Kosongkan memori edit
+                    window.currentEditMenuId = null; 
                     document.getElementById('modal-m-title').innerText = "➕ Buat Menu Navigasi Baru";
                     document.getElementById('btn-submit-m').innerText = "Simpan Menu";
                     
@@ -269,17 +438,26 @@ window.renderSuperView = async (target) => {
                     document.getElementById('m-target').value = '';
                     document.getElementById('m-urut').value = '';
                     document.querySelectorAll('.m-role-chk').forEach(cb => cb.checked = false);
+
+                    // Isi Dropdown Menu Induk
+                    const parentSelect = document.getElementById('m-parent');
+                    parentSelect.innerHTML = '<option value="">-- Tidak Ada (Menu Utama) --</option>';
+                    window.superMenuData.forEach(m => {
+                        if (!m.parent_id || m.parent_id === '') { 
+                            parentSelect.innerHTML += `<option value="${m.id_menu}">${m.icon || ''} ${m.label_menu}</option>`;
+                        }
+                    });
                     
                     modalM.style.display = 'flex'; 
                 };
 
                 document.getElementById('btn-close-m').onclick = () => modalM.style.display = 'none';
 
-                // 🔥 Tombol Simpan (Cerdas: Bedakan Edit dan Tambah)
                 document.getElementById('btn-submit-m').onclick = async () => {
                     const icon = document.getElementById('m-icon').value.trim();
                     const label = document.getElementById('m-label').value.trim();
                     const targetView = document.getElementById('m-target').value.trim().toLowerCase();
+                    const parentId = document.getElementById('m-parent').value; // 🔥 BARU
                     const urut = document.getElementById('m-urut').value;
                     
                     const checkedRoles = Array.from(document.querySelectorAll('.m-role-chk:checked')).map(cb => cb.value);
@@ -295,9 +473,8 @@ window.renderSuperView = async (target) => {
                     const newId = isEdit ? window.currentEditMenuId : `MENU-${Date.now().toString().slice(-5)}`;
                     const actionType = isEdit ? 'SECURE_EDIT_MENU_DATA' : 'SECURE_ADD_MENU';
 
-                    const payloadM = { id_menu: newId, label_menu: label, icon: icon, target_view: targetView, role_akses: roleString, urutan: urut, is_active: 'Y' };
+                    const payloadM = { id_menu: newId, label_menu: label, icon: icon, target_view: targetView, parent_id: parentId, role_akses: roleString, urutan: urut, is_active: 'Y' };
 
-                    // Pertahankan status is_active jika sedang mode edit
                     if (isEdit) {
                         const origMenu = window.superMenuData.find(m => m.id_menu === newId);
                         payloadM.is_active = origMenu ? origMenu.is_active : 'Y';
@@ -321,7 +498,6 @@ window.renderSuperView = async (target) => {
     }
 
     // --- 📋 MENU MASTER KUESIONER (SAMA SEPERTI SEBELUMNYA) ---
-    // ... [Sisa kode kuesioner dan user_management di bawahnya tetap sama persis dan tidak saya kurangi] ...
     else if (target === 'kuesioner') {
         content.innerHTML = `
             <div class="super-card" style="margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px;">
