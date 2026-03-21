@@ -2,7 +2,7 @@ import { initDB, putData, getDataById, deleteData, getAllData, clearStore } from
 import { downloadMasterData, uploadData } from './sync.js';
 import { initAdmin } from './admin.js';
 
-// 🔥 EKSPOS DATABASE KE GLOBAL (AGAR WIDGET BISA BACA DATA)
+// 🔥 EKSPOS DATABASE KE GLOBAL
 window.AppDB = { getAllData, getDataById, putData };
 
 const getEl = (id) => document.getElementById(id);
@@ -166,37 +166,11 @@ window.renderKonten = async (target) => {
             </div>`;
 
         try {
-            // 🔥 V18.3: Ambil master_tim juga untuk memastikan dusun terbaca jika tim tunggal
-            const [allWil, allTim, antrean] = await Promise.all([ 
-                getAllData('master_tim_wilayah').catch(()=>[]), 
-                getAllData('master_tim').catch(()=>[]),
-                getAllData('sync_queue').catch(()=>[]) 
-            ]);
-
+            const [allWil, allTim, antrean] = await Promise.all([ getAllData('master_tim_wilayah').catch(()=>[]), getAllData('master_tim').catch(()=>[]), getAllData('sync_queue').catch(()=>[]) ]);
             let namaDesa = session.desa && session.desa !== '-' && String(session.desa).toLowerCase() !== 'undefined' ? session.desa : '-'; 
             let daftarDusun = session.dusun && session.dusun !== '-' && String(session.dusun).toLowerCase() !== 'undefined' ? session.dusun : '-';
-            
-            // 🔥 LOGIKA CERDAS: Selalu paksa cari dusun dari DB jika kosong/strip
-            if (daftarDusun === '-' || !daftarDusun) {
-                const wilayahKerja = allWil.filter(w => String(w.id_tim) === String(session.id_tim));
-                if (wilayahKerja.length > 0) {
-                    daftarDusun = [...new Set(wilayahKerja.map(w => w.dusun_rw || w.dusun).filter(Boolean))].join(', ');
-                } else {
-                    // Coba cari di master_tim
-                    const timData = allTim.find(t => String(t.id_tim) === String(session.id_tim) || String(t.id) === String(session.id_tim));
-                    if (timData) daftarDusun = timData.dusun_rw || timData.dusun || '-';
-                }
-            }
-
-            if (namaDesa === '-' || !namaDesa) {
-                const wilayahKerja = allWil.filter(w => String(w.id_tim) === String(session.id_tim));
-                if (wilayahKerja.length > 0) {
-                    namaDesa = wilayahKerja[0]?.desa_kelurahan || wilayahKerja[0]?.desa || '-';
-                } else {
-                    const timData = allTim.find(t => String(t.id_tim) === String(session.id_tim) || String(t.id) === String(session.id_tim));
-                    if (timData) namaDesa = timData.desa_kelurahan || timData.desa || '-';
-                }
-            }
+            if (daftarDusun === '-' || !daftarDusun) { const wilayahKerja = allWil.filter(w => String(w.id_tim) === String(session.id_tim)); if (wilayahKerja.length > 0) { daftarDusun = [...new Set(wilayahKerja.map(w => w.dusun_rw || w.dusun).filter(Boolean))].join(', '); } else { const timData = allTim.find(t => String(t.id_tim) === String(session.id_tim) || String(t.id) === String(session.id_tim)); if (timData) daftarDusun = timData.dusun_rw || timData.dusun || '-'; } }
+            if (namaDesa === '-' || !namaDesa) { const wilayahKerja = allWil.filter(w => String(w.id_tim) === String(session.id_tim)); if (wilayahKerja.length > 0) { namaDesa = wilayahKerja[0]?.desa_kelurahan || wilayahKerja[0]?.desa || '-'; } else { const timData = allTim.find(t => String(t.id_tim) === String(session.id_tim) || String(t.id) === String(session.id_tim)); if (timData) namaDesa = timData.desa_kelurahan || timData.desa || '-'; } }
 
             if (getEl('dash-detail-wilayah')) { getEl('dash-detail-wilayah').innerHTML = `<div style="background: rgba(255,255,255,0.2); display: inline-block; padding: 4px 10px; border-radius: 6px; font-weight: bold; font-size: 0.85rem; margin-bottom: 12px;">NO. TIM: ${session.nomor_tim || session.id_tim}</div><div style="line-height: 1.25;"><div style="margin-bottom: 6px;"><span style="opacity:0.8; font-size: 0.8rem;">📍 Wilayah Tugas (Dusun/RW):</span><br><span style="font-weight: 600; font-size: 0.9rem;">${daftarDusun}</span></div><div style="margin-bottom: 6px;"><span style="opacity:0.8; font-size: 0.8rem;">🏘️ Desa/Kelurahan:</span><br><span style="font-weight: 600; font-size: 0.9rem;">${namaDesa}</span></div><div><span style="opacity:0.8; font-size: 0.8rem;">🏛️ Kecamatan:</span><br><span style="font-weight: 600; font-size: 0.9rem;">${session.kecamatan || '-'}</span></div></div>`; }
             
@@ -204,12 +178,7 @@ window.renderKonten = async (target) => {
             if (getEl('dash-tunda')) getEl('dash-tunda').innerText = `${queueTim.filter(a => a.is_synced).length}/${queueTim.filter(a => !a.is_synced).length}`;
             const regList = queueTim.filter(a => a.tipe_laporan === 'REGISTRASI'); const pendList = queueTim.filter(a => a.tipe_laporan === 'PENDAMPINGAN');
             const cReg = { CATIN: 0, BUMIL: 0, BUFAS: 0, BADUTA: 0 }; const cPend = { CATIN: 0, BUMIL: 0, BUFAS: 0, BADUTA: 0 }; const hariIni = new Date(); hariIni.setHours(0,0,0,0);
-            regList.forEach(r => {
-                let isAktif = r.status_sasaran !== 'SELESAI';
-                if (r.jenis_sasaran === 'CATIN' && r.data_laporan?.tanggal_pernikahan && new Date(r.data_laporan.tanggal_pernikahan) < hariIni) isAktif = false;
-                if (r.jenis_sasaran === 'BUFAS' && r.data_laporan?.tgl_persalinan) { const tB = new Date(r.data_laporan.tgl_persalinan); tB.setDate(tB.getDate() + 42); if (hariIni > tB) isAktif = false; }
-                if(cReg[r.jenis_sasaran] !== undefined && isAktif) cReg[r.jenis_sasaran]++;
-            });
+            regList.forEach(r => { let isAktif = r.status_sasaran !== 'SELESAI'; if (r.jenis_sasaran === 'CATIN' && r.data_laporan?.tanggal_pernikahan && new Date(r.data_laporan.tanggal_pernikahan) < hariIni) isAktif = false; if (r.jenis_sasaran === 'BUFAS' && r.data_laporan?.tgl_persalinan) { const tB = new Date(r.data_laporan.tgl_persalinan); tB.setDate(tB.getDate() + 42); if (hariIni > tB) isAktif = false; } if(cReg[r.jenis_sasaran] !== undefined && isAktif) cReg[r.jenis_sasaran]++; });
             pendList.forEach(p => { let j = p.jenis_sasaran_saat_kunjungan || (p.id_sasaran_ref.startsWith('CTN')?'CATIN':p.id_sasaran_ref.startsWith('BML')?'BUMIL':p.id_sasaran_ref.startsWith('BFS')?'BUFAS':'BADUTA'); if(cPend[j] !== undefined) cPend[j]++; });
             if(getEl('dash-summary')){ getEl('dash-summary').innerHTML = `<h4 style="font-size: 0.95rem; color: #555; margin-bottom: 12px; border-bottom: 1px solid #eee; padding-bottom: 8px;">📊 Total Data Kumulatif</h4><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 0.85rem;"><div><strong style="color:var(--primary);">🎯 Sasaran Terdaftar</strong><ul style="margin: 5px 0 0 15px; padding: 0; color: #444; list-style-type: square;"><li>CATIN: <b>${cReg.CATIN}</b></li><li>BUMIL: <b>${cReg.BUMIL}</b></li><li>BUFAS: <b>${cReg.BUFAS}</b></li><li>BADUTA: <b>${cReg.BADUTA}</b></li></ul></div><div><strong style="color:#198754;">🤝 Kunjungan Pendampingan</strong><ul style="margin: 5px 0 0 15px; padding: 0; color: #444; list-style-type: square;"><li>CATIN: <b>${cPend.CATIN}</b></li><li>BUMIL: <b>${cPend.BUMIL}</b></li><li>BUFAS: <b>${cPend.BUFAS}</b></li><li>BADUTA: <b>${cPend.BADUTA}</b></li></ul></div></div>`; }
         } catch (e) {}
@@ -269,7 +238,6 @@ window.renderKonten = async (target) => {
     } else if (target === 'setting') { const tpl = getEl('template-setting'); if(tpl) { area.appendChild(tpl.content.cloneNode(true)); initSetting(); }
     } else if (target === 'bantuan') { const tpl = getEl('template-bantuan'); if(tpl) { area.appendChild(tpl.content.cloneNode(true)); const btnCalc = getEl('btn-buka-kalkulator'); if(btnCalc) btnCalc.onclick = () => renderKonten('kalkulator'); } }
 
-    // 🎯 INJEKSI WIDGET GAIB + EKSEKUSI SCRIPT (V18.2 MAGIC)
     try {
         const allWidgets = await getAllData('master_widget').catch(()=>[]);
         const activeWidgets = allWidgets.filter(w => String(w.is_active || 'Y').toUpperCase() === 'Y' && String(w.target_halaman).toLowerCase() === target.toLowerCase());
@@ -282,11 +250,9 @@ window.renderKonten = async (target) => {
                 else htmlAtas += `<div style="margin-bottom:15px; width:100%;">${content}</div>`;
             });
 
-            // Cara aman menyisipkan HTML kompleks dan memaksa browser mengeksekusi <script>
             const injectAndExecute = (htmlString, position) => {
                 const tempDiv = document.createElement('div');
                 tempDiv.innerHTML = htmlString;
-                
                 const scripts = tempDiv.querySelectorAll('script');
                 scripts.forEach(s => {
                     const newScript = document.createElement('script');
@@ -294,12 +260,8 @@ window.renderKonten = async (target) => {
                     s.parentNode.removeChild(s); 
                     document.body.appendChild(newScript);
                 });
-
-                if(position === 'atas') {
-                    while(tempDiv.firstChild) area.insertBefore(tempDiv.firstChild, area.firstChild);
-                } else {
-                    while(tempDiv.firstChild) area.appendChild(tempDiv.firstChild);
-                }
+                if(position === 'atas') { while(tempDiv.firstChild) area.insertBefore(tempDiv.firstChild, area.firstChild); } 
+                else { while(tempDiv.firstChild) area.appendChild(tempDiv.firstChild); }
             };
 
             if(htmlAtas) injectAndExecute(htmlAtas, 'atas');
@@ -882,7 +844,7 @@ const initSetting = () => {
 };
 
 // ==========================================
-// 10. LOGIN PINTAR VIA SERVER (KEAMANAN TINGGI)
+// 10. LOGIN PINTAR VIA SERVER (V22)
 // ==========================================
 const SCRIPT_URL_LOGIN = 'https://script.google.com/macros/s/AKfycbzEmmn0wMJmC1OHij9JUxm8EIT2xW1AuV0597EYCWDIxG_nkpZYBPx1EGiNYe6OjEHniw/exec';
 
@@ -893,7 +855,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (fLogin) {
         fLogin.onsubmit = async (e) => {
             e.preventDefault();
-            const btn = getEl('btn-login-submit'); const id = getEl('kader-id').value.trim(); const pin = getEl('kader-pin').value.trim();
+            const btn = getEl('btn-login-submit'); 
+            const id = getEl('kader-id').value.trim(); 
+            const pin = getEl('kader-pin').value.trim();
 
             if (!id || !pin) return;
             if (btn) { btn.disabled = true; btn.innerText = "Memverifikasi ke Server..."; }
@@ -901,7 +865,21 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 if (!navigator.onLine) { alert("❌ Anda harus terhubung ke Internet untuk melakukan Login Otentikasi!"); if (btn) { btn.disabled = false; btn.innerText = "Masuk"; } return; }
 
-                const response = await fetch(SCRIPT_URL_LOGIN, { method: 'POST', body: JSON.stringify({ action: 'LOGIN', id: id, pin: pin }) });
+                // 🔥 V22: Sembunyikan GPS, tangkap KTP Perangkat (Browser/HP)
+                const infoPerangkat = navigator.userAgent;
+                const infoLokasi = "Lokasi Disembunyikan"; // Untuk menjaga kecepatan login dan privasi
+
+                const response = await fetch(SCRIPT_URL_LOGIN, { 
+                    method: 'POST', 
+                    body: JSON.stringify({ 
+                        action: 'LOGIN', 
+                        id: id, 
+                        pin: pin,
+                        perangkat: infoPerangkat,
+                        lokasi: infoLokasi
+                    }) 
+                });
+                
                 const res = await response.json();
 
                 if (res.status === 'success') {
