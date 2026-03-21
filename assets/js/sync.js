@@ -8,11 +8,11 @@ export const downloadMasterData = async () => {
         const res = await response.json();
         if (res.status === 'success') {
             const d = res.data;
-            // 🚀 UPDATE V17: Tambahkan 'master_widget' ke dalam daftar sedot!
             const stores = [
                 'master_kader', 'master_tim', 'master_tim_wilayah', 
                 'master_pertanyaan', 'master_wilayah_bali', 'standar_antropometri', 
-                'master_kembang', 'master_wilayah', 'master_menu', 'master_widget' 
+                'master_kembang', 'master_wilayah', 'master_menu', 'master_widget',
+                'master_pkb' // 🚀 Tambah master_pkb ke daftar sedot!
             ];
             
             for (let s of stores) {
@@ -39,17 +39,29 @@ export const uploadData = async () => {
         const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify(dataUnsynced) });
         const res = await response.json();
         if(res.status === 'success') {
-            for(let d of dataUnsynced) { d.is_synced = true; await putData('sync_queue', d); }
+            for(let d of dataUnsynced) { 
+                d.is_synced = true; 
+                await putData('sync_queue', d); 
+            }
             return true;
         }
         return false;
-    } catch(e) { throw e; }
+    } catch(e) { 
+        console.error("Error uploadData:", e);
+        throw e; 
+    }
 };
 
 window.jalankanSinkronisasi = async () => {
     try {
         const dl = await downloadMasterData();
         const ul = await uploadData();
-        if(dl) { alert("✅ Sinkronisasi Berhasil!"); location.reload(); }
-    } catch (e) { alert("❌ Gagal Sinkronisasi. Pastikan internet Bapak stabil."); location.reload(); }
+        if(dl) { 
+            alert("✅ Sinkronisasi Berhasil!"); 
+            location.reload(); 
+        }
+    } catch (e) { 
+        alert("❌ Gagal Sinkronisasi. Pastikan internet Bapak stabil."); 
+        location.reload(); 
+    }
 };
