@@ -1,5 +1,5 @@
 // ==========================================
-// 👑 GOD MODE: SUPER ADMIN DASHBOARD (V14 - LOGIKA KONDISIONAL)
+// 👑 GOD MODE: SUPER ADMIN DASHBOARD (V15 - DYNAMIC MENU ENGINE)
 // ==========================================
 import { getAllData, clearStore } from './db.js';
 
@@ -7,7 +7,7 @@ const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzEmmn0wMJmC1OHij9JU
 const SUPER_TOKEN = 'MasterKeyKubuSecure!001';
 
 window.superUsersData = []; window.superTimData = []; window.currentFilteredIds = [];
-window.superKuesionerData = []; 
+window.superKuesionerData = []; window.superMenuData = [];
 
 // ==========================================
 // 1. FUNGSI AKSI SUPER ADMIN (GLOBAL)
@@ -16,6 +16,7 @@ window.superResetPin = async (idUser, namaUser) => { const newPin = prompt(`🔐
 window.superToggleStatus = async (idUser, namaUser, currentStatus) => { const isAktif = (currentStatus || 'AKTIF').toUpperCase() === 'AKTIF'; const newStatus = isAktif ? 'NONAKTIF' : 'AKTIF'; if (!confirm(`⚠️ PERINGATAN!\nAnda akan ${isAktif ? 'MEMBLOKIR' : 'MENGAKTIFKAN'} akses untuk: ${namaUser}\n\nLanjutkan?`)) return; try { const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_UPDATE_USER', token: SUPER_TOKEN, id_user: idUser, updateType: 'STATUS', newStatus: newStatus }) }); const res = await response.json(); if (res.status === 'success') { alert(`✅ Status diubah menjadi ${newStatus}!`); window.renderSuperView('user_management'); } else { alert("❌ Gagal: " + res.message); } } catch (e) { alert("❌ Kesalahan Jaringan."); } };
 window.superBulkAction = async (actionType) => { const checkedBoxes = document.querySelectorAll('.chk-user:checked'); const targetIds = Array.from(checkedBoxes).map(cb => cb.value); const totalTarget = targetIds.length; if (totalTarget === 0) { alert("Pilih minimal 1 pengguna!"); return; } let confirmMsg = ""; let updateType = ""; let newValue = ""; if (actionType === 'BLOKIR') { confirmMsg = `⚠️ MEMBLOKIR ${totalTarget} akun. Ketik "YAKIN":`; updateType = 'STATUS'; newValue = 'NONAKTIF'; } else if (actionType === 'AKTIFKAN') { confirmMsg = `MENGAKTIFKAN ${totalTarget} akun. Ketik "YAKIN":`; updateType = 'STATUS'; newValue = 'AKTIF'; } else if (actionType === 'RESETPIN') { const pinMasal = prompt(`PIN BARU untuk ${totalTarget} akun:`); if (!pinMasal || pinMasal.length < 5) return; confirmMsg = `⚠️ MERESET PIN ${totalTarget} akun menjadi "${pinMasal}". Ketik "YAKIN":`; updateType = 'PIN'; newValue = pinMasal; } if (prompt(confirmMsg) !== "YAKIN") return; document.getElementById('table-wrapper').innerHTML = `<div style="padding:50px; text-align:center;"><h3>🚀 MENGEKSEKUSI...</h3></div>`; try { const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_BULK_UPDATE_USER', token: SUPER_TOKEN, ids: targetIds, updateType: updateType, newValue: newValue }) }); const res = await response.json(); if (res.status === 'success') { alert(`✅ SUKSES! ${res.count} Akun diperbarui!`); } else { alert("❌ Gagal: " + res.message); } window.renderSuperView('user_management'); } catch (e) { alert("❌ Kesalahan."); window.renderSuperView('user_management'); } };
 window.superToggleQuestion = async (idPertanyaan, statusSaatIni) => { const isAktif = (statusSaatIni || 'AKTIF').toUpperCase() === 'AKTIF' || statusSaatIni === 'Y'; const newStatus = isAktif ? 'N' : 'Y'; const aksi = isAktif ? 'MEMATIKAN' : 'MENGHIDUPKAN'; if(!confirm(`⚠️ PERINGATAN!\nAnda akan ${aksi} pertanyaan ini dari HP Kader.\nLanjutkan?`)) return; try { document.getElementById('table-wrapper-q').innerHTML = `<div style="padding:30px; text-align:center;">⏳ Memproses...</div>`; const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_UPDATE_QUESTION', token: SUPER_TOKEN, id_pertanyaan: idPertanyaan, newStatus: newStatus }) }); const res = await response.json(); if (res.status === 'success') { alert(`✅ Pertanyaan berhasil diupdate!`); await clearStore('master_pertanyaan'); window.renderSuperView('kuesioner'); } else { alert("❌ Gagal: " + res.message); window.renderSuperView('kuesioner');} } catch(e) { alert("❌ Kesalahan Jaringan."); window.renderSuperView('kuesioner');} };
+window.superToggleMenu = async (idMenu, statusSaatIni) => { const isAktif = (statusSaatIni || 'Y').toUpperCase() === 'Y'; const newStatus = isAktif ? 'N' : 'Y'; const aksi = isAktif ? 'MENYEMBUNYIKAN' : 'MEMUNCULKAN'; if(!confirm(`⚠️ PERINGATAN!\nAnda akan ${aksi} menu ini dari Aplikasi.\nLanjutkan?`)) return; try { document.getElementById('table-wrapper-m').innerHTML = `<div style="padding:30px; text-align:center;">⏳ Memproses...</div>`; const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_UPDATE_MENU', token: SUPER_TOKEN, id_menu: idMenu, newStatus: newStatus }) }); const res = await response.json(); if (res.status === 'success') { alert(`✅ Status menu berhasil diubah!`); await clearStore('master_menu'); window.renderSuperView('menu_management'); } else { alert("❌ Gagal: " + res.message); window.renderSuperView('menu_management');} } catch(e) { alert("❌ Kesalahan Jaringan."); window.renderSuperView('menu_management');} };
 
 // ==========================================
 // 2. FUNGSI RENDER TABEL
@@ -47,48 +48,56 @@ window.renderKuesionerTable = () => {
     const filterKat = document.getElementById('flt-kategori-q').value.toUpperCase();
     let tableHtml = `<table class="super-table"><thead><tr><th width="12%">ID Form</th><th width="15%">Posisi (Modul -> Sasaran)</th><th width="15%">Grup & Urutan</th><th width="30%">Teks Pertanyaan</th><th width="10%">Tipe Jawaban</th><th width="8%">Sifat</th><th width="10%">Aksi</th></tr></thead><tbody>`;
     let count = 0;
-    
     window.superKuesionerData.forEach(q => {
-        const id = q.id_pertanyaan || q.id || '-'; 
-        const modul = String(q.modul || '-').toUpperCase();
-        const kat = String(q.jenis_sasaran || q.kategori_sasaran || q.kategori || '-').toUpperCase(); 
-        const grup = q.grup_pertanyaan || '-';
-        const urutG = q.urutan_grup || '-'; 
-        const teks = q.label_pertanyaan || q.teks_pertanyaan || q.pertanyaan || '-'; 
-        const tipe = String(q.tipe_input || q.tipe_jawaban || q.tipe || '-').toUpperCase();
+        const id = q.id_pertanyaan || q.id || '-'; const modul = String(q.modul || '-').toUpperCase(); const kat = String(q.jenis_sasaran || q.kategori_sasaran || q.kategori || '-').toUpperCase(); const grup = q.grup_pertanyaan || '-'; const urutG = q.urutan_grup || '-'; const teks = q.label_pertanyaan || q.teks_pertanyaan || q.pertanyaan || '-'; const tipe = String(q.tipe_input || q.tipe_jawaban || q.tipe || '-').toUpperCase();
         const opsi = q.opsi_json || q.pilihan_jawaban ? `<div style="font-size:0.75rem; color:#888; margin-top:5px; background:#f1f2f6; padding:4px; border-radius:4px;">Opsi: ${q.opsi_json || q.pilihan_jawaban}</div>` : '';
         const wajib = String(q.is_required || q.wajib || 'Y').toUpperCase() === 'Y' || String(q.is_required || q.wajib || 'Y').toUpperCase() === 'YA' ? '<span style="color:#d63031; font-weight:bold;">Wajib *</span>' : '<span style="color:#636e72;">Opsional</span>';
         const status = String(q.is_active || q.status || q.status_pertanyaan || 'Y').toUpperCase();
-        
-        // 🔥 Label Kondisi
         const kondisiLabel = q.kondisi_tampil ? `<div style="font-size:0.75rem; color:#d35400; margin-top:5px; padding:4px; background:#fdf3e8; border-radius:4px; border:1px dashed #fadbd8;">👁️ Muncul Jika: <b>${q.kondisi_tampil}</b></div>` : '';
-
-        if (filterKat === 'ALL' || kat === filterKat) {
-            count++; 
-            const isAktif = status === 'AKTIF' || status === 'Y'; 
-            const bgRow = isAktif ? 'transparent' : '#fdfaf6'; 
-            const textStatus = isAktif ? '🟢 Aktif' : '🔴 Mati'; 
-            const btnColor = isAktif ? '#ff7675' : '#00b894'; 
-            const btnText = isAktif ? 'Matikan' : 'Hidupkan';
-            
-            tableHtml += `
-                <tr style="background:${bgRow}; opacity: ${isAktif ? '1' : '0.6'};">
-                    <td><code>${id}</code></td>
-                    <td>
-                        <span class="badge-role role-kader" style="display:block; margin-bottom:3px; text-align:center;">${modul}</span>
-                        <span class="badge-role role-admin" style="display:block; text-align:center;">${kat}</span>
-                    </td>
-                    <td><span style="font-size:0.7rem; color:#666; font-weight:bold;">Urutan Tampil: ${urutG}</span><br><b>${grup}</b></td>
-                    <td><b>${teks}</b>${opsi}${kondisiLabel}</td>
-                    <td><code style="color:#0984e3;">${tipe}</code></td>
-                    <td>${wajib}</td>
-                    <td><div style="font-size:0.7rem; font-weight:bold; margin-bottom:5px;">${textStatus}</div><button class="btn-action" style="background:${btnColor}; color:white; width:100%;" onclick="window.superToggleQuestion('${id}', '${status}')">${btnText}</button></td>
-                </tr>`;
+        if (filterKat === 'ALL' || kat === filterKat) { count++; const isAktif = status === 'AKTIF' || status === 'Y'; const bgRow = isAktif ? 'transparent' : '#fdfaf6'; const textStatus = isAktif ? '🟢 Aktif' : '🔴 Mati'; const btnColor = isAktif ? '#ff7675' : '#00b894'; const btnText = isAktif ? 'Matikan' : 'Hidupkan';
+            tableHtml += `<tr style="background:${bgRow}; opacity: ${isAktif ? '1' : '0.6'};"><td><code>${id}</code></td><td><span class="badge-role role-kader" style="display:block; margin-bottom:3px; text-align:center;">${modul}</span><span class="badge-role role-admin" style="display:block; text-align:center;">${kat}</span></td><td><span style="font-size:0.7rem; color:#666; font-weight:bold;">Urutan Tampil: ${urutG}</span><br><b>${grup}</b></td><td><b>${teks}</b>${opsi}${kondisiLabel}</td><td><code style="color:#0984e3;">${tipe}</code></td><td>${wajib}</td><td><div style="font-size:0.7rem; font-weight:bold; margin-bottom:5px;">${textStatus}</div><button class="btn-action" style="background:${btnColor}; color:white; width:100%;" onclick="window.superToggleQuestion('${id}', '${status}')">${btnText}</button></td></tr>`;
         }
     });
     if(count === 0) tableHtml += `<tr><td colspan="7" style="text-align:center; padding:30px; color:#666;">Belum ada pertanyaan untuk kategori ini.</td></tr>`;
-    tableHtml += `</tbody></table>`; document.getElementById('table-wrapper-q').innerHTML = tableHtml;
-    document.getElementById('lbl-count-q').innerText = `${count} Pertanyaan`;
+    tableHtml += `</tbody></table>`; document.getElementById('table-wrapper-q').innerHTML = tableHtml; document.getElementById('lbl-count-q').innerText = `${count} Pertanyaan`;
+};
+
+window.renderMenuTable = () => {
+    let tableHtml = `<table class="super-table"><thead><tr><th width="10%">Urutan</th><th width="20%">Nama Menu</th><th width="15%">Aksi Aplikasi (ID)</th><th width="35%">Target Role (Bisa Melihat)</th><th width="10%">Status</th><th width="10%">Aksi</th></tr></thead><tbody>`;
+    let count = 0;
+    
+    // Sort array menu
+    let sortedMenus = [...window.superMenuData].sort((a,b) => (parseInt(a.urutan)||0) - (parseInt(b.urutan)||0));
+    
+    sortedMenus.forEach(m => {
+        if(!m.id_menu) return;
+        count++;
+        const id = m.id_menu;
+        const label = `${m.icon || '📌'} ${m.label_menu || 'Tanpa Nama'}`;
+        const target = m.target_view || '-';
+        const role = (m.role_akses || 'KADER').toUpperCase().replace(/,/g, ', ');
+        const status = String(m.is_active || 'Y').toUpperCase();
+        
+        const isAktif = status === 'Y'; 
+        const bgRow = isAktif ? 'transparent' : '#fdfaf6'; 
+        const textStatus = isAktif ? '🟢 Muncul' : '🔴 Sembunyi'; 
+        const btnColor = isAktif ? '#ff7675' : '#00b894'; 
+        const btnText = isAktif ? 'Sembunyikan' : 'Munculkan';
+        
+        tableHtml += `
+            <tr style="background:${bgRow}; opacity: ${isAktif ? '1' : '0.6'};">
+                <td style="font-weight:bold; font-size:1.1rem; color:#0984e3; text-align:center;">${m.urutan || 0}</td>
+                <td style="font-weight:bold; color:#2c3e50;">${label}</td>
+                <td><code>${target}</code></td>
+                <td><div style="font-size:0.75rem; background:#eef2f5; padding:4px 8px; border-radius:4px; display:inline-block; border:1px solid #dcdde1;">${role}</div></td>
+                <td><b>${textStatus}</b></td>
+                <td><button class="btn-action" style="background:${btnColor}; color:white; width:100%;" onclick="window.superToggleMenu('${id}', '${status}')">${btnText}</button></td>
+            </tr>`;
+    });
+
+    if(count === 0) tableHtml += `<tr><td colspan="6" style="text-align:center; padding:30px; color:#666;">Database Menu masih kosong.</td></tr>`;
+    tableHtml += `</tbody></table>`; document.getElementById('table-wrapper-m').innerHTML = tableHtml;
+    document.getElementById('lbl-count-m').innerText = `${count} Menu Aktif`;
 };
 
 // ==========================================
@@ -107,6 +116,7 @@ export const initSuperAdmin = async (session) => {
                     <div class="super-menu-item" data-target="dashboard">🎛️ Dashboard Utama</div>
                     <div class="super-menu-item active" data-target="user_management">👥 Manajemen Pengguna</div>
                     <div class="super-menu-item" data-target="kuesioner">📋 Master Kuesioner (Form)</div>
+                    <div class="super-menu-item" data-target="menu_management">🎚️ Manajemen Menu (RBAC)</div>
                     <div class="super-menu-item" data-target="referensi">🏗️ Master Wilayah & Referensi</div>
                     <div class="super-menu-item" data-target="audit_trail">🛡️ Audit Log & Keamanan</div>
                 </div>
@@ -150,7 +160,115 @@ window.renderSuperView = async (target) => {
     
     if (target === 'dashboard') { content.innerHTML = `<div class="super-card"><h3>Dashboard sedang disiapkan...</h3><p>Silakan buka menu lain.</p></div>`; } 
     
-    // --- 📋 MENU MASTER KUESIONER (V14 - LOGIKA KONDISIONAL) ---
+    // --- 🎚️ MENU MANAJEMEN MENU (V15 - RBAC) ---
+    else if (target === 'menu_management') {
+        content.innerHTML = `
+            <div class="super-card" style="margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px;">
+                <div><h3 style="margin:0; color:#1a1a2e;">Pabrik Menu (Hak Akses)</h3><p style="margin:5px 0 0 0; color:#666; font-size:0.9rem;">Buat, atur urutan, dan tentukan siapa yang boleh melihat menu ini.</p></div>
+                <button id="btn-show-add-m" style="background:#0984e3; color:white; border:none; padding:10px 20px; border-radius:6px; font-weight:bold; cursor:pointer; box-shadow: 0 4px 6px rgba(9, 132, 227, 0.3);">+ Tambah Menu</button>
+            </div>
+            
+            <div class="super-card" style="padding:0; overflow:hidden;">
+                <div style="background:#f8f9fa; padding:15px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
+                    <div style="font-size:0.85rem; color:#856404; font-weight:bold;">💡 Menu akan muncul secara otomatis di layar target berdasarkan hak aksesnya.</div>
+                    <div style="font-size:0.85rem; font-weight:bold; color:#666; background:#fff; padding:8px 12px; border:1px solid #ddd; border-radius:6px;" id="lbl-count-m">0 Menu</div>
+                </div>
+                <div id="table-wrapper-m" class="super-table-container"><div style="padding:50px; text-align:center; color:#666;"><h3>⏳ Menyedot Data Menu...</h3></div></div>
+            </div>
+
+            <div id="modal-add-m" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.7); z-index:1000; align-items:center; justify-content:center;">
+                <div style="background:white; padding:30px; border-radius:10px; width:90%; max-width:500px; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+                    <h3 style="margin-top:0; color:#1a1a2e; border-bottom:2px solid #eee; padding-bottom:10px;">➕ Buat Menu Navigasi Baru</h3>
+                    
+                    <div style="display:flex; gap:10px; margin-bottom:15px;">
+                        <div style="flex:1;">
+                            <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:5px;">Icon (Emoji)</label>
+                            <input type="text" id="m-icon" class="filter-input" placeholder="Cth: 📊" style="width:100%; box-sizing:border-box;" required>
+                        </div>
+                        <div style="flex:4;">
+                            <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:5px;">Nama Menu (Label)</label>
+                            <input type="text" id="m-label" class="filter-input" placeholder="Cth: Rekap Bulanan" style="width:100%; box-sizing:border-box;" required>
+                        </div>
+                    </div>
+
+                    <div style="display:flex; gap:10px; margin-bottom:15px;">
+                        <div style="flex:2;">
+                            <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:5px;">Target Aplikasi (Aksi)</label>
+                            <input type="text" id="m-target" class="filter-input" placeholder="Cth: rekap_bulanan" style="width:100%; box-sizing:border-box;" required>
+                            <div style="font-size:0.7rem; color:#888; margin-top:3px;">*Kode aksi di sistem (tanpa spasi).</div>
+                        </div>
+                        <div style="flex:1;">
+                            <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:5px;">Urutan</label>
+                            <input type="number" id="m-urut" class="filter-input" placeholder="1, 2, 3..." style="width:100%; box-sizing:border-box;" required>
+                        </div>
+                    </div>
+
+                    <div style="background:#e8f4fd; padding:15px; border-radius:8px; margin-bottom:20px; border:1px solid #b6d4fe;">
+                        <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:10px; color:#0d6efd;">Hak Akses (Siapa yang boleh lihat?)</label>
+                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; font-size:0.9rem;">
+                            <label><input type="checkbox" class="m-role-chk" value="KADER"> Kader Lapangan</label>
+                            <label><input type="checkbox" class="m-role-chk" value="ADMIN_KECAMATAN"> Admin Kecamatan</label>
+                            <label><input type="checkbox" class="m-role-chk" value="ADMIN_KABUPATEN"> Admin Kabupaten</label>
+                            <label><input type="checkbox" class="m-role-chk" value="MITRA"> Mitra Kerja</label>
+                        </div>
+                    </div>
+
+                    <div style="display:flex; justify-content:flex-end; gap:10px;">
+                        <button type="button" id="btn-close-m" style="padding:10px 20px; border:none; background:#eee; color:#333; border-radius:5px; cursor:pointer; font-weight:bold;">Batal</button>
+                        <button type="button" id="btn-submit-m" style="padding:10px 20px; border:none; background:#0984e3; color:white; border-radius:5px; cursor:pointer; font-weight:bold;">Simpan Menu</button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        try {
+            const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_ALL', token: SUPER_TOKEN, sheetName: 'MASTER_MENU' }) });
+            const res = await response.json();
+            if (res.status === 'success') {
+                window.superMenuData = res.data;
+                window.renderMenuTable();
+                
+                const modalM = document.getElementById('modal-add-m'); 
+                document.getElementById('btn-show-add-m').onclick = () => { modalM.style.display = 'flex'; };
+                document.getElementById('btn-close-m').onclick = () => modalM.style.display = 'none';
+
+                document.getElementById('btn-submit-m').onclick = async () => {
+                    const icon = document.getElementById('m-icon').value.trim();
+                    const label = document.getElementById('m-label').value.trim();
+                    const targetView = document.getElementById('m-target').value.trim().toLowerCase();
+                    const urut = document.getElementById('m-urut').value;
+                    
+                    const checkedRoles = Array.from(document.querySelectorAll('.m-role-chk:checked')).map(cb => cb.value);
+                    if(checkedRoles.length === 0) { alert("⚠️ Pilih minimal 1 Role Hak Akses!"); return; }
+                    const roleString = checkedRoles.join(',');
+
+                    if(!label || !targetView || !urut) { alert("⚠️ Mohon isi form dengan lengkap!"); return; }
+
+                    const btnSubmit = document.getElementById('btn-submit-m'); 
+                    btnSubmit.innerText = "Menyimpan..."; btnSubmit.disabled = true;
+
+                    const newId = `MENU-${Date.now().toString().slice(-5)}`;
+
+                    const payloadM = { id_menu: newId, label_menu: label, icon: icon, target_view: targetView, role_akses: roleString, urutan: urut, is_active: 'Y' };
+
+                    try {
+                        const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_ADD_MENU', token: SUPER_TOKEN, data: payloadM }) });
+                        const res = await response.json();
+                        if(res.status === 'success') { 
+                            alert("✅ Menu baru berhasil dibuat!"); 
+                            modalM.style.display = 'none'; 
+                            document.getElementById('table-wrapper-m').innerHTML = `<div style="padding:50px; text-align:center; color:#0984e3;"><h3>🔄 MENYINKRONKAN...</h3></div>`;
+                            await clearStore('master_menu'); 
+                            setTimeout(() => { window.renderSuperView('menu_management'); }, 1000);
+                        } else { alert("❌ Gagal menyimpan: " + res.message); }
+                    } catch(e) { alert("❌ Kesalahan Jaringan."); } finally { btnSubmit.innerText = "Simpan Menu"; btnSubmit.disabled = false; }
+                };
+
+            } else { document.getElementById('table-wrapper-m').innerHTML = `<div style="padding:50px; text-align:center; color:#e94560;"><h3>❌ Gagal Membaca Menu</h3><p>${res.message}</p></div>`; }
+        } catch (error) { document.getElementById('table-wrapper-m').innerHTML = `<div style="padding:50px; text-align:center; color:#e94560;"><h3>❌ Gagal Terhubung</h3></div>`; }
+    }
+
+    // --- 📋 MENU MASTER KUESIONER (V14) ---
     else if (target === 'kuesioner') {
         content.innerHTML = `
             <div class="super-card" style="margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px;">
@@ -162,12 +280,7 @@ window.renderSuperView = async (target) => {
                 <div style="background:#f8f9fa; padding:15px; border-bottom:1px solid #eee; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
                     <strong style="color:#333;">Filter Sasaran:</strong>
                     <select id="flt-kategori-q" class="filter-input" style="min-width:200px;">
-                        <option value="ALL">📋 Semua Formulir</option>
-                        <option value="CATIN">👰 Formulir CATIN</option>
-                        <option value="BUMIL">🤰 Formulir IBU HAMIL</option>
-                        <option value="BUFAS">🤱 Formulir IBU NIFAS</option>
-                        <option value="BADUTA">👶 Formulir BADUTA</option>
-                        <option value="UMUM">🏘️ Formulir UMUM / LINGKUNGAN</option>
+                        <option value="ALL">📋 Semua Formulir</option><option value="CATIN">👰 Formulir CATIN</option><option value="BUMIL">🤰 Formulir IBU HAMIL</option><option value="BUFAS">🤱 Formulir IBU NIFAS</option><option value="BADUTA">👶 Formulir BADUTA</option><option value="UMUM">🏘️ Formulir UMUM / LINGKUNGAN</option>
                     </select>
                     <div style="font-size:0.85rem; font-weight:bold; color:#666; background:#fff; padding:8px 12px; border:1px solid #ddd; border-radius:6px;" id="lbl-count-q">0 Pertanyaan</div>
                 </div>
@@ -181,76 +294,27 @@ window.renderSuperView = async (target) => {
                     <div style="background:#f8f9fa; padding:15px; border-radius:8px; margin-bottom:15px; border: 1px solid #e1e8ed;">
                         <p style="margin:0 0 10px 0; font-size:0.85rem; font-weight:bold; color:#0984e3;">1. Tentukan Posisi Pertanyaan (Penempatan)</p>
                         <div style="display:flex; gap:10px; margin-bottom:10px;">
-                            <div style="flex:1;">
-                                <label style="display:block; font-size:0.8rem; font-weight:bold; margin-bottom:5px;">Modul (Fase)</label>
-                                <select id="q-modul" class="filter-input" style="width:100%; box-sizing:border-box;">
-                                    <option value="REGISTRASI">REGISTRASI (Pendataan Awal)</option>
-                                    <option value="PENDAMPINGAN">PENDAMPINGAN (Kunjungan Rutin)</option>
-                                </select>
-                            </div>
-                            <div style="flex:1;">
-                                <label style="display:block; font-size:0.8rem; font-weight:bold; margin-bottom:5px;">Jenis Sasaran</label>
-                                <select id="q-kat" class="filter-input" style="width:100%; box-sizing:border-box;">
-                                    <option value="BUMIL">IBU HAMIL</option>
-                                    <option value="CATIN">CATIN</option>
-                                    <option value="BUFAS">IBU NIFAS</option>
-                                    <option value="BADUTA">BADUTA</option>
-                                    <option value="UMUM">UMUM / KELUARGA</option>
-                                </select>
-                            </div>
+                            <div style="flex:1;"><label style="display:block; font-size:0.8rem; font-weight:bold; margin-bottom:5px;">Modul (Fase)</label><select id="q-modul" class="filter-input" style="width:100%; box-sizing:border-box;"><option value="REGISTRASI">REGISTRASI (Pendataan Awal)</option><option value="PENDAMPINGAN">PENDAMPINGAN (Kunjungan Rutin)</option></select></div>
+                            <div style="flex:1;"><label style="display:block; font-size:0.8rem; font-weight:bold; margin-bottom:5px;">Jenis Sasaran</label><select id="q-kat" class="filter-input" style="width:100%; box-sizing:border-box;"><option value="BUMIL">IBU HAMIL</option><option value="CATIN">CATIN</option><option value="BUFAS">IBU NIFAS</option><option value="BADUTA">BADUTA</option><option value="UMUM">UMUM / KELUARGA</option></select></div>
                         </div>
-                        
                         <div style="display:flex; gap:10px;">
-                            <div style="flex:2;">
-                                <label style="display:block; font-size:0.8rem; font-weight:bold; margin-bottom:5px;">Grup (Judul Kelompok)</label>
-                                <input type="text" id="q-grup" class="filter-input" placeholder="Cth: Antropometri" style="width:100%; box-sizing:border-box;" required>
-                            </div>
-                            <div style="flex:1;">
-                                <label style="display:block; font-size:0.8rem; font-weight:bold; margin-bottom:5px;">Urutan Tampil Grup</label>
-                                <input type="number" id="q-urut-grup" class="filter-input" placeholder="Angka: 1, 2.." style="width:100%; box-sizing:border-box;" required>
-                            </div>
+                            <div style="flex:2;"><label style="display:block; font-size:0.8rem; font-weight:bold; margin-bottom:5px;">Grup (Judul Kelompok)</label><input type="text" id="q-grup" class="filter-input" placeholder="Cth: Antropometri" style="width:100%; box-sizing:border-box;" required></div>
+                            <div style="flex:1;"><label style="display:block; font-size:0.8rem; font-weight:bold; margin-bottom:5px;">Urutan Tampil Grup</label><input type="number" id="q-urut-grup" class="filter-input" placeholder="Angka: 1, 2.." style="width:100%; box-sizing:border-box;" required></div>
                         </div>
                     </div>
 
-                    <div style="margin-bottom:15px;">
-                        <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:5px;">2. Teks Pertanyaan Lengkap</label>
-                        <textarea id="q-teks" class="filter-input" rows="2" placeholder="Cth: Apakah ibu rutin meminum tablet tambah darah?" style="width:100%; box-sizing:border-box;" required></textarea>
-                    </div>
+                    <div style="margin-bottom:15px;"><label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:5px;">2. Teks Pertanyaan Lengkap</label><textarea id="q-teks" class="filter-input" rows="2" placeholder="Cth: Apakah ibu rutin meminum tablet tambah darah?" style="width:100%; box-sizing:border-box;" required></textarea></div>
 
                     <div style="display:flex; gap:10px; margin-bottom:15px;">
-                        <div style="flex:1;">
-                            <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:5px;">3. Tipe Input Sistem</label>
-                            <select id="q-tipe" class="filter-input" style="width:100%; box-sizing:border-box;">
-                                <option value="select">PILIHAN (Dropdown/Radio)</option>
-                                <option value="text">TEKS BEBAS (Huruf)</option>
-                                <option value="number">ANGKA (Kalkulator Stunting)</option>
-                                <option value="date">TANGGAL (Kalender)</option>
-                            </select>
-                        </div>
-                        <div style="flex:1;">
-                            <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:5px;">Sifat Jawaban</label>
-                            <select id="q-wajib" class="filter-input" style="width:100%; box-sizing:border-box;">
-                                <option value="Y">Wajib Diisi (*)</option>
-                                <option value="N">Opsional (Boleh Kosong)</option>
-                            </select>
-                        </div>
+                        <div style="flex:1;"><label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:5px;">3. Tipe Input Sistem</label><select id="q-tipe" class="filter-input" style="width:100%; box-sizing:border-box;"><option value="select">PILIHAN (Dropdown/Radio)</option><option value="text">TEKS BEBAS (Huruf)</option><option value="number">ANGKA (Kalkulator Stunting)</option><option value="date">TANGGAL (Kalender)</option></select></div>
+                        <div style="flex:1;"><label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:5px;">Sifat Jawaban</label><select id="q-wajib" class="filter-input" style="width:100%; box-sizing:border-box;"><option value="Y">Wajib Diisi (*)</option><option value="N">Opsional (Boleh Kosong)</option></select></div>
                     </div>
 
-                    <div id="panel-opsi" style="display:block; background:#fff3cd; padding:15px; border-radius:8px; margin-bottom:15px; border:1px solid #ffeeba;">
-                        <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:5px; color:#856404;">Pilihan Jawaban (Pisahkan dengan Koma)</label>
-                        <input type="text" id="q-opsi" class="filter-input" placeholder="Cth: Ya, Tidak, Kadang-kadang" style="width:100%; box-sizing:border-box;">
-                    </div>
+                    <div id="panel-opsi" style="display:block; background:#fff3cd; padding:15px; border-radius:8px; margin-bottom:15px; border:1px solid #ffeeba;"><label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:5px; color:#856404;">Pilihan Jawaban (Pisahkan dengan Koma)</label><input type="text" id="q-opsi" class="filter-input" placeholder="Cth: Ya, Tidak, Kadang-kadang" style="width:100%; box-sizing:border-box;"></div>
 
-                    <div style="background:#fdf3e8; padding:15px; border-radius:8px; margin-bottom:20px; border: 1px dashed #e67e22;">
-                        <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:5px; color:#d35400;">4. Logika Percabangan (Opsional)</label>
-                        <input type="text" id="q-kondisi" class="filter-input" placeholder="Cth: Q-PEN-BDT-1234=Ya" style="width:100%; box-sizing:border-box;">
-                        <div style="font-size:0.75rem; color:#888; margin-top:5px;">*Format: <b>ID_PERTANYAAN_INDUK=JAWABAN</b>.<br>Kosongkan jika pertanyaan ini selalu tampil.</div>
-                    </div>
+                    <div style="background:#fdf3e8; padding:15px; border-radius:8px; margin-bottom:20px; border: 1px dashed #e67e22;"><label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:5px; color:#d35400;">4. Logika Percabangan (Opsional)</label><input type="text" id="q-kondisi" class="filter-input" placeholder="Cth: Q-PEN-BDT-1234=Ya" style="width:100%; box-sizing:border-box;"><div style="font-size:0.75rem; color:#888; margin-top:5px;">*Format: <b>ID_PERTANYAAN_INDUK=JAWABAN</b>.<br>Kosongkan jika selalu tampil.</div></div>
 
-                    <div style="display:flex; justify-content:flex-end; gap:10px;">
-                        <button type="button" id="btn-close-q" style="padding:10px 20px; border:none; background:#eee; color:#333; border-radius:5px; cursor:pointer; font-weight:bold;">Batal</button>
-                        <button type="button" id="btn-submit-q" style="padding:10px 20px; border:none; background:#0984e3; color:white; border-radius:5px; cursor:pointer; font-weight:bold;">Simpan ke Google Sheet</button>
-                    </div>
+                    <div style="display:flex; justify-content:flex-end; gap:10px;"><button type="button" id="btn-close-q" style="padding:10px 20px; border:none; background:#eee; color:#333; border-radius:5px; cursor:pointer; font-weight:bold;">Batal</button><button type="button" id="btn-submit-q" style="padding:10px 20px; border:none; background:#0984e3; color:white; border-radius:5px; cursor:pointer; font-weight:bold;">Simpan ke Google Sheet</button></div>
                 </div>
             </div>
         `;
@@ -261,72 +325,27 @@ window.renderSuperView = async (target) => {
             if (res.status === 'success') {
                 window.superKuesionerData = res.data;
                 window.renderKuesionerTable();
-                
                 document.getElementById('flt-kategori-q').addEventListener('change', window.renderKuesionerTable);
 
-                const modalQ = document.getElementById('modal-add-q'); 
-                const tipeSelect = document.getElementById('q-tipe'); 
-                const panelOpsi = document.getElementById('panel-opsi');
-
-                document.getElementById('btn-show-add-q').onclick = () => { modalQ.style.display = 'flex'; };
-                document.getElementById('btn-close-q').onclick = () => modalQ.style.display = 'none';
-
+                const modalQ = document.getElementById('modal-add-q'); const tipeSelect = document.getElementById('q-tipe'); const panelOpsi = document.getElementById('panel-opsi');
+                document.getElementById('btn-show-add-q').onclick = () => { modalQ.style.display = 'flex'; }; document.getElementById('btn-close-q').onclick = () => modalQ.style.display = 'none';
                 tipeSelect.addEventListener('change', () => { panelOpsi.style.display = tipeSelect.value === 'select' ? 'block' : 'none'; });
 
                 document.getElementById('btn-submit-q').onclick = async () => {
-                    const modul = document.getElementById('q-modul').value;
-                    const kat = document.getElementById('q-kat').value;
-                    const grup = document.getElementById('q-grup').value.trim();
-                    const urutGrup = document.getElementById('q-urut-grup').value; 
-                    const teks = document.getElementById('q-teks').value.trim();
-                    const tipe = document.getElementById('q-tipe').value;
-                    const wajib = document.getElementById('q-wajib').value;
-                    const opsiRaw = tipe === 'select' ? document.getElementById('q-opsi').value.trim() : '';
-                    const kondisiRaw = document.getElementById('q-kondisi').value.trim(); // 🔥 TANGKAP KONDISI
+                    const modul = document.getElementById('q-modul').value; const kat = document.getElementById('q-kat').value; const grup = document.getElementById('q-grup').value.trim(); const urutGrup = document.getElementById('q-urut-grup').value; const teks = document.getElementById('q-teks').value.trim(); const tipe = document.getElementById('q-tipe').value; const wajib = document.getElementById('q-wajib').value; const opsiRaw = tipe === 'select' ? document.getElementById('q-opsi').value.trim() : ''; const kondisiRaw = document.getElementById('q-kondisi').value.trim(); 
 
-                    if(!grup || !urutGrup) { alert("⚠️ Grup Pertanyaan dan Angka Urutannya harus diisi!"); return; }
-                    if(!teks) { alert("⚠️ Teks Pertanyaan tidak boleh kosong!"); return; }
-                    if(tipe === 'select' && !opsiRaw) { alert("⚠️ Karena tipenya PILIHAN, Anda harus memasukkan opsi jawabannya!"); return; }
+                    if(!grup || !urutGrup) { alert("⚠️ Grup Pertanyaan dan Angka Urutannya harus diisi!"); return; } if(!teks) { alert("⚠️ Teks Pertanyaan tidak boleh kosong!"); return; } if(tipe === 'select' && !opsiRaw) { alert("⚠️ Karena tipenya PILIHAN, Anda harus memasukkan opsi jawabannya!"); return; }
 
-                    const btnSubmit = document.getElementById('btn-submit-q'); 
-                    btnSubmit.innerText = "Menembak ke Server..."; btnSubmit.disabled = true;
+                    const btnSubmit = document.getElementById('btn-submit-q'); btnSubmit.innerText = "Menembak ke Server..."; btnSubmit.disabled = true;
 
-                    // KONVERSI JSON OTOMATIS
-                    let jsonOpsi = '';
-                    if (tipe === 'select' && opsiRaw) {
-                        const arrOpsi = opsiRaw.split(',').map(item => item.trim()).filter(item => item !== '');
-                        jsonOpsi = JSON.stringify(arrOpsi); 
-                    }
+                    let jsonOpsi = ''; if (tipe === 'select' && opsiRaw) { const arrOpsi = opsiRaw.split(',').map(item => item.trim()).filter(item => item !== ''); jsonOpsi = JSON.stringify(arrOpsi); }
+                    const prefix = modul === 'REGISTRASI' ? 'Q-REG' : 'Q-PEN'; const mid = kat === 'BUMIL' ? 'BML' : (kat === 'CATIN' ? 'CTN' : (kat === 'BUFAS' ? 'BFS' : (kat === 'BADUTA' ? 'BDT' : 'UMM'))); const newId = `${prefix}-${mid}-${Date.now().toString().slice(-4)}`;
 
-                    // ID GENERATOR CERDAS
-                    const prefix = modul === 'REGISTRASI' ? 'Q-REG' : 'Q-PEN';
-                    const mid = kat === 'BUMIL' ? 'BML' : (kat === 'CATIN' ? 'CTN' : (kat === 'BUFAS' ? 'BFS' : (kat === 'BADUTA' ? 'BDT' : 'UMM')));
-                    const newId = `${prefix}-${mid}-${Date.now().toString().slice(-4)}`;
-
-                    const payloadQ = { 
-                        id_pertanyaan: newId, 
-                        modul: modul,
-                        jenis_sasaran: kat, 
-                        grup_pertanyaan: grup,
-                        urutan_grup: urutGrup, 
-                        label_pertanyaan: teks, 
-                        tipe_input: tipe, 
-                        opsi_json: jsonOpsi, 
-                        is_required: wajib, 
-                        is_active: 'Y',
-                        kondisi_tampil: kondisiRaw // 🔥 MASUKKAN KONDISI KE PAYLOAD
-                    };
+                    const payloadQ = { id_pertanyaan: newId, modul: modul, jenis_sasaran: kat, grup_pertanyaan: grup, urutan_grup: urutGrup, label_pertanyaan: teks, tipe_input: tipe, opsi_json: jsonOpsi, is_required: wajib, is_active: 'Y', kondisi_tampil: kondisiRaw };
 
                     try {
-                        const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_ADD_QUESTION', token: SUPER_TOKEN, data: payloadQ }) });
-                        const res = await response.json();
-                        if(res.status === 'success') { 
-                            alert("✅ Kuesioner Percabangan berhasil mengudara!"); 
-                            modalQ.style.display = 'none'; 
-                            document.getElementById('table-wrapper-q').innerHTML = `<div style="padding:50px; text-align:center; color:#0984e3;"><h3>🔄 MENYINKRONKAN KUESIONER...</h3></div>`;
-                            await clearStore('master_pertanyaan'); 
-                            setTimeout(() => { window.renderSuperView('kuesioner'); }, 1000);
-                        } else { alert("❌ Gagal menyimpan: " + res.message); }
+                        const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_ADD_QUESTION', token: SUPER_TOKEN, data: payloadQ }) }); const res = await response.json();
+                        if(res.status === 'success') { alert("✅ Kuesioner Percabangan berhasil mengudara!"); modalQ.style.display = 'none'; document.getElementById('table-wrapper-q').innerHTML = `<div style="padding:50px; text-align:center; color:#0984e3;"><h3>🔄 MENYINKRONKAN KUESIONER...</h3></div>`; await clearStore('master_pertanyaan'); setTimeout(() => { window.renderSuperView('kuesioner'); }, 1000); } else { alert("❌ Gagal menyimpan: " + res.message); }
                     } catch(e) { alert("❌ Kesalahan Jaringan."); } finally { btnSubmit.innerText = "Simpan ke Google Sheet"; btnSubmit.disabled = false; }
                 };
 
