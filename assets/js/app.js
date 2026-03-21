@@ -166,10 +166,40 @@ window.renderKonten = async (target) => {
             </div>`;
 
         try {
-            const [allWil, antrean] = await Promise.all([ getAllData('master_tim_wilayah').catch(()=>[]), getAllData('sync_queue').catch(()=>[]) ]);
-            let namaDesa = session.desa && session.desa !== '-' ? session.desa : '-'; let daftarDusun = session.dusun && session.dusun !== '-' ? session.dusun : '-';
-            if (namaDesa === '-') { const wilayahKerja = allWil.filter(w => String(w.id_tim) === String(session.id_tim)); daftarDusun = wilayahKerja.map(w => w.dusun_rw).join(', ') || '-'; namaDesa = wilayahKerja[0]?.desa_kelurahan || '-'; }
+            // 🔥 V18.3: Ambil master_tim juga untuk memastikan dusun terbaca jika tim tunggal
+            const [allWil, allTim, antrean] = await Promise.all([ 
+                getAllData('master_tim_wilayah').catch(()=>[]), 
+                getAllData('master_tim').catch(()=>[]),
+                getAllData('sync_queue').catch(()=>[]) 
+            ]);
+
+            let namaDesa = session.desa && session.desa !== '-' && String(session.desa).toLowerCase() !== 'undefined' ? session.desa : '-'; 
+            let daftarDusun = session.dusun && session.dusun !== '-' && String(session.dusun).toLowerCase() !== 'undefined' ? session.dusun : '-';
+            
+            // 🔥 LOGIKA CERDAS: Selalu paksa cari dusun dari DB jika kosong/strip
+            if (daftarDusun === '-' || !daftarDusun) {
+                const wilayahKerja = allWil.filter(w => String(w.id_tim) === String(session.id_tim));
+                if (wilayahKerja.length > 0) {
+                    daftarDusun = [...new Set(wilayahKerja.map(w => w.dusun_rw || w.dusun).filter(Boolean))].join(', ');
+                } else {
+                    // Coba cari di master_tim
+                    const timData = allTim.find(t => String(t.id_tim) === String(session.id_tim) || String(t.id) === String(session.id_tim));
+                    if (timData) daftarDusun = timData.dusun_rw || timData.dusun || '-';
+                }
+            }
+
+            if (namaDesa === '-' || !namaDesa) {
+                const wilayahKerja = allWil.filter(w => String(w.id_tim) === String(session.id_tim));
+                if (wilayahKerja.length > 0) {
+                    namaDesa = wilayahKerja[0]?.desa_kelurahan || wilayahKerja[0]?.desa || '-';
+                } else {
+                    const timData = allTim.find(t => String(t.id_tim) === String(session.id_tim) || String(t.id) === String(session.id_tim));
+                    if (timData) namaDesa = timData.desa_kelurahan || timData.desa || '-';
+                }
+            }
+
             if (getEl('dash-detail-wilayah')) { getEl('dash-detail-wilayah').innerHTML = `<div style="background: rgba(255,255,255,0.2); display: inline-block; padding: 4px 10px; border-radius: 6px; font-weight: bold; font-size: 0.85rem; margin-bottom: 12px;">NO. TIM: ${session.nomor_tim || session.id_tim}</div><div style="line-height: 1.25;"><div style="margin-bottom: 6px;"><span style="opacity:0.8; font-size: 0.8rem;">📍 Wilayah Tugas (Dusun/RW):</span><br><span style="font-weight: 600; font-size: 0.9rem;">${daftarDusun}</span></div><div style="margin-bottom: 6px;"><span style="opacity:0.8; font-size: 0.8rem;">🏘️ Desa/Kelurahan:</span><br><span style="font-weight: 600; font-size: 0.9rem;">${namaDesa}</span></div><div><span style="opacity:0.8; font-size: 0.8rem;">🏛️ Kecamatan:</span><br><span style="font-weight: 600; font-size: 0.9rem;">${session.kecamatan || '-'}</span></div></div>`; }
+            
             const queueTim = antrean.filter(a => String(a.id_tim) === String(session.id_tim));
             if (getEl('dash-tunda')) getEl('dash-tunda').innerText = `${queueTim.filter(a => a.is_synced).length}/${queueTim.filter(a => !a.is_synced).length}`;
             const regList = queueTim.filter(a => a.tipe_laporan === 'REGISTRASI'); const pendList = queueTim.filter(a => a.tipe_laporan === 'PENDAMPINGAN');
@@ -257,14 +287,11 @@ window.renderKonten = async (target) => {
                 const tempDiv = document.createElement('div');
                 tempDiv.innerHTML = htmlString;
                 
-                // Ekstrak semua script dari widget
                 const scripts = tempDiv.querySelectorAll('script');
                 scripts.forEach(s => {
                     const newScript = document.createElement('script');
                     newScript.text = s.innerHTML;
-                    // Hapus script lama agar tidak dieksekusi ganda jika innerHTML jalan
                     s.parentNode.removeChild(s); 
-                    // Tanam script baru langsung ke body agar dieksekusi
                     document.body.appendChild(newScript);
                 });
 
