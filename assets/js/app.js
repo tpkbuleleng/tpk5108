@@ -226,11 +226,11 @@ const getKodeKecamatan = (kec) => {
     return map[kec.toUpperCase()] || "XXX";
 };
 
-// 🔥 MESIN PERAKIT KUESIONER DINAMIS (CASCADING GROUPS)
+// 🔥 MESIN PERAKIT KUESIONER DINAMIS (V13 - ENTERPRISE CASCADING)
 const renderPertanyaanDinamis = (jenis, modul, container, questions) => {
     if (!jenis) { container.innerHTML = ''; return; }
     
-    // 1. Ambil pertanyaan sesuai Modul & Jenis Sasaran (Termasuk UMUM)
+    // 1. Ambil pertanyaan sesuai Modul & Jenis Sasaran
     const filteredQ = questions.filter(q => {
         let status = String(q.is_active || q.status || 'Y').toUpperCase();
         let sasaran = String(q.jenis_sasaran || '').toUpperCase();
@@ -241,21 +241,31 @@ const renderPertanyaanDinamis = (jenis, modul, container, questions) => {
     }).sort((a,b)=> (parseInt(a.urutan)||0) - (parseInt(b.urutan)||0));
 
     if (filteredQ.length > 0) {
-        // 2. Kelompokkan berdasarkan 'grup_pertanyaan'
+        // 2. Kelompokkan berdasarkan 'grup_pertanyaan' dan simpan 'urutan_grup'-nya
         const grouped = {};
         filteredQ.forEach(q => {
             let grup = q.grup_pertanyaan || 'Informasi Tambahan';
-            if(!grouped[grup]) grouped[grup] = [];
-            grouped[grup].push(q);
+            // Jika kolom urutan_grup kosong di sheet, beri default 999 agar dilempar ke paling bawah
+            let urutG = parseInt(q.urutan_grup); 
+            if (isNaN(urutG)) urutG = 999; 
+
+            if(!grouped[grup]) {
+                grouped[grup] = { urutan_grup: urutG, questions: [] };
+            }
+            grouped[grup].questions.push(q);
         });
 
-        // 3. Render HTML berdasarkan Grup
+        // 3. Konversi ke Array dan URUTKAN GRUP berdasarkan 'urutan_grup' terkecil!
+        const groupArray = Object.keys(grouped).map(k => ({ nama_grup: k, ...grouped[k] }));
+        groupArray.sort((a, b) => a.urutan_grup - b.urutan_grup);
+
+        // 4. Gambar Kotaknya di Layar
         let html = ``;
-        for (const grup in grouped) {
+        groupArray.forEach(g => {
             html += `<div style="background:#fff; border:1px solid #e1e8ed; padding:15px; border-radius:8px; margin-bottom:15px;">`;
-            html += `<h4 style="margin:0 0 15px 0; color:#2c3e50; font-size:1rem; border-bottom:1px solid #eee; padding-bottom:5px;">📋 ${grup}</h4>`;
+            html += `<h4 style="margin:0 0 15px 0; color:#2c3e50; font-size:1rem; border-bottom:1px solid #eee; padding-bottom:5px;">📋 ${g.nama_grup}</h4>`;
             
-            grouped[grup].forEach(q => {
+            g.questions.forEach(q => {
                 let lbl = q.label_pertanyaan || q.teks_pertanyaan || 'Pertanyaan Tanpa Judul';
                 let req = String(q.is_required || q.wajib || 'Y').toUpperCase() === 'Y' || String(q.is_required || q.wajib || 'Y').toUpperCase() === 'YA' ? 'required' : ''; 
                 let markerReq = req ? '<span style="color:red; font-weight:bold;">*</span>' : '';
@@ -282,7 +292,7 @@ const renderPertanyaanDinamis = (jenis, modul, container, questions) => {
                 html += `<div class="form-group" style="margin-bottom: 12px;"><label style="font-weight:600; color:#444; font-size: 0.9rem;">${lbl} ${markerReq}</label>${inputHtml}</div>`;
             });
             html += `</div>`;
-        }
+        });
         container.innerHTML = html;
     } else { container.innerHTML = ''; }
 };
