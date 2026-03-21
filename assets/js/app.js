@@ -131,12 +131,9 @@ window.renderKonten = async (target) => {
 
         try {
             const [allWil, antrean] = await Promise.all([ getAllData('master_tim_wilayah').catch(()=>[]), getAllData('sync_queue').catch(()=>[]) ]);
-            
-            // 🔥 PERBAIKAN: Gunakan data desa/dusun langsung dari Session (V12 Fix)
             let namaDesa = session.desa && session.desa !== '-' ? session.desa : '-';
             let daftarDusun = session.dusun && session.dusun !== '-' ? session.dusun : '-';
             
-            // Fallback ke master_tim_wilayah jika session kosong
             if (namaDesa === '-') {
                 const wilayahKerja = allWil.filter(w => String(w.id_tim) === String(session.id_tim));
                 daftarDusun = wilayahKerja.map(w => w.dusun_rw).join(', ') || '-';
@@ -218,7 +215,7 @@ window.renderKonten = async (target) => {
 };
 
 // ==========================================
-// 4. LOGIKA FORM REGISTRASI & MESIN PERAKIT FORM (V12)
+// 4. LOGIKA FORM REGISTRASI & MESIN PERAKIT FORM (ENTERPRISE)
 // ==========================================
 const getKodeKecamatan = (kec) => {
     if (!kec) return "XXX";
@@ -226,7 +223,7 @@ const getKodeKecamatan = (kec) => {
     return map[kec.toUpperCase()] || "XXX";
 };
 
-// 🔥 MESIN PERAKIT KUESIONER DINAMIS (V13 - ENTERPRISE CASCADING)
+// 🔥 MESIN PERAKIT KUESIONER DINAMIS DENGAN KENDALI URUTAN GRUP (V13)
 const renderPertanyaanDinamis = (jenis, modul, container, questions) => {
     if (!jenis) { container.innerHTML = ''; return; }
     
@@ -241,11 +238,11 @@ const renderPertanyaanDinamis = (jenis, modul, container, questions) => {
     }).sort((a,b)=> (parseInt(a.urutan)||0) - (parseInt(b.urutan)||0));
 
     if (filteredQ.length > 0) {
-        // 2. Kelompokkan berdasarkan 'grup_pertanyaan' dan simpan 'urutan_grup'-nya
+        // 2. Kelompokkan berdasarkan 'grup_pertanyaan' dan simpan 'urutan_grup'
         const grouped = {};
         filteredQ.forEach(q => {
             let grup = q.grup_pertanyaan || 'Informasi Tambahan';
-            // Jika kolom urutan_grup kosong di sheet, beri default 999 agar dilempar ke paling bawah
+            // Tangkap urutan_grup dari Google Sheet, jika kosong beri nilai 999 (taruh paling bawah)
             let urutG = parseInt(q.urutan_grup); 
             if (isNaN(urutG)) urutG = 999; 
 
@@ -255,14 +252,14 @@ const renderPertanyaanDinamis = (jenis, modul, container, questions) => {
             grouped[grup].questions.push(q);
         });
 
-        // 3. Konversi ke Array dan URUTKAN GRUP berdasarkan 'urutan_grup' terkecil!
+        // 3. Konversi ke Array dan URUTKAN GRUP berdasarkan angka terkecil
         const groupArray = Object.keys(grouped).map(k => ({ nama_grup: k, ...grouped[k] }));
         groupArray.sort((a, b) => a.urutan_grup - b.urutan_grup);
 
-        // 4. Gambar Kotaknya di Layar
+        // 4. Gambar Kotaknya di Layar secara Berurutan!
         let html = ``;
         groupArray.forEach(g => {
-            html += `<div style="background:#fff; border:1px solid #e1e8ed; padding:15px; border-radius:8px; margin-bottom:15px;">`;
+            html += `<div style="background:#fff; border:1px solid #e1e8ed; padding:15px; border-radius:8px; margin-bottom:15px; box-shadow:0 1px 2px rgba(0,0,0,0.05);">`;
             html += `<h4 style="margin:0 0 15px 0; color:#2c3e50; font-size:1rem; border-bottom:1px solid #eee; padding-bottom:5px;">📋 ${g.nama_grup}</h4>`;
             
             g.questions.forEach(q => {
@@ -423,7 +420,7 @@ const initFormRegistrasi = async () => {
 };
 
 // ==========================================
-// 5. FITUR DAFTAR SASARAN & DETAIL (KIA DIGITAL)
+// 5. FITUR DAFTAR SASARAN & DETAIL
 // ==========================================
 window.bukaEditSasaran = async (id) => { const r = await getDataById('sync_queue', id); if(r) { window.editModeData = r; renderKonten('registrasi'); } else { alert('Data tidak ditemukan'); } };
 window.bukaEditLaporan = async (idLaporan) => { const r = await getDataById('sync_queue', idLaporan); if(r) { window.editModeLaporan = r; renderKonten('pendampingan'); } else { alert('Data laporan tidak ditemukan'); } };
@@ -564,7 +561,7 @@ const initDaftarSasaran = async () => {
 };
 
 // ==========================================
-// 6. FORM PENDAMPINGAN DINAMIS (V12)
+// 6. FORM PENDAMPINGAN DINAMIS
 // ==========================================
 const initFormPendampingan = async () => {
     const session = window.currentUser;
@@ -606,7 +603,7 @@ const initFormPendampingan = async () => {
                 infoBox.innerHTML = `<div style="font-weight:bold; color:#0043a8; margin-bottom: 8px; background: #fff; padding: 6px 12px; border-radius: 6px; border: 1px solid #c6c6c6; text-align:center; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">📌 Profil Sasaran Terpilih</div><table style="width:100%; font-size: 0.85rem; background: #fff; padding: 12px; border-radius: 6px; border: 1px solid #ddd; line-height:1.5;"><tr><td style="width:35%; color:#555;">Nama</td><td>: <b>${sasaran.nama_sasaran}</b></td></tr><tr><td style="color:#555;">No. KK</td><td>: ${sasaran.data_laporan?.nomor_kk||'-'}</td></tr><tr><td style="color:#555;">Umur Daftar</td><td>: ${sasaran.data_laporan?.usia_saat_daftar_tahun||'-'} Tahun</td></tr></table>`;
             }
 
-            // PANGGIL MESIN PERAKIT FORM (Grup & Dinamis)
+            // PANGGIL MESIN PERAKIT FORM (Grup & Dinamis V13)
             renderPertanyaanDinamis(sasaran.jenis_sasaran, 'PENDAMPINGAN', containerQ, questions);
 
             // LOGIKA SPESIFIK KALKULATOR BADUTA (Disuntikkan setelah form dirender)
@@ -620,7 +617,6 @@ const initFormPendampingan = async () => {
                     const kkaData = getKkaData(uBln); let listT = "", listP = "";
                     kkaData.forEach(k => { let kode = k.kode_aspek ? `[${k.kode_aspek}] ` : ''; listT += `<li><b>${kode}</b>${k.tugas_perkembangan}</li>`; listP += `<li style="margin-bottom:6px;"><b>${kode}</b>${k.pesan_stimulasi}</li>`; });
 
-                    // Cari ID input BB dan TB yang digenerate oleh Mesin Form
                     let idInputBB = null, idInputTB = null;
                     const inputs = containerQ.querySelectorAll('input');
                     inputs.forEach(inp => {
@@ -671,7 +667,6 @@ const initFormPendampingan = async () => {
                     if(getEl('is_melahirkan')) getEl('is_melahirkan').onchange = (e) => { if(e.target.value === 'YA') getEl('box-tgl-lahir').classList.remove('hidden'); else getEl('box-tgl-lahir').classList.add('hidden'); };
                 }
 
-                // Isi data jika mode edit
                 if(window.editModeLaporan) {
                     const eL = window.editModeLaporan;
                     for (const [key, value] of Object.entries(eL.data_laporan || {})) {
