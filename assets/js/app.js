@@ -2,53 +2,27 @@ import { initDB, putData, getDataById, deleteData, getAllData, clearStore } from
 import { downloadMasterData, uploadData } from './sync.js';
 import { initAdmin } from './admin.js';
 
-// 🔥 EKSPOS DATABASE KE GLOBAL
 window.AppDB = { getAllData, getDataById, putData };
 
 const getEl = (id) => document.getElementById(id);
 
-// ==========================================
-// 0. INISIALISASI SETTING TAMPILAN
-// ==========================================
 const applySettings = () => {
-    if(localStorage.getItem('theme') === 'dark') {
-        document.body.style.backgroundColor = '#121212'; document.body.style.color = '#ffffff';
-    } else {
-        document.body.style.backgroundColor = '#f0f4f8'; document.body.style.color = '#333333';
-    }
-    let fontSize = localStorage.getItem('fontSize') || '16';
-    document.documentElement.style.fontSize = fontSize + 'px';
+    if(localStorage.getItem('theme') === 'dark') { document.body.style.backgroundColor = '#121212'; document.body.style.color = '#ffffff'; } else { document.body.style.backgroundColor = '#f0f4f8'; document.body.style.color = '#333333'; }
+    let fontSize = localStorage.getItem('fontSize') || '16'; document.documentElement.style.fontSize = fontSize + 'px';
 };
 applySettings();
 
-// ==========================================
-// 0.5. 🛰️ FUNGSI PELACAK SATELIT (GEOTAGGING)
-// ==========================================
 const dapatkanLokasiGPS = async () => {
     return new Promise((resolve) => {
-        if (!navigator.geolocation) {
-            resolve("Browser tidak mendukung GPS");
-            return;
-        }
+        if (!navigator.geolocation) { resolve("Browser tidak mendukung GPS"); return; }
         navigator.geolocation.getCurrentPosition(
-            (position) => {
-                resolve(`${position.coords.latitude}, ${position.coords.longitude}`);
-            },
-            (error) => {
-                let msg = "Gagal (Tidak Diketahui)";
-                if (error.code === 1) msg = "Ditolak Pengguna";
-                else if (error.code === 2) msg = "Sinyal GPS Hilang";
-                else if (error.code === 3) msg = "Timeout Pencarian Satelit";
-                resolve(msg);
-            },
-            { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 } // Maksimal cari sinyal 8 detik
+            (position) => { resolve(`${position.coords.latitude}, ${position.coords.longitude}`); },
+            (error) => { let msg = "Gagal (Tidak Diketahui)"; if (error.code === 1) msg = "Ditolak Pengguna"; else if (error.code === 2) msg = "Sinyal GPS Hilang"; else if (error.code === 3) msg = "Timeout Pencarian Satelit"; resolve(msg); },
+            { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 } 
         );
     });
 };
 
-// ==========================================
-// 1. NAVIGASI LAYAR & JARINGAN
-// ==========================================
 const tampilkanLayar = (id) => {
     const vSplash = getEl('view-splash'); const vLogin = getEl('view-login'); const vApp = getEl('view-app');
     if (vSplash) { vSplash.classList.remove('active'); vSplash.style.display = 'none'; }
@@ -62,22 +36,17 @@ const updateNetworkStatus = () => {
     if (status) { const isOnline = navigator.onLine; status.innerText = isOnline ? 'Online' : 'Offline'; status.style.backgroundColor = isOnline ? '#198754' : '#6c757d'; }
 };
 
-// ==========================================
-// 2. INISIALISASI APLIKASI & ROUTER
-// ==========================================
 const initApp = async () => {
     try {
         await initDB();
         const session = await getDataById('kader_session', 'active_user');
-        
-        const vSplash = document.getElementById('view-splash');
-        const vLogin = document.getElementById('view-login');
-        const vApp = document.getElementById('view-app');
+        const vSplash = document.getElementById('view-splash'); const vLogin = document.getElementById('view-login'); const vApp = document.getElementById('view-app');
 
         if (session) {
+            // 🔥 V27 ROUTING: Arahkan PKB ke Dashboard Monitor (admin.js)
             if (String(session.role).toUpperCase().includes('SUPER')) {
                 import('./super.js').then(module => { module.initSuperAdmin(session); }).catch(err => { alert("Modul Super Admin tidak ditemukan!"); });
-            } else if (String(session.role).toUpperCase().includes('ADMIN')) {
+            } else if (String(session.role).toUpperCase().includes('ADMIN') || String(session.role).toUpperCase().includes('PKB')) {
                 if (typeof initAdmin === 'function') { initAdmin(session); } else { import('./admin.js').then(module => module.initAdmin(session)); }
             } else { masukKeAplikasi(session); }
         } else {
@@ -105,9 +74,6 @@ const masukKeAplikasi = async (session) => {
     renderMenu(session.role); renderKonten('dashboard'); tampilkanLayar('app');
 };
 
-// ==========================================
-// 3. PABRIK SUB-MENU
-// ==========================================
 const renderMenu = async (role) => {
     const container = getEl('dynamic-menu-container'); if (!container) return;
     let allMenu = await getAllData('master_menu').catch(()=>[]);
@@ -507,7 +473,6 @@ const initFormRegistrasi = async () => {
         formReg.onsubmit = async (e) => {
             e.preventDefault(); const btn = e.target.querySelector('button'); btn.disabled = true; 
             
-            // 🔥 V23: CEK SATELIT SEBELUM MENYIMPAN!
             btn.innerText = "📍 Mencari Titik Koordinat...";
             const gpsLocation = await dapatkanLokasiGPS();
             btn.innerText = "⏳ Membungkus Data...";
@@ -527,7 +492,6 @@ const initFormRegistrasi = async () => {
                 }
                 const createdDate = window.editModeData ? window.editModeData.created_at : new Date().toISOString();
                 
-                // Masukkan lokasi_gps ke payload
                 const laporan = { id: idSasaran, tipe_laporan: 'REGISTRASI', username: session.username, id_tim: session.id_tim, nomor_tim: session.nomor_tim, kecamatan: kecamatan, jenis_sasaran: jenisSasaran, nama_sasaran: jawaban.nama_sasaran, desa: desaFinal, dusun: dusunFinal, data_laporan: jawaban, status_sasaran: 'AKTIF', is_synced: false, created_at: createdDate, lokasi_gps: gpsLocation };
 
                 await putData('sync_queue', laporan); window.editModeData = null; alert(window.editModeData ? `✅ Data berhasil diperbarui!` : `✅ Registrasi berhasil! ID: ${idSasaran}`); renderKonten('daftar_sasaran');
@@ -799,7 +763,6 @@ const initFormPendampingan = async () => {
         formPend.onsubmit = async (e) => {
             e.preventDefault(); const btn = e.target.querySelector('button'); btn.disabled = true;
             
-            // 🔥 V23: CEK SATELIT SEBELUM MENYIMPAN!
             btn.innerText = "📍 Mencari Titik Koordinat...";
             const gpsLocation = await dapatkanLokasiGPS();
             btn.innerText = "⏳ Membungkus Data...";
@@ -819,7 +782,6 @@ const initFormPendampingan = async () => {
                 let createdDate = window.editModeLaporan ? window.editModeLaporan.created_at : new Date().toISOString();
                 if(window.editModeLaporan) { jawaban.id_sasaran = selSasaran.value; }
                 
-                // Masukkan lokasi_gps ke payload
                 await putData('sync_queue', { id: idLapor, tipe_laporan: 'PENDAMPINGAN', username: session.username, id_tim: session.id_tim, id_sasaran_ref: jawaban.id_sasaran || selSasaran.value, jenis_sasaran_saat_kunjungan: selJenis.value, data_laporan: jawaban, is_synced: false, created_at: createdDate, lokasi_gps: gpsLocation });
 
                 window.editModeLaporan = null; alert("✅ Laporan Pendampingan Tersimpan!"); renderKonten('daftar_sasaran');
@@ -911,9 +873,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 const response = await fetch(SCRIPT_URL_LOGIN, { 
                     method: 'POST', 
-                    body: JSON.stringify({ 
-                        action: 'LOGIN', id: id, pin: pin, perangkat: infoPerangkat, lokasi: infoLokasi
-                    }) 
+                    body: JSON.stringify({ action: 'LOGIN', id: id, pin: pin, perangkat: infoPerangkat, lokasi: infoLokasi }) 
                 });
                 
                 const res = await response.json();
@@ -922,8 +882,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     await initDB(); await putData('kader_session', res.session);
                     getEl('kader-id').value = ''; getEl('kader-pin').value = '';
 
+                    // 🔥 V27 ROUTING: Arahkan PKB ke Dashboard Monitor (admin.js)
                     if (res.session.role.includes('SUPER')) { import('./super.js').then(module => { module.initSuperAdmin(res.session); }).catch(err => { alert("❌ Peringatan Keamanan: Modul Super Admin tidak ditemukan di server!"); }); } 
-                    else if (res.session.role.includes('ADMIN')) { initAdmin(res.session); } 
+                    else if (res.session.role.includes('ADMIN') || res.session.role.includes('PKB')) { 
+                        if (typeof initAdmin === 'function') { initAdmin(res.session); } else { import('./admin.js').then(module => module.initAdmin(res.session)); }
+                    } 
                     else { masukKeAplikasi(res.session); }
                 } else { alert("❌ " + (res.message || "ID atau PIN yang Anda masukkan salah!")); }
             } catch (err) { alert("Kesalahan Sistem: Gagal menghubungi server otentikasi."); } finally { if (btn) { btn.disabled = false; btn.innerText = "Masuk"; } }
