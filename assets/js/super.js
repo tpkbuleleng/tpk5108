@@ -1,5 +1,5 @@
 // ==========================================
-// 👑 GOD MODE: SUPER ADMIN DASHBOARD (V15 - DYNAMIC MENU ENGINE)
+// 👑 GOD MODE: SUPER ADMIN DASHBOARD (V16 - SMART EDIT MENU)
 // ==========================================
 import { getAllData, clearStore } from './db.js';
 
@@ -17,6 +17,31 @@ window.superToggleStatus = async (idUser, namaUser, currentStatus) => { const is
 window.superBulkAction = async (actionType) => { const checkedBoxes = document.querySelectorAll('.chk-user:checked'); const targetIds = Array.from(checkedBoxes).map(cb => cb.value); const totalTarget = targetIds.length; if (totalTarget === 0) { alert("Pilih minimal 1 pengguna!"); return; } let confirmMsg = ""; let updateType = ""; let newValue = ""; if (actionType === 'BLOKIR') { confirmMsg = `⚠️ MEMBLOKIR ${totalTarget} akun. Ketik "YAKIN":`; updateType = 'STATUS'; newValue = 'NONAKTIF'; } else if (actionType === 'AKTIFKAN') { confirmMsg = `MENGAKTIFKAN ${totalTarget} akun. Ketik "YAKIN":`; updateType = 'STATUS'; newValue = 'AKTIF'; } else if (actionType === 'RESETPIN') { const pinMasal = prompt(`PIN BARU untuk ${totalTarget} akun:`); if (!pinMasal || pinMasal.length < 5) return; confirmMsg = `⚠️ MERESET PIN ${totalTarget} akun menjadi "${pinMasal}". Ketik "YAKIN":`; updateType = 'PIN'; newValue = pinMasal; } if (prompt(confirmMsg) !== "YAKIN") return; document.getElementById('table-wrapper').innerHTML = `<div style="padding:50px; text-align:center;"><h3>🚀 MENGEKSEKUSI...</h3></div>`; try { const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_BULK_UPDATE_USER', token: SUPER_TOKEN, ids: targetIds, updateType: updateType, newValue: newValue }) }); const res = await response.json(); if (res.status === 'success') { alert(`✅ SUKSES! ${res.count} Akun diperbarui!`); } else { alert("❌ Gagal: " + res.message); } window.renderSuperView('user_management'); } catch (e) { alert("❌ Kesalahan."); window.renderSuperView('user_management'); } };
 window.superToggleQuestion = async (idPertanyaan, statusSaatIni) => { const isAktif = (statusSaatIni || 'AKTIF').toUpperCase() === 'AKTIF' || statusSaatIni === 'Y'; const newStatus = isAktif ? 'N' : 'Y'; const aksi = isAktif ? 'MEMATIKAN' : 'MENGHIDUPKAN'; if(!confirm(`⚠️ PERINGATAN!\nAnda akan ${aksi} pertanyaan ini dari HP Kader.\nLanjutkan?`)) return; try { document.getElementById('table-wrapper-q').innerHTML = `<div style="padding:30px; text-align:center;">⏳ Memproses...</div>`; const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_UPDATE_QUESTION', token: SUPER_TOKEN, id_pertanyaan: idPertanyaan, newStatus: newStatus }) }); const res = await response.json(); if (res.status === 'success') { alert(`✅ Pertanyaan berhasil diupdate!`); await clearStore('master_pertanyaan'); window.renderSuperView('kuesioner'); } else { alert("❌ Gagal: " + res.message); window.renderSuperView('kuesioner');} } catch(e) { alert("❌ Kesalahan Jaringan."); window.renderSuperView('kuesioner');} };
 window.superToggleMenu = async (idMenu, statusSaatIni) => { const isAktif = (statusSaatIni || 'Y').toUpperCase() === 'Y'; const newStatus = isAktif ? 'N' : 'Y'; const aksi = isAktif ? 'MENYEMBUNYIKAN' : 'MEMUNCULKAN'; if(!confirm(`⚠️ PERINGATAN!\nAnda akan ${aksi} menu ini dari Aplikasi.\nLanjutkan?`)) return; try { document.getElementById('table-wrapper-m').innerHTML = `<div style="padding:30px; text-align:center;">⏳ Memproses...</div>`; const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_UPDATE_MENU', token: SUPER_TOKEN, id_menu: idMenu, newStatus: newStatus }) }); const res = await response.json(); if (res.status === 'success') { alert(`✅ Status menu berhasil diubah!`); await clearStore('master_menu'); window.renderSuperView('menu_management'); } else { alert("❌ Gagal: " + res.message); window.renderSuperView('menu_management');} } catch(e) { alert("❌ Kesalahan Jaringan."); window.renderSuperView('menu_management');} };
+
+// 🔥 FUNGSI BARU: BUKA MODAL EDIT MENU (V16)
+window.superEditMenu = (id) => {
+    const menu = window.superMenuData.find(m => m.id_menu === id);
+    if(!menu) return;
+    
+    window.currentEditMenuId = id; // Simpan ID yang sedang diedit di memori
+    
+    document.getElementById('modal-m-title').innerHTML = "✏️ Edit Menu Navigasi";
+    document.getElementById('btn-submit-m').innerText = "Update Menu";
+    
+    // Isi data ke dalam form
+    document.getElementById('m-icon').value = menu.icon || '';
+    document.getElementById('m-label').value = menu.label_menu || '';
+    document.getElementById('m-target').value = menu.target_view || '';
+    document.getElementById('m-urut').value = menu.urutan || '';
+
+    // Centang Role yang sesuai
+    const roles = (menu.role_akses || '').split(',');
+    document.querySelectorAll('.m-role-chk').forEach(cb => {
+        cb.checked = roles.includes(cb.value);
+    });
+
+    document.getElementById('modal-add-m').style.display = 'flex';
+};
 
 // ==========================================
 // 2. FUNGSI RENDER TABEL
@@ -66,7 +91,6 @@ window.renderMenuTable = () => {
     let tableHtml = `<table class="super-table"><thead><tr><th width="10%">Urutan</th><th width="20%">Nama Menu</th><th width="15%">Aksi Aplikasi (ID)</th><th width="35%">Target Role (Bisa Melihat)</th><th width="10%">Status</th><th width="10%">Aksi</th></tr></thead><tbody>`;
     let count = 0;
     
-    // Sort array menu
     let sortedMenus = [...window.superMenuData].sort((a,b) => (parseInt(a.urutan)||0) - (parseInt(b.urutan)||0));
     
     sortedMenus.forEach(m => {
@@ -84,6 +108,7 @@ window.renderMenuTable = () => {
         const btnColor = isAktif ? '#ff7675' : '#00b894'; 
         const btnText = isAktif ? 'Sembunyikan' : 'Munculkan';
         
+        // 🔥 TOMBOL EDIT DITAMBAHKAN DI SINI
         tableHtml += `
             <tr style="background:${bgRow}; opacity: ${isAktif ? '1' : '0.6'};">
                 <td style="font-weight:bold; font-size:1.1rem; color:#0984e3; text-align:center;">${m.urutan || 0}</td>
@@ -91,7 +116,10 @@ window.renderMenuTable = () => {
                 <td><code>${target}</code></td>
                 <td><div style="font-size:0.75rem; background:#eef2f5; padding:4px 8px; border-radius:4px; display:inline-block; border:1px solid #dcdde1;">${role}</div></td>
                 <td><b>${textStatus}</b></td>
-                <td><button class="btn-action" style="background:${btnColor}; color:white; width:100%;" onclick="window.superToggleMenu('${id}', '${status}')">${btnText}</button></td>
+                <td style="display:flex; flex-direction:column; gap:5px;">
+                    <button class="btn-action btn-edit" style="width:100%;" onclick="window.superEditMenu('${id}')">✏️ Edit</button>
+                    <button class="btn-action" style="background:${btnColor}; color:white; width:100%;" onclick="window.superToggleMenu('${id}', '${status}')">${btnText}</button>
+                </td>
             </tr>`;
     });
 
@@ -160,12 +188,12 @@ window.renderSuperView = async (target) => {
     
     if (target === 'dashboard') { content.innerHTML = `<div class="super-card"><h3>Dashboard sedang disiapkan...</h3><p>Silakan buka menu lain.</p></div>`; } 
     
-    // --- 🎚️ MENU MANAJEMEN MENU (V15 - RBAC) ---
+    // --- 🎚️ MENU MANAJEMEN MENU (V16 - SMART EDIT) ---
     else if (target === 'menu_management') {
         content.innerHTML = `
             <div class="super-card" style="margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px;">
                 <div><h3 style="margin:0; color:#1a1a2e;">Pabrik Menu (Hak Akses)</h3><p style="margin:5px 0 0 0; color:#666; font-size:0.9rem;">Buat, atur urutan, dan tentukan siapa yang boleh melihat menu ini.</p></div>
-                <button id="btn-show-add-m" style="background:#0984e3; color:white; border:none; padding:10px 20px; border-radius:6px; font-weight:bold; cursor:pointer; box-shadow: 0 4px 6px rgba(9, 132, 227, 0.3);">+ Tambah Menu</button>
+                <button id="btn-show-add-m" style="background:#0984e3; color:white; border:none; padding:10px 20px; border-radius:6px; font-weight:bold; cursor:pointer; box-shadow: 0 4px 6px rgba(9, 132, 227, 0.3);">+ Tambah Menu Baru</button>
             </div>
             
             <div class="super-card" style="padding:0; overflow:hidden;">
@@ -178,7 +206,7 @@ window.renderSuperView = async (target) => {
 
             <div id="modal-add-m" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.7); z-index:1000; align-items:center; justify-content:center;">
                 <div style="background:white; padding:30px; border-radius:10px; width:90%; max-width:500px; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
-                    <h3 style="margin-top:0; color:#1a1a2e; border-bottom:2px solid #eee; padding-bottom:10px;">➕ Buat Menu Navigasi Baru</h3>
+                    <h3 id="modal-m-title" style="margin-top:0; color:#1a1a2e; border-bottom:2px solid #eee; padding-bottom:10px;">➕ Buat Menu Navigasi Baru</h3>
                     
                     <div style="display:flex; gap:10px; margin-bottom:15px;">
                         <div style="flex:1;">
@@ -229,9 +257,25 @@ window.renderSuperView = async (target) => {
                 window.renderMenuTable();
                 
                 const modalM = document.getElementById('modal-add-m'); 
-                document.getElementById('btn-show-add-m').onclick = () => { modalM.style.display = 'flex'; };
+                
+                // 🔥 Tombol Tambah Menu Baru (Reset Form)
+                document.getElementById('btn-show-add-m').onclick = () => { 
+                    window.currentEditMenuId = null; // Kosongkan memori edit
+                    document.getElementById('modal-m-title').innerText = "➕ Buat Menu Navigasi Baru";
+                    document.getElementById('btn-submit-m').innerText = "Simpan Menu";
+                    
+                    document.getElementById('m-icon').value = '';
+                    document.getElementById('m-label').value = '';
+                    document.getElementById('m-target').value = '';
+                    document.getElementById('m-urut').value = '';
+                    document.querySelectorAll('.m-role-chk').forEach(cb => cb.checked = false);
+                    
+                    modalM.style.display = 'flex'; 
+                };
+
                 document.getElementById('btn-close-m').onclick = () => modalM.style.display = 'none';
 
+                // 🔥 Tombol Simpan (Cerdas: Bedakan Edit dan Tambah)
                 document.getElementById('btn-submit-m').onclick = async () => {
                     const icon = document.getElementById('m-icon').value.trim();
                     const label = document.getElementById('m-label').value.trim();
@@ -247,15 +291,23 @@ window.renderSuperView = async (target) => {
                     const btnSubmit = document.getElementById('btn-submit-m'); 
                     btnSubmit.innerText = "Menyimpan..."; btnSubmit.disabled = true;
 
-                    const newId = `MENU-${Date.now().toString().slice(-5)}`;
+                    const isEdit = window.currentEditMenuId != null;
+                    const newId = isEdit ? window.currentEditMenuId : `MENU-${Date.now().toString().slice(-5)}`;
+                    const actionType = isEdit ? 'SECURE_EDIT_MENU_DATA' : 'SECURE_ADD_MENU';
 
                     const payloadM = { id_menu: newId, label_menu: label, icon: icon, target_view: targetView, role_akses: roleString, urutan: urut, is_active: 'Y' };
 
+                    // Pertahankan status is_active jika sedang mode edit
+                    if (isEdit) {
+                        const origMenu = window.superMenuData.find(m => m.id_menu === newId);
+                        payloadM.is_active = origMenu ? origMenu.is_active : 'Y';
+                    }
+
                     try {
-                        const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_ADD_MENU', token: SUPER_TOKEN, data: payloadM }) });
+                        const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: actionType, token: SUPER_TOKEN, data: payloadM }) });
                         const res = await response.json();
                         if(res.status === 'success') { 
-                            alert("✅ Menu baru berhasil dibuat!"); 
+                            alert(isEdit ? "✅ Menu berhasil diupdate!" : "✅ Menu baru berhasil dibuat!"); 
                             modalM.style.display = 'none'; 
                             document.getElementById('table-wrapper-m').innerHTML = `<div style="padding:50px; text-align:center; color:#0984e3;"><h3>🔄 MENYINKRONKAN...</h3></div>`;
                             await clearStore('master_menu'); 
@@ -268,7 +320,8 @@ window.renderSuperView = async (target) => {
         } catch (error) { document.getElementById('table-wrapper-m').innerHTML = `<div style="padding:50px; text-align:center; color:#e94560;"><h3>❌ Gagal Terhubung</h3></div>`; }
     }
 
-    // --- 📋 MENU MASTER KUESIONER (V14) ---
+    // --- 📋 MENU MASTER KUESIONER (SAMA SEPERTI SEBELUMNYA) ---
+    // ... [Sisa kode kuesioner dan user_management di bawahnya tetap sama persis dan tidak saya kurangi] ...
     else if (target === 'kuesioner') {
         content.innerHTML = `
             <div class="super-card" style="margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px;">
@@ -353,7 +406,6 @@ window.renderSuperView = async (target) => {
         } catch (error) { document.getElementById('table-wrapper-q').innerHTML = `<div style="padding:50px; text-align:center; color:#e94560;"><h3>❌ Gagal Terhubung</h3></div>`; }
     }
 
-    // --- 👥 MENU MANAJEMEN PENGGUNA ---
     else if (target === 'user_management') {
         content.innerHTML = `
             <div class="super-card" style="margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px;">
