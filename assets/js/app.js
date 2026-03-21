@@ -2,6 +2,9 @@ import { initDB, putData, getDataById, deleteData, getAllData, clearStore } from
 import { downloadMasterData, uploadData } from './sync.js';
 import { initAdmin } from './admin.js';
 
+// 🔥 EKSPOS DATABASE KE GLOBAL (AGAR WIDGET BISA BACA DATA)
+window.AppDB = { getAllData, getDataById, putData };
+
 const getEl = (id) => document.getElementById(id);
 
 // ==========================================
@@ -78,14 +81,11 @@ const masukKeAplikasi = async (session) => {
 };
 
 // ==========================================
-// 3. MENU & KONTEN (🔥 PABRIK SUB-MENU V17)
+// 3. PABRIK SUB-MENU
 // ==========================================
 const renderMenu = async (role) => {
     const container = getEl('dynamic-menu-container'); if (!container) return;
-    
     let allMenu = await getAllData('master_menu').catch(()=>[]);
-    
-    // Fallback darurat jika Kader belum menekan tombol sinkronisasi
     if (allMenu.length === 0) {
         allMenu = [
             { id_menu: 'M1', label_menu: 'Dashboard', icon: '🏠', target_view: 'dashboard', role_akses: 'KADER', urutan: 1, is_active: 'Y' },
@@ -105,28 +105,23 @@ const renderMenu = async (role) => {
         return isActive && roles.includes(String(role).toUpperCase());
     }).sort((a,b) => (parseInt(a.urutan)||0) - (parseInt(b.urutan)||0));
 
-    // 🎯 Pisahkan Menu Induk dan Sub-Menu
     const parents = filteredMenu.filter(m => !m.parent_id);
     const children = filteredMenu.filter(m => m.parent_id);
 
     let menuHtml = '';
     parents.forEach(p => {
         const myChildren = children.filter(c => c.parent_id === p.id_menu).sort((a,b) => (parseInt(a.urutan)||0) - (parseInt(b.urutan)||0));
-        
         if(myChildren.length > 0) {
-            // Ini adalah Menu Dropdown (Miliki Anak)
             menuHtml += `
                 <div style="margin-bottom: 2px;">
                     <a class="menu-item" style="display:flex; justify-content:space-between; align-items:center;" onclick="var c = this.nextElementSibling; if(c.style.display==='none'){c.style.display='block'; this.style.background='rgba(0,0,0,0.05)';}else{c.style.display='none'; this.style.background='';}">
-                        <span><span class="icon">${p.icon || '📁'}</span> ${p.label_menu}</span>
-                        <span style="font-size:0.7rem; opacity:0.6;">▼</span>
+                        <span><span class="icon">${p.icon || '📁'}</span> ${p.label_menu}</span><span style="font-size:0.7rem; opacity:0.6;">▼</span>
                     </a>
                     <div style="display:none; background: rgba(0,0,0,0.03); border-left: 3px solid var(--primary);">
                         ${myChildren.map(c => `<a class="menu-item" style="padding-left: 45px; font-size:0.9rem;" data-target="${c.target_view}"><span class="icon">${c.icon || '📄'}</span> ${c.label_menu}</a>`).join('')}
                     </div>
                 </div>`;
         } else {
-            // Ini Menu Biasa
             menuHtml += `<a class="menu-item" data-target="${p.target_view}"><span class="icon">${p.icon || '📌'}</span> ${p.label_menu}</a>`;
         }
     });
@@ -174,20 +169,16 @@ window.renderKonten = async (target) => {
             const [allWil, antrean] = await Promise.all([ getAllData('master_tim_wilayah').catch(()=>[]), getAllData('sync_queue').catch(()=>[]) ]);
             let namaDesa = session.desa && session.desa !== '-' ? session.desa : '-'; let daftarDusun = session.dusun && session.dusun !== '-' ? session.dusun : '-';
             if (namaDesa === '-') { const wilayahKerja = allWil.filter(w => String(w.id_tim) === String(session.id_tim)); daftarDusun = wilayahKerja.map(w => w.dusun_rw).join(', ') || '-'; namaDesa = wilayahKerja[0]?.desa_kelurahan || '-'; }
-
             if (getEl('dash-detail-wilayah')) { getEl('dash-detail-wilayah').innerHTML = `<div style="background: rgba(255,255,255,0.2); display: inline-block; padding: 4px 10px; border-radius: 6px; font-weight: bold; font-size: 0.85rem; margin-bottom: 12px;">NO. TIM: ${session.nomor_tim || session.id_tim}</div><div style="line-height: 1.25;"><div style="margin-bottom: 6px;"><span style="opacity:0.8; font-size: 0.8rem;">📍 Wilayah Tugas (Dusun/RW):</span><br><span style="font-weight: 600; font-size: 0.9rem;">${daftarDusun}</span></div><div style="margin-bottom: 6px;"><span style="opacity:0.8; font-size: 0.8rem;">🏘️ Desa/Kelurahan:</span><br><span style="font-weight: 600; font-size: 0.9rem;">${namaDesa}</span></div><div><span style="opacity:0.8; font-size: 0.8rem;">🏛️ Kecamatan:</span><br><span style="font-weight: 600; font-size: 0.9rem;">${session.kecamatan || '-'}</span></div></div>`; }
-
             const queueTim = antrean.filter(a => String(a.id_tim) === String(session.id_tim));
             if (getEl('dash-tunda')) getEl('dash-tunda').innerText = `${queueTim.filter(a => a.is_synced).length}/${queueTim.filter(a => !a.is_synced).length}`;
-
             const regList = queueTim.filter(a => a.tipe_laporan === 'REGISTRASI'); const pendList = queueTim.filter(a => a.tipe_laporan === 'PENDAMPINGAN');
             const cReg = { CATIN: 0, BUMIL: 0, BUFAS: 0, BADUTA: 0 }; const cPend = { CATIN: 0, BUMIL: 0, BUFAS: 0, BADUTA: 0 }; const hariIni = new Date(); hariIni.setHours(0,0,0,0);
-
             regList.forEach(r => {
                 let isAktif = r.status_sasaran !== 'SELESAI';
                 if (r.jenis_sasaran === 'CATIN' && r.data_laporan?.tanggal_pernikahan && new Date(r.data_laporan.tanggal_pernikahan) < hariIni) isAktif = false;
                 if (r.jenis_sasaran === 'BUFAS' && r.data_laporan?.tgl_persalinan) { const tB = new Date(r.data_laporan.tgl_persalinan); tB.setDate(tB.getDate() + 42); if (hariIni > tB) isAktif = false; }
-                if(cReg[r.jenis_sasaran] !== undefined) cReg[r.jenis_sasaran]++;
+                if(cReg[r.jenis_sasaran] !== undefined && isAktif) cReg[r.jenis_sasaran]++;
             });
             pendList.forEach(p => { let j = p.jenis_sasaran_saat_kunjungan || (p.id_sasaran_ref.startsWith('CTN')?'CATIN':p.id_sasaran_ref.startsWith('BML')?'BUMIL':p.id_sasaran_ref.startsWith('BFS')?'BUFAS':'BADUTA'); if(cPend[j] !== undefined) cPend[j]++; });
             if(getEl('dash-summary')){ getEl('dash-summary').innerHTML = `<h4 style="font-size: 0.95rem; color: #555; margin-bottom: 12px; border-bottom: 1px solid #eee; padding-bottom: 8px;">📊 Total Data Kumulatif</h4><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 0.85rem;"><div><strong style="color:var(--primary);">🎯 Sasaran Terdaftar</strong><ul style="margin: 5px 0 0 15px; padding: 0; color: #444; list-style-type: square;"><li>CATIN: <b>${cReg.CATIN}</b></li><li>BUMIL: <b>${cReg.BUMIL}</b></li><li>BUFAS: <b>${cReg.BUFAS}</b></li><li>BADUTA: <b>${cReg.BADUTA}</b></li></ul></div><div><strong style="color:#198754;">🤝 Kunjungan Pendampingan</strong><ul style="margin: 5px 0 0 15px; padding: 0; color: #444; list-style-type: square;"><li>CATIN: <b>${cPend.CATIN}</b></li><li>BUMIL: <b>${cPend.BUMIL}</b></li><li>BUFAS: <b>${cPend.BUFAS}</b></li><li>BADUTA: <b>${cPend.BADUTA}</b></li></ul></div></div>`; }
@@ -248,7 +239,7 @@ window.renderKonten = async (target) => {
     } else if (target === 'setting') { const tpl = getEl('template-setting'); if(tpl) { area.appendChild(tpl.content.cloneNode(true)); initSetting(); }
     } else if (target === 'bantuan') { const tpl = getEl('template-bantuan'); if(tpl) { area.appendChild(tpl.content.cloneNode(true)); const btnCalc = getEl('btn-buka-kalkulator'); if(btnCalc) btnCalc.onclick = () => renderKonten('kalkulator'); } }
 
-    // 🎯 INJEKSI WIDGET SECARA GAIB (V17 MAGIC)
+    // 🎯 INJEKSI WIDGET GAIB + EKSEKUSI SCRIPT (V18.2 MAGIC)
     try {
         const allWidgets = await getAllData('master_widget').catch(()=>[]);
         const activeWidgets = allWidgets.filter(w => String(w.is_active || 'Y').toUpperCase() === 'Y' && String(w.target_halaman).toLowerCase() === target.toLowerCase());
@@ -256,22 +247,42 @@ window.renderKonten = async (target) => {
         if (activeWidgets.length > 0) {
             let htmlAtas = ''; let htmlBawah = '';
             activeWidgets.forEach(w => {
-                // Jika tipe 'html', render mentah. Jika tipe 'teks', beri kotak peringatan.
                 const content = w.tipe === 'html' ? w.isi_konten : `<div style="background:#fff3cd; padding:12px; border-radius:6px; border-left:4px solid #ffc107; font-size:0.9rem; color:#856404; margin-bottom:15px; line-height:1.4;">${w.isi_konten}</div>`;
-                
                 if(w.posisi === 'bawah') htmlBawah += `<div style="margin-top:15px; width:100%;">${content}</div>`;
                 else htmlAtas += `<div style="margin-bottom:15px; width:100%;">${content}</div>`;
             });
 
-            // Menyisipkan widget dengan aman tanpa merusak event listener Form yang sudah berjalan!
-            if(htmlAtas) area.insertAdjacentHTML('afterbegin', htmlAtas);
-            if(htmlBawah) area.insertAdjacentHTML('beforeend', htmlBawah);
+            // Cara aman menyisipkan HTML kompleks dan memaksa browser mengeksekusi <script>
+            const injectAndExecute = (htmlString, position) => {
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = htmlString;
+                
+                // Ekstrak semua script dari widget
+                const scripts = tempDiv.querySelectorAll('script');
+                scripts.forEach(s => {
+                    const newScript = document.createElement('script');
+                    newScript.text = s.innerHTML;
+                    // Hapus script lama agar tidak dieksekusi ganda jika innerHTML jalan
+                    s.parentNode.removeChild(s); 
+                    // Tanam script baru langsung ke body agar dieksekusi
+                    document.body.appendChild(newScript);
+                });
+
+                if(position === 'atas') {
+                    while(tempDiv.firstChild) area.insertBefore(tempDiv.firstChild, area.firstChild);
+                } else {
+                    while(tempDiv.firstChild) area.appendChild(tempDiv.firstChild);
+                }
+            };
+
+            if(htmlAtas) injectAndExecute(htmlAtas, 'atas');
+            if(htmlBawah) injectAndExecute(htmlBawah, 'bawah');
         }
     } catch(e) { console.error("Widget Error:", e); }
 };
 
 // ==========================================
-// 4. LOGIKA FORM REGISTRASI & MESIN PERAKIT FORM
+// 4. LOGIKA KUESIONER DINAMIS (CASCADING & KONDISIONAL)
 // ==========================================
 const getKodeKecamatan = (kec) => {
     if (!kec) return "XXX";
@@ -279,7 +290,6 @@ const getKodeKecamatan = (kec) => {
     return map[kec.toUpperCase()] || "XXX";
 };
 
-// 🔥 MESIN PERAKIT KUESIONER DINAMIS (CASCADING & LOGIKA KONDISIONAL)
 const renderPertanyaanDinamis = (jenis, modul, container, questions) => {
     if (!jenis) { container.innerHTML = ''; return; }
     
@@ -296,9 +306,7 @@ const renderPertanyaanDinamis = (jenis, modul, container, questions) => {
         const grouped = {};
         filteredQ.forEach(q => {
             let grup = q.grup_pertanyaan || 'Informasi Tambahan';
-            let urutG = parseInt(q.urutan_grup); 
-            if (isNaN(urutG)) urutG = 999; 
-
+            let urutG = parseInt(q.urutan_grup); if (isNaN(urutG)) urutG = 999; 
             if(!grouped[grup]) { grouped[grup] = { urutan_grup: urutG, questions: [] }; }
             grouped[grup].questions.push(q);
         });
@@ -335,7 +343,6 @@ const renderPertanyaanDinamis = (jenis, modul, container, questions) => {
                     inputHtml = `<input type="${typeReal}" name="${q.id_pertanyaan}" id="${q.id_pertanyaan}" class="form-control" placeholder="${pHolder}" step="any" ${req}>`;
                 }
 
-                // 🔥 LOGIKA PERCABANGAN
                 let kondisiTampil = q.kondisi_tampil ? q.kondisi_tampil.trim() : '';
                 let displayStyle = kondisiTampil ? 'display:none;' : 'display:block;';
                 
@@ -348,7 +355,6 @@ const renderPertanyaanDinamis = (jenis, modul, container, questions) => {
         });
         container.innerHTML = html;
 
-        // 4. PASANG SENSOR (LISTENER) PERCABANGAN
         const evaluateConditions = () => {
             const wrappers = container.querySelectorAll('.conditional-wrapper[data-condition]');
             wrappers.forEach(wrapper => {
@@ -374,20 +380,15 @@ const renderPertanyaanDinamis = (jenis, modul, container, questions) => {
                         wrapper.style.display = 'none';
                         if (inputElement) {
                             inputElement.removeAttribute('required');
-                            if(inputElement.value !== '') {
-                                inputElement.value = ''; 
-                                inputElement.dispatchEvent(new Event('change')); 
-                            }
+                            if(inputElement.value !== '') { inputElement.value = ''; inputElement.dispatchEvent(new Event('change')); }
                         }
                     }
                 }
             });
         };
 
-        container.addEventListener('change', evaluateConditions);
-        container.addEventListener('input', evaluateConditions);
+        container.addEventListener('change', evaluateConditions); container.addEventListener('input', evaluateConditions);
         setTimeout(evaluateConditions, 400);
-
     } else { container.innerHTML = ''; }
 };
 
@@ -429,7 +430,6 @@ const initFormRegistrasi = async () => {
         catinDesa.onchange = () => {
             if (catinKab.value.toUpperCase().includes('BULELENG')) {
                 const dDusun = masterWilayah.filter(w => String(w.desa_kelurahan).toUpperCase() === String(catinDesa.value).toUpperCase());
-
                 if(dDusun.length > 0) {
                     const uniqueDusun = [...new Set(dDusun.map(w => w.dusun_rw))].filter(Boolean);
                     catinDusunSel.innerHTML = '<option value="">-- Pilih Dusun --</option>' + uniqueDusun.map(d => `<option value="${d}">${d}</option>`).join('');
