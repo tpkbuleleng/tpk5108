@@ -1,5 +1,5 @@
 // ==========================================
-// 👑 GOD MODE: SUPER ADMIN DASHBOARD (V17 - CMS WIDGET & SUB-MENU)
+// 👑 GOD MODE: SUPER ADMIN DASHBOARD (V18 - NO-CODE VISUAL BUILDER)
 // ==========================================
 import { getAllData, clearStore } from './db.js';
 
@@ -24,9 +24,18 @@ window.superEditMenu = (id) => {
     document.getElementById('modal-m-title').innerHTML = "✏️ Edit Menu Navigasi"; document.getElementById('btn-submit-m').innerText = "Update Menu";
     
     document.getElementById('m-icon').value = menu.icon || ''; document.getElementById('m-label').value = menu.label_menu || '';
-    document.getElementById('m-target').value = menu.target_view || ''; document.getElementById('m-urut').value = menu.urutan || '';
     
-    // Load Parent Options
+    // Dropdown Pintar Target View
+    const targetSel = document.getElementById('m-target-sel');
+    const targetCus = document.getElementById('m-target-custom');
+    const opts = Array.from(targetSel.options).map(o => o.value);
+    if (opts.includes(menu.target_view)) {
+        targetSel.value = menu.target_view; targetCus.style.display = 'none'; targetCus.value = '';
+    } else {
+        targetSel.value = 'CUSTOM'; targetCus.style.display = 'block'; targetCus.value = menu.target_view || '';
+    }
+
+    document.getElementById('m-urut').value = menu.urutan || '';
     const parentSelect = document.getElementById('m-parent'); parentSelect.innerHTML = '<option value="">-- Tidak Ada (Menu Utama) --</option>';
     window.superMenuData.forEach(m => { if ((!m.parent_id || m.parent_id === '') && m.id_menu !== id) { parentSelect.innerHTML += `<option value="${m.id_menu}">${m.icon || ''} ${m.label_menu}</option>`; } });
     if(menu.parent_id) parentSelect.value = menu.parent_id;
@@ -39,10 +48,21 @@ window.superEditWidget = (id) => {
     const widget = window.superWidgetData.find(w => w.id_widget === id); if(!widget) return; window.currentEditWidgetId = id;
     document.getElementById('modal-w-title').innerHTML = "✏️ Edit Widget Injector"; document.getElementById('btn-submit-w').innerText = "Update Widget";
     
-    document.getElementById('w-target').value = widget.target_halaman || 'dashboard'; 
+    // Refresh Target Halaman Dropdown
+    const tHalaman = document.getElementById('w-target-sel'); tHalaman.innerHTML = '<option value="">-- Pilih Halaman --</option>';
+    const uniqueTargets = [...new Set(window.superMenuData.map(m => m.target_view).filter(Boolean))];
+    uniqueTargets.forEach(t => tHalaman.innerHTML += `<option value="${t}">${t}</option>`);
+    
+    tHalaman.value = widget.target_halaman || '';
     document.getElementById('w-posisi').value = widget.posisi || 'atas';
-    document.getElementById('w-tipe').value = widget.tipe || 'html';
-    document.getElementById('w-konten').value = widget.isi_konten || '';
+    
+    // Smart Editor Mode (Paksa ke mode HTML jika diedit agar layout tidak rusak)
+    document.getElementById('w-tipe').value = 'html';
+    document.getElementById('panel-html').style.display = 'block';
+    document.getElementById('panel-tombol').style.display = 'none';
+    document.getElementById('panel-teks').style.display = 'none';
+    document.getElementById('panel-banner').style.display = 'none';
+    document.getElementById('w-konten-html').value = widget.isi_konten || '';
     
     document.getElementById('modal-add-w').style.display = 'flex';
 };
@@ -94,87 +114,27 @@ window.renderKuesionerTable = () => {
 window.renderMenuTable = () => {
     let tableHtml = `<table class="super-table"><thead><tr><th width="10%">Urutan</th><th width="20%">Nama Menu</th><th width="15%">Aksi Aplikasi (ID)</th><th width="35%">Target Role (Bisa Melihat)</th><th width="10%">Status</th><th width="10%">Aksi</th></tr></thead><tbody>`;
     let count = 0;
-    
-    let sortedMenus = [...window.superMenuData].sort((a,b) => {
-        // Sort by parent first, then by order
-        if(a.parent_id === b.parent_id) return (parseInt(a.urutan)||0) - (parseInt(b.urutan)||0);
-        return (a.parent_id || '').localeCompare(b.parent_id || '');
-    });
-    
+    let sortedMenus = [...window.superMenuData].sort((a,b) => { if(a.parent_id === b.parent_id) return (parseInt(a.urutan)||0) - (parseInt(b.urutan)||0); return (a.parent_id || '').localeCompare(b.parent_id || ''); });
     sortedMenus.forEach(m => {
-        if(!m.id_menu) return;
-        count++;
-        const id = m.id_menu;
-        const isChild = m.parent_id && m.parent_id !== '';
-        const parentName = isChild ? (window.superMenuData.find(p => p.id_menu === m.parent_id)?.label_menu || 'Induk Unknown') : '';
+        if(!m.id_menu) return; count++; const id = m.id_menu; const isChild = m.parent_id && m.parent_id !== ''; const parentName = isChild ? (window.superMenuData.find(p => p.id_menu === m.parent_id)?.label_menu || 'Induk Unknown') : '';
         const label = isChild ? `<span style="color:#aaa;">↳ (Anak dari ${parentName})</span><br>${m.icon || '📌'} ${m.label_menu}` : `<b style="font-size:1.05rem;">${m.icon || '📌'} ${m.label_menu}</b>`;
-        
-        const target = m.target_view || '-';
-        const role = (m.role_akses || 'KADER').toUpperCase().replace(/,/g, ', ');
-        const status = String(m.is_active || 'Y').toUpperCase();
-        
-        const isAktif = status === 'Y'; 
-        const bgRow = isChild ? (isAktif ? '#f8fafd' : '#f1f2f6') : (isAktif ? 'transparent' : '#fdfaf6'); 
-        const textStatus = isAktif ? '🟢 Muncul' : '🔴 Sembunyi'; 
-        const btnColor = isAktif ? '#ff7675' : '#00b894'; 
-        const btnText = isAktif ? 'Sembunyikan' : 'Munculkan';
-        
-        tableHtml += `
-            <tr style="background:${bgRow}; opacity: ${isAktif ? '1' : '0.6'};">
-                <td style="font-weight:bold; font-size:1.1rem; color:#0984e3; text-align:center;">${m.urutan || 0}</td>
-                <td style="color:#2c3e50;">${label}</td>
-                <td><code>${target}</code></td>
-                <td><div style="font-size:0.75rem; background:#eef2f5; padding:4px 8px; border-radius:4px; display:inline-block; border:1px solid #dcdde1;">${role}</div></td>
-                <td><b>${textStatus}</b></td>
-                <td style="display:flex; flex-direction:column; gap:5px;">
-                    <button class="btn-action btn-edit" style="width:100%;" onclick="window.superEditMenu('${id}')">✏️ Edit</button>
-                    <button class="btn-action" style="background:${btnColor}; color:white; width:100%;" onclick="window.superToggleMenu('${id}', '${status}')">${btnText}</button>
-                </td>
-            </tr>`;
+        const target = m.target_view || '-'; const role = (m.role_akses || 'KADER').toUpperCase().replace(/,/g, ', '); const status = String(m.is_active || 'Y').toUpperCase();
+        const isAktif = status === 'Y'; const bgRow = isChild ? (isAktif ? '#f8fafd' : '#f1f2f6') : (isAktif ? 'transparent' : '#fdfaf6'); const textStatus = isAktif ? '🟢 Muncul' : '🔴 Sembunyi'; const btnColor = isAktif ? '#ff7675' : '#00b894'; const btnText = isAktif ? 'Sembunyikan' : 'Munculkan';
+        tableHtml += `<tr style="background:${bgRow}; opacity: ${isAktif ? '1' : '0.6'};"><td style="font-weight:bold; font-size:1.1rem; color:#0984e3; text-align:center;">${m.urutan || 0}</td><td style="color:#2c3e50;">${label}</td><td><code>${target}</code></td><td><div style="font-size:0.75rem; background:#eef2f5; padding:4px 8px; border-radius:4px; display:inline-block; border:1px solid #dcdde1;">${role}</div></td><td><b>${textStatus}</b></td><td style="display:flex; flex-direction:column; gap:5px;"><button class="btn-action btn-edit" style="width:100%;" onclick="window.superEditMenu('${id}')">✏️ Edit</button><button class="btn-action" style="background:${btnColor}; color:white; width:100%;" onclick="window.superToggleMenu('${id}', '${status}')">${btnText}</button></td></tr>`;
     });
-
-    if(count === 0) tableHtml += `<tr><td colspan="6" style="text-align:center; padding:30px; color:#666;">Database Menu masih kosong.</td></tr>`;
-    tableHtml += `</tbody></table>`; document.getElementById('table-wrapper-m').innerHTML = tableHtml;
-    document.getElementById('lbl-count-m').innerText = `${count} Menu Aktif`;
+    if(count === 0) tableHtml += `<tr><td colspan="6" style="text-align:center; padding:30px; color:#666;">Database Menu masih kosong.</td></tr>`; tableHtml += `</tbody></table>`; document.getElementById('table-wrapper-m').innerHTML = tableHtml; document.getElementById('lbl-count-m').innerText = `${count} Menu Aktif`;
 };
 
 window.renderWidgetTable = () => {
-    let tableHtml = `<table class="super-table"><thead><tr><th width="15%">Target Halaman</th><th width="10%">Posisi</th><th width="15%">Tipe</th><th width="40%">Isi Konten (Preview)</th><th width="10%">Status</th><th width="10%">Aksi</th></tr></thead><tbody>`;
+    let tableHtml = `<table class="super-table"><thead><tr><th width="15%">Target Halaman</th><th width="10%">Posisi</th><th width="15%">Tipe Terbaca</th><th width="40%">Isi Konten (Preview)</th><th width="10%">Status</th><th width="10%">Aksi</th></tr></thead><tbody>`;
     let count = 0;
-    
     window.superWidgetData.forEach(w => {
-        if(!w.id_widget) return;
-        count++;
-        const id = w.id_widget;
-        const target = w.target_halaman || '-';
-        const posisi = w.posisi || '-';
-        const tipe = w.tipe || 'html';
-        const konten = (w.isi_konten || '').substring(0, 50) + '...';
-        const status = String(w.is_active || 'Y').toUpperCase();
-        
-        const isAktif = status === 'Y'; 
-        const bgRow = isAktif ? 'transparent' : '#fdfaf6'; 
-        const textStatus = isAktif ? '🟢 Aktif' : '🔴 Mati'; 
-        const btnColor = isAktif ? '#ff7675' : '#00b894'; 
-        const btnText = isAktif ? 'Matikan' : 'Hidupkan';
-        
-        tableHtml += `
-            <tr style="background:${bgRow}; opacity: ${isAktif ? '1' : '0.6'};">
-                <td><b><code style="color:#e94560;">${target}</code></b></td>
-                <td><span style="background:#e8f4fd; color:#0984e3; padding:3px 8px; border-radius:4px; font-size:0.8rem; font-weight:bold;">${posisi.toUpperCase()}</span></td>
-                <td>${tipe.toUpperCase()}</td>
-                <td><div style="font-size:0.8rem; background:#eee; padding:5px; border-radius:4px; font-family:monospace; color:#555;">${konten.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div></td>
-                <td><b>${textStatus}</b></td>
-                <td style="display:flex; flex-direction:column; gap:5px;">
-                    <button class="btn-action btn-edit" style="width:100%;" onclick="window.superEditWidget('${id}')">✏️ Edit</button>
-                    <button class="btn-action" style="background:${btnColor}; color:white; width:100%;" onclick="window.superToggleWidget('${id}', '${status}')">${btnText}</button>
-                </td>
-            </tr>`;
+        if(!w.id_widget) return; count++; const id = w.id_widget; const target = w.target_halaman || '-'; const posisi = w.posisi || '-'; const tipe = w.tipe || 'html';
+        const konten = (w.isi_konten || '').substring(0, 80) + '...'; const status = String(w.is_active || 'Y').toUpperCase();
+        const isAktif = status === 'Y'; const bgRow = isAktif ? 'transparent' : '#fdfaf6'; const textStatus = isAktif ? '🟢 Aktif' : '🔴 Mati'; const btnColor = isAktif ? '#ff7675' : '#00b894'; const btnText = isAktif ? 'Matikan' : 'Hidupkan';
+        tableHtml += `<tr style="background:${bgRow}; opacity: ${isAktif ? '1' : '0.6'};"><td><b><code style="color:#e94560;">${target}</code></b></td><td><span style="background:#e8f4fd; color:#0984e3; padding:3px 8px; border-radius:4px; font-size:0.8rem; font-weight:bold;">${posisi.toUpperCase()}</span></td><td>${tipe.toUpperCase()}</td><td><div style="font-size:0.8rem; background:#eee; padding:5px; border-radius:4px; font-family:monospace; color:#555; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${konten.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div></td><td><b>${textStatus}</b></td><td style="display:flex; flex-direction:column; gap:5px;"><button class="btn-action btn-edit" style="width:100%;" onclick="window.superEditWidget('${id}')">✏️ Edit</button><button class="btn-action" style="background:${btnColor}; color:white; width:100%;" onclick="window.superToggleWidget('${id}', '${status}')">${btnText}</button></td></tr>`;
     });
-
-    if(count === 0) tableHtml += `<tr><td colspan="6" style="text-align:center; padding:30px; color:#666;">Database Widget Injeksi masih kosong.</td></tr>`;
-    tableHtml += `</tbody></table>`; document.getElementById('table-wrapper-w').innerHTML = tableHtml;
-    document.getElementById('lbl-count-w').innerText = `${count} Widget Aktif`;
+    if(count === 0) tableHtml += `<tr><td colspan="6" style="text-align:center; padding:30px; color:#666;">Database Widget Injeksi masih kosong.</td></tr>`; tableHtml += `</tbody></table>`; document.getElementById('table-wrapper-w').innerHTML = tableHtml; document.getElementById('lbl-count-w').innerText = `${count} Widget Aktif`;
 };
 
 // ==========================================
@@ -194,7 +154,7 @@ export const initSuperAdmin = async (session) => {
                     <div class="super-menu-item active" data-target="user_management">👥 Manajemen Pengguna</div>
                     <div class="super-menu-item" data-target="kuesioner">📋 Master Kuesioner (Form)</div>
                     <div class="super-menu-item" data-target="menu_management">🎚️ Manajemen Menu (RBAC)</div>
-                    <div class="super-menu-item" data-target="widget_management">🧩 Manajemen Widget (Injeksi)</div>
+                    <div class="super-menu-item" data-target="widget_management">🧩 Pabrik Halaman (Widget)</div>
                     <div class="super-menu-item" data-target="referensi">🏗️ Master Wilayah & Referensi</div>
                     <div class="super-menu-item" data-target="audit_trail">🛡️ Audit Log & Keamanan</div>
                 </div>
@@ -217,6 +177,9 @@ export const initSuperAdmin = async (session) => {
             .btn-mass { padding: 8px 15px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; color: white; display: flex; align-items: center; gap: 5px; font-size:0.85rem;}
             .chk-user { cursor:pointer; transform:scale(1.3); accent-color: #0984e3; } #chk-all-users { cursor:pointer; transform:scale(1.3); accent-color: #e94560; } #btn-clear-search:hover { color: #e94560 !important; }
             @media (max-width: 1024px) { #super-sidebar { position: absolute; top:0; bottom:0; left:0; transform: translateX(-100%); } #super-sidebar.mobile-active { transform: translateX(0); } #super-sidebar-overlay.mobile-active { display: block !important; } } @media (min-width: 1025px) { #super-sidebar.desktop-collapsed { margin-left: -280px; } }
+            /* Styling for Emoji Picker */
+            .emoji-item { cursor:pointer; font-size:1.5rem; text-align:center; padding:5px; border-radius:5px; transition:background 0.2s; }
+            .emoji-item:hover { background:#e8f4fd; }
         </style>
     `;
 
@@ -233,15 +196,17 @@ export const initSuperAdmin = async (session) => {
 // ==========================================
 // 4. PENGENDALI TAMPILAN MENU (ROUTER)
 // ==========================================
+const EMOJI_LIST = ['📊','🏠','📝','🤝','🖨️','🆘','⚙️','🔁','📋','📈','📌','🗓️','👨‍👩‍👧‍👦','👶','🤰','👰','🏥','📢','⚠️','✅','🔥','🌟','💡','🔍','📁','📑'];
+
 window.renderSuperView = async (target) => {
     const content = document.getElementById('super-content');
     if (target === 'dashboard') { content.innerHTML = `<div class="super-card"><h3>Dashboard sedang disiapkan...</h3><p>Silakan buka menu lain.</p></div>`; } 
     
-    // --- 🧩 MENU MANAJEMEN WIDGET (V17 - WIDGET INJECTOR) ---
+    // --- 🧩 PABRIK HALAMAN & WIDGET (V18 - VISUAL BUILDER) ---
     else if (target === 'widget_management') {
         content.innerHTML = `
             <div class="super-card" style="margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px;">
-                <div><h3 style="margin:0; color:#1a1a2e;">Pabrik Widget (Injeksi Visual)</h3><p style="margin:5px 0 0 0; color:#666; font-size:0.9rem;">Sisipkan tombol cetak, banner, atau teks pengumuman ke halaman manapun secara gaib.</p></div>
+                <div><h3 style="margin:0; color:#1a1a2e;">Pabrik Halaman & Widget</h3><p style="margin:5px 0 0 0; color:#666; font-size:0.9rem;">Rakut halaman dari nol, sisipkan tombol cetak, banner, atau teks pengumuman ke halaman manapun.</p></div>
                 <button id="btn-show-add-w" style="background:#e94560; color:white; border:none; padding:10px 20px; border-radius:6px; font-weight:bold; cursor:pointer; box-shadow: 0 4px 6px rgba(233, 69, 96, 0.3);">+ Tambah Widget Baru</button>
             </div>
             <div class="super-card" style="padding:0; overflow:hidden;">
@@ -253,39 +218,66 @@ window.renderSuperView = async (target) => {
             </div>
 
             <div id="modal-add-w" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.7); z-index:1000; align-items:center; justify-content:center;">
-                <div style="background:white; padding:30px; border-radius:10px; width:90%; max-width:600px; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
-                    <h3 id="modal-w-title" style="margin-top:0; color:#1a1a2e; border-bottom:2px solid #eee; padding-bottom:10px;">➕ Buat Widget Baru</h3>
+                <div style="background:white; padding:30px; border-radius:10px; width:90%; max-width:650px; max-height:90vh; overflow-y:auto; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+                    <h3 id="modal-w-title" style="margin-top:0; color:#1a1a2e; border-bottom:2px solid #eee; padding-bottom:10px;">➕ Buat Widget / Komponen Halaman</h3>
                     
-                    <div style="display:flex; gap:10px; margin-bottom:15px;">
+                    <div style="display:flex; gap:10px; margin-bottom:15px; background:#f8f9fa; padding:15px; border-radius:8px; border:1px solid #ddd;">
                         <div style="flex:2;">
-                            <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:5px;">Target Halaman (Kode)</label>
-                            <input type="text" id="w-target" class="filter-input" placeholder="Cth: rekap_bulanan" style="width:100%; box-sizing:border-box;" required>
-                            <div style="font-size:0.7rem; color:#888; margin-top:3px;">*Kode halaman di sistem (cth: dashboard, pendampingan).</div>
+                            <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:5px;">Pilih Target Halaman <span style="color:red">*</span></label>
+                            <select id="w-target-sel" class="filter-input" style="width:100%; box-sizing:border-box;">
+                                <option value="">-- Sedang memuat halaman... --</option>
+                            </select>
                         </div>
                         <div style="flex:1;">
                             <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:5px;">Posisi Tempel</label>
                             <select id="w-posisi" class="filter-input" style="width:100%; box-sizing:border-box;">
-                                <option value="atas">ATAS (Sebelum Konten)</option>
-                                <option value="bawah">BAWAH (Setelah Konten)</option>
-                            </select>
-                        </div>
-                        <div style="flex:1;">
-                            <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:5px;">Tipe Widget</label>
-                            <select id="w-tipe" class="filter-input" style="width:100%; box-sizing:border-box;">
-                                <option value="html">Kode HTML</option>
-                                <option value="teks">Teks Biasa</option>
+                                <option value="atas">⬆️ ATAS</option><option value="bawah">⬇️ BAWAH</option>
                             </select>
                         </div>
                     </div>
 
-                    <div style="margin-bottom:20px;">
-                        <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:5px; color:#0984e3;">Isi Konten (Tombol / Banner / Teks)</label>
-                        <textarea id="w-konten" class="filter-input" rows="6" placeholder='Contoh Tombol Cetak:\n<button class="btn btn-success" style="width:100%; margin-bottom:15px;" onclick="window.print()">🖨️ Cetak Halaman Ini</button>' style="width:100%; box-sizing:border-box; font-family:monospace; background:#f8f9fa;"></textarea>
+                    <div style="margin-bottom:15px;">
+                        <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:5px; color:#e94560;">Pilih Tipe Komponen Builder</label>
+                        <select id="w-tipe" class="filter-input" style="width:100%; box-sizing:border-box; border-color:#e94560; font-weight:bold;">
+                            <option value="teks">Teks / Pengumuman / Paragraf</option>
+                            <option value="tombol">Tombol Aksi (Button)</option>
+                            <option value="banner">Gambar Banner (Image)</option>
+                            <option value="html">⚙️ Koding Bebas (Advanced HTML)</option>
+                        </select>
+                    </div>
+
+                    <div id="panel-teks" class="widget-panel" style="display:block; background:#eef2f5; padding:15px; border-radius:8px; border-left:4px solid #0984e3; margin-bottom:20px;">
+                        <div style="margin-bottom:10px;"><label style="font-size:0.8rem; font-weight:bold;">Isi Teks / Pengumuman</label><textarea id="w-txt-isi" class="filter-input" rows="3" style="width:100%; box-sizing:border-box;"></textarea></div>
+                        <div style="display:flex; gap:10px;">
+                            <div style="flex:1;"><label style="font-size:0.8rem; font-weight:bold;">Ukuran Teks</label><select id="w-txt-ukuran" class="filter-input" style="width:100%;"><option value="0.9rem">Kecil</option><option value="1.1rem" selected>Sedang</option><option value="1.5rem">Besar (Judul)</option></select></div>
+                            <div style="flex:1;"><label style="font-size:0.8rem; font-weight:bold;">Warna Teks</label><select id="w-txt-warna" class="filter-input" style="width:100%;"><option value="#333">Hitam Gelap</option><option value="#0984e3">Biru Primary</option><option value="#e94560">Merah Danger</option><option value="#198754">Hijau Success</option></select></div>
+                            <div style="flex:1;"><label style="font-size:0.8rem; font-weight:bold;">Posisi (Align)</label><select id="w-txt-align" class="filter-input" style="width:100%;"><option value="left">Kiri</option><option value="center">Tengah</option></select></div>
+                        </div>
+                        <div style="margin-top:10px;"><label style="font-size:0.85rem; font-weight:bold; cursor:pointer;"><input type="checkbox" id="w-txt-alert"> Jadikan Kotak Peringatan (Kuning)</label></div>
+                    </div>
+
+                    <div id="panel-tombol" class="widget-panel" style="display:none; background:#e8f4fd; padding:15px; border-radius:8px; border-left:4px solid #00b894; margin-bottom:20px;">
+                        <div style="display:flex; gap:10px; margin-bottom:10px;">
+                            <div style="flex:2;"><label style="font-size:0.8rem; font-weight:bold;">Tulisan di Tombol</label><input type="text" id="w-btn-teks" class="filter-input" placeholder="Cth: 🖨️ Cetak PDF" style="width:100%; box-sizing:border-box;"></div>
+                            <div style="flex:1;"><label style="font-size:0.8rem; font-weight:bold;">Warna Tombol</label><select id="w-btn-warna" class="filter-input" style="width:100%;"><option value="#198754">Hijau (Success)</option><option value="#0984e3">Biru (Primary)</option><option value="#e94560">Merah (Danger)</option></select></div>
+                        </div>
+                        <div><label style="font-size:0.8rem; font-weight:bold;">Aksi Saat Diklik</label><select id="w-btn-aksi" class="filter-input" style="width:100%; box-sizing:border-box;"><option value="print">Cetak Halaman Ini (Print)</option><option value="https://google.com">Buka Link URL (Contoh: Buka Dashboard Looker Studio)</option></select></div>
+                        <input type="text" id="w-btn-url" class="filter-input" placeholder="Masukkan Link http://..." style="width:100%; box-sizing:border-box; margin-top:5px; display:none;">
+                    </div>
+
+                    <div id="panel-banner" class="widget-panel" style="display:none; background:#fdf3e8; padding:15px; border-radius:8px; border-left:4px solid #fdcb6e; margin-bottom:20px;">
+                        <div style="margin-bottom:10px;"><label style="font-size:0.8rem; font-weight:bold;">Link URL Gambar (.jpg / .png)</label><input type="text" id="w-ban-url" class="filter-input" placeholder="https://..." style="width:100%; box-sizing:border-box;"></div>
+                        <div><label style="font-size:0.8rem; font-weight:bold;">Link Tujuan (Jika gambar diklik) - Opsional</label><input type="text" id="w-ban-link" class="filter-input" placeholder="https://..." style="width:100%; box-sizing:border-box;"></div>
+                    </div>
+
+                    <div id="panel-html" class="widget-panel" style="display:none; margin-bottom:20px;">
+                        <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:5px; color:#555;">Kode HTML (Advanced)</label>
+                        <textarea id="w-konten-html" class="filter-input" rows="6" placeholder="Ketik kode <div>, <button>, atau <iframe> di sini..." style="width:100%; box-sizing:border-box; font-family:monospace; background:#333; color:#00ff00;"></textarea>
                     </div>
 
                     <div style="display:flex; justify-content:flex-end; gap:10px;">
                         <button type="button" id="btn-close-w" style="padding:10px 20px; border:none; background:#eee; color:#333; border-radius:5px; cursor:pointer; font-weight:bold;">Batal</button>
-                        <button type="button" id="btn-submit-w" style="padding:10px 20px; border:none; background:#e94560; color:white; border-radius:5px; cursor:pointer; font-weight:bold;">Simpan Widget</button>
+                        <button type="button" id="btn-submit-w" style="padding:10px 20px; border:none; background:#e94560; color:white; border-radius:5px; cursor:pointer; font-weight:bold;">Generate & Simpan</button>
                     </div>
                 </div>
             </div>
@@ -299,27 +291,82 @@ window.renderSuperView = async (target) => {
                 window.renderWidgetTable();
                 
                 const modalW = document.getElementById('modal-add-w'); 
+                const tHalaman = document.getElementById('w-target-sel');
+                const wTipe = document.getElementById('w-tipe');
+                const panels = document.querySelectorAll('.widget-panel');
+                
+                // Populate Target Halaman from Menu Data
+                const populateTarget = () => {
+                    tHalaman.innerHTML = '<option value="">-- Pilih Halaman / Menu --</option>';
+                    const uniqueTargets = [...new Set(window.superMenuData.map(m => m.target_view).filter(Boolean))];
+                    uniqueTargets.forEach(t => tHalaman.innerHTML += `<option value="${t}">${t}</option>`);
+                };
+                if(window.superMenuData.length > 0) populateTarget();
+
+                wTipe.onchange = () => {
+                    panels.forEach(p => p.style.display = 'none');
+                    document.getElementById(`panel-${wTipe.value}`).style.display = 'block';
+                };
+
+                const btnAksi = document.getElementById('w-btn-aksi');
+                btnAksi.onchange = () => { document.getElementById('w-btn-url').style.display = btnAksi.value === 'print' ? 'none' : 'block'; };
                 
                 document.getElementById('btn-show-add-w').onclick = () => { 
                     window.currentEditWidgetId = null; 
-                    document.getElementById('modal-w-title').innerText = "➕ Buat Widget Baru";
-                    document.getElementById('btn-submit-w').innerText = "Simpan Widget";
-                    document.getElementById('w-target').value = '';
-                    document.getElementById('w-posisi').value = 'atas';
-                    document.getElementById('w-tipe').value = 'html';
-                    document.getElementById('w-konten').value = '';
+                    if(window.superMenuData.length > 0) populateTarget();
+                    document.getElementById('modal-w-title').innerText = "➕ Buat Komponen Halaman";
+                    document.getElementById('btn-submit-w').innerText = "Generate & Simpan";
+                    tHalaman.value = ''; document.getElementById('w-posisi').value = 'atas';
+                    wTipe.value = 'teks'; wTipe.dispatchEvent(new Event('change'));
+                    
+                    // Reset fields
+                    document.getElementById('w-txt-isi').value=''; document.getElementById('w-btn-teks').value='';
+                    document.getElementById('w-ban-url').value=''; document.getElementById('w-konten-html').value='';
+                    
                     modalW.style.display = 'flex'; 
                 };
 
                 document.getElementById('btn-close-w').onclick = () => modalW.style.display = 'none';
 
                 document.getElementById('btn-submit-w').onclick = async () => {
-                    const target = document.getElementById('w-target').value.trim().toLowerCase();
+                    const target = tHalaman.value.trim();
                     const posisi = document.getElementById('w-posisi').value;
-                    const tipe = document.getElementById('w-tipe').value;
-                    const konten = document.getElementById('w-konten').value.trim();
+                    const tipe = wTipe.value;
+                    let finalKonten = '';
 
-                    if(!target || !konten) { alert("⚠️ Mohon isi Target Halaman dan Isi Konten!"); return; }
+                    if(!target) { alert("⚠️ Mohon pilih Target Halaman!"); return; }
+
+                    // 🔥 WIDGET GENERATOR LOGIC
+                    if (tipe === 'html') {
+                        finalKonten = document.getElementById('w-konten-html').value.trim();
+                        if(!finalKonten) { alert("⚠️ Kode HTML tidak boleh kosong!"); return; }
+                    } else if (tipe === 'tombol') {
+                        const tTeks = document.getElementById('w-btn-teks').value.trim();
+                        const tWarna = document.getElementById('w-btn-warna').value;
+                        const tAksi = document.getElementById('w-btn-aksi').value;
+                        const tUrl = document.getElementById('w-btn-url').value.trim();
+                        if(!tTeks) { alert("⚠️ Tulisan di tombol tidak boleh kosong!"); return; }
+                        let actCode = tAksi === 'print' ? 'window.print()' : `window.open('${tUrl || tAksi}', '_blank')`;
+                        finalKonten = `<button style="width:100%; padding:15px; background:${tWarna}; color:white; border:none; border-radius:8px; font-weight:bold; cursor:pointer; box-shadow:0 2px 4px rgba(0,0,0,0.1);" onclick="${actCode}">${tTeks}</button>`;
+                    } else if (tipe === 'teks') {
+                        const txtIsi = document.getElementById('w-txt-isi').value.replace(/\n/g, '<br>');
+                        const txtUkuran = document.getElementById('w-txt-ukuran').value;
+                        const txtWarna = document.getElementById('w-txt-warna').value;
+                        const txtAlign = document.getElementById('w-txt-align').value;
+                        const isAlert = document.getElementById('w-txt-alert').checked;
+                        if(!txtIsi) { alert("⚠️ Isi teks tidak boleh kosong!"); return; }
+                        if(isAlert) {
+                            finalKonten = `<div style="background:#fff3cd; padding:15px; border-radius:8px; border-left:5px solid ${txtWarna}; text-align:${txtAlign}; font-size:${txtUkuran}; color:#856404; margin-bottom:15px;">${txtIsi}</div>`;
+                        } else {
+                            finalKonten = `<div style="text-align:${txtAlign}; font-size:${txtUkuran}; color:${txtWarna}; margin-bottom:15px; line-height:1.5; font-weight:bold;">${txtIsi}</div>`;
+                        }
+                    } else if (tipe === 'banner') {
+                        const bUrl = document.getElementById('w-ban-url').value.trim();
+                        const bLink = document.getElementById('w-ban-link').value.trim();
+                        if(!bUrl) { alert("⚠️ Link gambar tidak boleh kosong!"); return; }
+                        const imgHtml = `<img src="${bUrl}" style="width:100%; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); display:block; margin-bottom:15px;">`;
+                        finalKonten = bLink ? `<a href="${bLink}" target="_blank">${imgHtml}</a>` : imgHtml;
+                    }
 
                     const btnSubmit = document.getElementById('btn-submit-w'); 
                     btnSubmit.innerText = "Menyimpan..."; btnSubmit.disabled = true;
@@ -328,7 +375,7 @@ window.renderSuperView = async (target) => {
                     const newId = isEdit ? window.currentEditWidgetId : `WIDGET-${Date.now().toString().slice(-5)}`;
                     const actionType = isEdit ? 'SECURE_EDIT_WIDGET_DATA' : 'SECURE_ADD_WIDGET';
 
-                    const payloadW = { id_widget: newId, target_halaman: target, posisi: posisi, tipe: tipe, isi_konten: konten, is_active: 'Y' };
+                    const payloadW = { id_widget: newId, target_halaman: target, posisi: posisi, tipe: tipe, isi_konten: finalKonten, is_active: 'Y' };
 
                     if (isEdit) {
                         const origW = window.superWidgetData.find(w => w.id_widget === newId);
@@ -339,7 +386,7 @@ window.renderSuperView = async (target) => {
                         const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: actionType, token: SUPER_TOKEN, data: payloadW }) });
                         const res = await response.json();
                         if(res.status === 'success') { 
-                            alert(isEdit ? "✅ Widget berhasil diupdate!" : "✅ Widget baru berhasil dipasang!"); 
+                            alert(isEdit ? "✅ Komponen berhasil diupdate!" : "✅ Komponen berhasil dipasang!"); 
                             modalW.style.display = 'none'; 
                             document.getElementById('table-wrapper-w').innerHTML = `<div style="padding:50px; text-align:center; color:#e94560;"><h3>🔄 MENYINKRONKAN...</h3></div>`;
                             await clearStore('master_widget'); 
@@ -352,7 +399,7 @@ window.renderSuperView = async (target) => {
         } catch (error) { document.getElementById('table-wrapper-w').innerHTML = `<div style="padding:50px; text-align:center; color:#e94560;"><h3>❌ Gagal Terhubung</h3></div>`; }
     }
 
-    // --- 🎚️ MENU MANAJEMEN MENU (V17 - SMART EDIT & SUB-MENU) ---
+    // --- 🎚️ MENU MANAJEMEN MENU (V18 - SMART DROPDOWN & EMOJI PICKER) ---
     else if (target === 'menu_management') {
         content.innerHTML = `
             <div class="super-card" style="margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px;">
@@ -369,13 +416,14 @@ window.renderSuperView = async (target) => {
             </div>
 
             <div id="modal-add-m" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.7); z-index:1000; align-items:center; justify-content:center;">
-                <div style="background:white; padding:30px; border-radius:10px; width:90%; max-width:600px; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+                <div style="background:white; padding:30px; border-radius:10px; width:90%; max-width:650px; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
                     <h3 id="modal-m-title" style="margin-top:0; color:#1a1a2e; border-bottom:2px solid #eee; padding-bottom:10px;">➕ Buat Menu Navigasi Baru</h3>
                     
-                    <div style="display:flex; gap:10px; margin-bottom:15px;">
-                        <div style="flex:1;">
-                            <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:5px;">Icon (Emoji)</label>
-                            <input type="text" id="m-icon" class="filter-input" placeholder="Cth: 📊" style="width:100%; box-sizing:border-box;" required>
+                    <div style="display:flex; gap:15px; margin-bottom:15px;">
+                        <div style="flex:1; position:relative;">
+                            <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:5px;">Icon (Pilih)</label>
+                            <input type="text" id="m-icon" class="filter-input" placeholder="Klik 👉" style="width:100%; box-sizing:border-box; cursor:pointer; text-align:center; font-size:1.2rem;" readonly required>
+                            <div id="emoji-picker" style="display:none; position:absolute; top:100%; left:0; background:white; border:1px solid #ddd; border-radius:8px; padding:10px; width:220px; grid-template-columns:repeat(6, 1fr); gap:5px; z-index:10; box-shadow:0 5px 15px rgba(0,0,0,0.2);"></div>
                         </div>
                         <div style="flex:4;">
                             <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:5px;">Nama Menu (Label)</label>
@@ -383,16 +431,27 @@ window.renderSuperView = async (target) => {
                         </div>
                     </div>
 
-                    <div style="display:flex; gap:10px; margin-bottom:15px;">
+                    <div style="display:flex; gap:15px; margin-bottom:15px; background:#f8f9fa; padding:15px; border-radius:8px; border:1px solid #eee;">
                         <div style="flex:2;">
-                            <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:5px;">Target Aplikasi (Aksi)</label>
-                            <input type="text" id="m-target" class="filter-input" placeholder="Cth: rekap_bulanan" style="width:100%; box-sizing:border-box;" required>
-                            <div style="font-size:0.7rem; color:#888; margin-top:3px;">*Kode aksi di sistem (tanpa spasi).</div>
+                            <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:5px; color:#0984e3;">Target Aplikasi (Aksi)</label>
+                            <select id="m-target-sel" class="filter-input" style="width:100%; box-sizing:border-box; margin-bottom:5px;">
+                                <option value="dashboard">🏠 Beranda (dashboard)</option>
+                                <option value="registrasi">📝 Registrasi Sasaran (registrasi)</option>
+                                <option value="daftar_sasaran">📋 Data Sasaran (daftar_sasaran)</option>
+                                <option value="pendampingan">🤝 Pendampingan (pendampingan)</option>
+                                <option value="rekap_bulanan">📊 Rekap Bulanan (rekap_bulanan)</option>
+                                <option value="cetak_pdf">🖨️ Cetak PDF (cetak_pdf)</option>
+                                <option value="bantuan">🆘 Bantuan (bantuan)</option>
+                                <option value="setting">⚙️ Pengaturan (setting)</option>
+                                <option value="reload_app">🔁 Muat Ulang (reload_app)</option>
+                                <option value="CUSTOM" style="font-weight:bold; color:#e94560;">✨ Buat Halaman Kosong (Ketik Nama)</option>
+                            </select>
+                            <input type="text" id="m-target-custom" class="filter-input" placeholder="Cth: rekap_krs" style="width:100%; box-sizing:border-box; display:none; border-color:#e94560;">
                         </div>
                         <div style="flex:2;">
                             <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:5px;">Menu Induk (Sub-Menu)</label>
                             <select id="m-parent" class="filter-input" style="width:100%; box-sizing:border-box;">
-                                <option value="">-- Tidak Ada (Menu Utama) --</option>
+                                <option value="">-- Bukan Sub-Menu --</option>
                             </select>
                         </div>
                         <div style="flex:1;">
@@ -428,36 +487,46 @@ window.renderSuperView = async (target) => {
                 
                 const modalM = document.getElementById('modal-add-m'); 
                 
+                // 🔥 SETUP EMOJI PICKER
+                const iconInput = document.getElementById('m-icon');
+                const picker = document.getElementById('emoji-picker');
+                picker.innerHTML = EMOJI_LIST.map(e => `<div class="emoji-item" onclick="document.getElementById('m-icon').value='${e}'; document.getElementById('emoji-picker').style.display='none';">${e}</div>`).join('');
+                iconInput.onclick = () => picker.style.display = picker.style.display === 'none' ? 'grid' : 'none';
+
+                // 🔥 SETUP SMART DROPDOWN
+                const targetSel = document.getElementById('m-target-sel');
+                const targetCus = document.getElementById('m-target-custom');
+                targetSel.onchange = () => {
+                    if(targetSel.value === 'CUSTOM') { targetCus.style.display = 'block'; targetCus.required = true; }
+                    else { targetCus.style.display = 'none'; targetCus.required = false; }
+                };
+                
                 document.getElementById('btn-show-add-m').onclick = () => { 
                     window.currentEditMenuId = null; 
                     document.getElementById('modal-m-title').innerText = "➕ Buat Menu Navigasi Baru";
                     document.getElementById('btn-submit-m').innerText = "Simpan Menu";
                     
-                    document.getElementById('m-icon').value = '';
-                    document.getElementById('m-label').value = '';
-                    document.getElementById('m-target').value = '';
+                    iconInput.value = ''; document.getElementById('m-label').value = '';
+                    targetSel.value = 'dashboard'; targetSel.dispatchEvent(new Event('change'));
                     document.getElementById('m-urut').value = '';
                     document.querySelectorAll('.m-role-chk').forEach(cb => cb.checked = false);
 
-                    // Isi Dropdown Menu Induk
                     const parentSelect = document.getElementById('m-parent');
-                    parentSelect.innerHTML = '<option value="">-- Tidak Ada (Menu Utama) --</option>';
+                    parentSelect.innerHTML = '<option value="">-- Bukan Sub-Menu --</option>';
                     window.superMenuData.forEach(m => {
-                        if (!m.parent_id || m.parent_id === '') { 
-                            parentSelect.innerHTML += `<option value="${m.id_menu}">${m.icon || ''} ${m.label_menu}</option>`;
-                        }
+                        if (!m.parent_id || m.parent_id === '') { parentSelect.innerHTML += `<option value="${m.id_menu}">${m.icon || ''} ${m.label_menu}</option>`; }
                     });
                     
                     modalM.style.display = 'flex'; 
                 };
 
-                document.getElementById('btn-close-m').onclick = () => modalM.style.display = 'none';
+                document.getElementById('btn-close-m').onclick = () => { modalM.style.display = 'none'; picker.style.display = 'none'; };
 
                 document.getElementById('btn-submit-m').onclick = async () => {
-                    const icon = document.getElementById('m-icon').value.trim();
+                    const icon = iconInput.value.trim();
                     const label = document.getElementById('m-label').value.trim();
-                    const targetView = document.getElementById('m-target').value.trim().toLowerCase();
-                    const parentId = document.getElementById('m-parent').value; // 🔥 BARU
+                    let targetView = targetSel.value === 'CUSTOM' ? targetCus.value.trim().toLowerCase() : targetSel.value;
+                    const parentId = document.getElementById('m-parent').value;
                     const urut = document.getElementById('m-urut').value;
                     
                     const checkedRoles = Array.from(document.querySelectorAll('.m-role-chk:checked')).map(cb => cb.value);
