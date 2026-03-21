@@ -1,5 +1,5 @@
 // ==========================================
-// 👑 GOD MODE: SUPER ADMIN DASHBOARD (V12 - Super Form Builder)
+// 👑 GOD MODE: SUPER ADMIN DASHBOARD (V13 - Enterprise Edition)
 // ==========================================
 import { getAllData, clearStore } from './db.js';
 
@@ -45,13 +45,15 @@ window.renderUserTable = () => {
 
 window.renderKuesionerTable = () => {
     const filterKat = document.getElementById('flt-kategori-q').value.toUpperCase();
-    let tableHtml = `<table class="super-table"><thead><tr><th width="12%">ID Form</th><th width="15%">Posisi (Modul -> Sasaran)</th><th width="12%">Grup Pertanyaan</th><th width="30%">Teks Pertanyaan</th><th width="12%">Tipe Jawaban</th><th width="10%">Sifat</th><th width="10%">Aksi</th></tr></thead><tbody>`;
+    let tableHtml = `<table class="super-table"><thead><tr><th width="12%">ID Form</th><th width="15%">Posisi (Modul -> Sasaran)</th><th width="15%">Grup & Urutan</th><th width="30%">Teks Pertanyaan</th><th width="10%">Tipe Jawaban</th><th width="8%">Sifat</th><th width="10%">Aksi</th></tr></thead><tbody>`;
     let count = 0;
+    
     window.superKuesionerData.forEach(q => {
         const id = q.id_pertanyaan || q.id || '-'; 
         const modul = String(q.modul || '-').toUpperCase();
         const kat = String(q.jenis_sasaran || q.kategori_sasaran || q.kategori || '-').toUpperCase(); 
         const grup = q.grup_pertanyaan || '-';
+        const urutG = q.urutan_grup || '-'; // Tampilkan Urutan Grup di tabel
         const teks = q.label_pertanyaan || q.teks_pertanyaan || q.pertanyaan || '-'; 
         const tipe = String(q.tipe_input || q.tipe_jawaban || q.tipe || '-').toUpperCase();
         const opsi = q.opsi_json || q.pilihan_jawaban ? `<div style="font-size:0.75rem; color:#888; margin-top:5px; background:#f1f2f6; padding:4px; border-radius:4px;">Opsi: ${q.opsi_json || q.pilihan_jawaban}</div>` : '';
@@ -73,7 +75,7 @@ window.renderKuesionerTable = () => {
                         <span class="badge-role role-kader" style="display:block; margin-bottom:3px; text-align:center;">${modul}</span>
                         <span class="badge-role role-admin" style="display:block; text-align:center;">${kat}</span>
                     </td>
-                    <td><b>${grup}</b></td>
+                    <td><span style="font-size:0.7rem; color:#666; font-weight:bold;">Urutan Tampil: ${urutG}</span><br><b>${grup}</b></td>
                     <td><b>${teks}</b>${opsi}</td>
                     <td><code style="color:#0984e3;">${tipe}</code></td>
                     <td>${wajib}</td>
@@ -145,7 +147,7 @@ window.renderSuperView = async (target) => {
     
     if (target === 'dashboard') { content.innerHTML = `<div class="super-card"><h3>Dashboard sedang disiapkan...</h3><p>Silakan buka menu lain.</p></div>`; } 
     
-    // --- 📋 MENU MASTER KUESIONER (V12 - FULL CONTROL) ---
+    // --- 📋 MENU MASTER KUESIONER (V13 - ENTERPRISE CONTROL) ---
     else if (target === 'kuesioner') {
         content.innerHTML = `
             <div class="super-card" style="margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px;">
@@ -194,11 +196,18 @@ window.renderSuperView = async (target) => {
                                 </select>
                             </div>
                         </div>
-                        <div style="margin-bottom:5px;">
-                            <label style="display:block; font-size:0.8rem; font-weight:bold; margin-bottom:5px;">Grup Pertanyaan (Judul Kelompok)</label>
-                            <input type="text" id="q-grup" class="filter-input" placeholder="Cth: Kesehatan, Antropometri, Riwayat Penyakit..." style="width:100%; box-sizing:border-box;" required>
-                            <div style="font-size:0.7rem; color:#888; margin-top:3px;">*Bebas diketik. Form di HP Kader akan dikelompokkan berdasarkan nama grup ini.</div>
+                        
+                        <div style="display:flex; gap:10px;">
+                            <div style="flex:2;">
+                                <label style="display:block; font-size:0.8rem; font-weight:bold; margin-bottom:5px;">Grup (Judul Kelompok)</label>
+                                <input type="text" id="q-grup" class="filter-input" placeholder="Cth: Antropometri" style="width:100%; box-sizing:border-box;" required>
+                            </div>
+                            <div style="flex:1;">
+                                <label style="display:block; font-size:0.8rem; font-weight:bold; margin-bottom:5px;">Urutan Tampil Grup</label>
+                                <input type="number" id="q-urut-grup" class="filter-input" placeholder="Angka: 1, 2.." style="width:100%; box-sizing:border-box;" required>
+                            </div>
                         </div>
+                        <div style="font-size:0.7rem; color:#888; margin-top:5px;">*Kotak Grup dengan "Urutan Tampil" terkecil akan digambar paling atas di HP Kader.</div>
                     </div>
 
                     <div style="margin-bottom:15px;">
@@ -261,12 +270,13 @@ window.renderSuperView = async (target) => {
                     const modul = document.getElementById('q-modul').value;
                     const kat = document.getElementById('q-kat').value;
                     const grup = document.getElementById('q-grup').value.trim();
+                    const urutGrup = document.getElementById('q-urut-grup').value; // 🔥 BARU
                     const teks = document.getElementById('q-teks').value.trim();
                     const tipe = document.getElementById('q-tipe').value;
                     const wajib = document.getElementById('q-wajib').value;
                     const opsiRaw = tipe === 'select' ? document.getElementById('q-opsi').value.trim() : '';
 
-                    if(!grup) { alert("⚠️ Grup Pertanyaan (Kesehatan/Antropometri/dll) harus diisi!"); return; }
+                    if(!grup || !urutGrup) { alert("⚠️ Grup Pertanyaan dan Angka Urutannya harus diisi!"); return; }
                     if(!teks) { alert("⚠️ Teks Pertanyaan tidak boleh kosong!"); return; }
                     if(tipe === 'select' && !opsiRaw) { alert("⚠️ Karena tipenya PILIHAN, Anda harus memasukkan opsi jawabannya!"); return; }
 
@@ -277,10 +287,10 @@ window.renderSuperView = async (target) => {
                     let jsonOpsi = '';
                     if (tipe === 'select' && opsiRaw) {
                         const arrOpsi = opsiRaw.split(',').map(item => item.trim()).filter(item => item !== '');
-                        jsonOpsi = JSON.stringify(arrOpsi); // Merubah "A, B" menjadi '["A", "B"]'
+                        jsonOpsi = JSON.stringify(arrOpsi); 
                     }
 
-                    // ID GENERATOR CERDAS (Contoh: Q-REG-BML-5432)
+                    // ID GENERATOR CERDAS
                     const prefix = modul === 'REGISTRASI' ? 'Q-REG' : 'Q-PEN';
                     const mid = kat === 'BUMIL' ? 'BML' : (kat === 'CATIN' ? 'CTN' : (kat === 'BUFAS' ? 'BFS' : (kat === 'BADUTA' ? 'BDT' : 'UMM')));
                     const newId = `${prefix}-${mid}-${Date.now().toString().slice(-4)}`;
@@ -290,6 +300,7 @@ window.renderSuperView = async (target) => {
                         modul: modul,
                         jenis_sasaran: kat, 
                         grup_pertanyaan: grup,
+                        urutan_grup: urutGrup, // 🔥 MASUKKAN KE PAYLOAD UNTUK SHEET
                         label_pertanyaan: teks, 
                         tipe_input: tipe, 
                         opsi_json: jsonOpsi, 
