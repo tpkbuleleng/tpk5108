@@ -2,27 +2,53 @@ import { initDB, putData, getDataById, deleteData, getAllData, clearStore } from
 import { downloadMasterData, uploadData } from './sync.js';
 import { initAdmin } from './admin.js';
 
+// 🔥 EKSPOS DATABASE KE GLOBAL
 window.AppDB = { getAllData, getDataById, putData };
 
 const getEl = (id) => document.getElementById(id);
 
+// ==========================================
+// 0. INISIALISASI SETTING TAMPILAN
+// ==========================================
 const applySettings = () => {
-    if(localStorage.getItem('theme') === 'dark') { document.body.style.backgroundColor = '#121212'; document.body.style.color = '#ffffff'; } else { document.body.style.backgroundColor = '#f0f4f8'; document.body.style.color = '#333333'; }
-    let fontSize = localStorage.getItem('fontSize') || '16'; document.documentElement.style.fontSize = fontSize + 'px';
+    if(localStorage.getItem('theme') === 'dark') {
+        document.body.style.backgroundColor = '#121212'; document.body.style.color = '#ffffff';
+    } else {
+        document.body.style.backgroundColor = '#f0f4f8'; document.body.style.color = '#333333';
+    }
+    let fontSize = localStorage.getItem('fontSize') || '16';
+    document.documentElement.style.fontSize = fontSize + 'px';
 };
 applySettings();
 
+// ==========================================
+// 0.5. 🛰️ FUNGSI PELACAK SATELIT (GEOTAGGING)
+// ==========================================
 const dapatkanLokasiGPS = async () => {
     return new Promise((resolve) => {
-        if (!navigator.geolocation) { resolve("Browser tidak mendukung GPS"); return; }
+        if (!navigator.geolocation) {
+            resolve("Browser tidak mendukung GPS");
+            return;
+        }
         navigator.geolocation.getCurrentPosition(
-            (position) => { resolve(`${position.coords.latitude}, ${position.coords.longitude}`); },
-            (error) => { let msg = "Gagal (Tidak Diketahui)"; if (error.code === 1) msg = "Ditolak Pengguna"; else if (error.code === 2) msg = "Sinyal GPS Hilang"; else if (error.code === 3) msg = "Timeout Pencarian Satelit"; resolve(msg); },
-            { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 } 
+            (position) => {
+                resolve(`${position.coords.latitude}, ${position.coords.longitude}`);
+            },
+            (error) => {
+                let msg = "Gagal (Tidak Diketahui)";
+                if (error.code === 1) msg = "Ditolak Pengguna";
+                else if (error.code === 2) msg = "Sinyal GPS Hilang";
+                else if (error.code === 3) msg = "Timeout Pencarian Satelit";
+                resolve(msg);
+            },
+            { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 } // Maksimal cari sinyal 8 detik
         );
     });
 };
 
+// ==========================================
+// 1. NAVIGASI LAYAR & JARINGAN
+// ==========================================
 const tampilkanLayar = (id) => {
     const vSplash = getEl('view-splash'); const vLogin = getEl('view-login'); const vApp = getEl('view-app');
     if (vSplash) { vSplash.classList.remove('active'); vSplash.style.display = 'none'; }
@@ -36,14 +62,19 @@ const updateNetworkStatus = () => {
     if (status) { const isOnline = navigator.onLine; status.innerText = isOnline ? 'Online' : 'Offline'; status.style.backgroundColor = isOnline ? '#198754' : '#6c757d'; }
 };
 
+// ==========================================
+// 2. INISIALISASI APLIKASI & ROUTER
+// ==========================================
 const initApp = async () => {
     try {
         await initDB();
         const session = await getDataById('kader_session', 'active_user');
-        const vSplash = document.getElementById('view-splash'); const vLogin = document.getElementById('view-login'); const vApp = document.getElementById('view-app');
+        
+        const vSplash = document.getElementById('view-splash');
+        const vLogin = document.getElementById('view-login');
+        const vApp = document.getElementById('view-app');
 
         if (session) {
-            // 🔥 V27 ROUTING: Arahkan PKB ke Dashboard Monitor (admin.js)
             if (String(session.role).toUpperCase().includes('SUPER')) {
                 import('./super.js').then(module => { module.initSuperAdmin(session); }).catch(err => { alert("Modul Super Admin tidak ditemukan!"); });
             } else if (String(session.role).toUpperCase().includes('ADMIN') || String(session.role).toUpperCase().includes('PKB')) {
@@ -74,6 +105,9 @@ const masukKeAplikasi = async (session) => {
     renderMenu(session.role); renderKonten('dashboard'); tampilkanLayar('app');
 };
 
+// ==========================================
+// 3. PABRIK SUB-MENU
+// ==========================================
 const renderMenu = async (role) => {
     const container = getEl('dynamic-menu-container'); if (!container) return;
     let allMenu = await getAllData('master_menu').catch(()=>[]);
@@ -84,9 +118,8 @@ const renderMenu = async (role) => {
             { id_menu: 'M3', label_menu: 'Data Sasaran & Riwayat', icon: '📋', target_view: 'daftar_sasaran', role_akses: 'KADER', urutan: 3, is_active: 'Y' },
             { id_menu: 'M4', label_menu: 'Laporan Pendampingan', icon: '🤝', target_view: 'pendampingan', role_akses: 'KADER', urutan: 4, is_active: 'Y' },
             { id_menu: 'M5', label_menu: 'Rekap Bulanan', icon: '📊', target_view: 'rekap_bulanan', role_akses: 'KADER', urutan: 5, is_active: 'Y' },
-            { id_menu: 'M6', label_menu: 'Bantuan & Pengaturan', icon: '⚙️', target_view: '', role_akses: 'KADER', urutan: 6, is_active: 'Y' },
-            { id_menu: 'M6A', label_menu: 'Pengaturan', icon: '🛠️', target_view: 'setting', parent_id: 'M6', role_akses: 'KADER', urutan: 1, is_active: 'Y' },
-            { id_menu: 'M6B', label_menu: 'Muat Ulang Layar', icon: '🔁', target_view: 'reload_app', parent_id: 'M6', role_akses: 'KADER', urutan: 2, is_active: 'Y' }
+            { id_menu: 'M6', label_menu: 'Bantuan & FAQ', icon: '🆘', target_view: 'bantuan', role_akses: 'KADER', urutan: 6, is_active: 'Y' },
+            { id_menu: 'M7', label_menu: 'Pengaturan Akun', icon: '⚙️', target_view: 'setting', role_akses: 'KADER', urutan: 7, is_active: 'Y' }
         ];
     }
 
@@ -227,7 +260,107 @@ window.renderKonten = async (target) => {
     } else if (target === 'kalkulator') { const tpl = getEl('template-kalkulator'); if(tpl) { area.appendChild(tpl.content.cloneNode(true)); initKalkulator(); }
     } else if (target === 'cetak_pdf') { const tpl = getEl('template-cetak-pdf'); if(tpl) area.appendChild(tpl.content.cloneNode(true));
     } else if (target === 'setting') { const tpl = getEl('template-setting'); if(tpl) { area.appendChild(tpl.content.cloneNode(true)); initSetting(); }
-    } else if (target === 'bantuan') { const tpl = getEl('template-bantuan'); if(tpl) { area.appendChild(tpl.content.cloneNode(true)); const btnCalc = getEl('btn-buka-kalkulator'); if(btnCalc) btnCalc.onclick = () => renderKonten('kalkulator'); } }
+    } 
+    
+    // 🔥 V29: PUSAT BANTUAN & FAQ KHUSUS KADER
+    else if (target === 'bantuan') { 
+        area.innerHTML = `
+            <div class="animate-fade">
+                <div style="background: linear-gradient(135deg, #00b894, #059b7b); padding: 25px 20px; border-radius: 12px; color: white; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center;">
+                    <div style="font-size: 3rem; margin-bottom: 10px;">🆘</div>
+                    <h2 style="margin: 0 0 5px 0; font-size: 1.5rem; font-weight: 800;">Pusat Bantuan Kader</h2>
+                    <p style="margin: 0; opacity: 0.9; font-size: 0.9rem;">Jangan bingung, Ibu/Bapak Kader! Temukan semua jawaban dari kendala aplikasi di sini.</p>
+                </div>
+
+                <div style="margin-bottom:20px;">
+                    <button id="btn-buka-kalkulator" style="width: 100%; background: #fff; border: 2px solid #0984e3; color: #0984e3; padding: 15px; border-radius: 8px; font-weight: bold; font-size: 1.05rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; box-shadow: 0 2px 4px rgba(9, 132, 227, 0.1);">
+                        🧮 BUKA KALKULATOR GIZI & HPL
+                    </button>
+                </div>
+
+                <h3 style="color:#2c3e50; font-size:1.1rem; margin-bottom:15px; padding-bottom:5px; border-bottom:2px solid #eee;">❓ Pertanyaan Sering Ditanya (FAQ)</h3>
+
+                <div class="faq-container">
+                    <button class="faq-question">🔄 Apa fungsi tombol "SINKRONISASI"?</button>
+                    <div class="faq-answer">
+                        <p>Tombol <b>SINKRONISASI</b> itu ibarat "Tukang Pos".</p>
+                        <p>Aplikasi ini dirancang bisa bekerja tanpa sinyal (Offline). Jadi, data yang Ibu masukkan akan disimpan dulu di dalam HP.</p>
+                        <p><b>Cara pakainya:</b><br>
+                        1. Saat ada sinyal (di balai desa/rumah), tekan SINKRONISASI untuk mengirim data Ibu ke dinas.<br>
+                        2. Jika angka di tombol sudah berubah menjadi <b>0/0</b>, artinya semua data sudah aman terkirim!</p>
+                    </div>
+
+                    <button class="faq-question">📡 Bagaimana jika saat mendata warga sinyal saya hilang?</button>
+                    <div class="faq-answer">
+                        <p><b>Lanjut saja mendata, Bu! Tidak perlu panik.</b> 😊</p>
+                        <p>Aplikasi ini kebal terhadap sinyal hilang. Isi form seperti biasa lalu klik "Simpan". Data akan aman tertidur di HP Ibu. Nanti pas sudah sampai di tempat yang ada sinyal / WiFi, tinggal klik SINKRONISASI.</p>
+                    </div>
+
+                    <button class="faq-question">📍 Kenapa saya disuruh menyalakan Lokasi (GPS)?</button>
+                    <div class="faq-answer">
+                        <p>Sistem akan meminta izin lokasi Ibu tepat saat tombol "Simpan" ditekan.</p>
+                        <p>Ini digunakan sebagai <b>Bukti Digital (CCTV Lapangan)</b> bahwa Ibu benar-benar turun ke rumah warga saat melakukan pendampingan, bukan mengisi data dari rumah. Cukup klik "Izinkan" atau "Allow" jika HP meminta izin ya!</p>
+                    </div>
+
+                    <button class="faq-question">🤰 BUMIL yang saya dampingi sudah melahirkan, bagaimana cara lapornya?</button>
+                    <div class="faq-answer">
+                        <p>Wah, selamat! Caranya sangat mudah:</p>
+                        <ol style="padding-left:20px; margin-top:5px;">
+                            <li>Buka menu <b>Lapor Pendampingan</b>.</li>
+                            <li>Pilih nama BUMIL tersebut.</li>
+                            <li>Akan muncul pertanyaan: <i>"Apakah BUMIL sudah melahirkan?"</i></li>
+                            <li>Pilih <b>YA</b>, lalu masukkan tanggal lahir si bayi.</li>
+                        </ol>
+                        <p>Selesai! Sistem akan otomatis mematikan kartu BUMIL-nya, dan membuatkan kartu <b>BUFAS (Ibu Nifas)</b> baru secara otomatis untuk Ibu dampingi selanjutnya.</p>
+                    </div>
+
+                    <button class="faq-question">📉 Jika hasil ukur Baduta berwarna Merah, apa artinya?</button>
+                    <div class="faq-answer">
+                        <p>Aplikasi ini sudah ditanami otak pintar buatan Kemenkes RI.</p>
+                        <p>Jika saat Ibu memasukkan Berat dan Tinggi anak lalu muncul warna <b>Merah (Kekurangan Gizi / Pendek)</b>, itu adalah alarm peringatan (Warning)! 🚨</p>
+                        <p>Segera sarankan orang tua bayi untuk membawa anaknya ke Posyandu atau Bidan Desa terdekat hari itu juga untuk mendapat pemeriksaan medis.</p>
+                    </div>
+
+                    <button class="faq-question">✏️ Saya salah ketik nama/data, apakah bisa diperbaiki?</button>
+                    <div class="faq-answer">
+                        <p>Sangat bisa! Kesalahan adalah hal yang wajar.</p>
+                        <p>Buka menu <b>Data Sasaran & Riwayat</b>, cari nama warga yang salah, klik namanya, lalu klik tulisan biru <b>✏️ (edit)</b> di pojok kanan atas nama mereka.</p>
+                        <p style="color:#d63384; font-size:0.85rem;"><b>Catatan:</b> Jika data sudah terlanjur di-Sinkronisasi ke pusat, Ibu tetap bisa mengeditnya. Nanti sistem akan otomatis menimpa data yang lama di Dinas.</p>
+                    </div>
+                </div>
+
+                <div style="margin-top:30px; text-align:center; padding:15px; background:#f8f9fa; border-radius:8px; border: 1px dashed #ccc;">
+                    <p style="margin:0; font-size:0.85rem; color:#666;">Masih kebingungan?<br>Silakan hubungi <b>Admin Kecamatan</b> atau <b>PKB (Penyuluh KB)</b> di wilayah Ibu.</p>
+                </div>
+            </div>
+
+            <style>
+                .faq-question {
+                    background-color: #fff; color: #333; cursor: pointer; padding: 18px; width: 100%; text-align: left; border: 1px solid #ddd;
+                    border-radius: 8px; outline: none; transition: 0.3s; font-weight: bold; font-size: 0.95rem; margin-bottom: 8px;
+                    display: flex; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+                }
+                .faq-question:hover { background-color: #f1f7fd; border-color: #0984e3; }
+                .faq-question.active { background-color: #0984e3; color: white; border-color: #0984e3; }
+                .faq-answer {
+                    padding: 0 18px; display: none; background-color: #fdfdfd; overflow: hidden; border-left: 3px solid #0984e3;
+                    border-bottom: 1px solid #eee; border-right: 1px solid #eee; border-radius: 0 0 8px 8px; margin-top: -8px; margin-bottom: 15px;
+                    font-size: 0.9rem; line-height: 1.6; color: #444; padding-top: 15px; padding-bottom: 15px; box-shadow: 0 2px 3px rgba(0,0,0,0.05);
+                }
+                .faq-answer p { margin-top: 0; margin-bottom: 10px; }
+            </style>
+        `;
+
+        document.querySelectorAll('.faq-question').forEach(btn => {
+            btn.onclick = () => {
+                btn.classList.toggle('active');
+                const panel = btn.nextElementSibling;
+                if (panel.style.display === "block") { panel.style.display = "none"; } else { panel.style.display = "block"; }
+            }
+        });
+        
+        const btnCalc = getEl('btn-buka-kalkulator'); if(btnCalc) btnCalc.onclick = () => renderKonten('kalkulator');
+    }
 
     try {
         const allWidgets = await getAllData('master_widget').catch(()=>[]);
@@ -882,7 +1015,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     await initDB(); await putData('kader_session', res.session);
                     getEl('kader-id').value = ''; getEl('kader-pin').value = '';
 
-                    // 🔥 V27 ROUTING: Arahkan PKB ke Dashboard Monitor (admin.js)
                     if (res.session.role.includes('SUPER')) { import('./super.js').then(module => { module.initSuperAdmin(res.session); }).catch(err => { alert("❌ Peringatan Keamanan: Modul Super Admin tidak ditemukan di server!"); }); } 
                     else if (res.session.role.includes('ADMIN') || res.session.role.includes('PKB')) { 
                         if (typeof initAdmin === 'function') { initAdmin(res.session); } else { import('./admin.js').then(module => module.initAdmin(res.session)); }
