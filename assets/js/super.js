@@ -1,5 +1,5 @@
 // ==========================================
-// 👑 GOD MODE: SUPER ADMIN DASHBOARD (V18.1 - NO-CODE VISUAL BUILDER PATCH)
+// 👑 GOD MODE: SUPER ADMIN DASHBOARD (V20 - MAIN DASHBOARD & LOBBY)
 // ==========================================
 import { getAllData, clearStore } from './db.js';
 
@@ -8,6 +8,7 @@ const SUPER_TOKEN = 'MasterKeyKubuSecure!001';
 
 window.superUsersData = []; window.superTimData = []; window.currentFilteredIds = [];
 window.superKuesionerData = []; window.superMenuData = []; window.superWidgetData = [];
+window.currentUser = null;
 
 // ==========================================
 // 1. FUNGSI AKSI SUPER ADMIN (GLOBAL)
@@ -42,23 +43,19 @@ window.superEditWidget = (id) => {
     const widget = window.superWidgetData.find(w => w.id_widget === id); if(!widget) return; window.currentEditWidgetId = id;
     document.getElementById('modal-w-title').innerHTML = "✏️ Edit Komponen Halaman"; document.getElementById('btn-submit-w').innerText = "Update Komponen";
     
-    // Refresh Target Halaman Dropdown
     const tHalaman = document.getElementById('w-target-sel'); tHalaman.innerHTML = '<option value="">-- Pilih Halaman / Menu --</option>';
     const defaultTargets = ['dashboard', 'registrasi', 'daftar_sasaran', 'pendampingan', 'rekap_bulanan', 'cetak_pdf', 'bantuan', 'setting'];
     const dynamicTargets = window.superMenuData.map(m => m.target_view).filter(Boolean);
     const uniqueTargets = [...new Set([...defaultTargets, ...dynamicTargets])];
     uniqueTargets.forEach(t => tHalaman.innerHTML += `<option value="${t}">${t}</option>`);
     
-    tHalaman.value = widget.target_halaman || '';
-    document.getElementById('w-posisi').value = widget.posisi || 'atas';
+    tHalaman.value = widget.target_halaman || ''; document.getElementById('w-posisi').value = widget.posisi || 'atas';
     
-    // Smart Editor Mode
     document.getElementById('w-tipe').value = 'html';
     document.querySelectorAll('.widget-panel').forEach(p => p.style.display = 'none');
     document.getElementById('panel-html').style.display = 'block';
     
     document.getElementById('w-konten-html').value = widget.isi_konten || '';
-    
     document.getElementById('modal-add-w').style.display = 'flex';
 };
 
@@ -136,6 +133,7 @@ window.renderWidgetTable = () => {
 // 3. INISIALISASI KERANGKA (SKELETON)
 // ==========================================
 export const initSuperAdmin = async (session) => {
+    window.currentUser = session;
     const vSplash = document.getElementById('view-splash'); const vLogin = document.getElementById('view-login'); const vApp = document.getElementById('view-app');
     if(vLogin) vLogin.classList.add('hidden'); if(vApp) vApp.classList.add('hidden'); if(vSplash) vSplash.style.display = 'none';
 
@@ -145,8 +143,8 @@ export const initSuperAdmin = async (session) => {
             <div id="super-sidebar" style="width:280px; background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%); color:white; display:flex; flex-direction:column; box-shadow: 4px 0 10px rgba(0,0,0,0.15); z-index:100; flex-shrink: 0; transition: transform 0.3s ease;">
                 <div style="padding: 25px 20px; border-bottom: 1px solid rgba(255,255,255,0.1); text-align:center;"><div style="font-size: 3rem; margin-bottom: 10px;">👑</div><h3 style="margin:0; font-weight:900; line-height:1.2; letter-spacing:1px;"><span style="font-size:1.1rem; color:#e94560; display:block;">PUSAT KENDALI</span><span style="font-size:1.3rem; color:#ffffff; display:block;">SUPER ADMIN</span></h3></div>
                 <div style="flex:1; padding: 20px 0; overflow-y:auto; min-height:0;">
-                    <div class="super-menu-item" data-target="dashboard">🎛️ Dashboard Utama</div>
-                    <div class="super-menu-item active" data-target="user_management">👥 Manajemen Pengguna</div>
+                    <div class="super-menu-item active" data-target="dashboard">🎛️ Dashboard Utama</div>
+                    <div class="super-menu-item" data-target="user_management">👥 Manajemen Pengguna</div>
                     <div class="super-menu-item" data-target="kuesioner">📋 Master Kuesioner (Form)</div>
                     <div class="super-menu-item" data-target="menu_management">🎚️ Manajemen Menu (RBAC)</div>
                     <div class="super-menu-item" data-target="widget_management">🧩 Pabrik Halaman (Widget)</div>
@@ -157,7 +155,7 @@ export const initSuperAdmin = async (session) => {
             </div>
             <div style="flex:1; display:flex; flex-direction:column; overflow:hidden; width:100%;">
                 <div style="background:white; padding: 15px 25px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); z-index:5; display:flex; justify-content:space-between; align-items:center;">
-                    <div style="display:flex; align-items:center; gap:15px;"><button id="btn-toggle-super" style="background:none; border:none; font-size:1.6rem; cursor:pointer; color:#1a1a2e; padding:0; line-height:1;">☰</button><h2 id="super-page-title" style="margin:0; font-size:1.4rem; color:#1a1a2e; font-weight:800;">Manajemen Pengguna</h2></div>
+                    <div style="display:flex; align-items:center; gap:15px;"><button id="btn-toggle-super" style="background:none; border:none; font-size:1.6rem; cursor:pointer; color:#1a1a2e; padding:0; line-height:1;">☰</button><h2 id="super-page-title" style="margin:0; font-size:1.4rem; color:#1a1a2e; font-weight:800;">Dashboard Utama</h2></div>
                     <div style="font-size:0.8rem; background:#198754; color:white; padding:4px 10px; border-radius:20px; font-weight:bold; letter-spacing:1px;">API SECURED 🔐</div>
                 </div>
                 <div id="super-content" style="flex:1; padding: 25px; overflow-y:auto; background:#eef2f5;"></div>
@@ -171,10 +169,10 @@ export const initSuperAdmin = async (session) => {
             .btn-action { padding: 6px 12px; border: none; border-radius: 4px; font-size: 0.8rem; font-weight: bold; cursor: pointer; margin-right: 5px; transition: opacity 0.2s;} .btn-action:hover { opacity: 0.8; } .btn-edit { background: #fdcb6e; color: #2d3436; } .filter-input { padding:8px 12px; border:1px solid #ccc; border-radius:6px; outline:none; font-family:inherit; } .filter-input:focus { border-color:#0984e3; box-shadow: 0 0 0 2px rgba(9, 132, 227, 0.2); }
             .btn-mass { padding: 8px 15px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; color: white; display: flex; align-items: center; gap: 5px; font-size:0.85rem;}
             .chk-user { cursor:pointer; transform:scale(1.3); accent-color: #0984e3; } #chk-all-users { cursor:pointer; transform:scale(1.3); accent-color: #e94560; } #btn-clear-search:hover { color: #e94560 !important; }
-            @media (max-width: 1024px) { #super-sidebar { position: absolute; top:0; bottom:0; left:0; transform: translateX(-100%); } #super-sidebar.mobile-active { transform: translateX(0); } #super-sidebar-overlay.mobile-active { display: block !important; } } @media (min-width: 1025px) { #super-sidebar.desktop-collapsed { margin-left: -280px; } }
-            /* Styling for Emoji Picker */
+            .quick-link-btn:hover { background: #eef2f5 !important; border-color: #0984e3 !important; transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.05); }
             .emoji-item { cursor:pointer; font-size:1.5rem; text-align:center; padding:5px; border-radius:5px; transition:background 0.2s; }
             .emoji-item:hover { background:#e8f4fd; }
+            @media (max-width: 1024px) { #super-sidebar { position: absolute; top:0; bottom:0; left:0; transform: translateX(-100%); } #super-sidebar.mobile-active { transform: translateX(0); } #super-sidebar-overlay.mobile-active { display: block !important; } } @media (min-width: 1025px) { #super-sidebar.desktop-collapsed { margin-left: -280px; } }
         </style>
     `;
 
@@ -185,7 +183,8 @@ export const initSuperAdmin = async (session) => {
     const menuItems = document.querySelectorAll('.super-menu-item');
     menuItems.forEach(item => { item.onclick = () => { menuItems.forEach(m => m.classList.remove('active')); item.classList.add('active'); document.getElementById('super-page-title').innerText = item.innerText.replace(/[^\w\s]/gi, '').trim(); if (window.innerWidth <= 1024) { document.getElementById('super-sidebar').classList.remove('mobile-active'); document.getElementById('super-sidebar-overlay').classList.remove('mobile-active'); } window.renderSuperView(item.getAttribute('data-target')); }; });
 
-    window.renderSuperView('user_management');
+    // 🔥 V20: Mendarat langsung di Dashboard Utama!
+    window.renderSuperView('dashboard');
 };
 
 // ==========================================
@@ -195,9 +194,86 @@ const EMOJI_LIST = ['📊','🏠','📝','🤝','🖨️','🆘','⚙️','🔁'
 
 window.renderSuperView = async (target) => {
     const content = document.getElementById('super-content');
-    if (target === 'dashboard') { content.innerHTML = `<div class="super-card"><h3>Dashboard sedang disiapkan...</h3><p>Silakan buka menu lain.</p></div>`; } 
     
-    // --- 🧩 PABRIK HALAMAN & WIDGET (V18.1 - VISUAL BUILDER PATCH) ---
+    // --- 🎛️ DASHBOARD UTAMA (V20) ---
+    if (target === 'dashboard') { 
+        content.innerHTML = `
+            <div class="animate-fade">
+                <div class="super-card" style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); color: white; margin-bottom: 20px; border: none; padding: 30px;">
+                    <h2 style="margin:0 0 5px 0; font-size:1.8rem;">Selamat Datang, ${window.currentUser?.nama || 'Komandan'}! 🚀</h2>
+                    <p style="margin:0; opacity:0.8; font-size:0.95rem;">Pusat Kendali Utama (God Mode) Sistem Pendataan Kader TPK.</p>
+                </div>
+
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
+                    <div class="super-card" style="border-left: 5px solid #0984e3; display:flex; flex-direction:column; justify-content:center;">
+                        <div style="font-size:0.85rem; color:#666; font-weight:bold;">👥 TOTAL PENGGUNA</div>
+                        <div id="dash-count-user" style="font-size:2rem; font-weight:900; color:#0984e3; margin-top:5px;">⏳</div>
+                    </div>
+                    <div class="super-card" style="border-left: 5px solid #00b894; display:flex; flex-direction:column; justify-content:center;">
+                        <div style="font-size:0.85rem; color:#666; font-weight:bold;">📋 KUESIONER (FORM)</div>
+                        <div id="dash-count-q" style="font-size:2rem; font-weight:900; color:#00b894; margin-top:5px;">⏳</div>
+                    </div>
+                    <div class="super-card" style="border-left: 5px solid #fdcb6e; display:flex; flex-direction:column; justify-content:center;">
+                        <div style="font-size:0.85rem; color:#666; font-weight:bold;">🎚️ MENU NAVIGASI</div>
+                        <div id="dash-count-m" style="font-size:2rem; font-weight:900; color:#e1b12c; margin-top:5px;">⏳</div>
+                    </div>
+                    <div class="super-card" style="border-left: 5px solid #e94560; display:flex; flex-direction:column; justify-content:center;">
+                        <div style="font-size:0.85rem; color:#666; font-weight:bold;">🧩 WIDGET INJEKSI</div>
+                        <div id="dash-count-w" style="font-size:2rem; font-weight:900; color:#e94560; margin-top:5px;">⏳</div>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 15px;">
+                    <div class="super-card">
+                        <h3 style="margin-top:0; color:#1a1a2e; border-bottom:1px solid #eee; padding-bottom:10px;">⚡ Aksi Cepat (Quick Links)</h3>
+                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:15px;">
+                            <button class="quick-link-btn" onclick="document.querySelector('[data-target=user_management]').click()" style="padding:15px; background:#f8f9fa; border:1px solid #ddd; border-radius:8px; cursor:pointer; text-align:left; font-weight:bold; color:#333; transition:all 0.2s;">👥 Kelola Pengguna & Wilayah</button>
+                            <button class="quick-link-btn" onclick="document.querySelector('[data-target=kuesioner]').click()" style="padding:15px; background:#f8f9fa; border:1px solid #ddd; border-radius:8px; cursor:pointer; text-align:left; font-weight:bold; color:#333; transition:all 0.2s;">📋 Rakit Kuesioner Baru</button>
+                            <button class="quick-link-btn" onclick="document.querySelector('[data-target=menu_management]').click()" style="padding:15px; background:#f8f9fa; border:1px solid #ddd; border-radius:8px; cursor:pointer; text-align:left; font-weight:bold; color:#333; transition:all 0.2s;">🎚️ Atur Menu (RBAC)</button>
+                            <button class="quick-link-btn" onclick="document.querySelector('[data-target=widget_management]').click()" style="padding:15px; background:#f8f9fa; border:1px solid #ddd; border-radius:8px; cursor:pointer; text-align:left; font-weight:bold; color:#333; transition:all 0.2s;">🧩 Buat Halaman / Widget</button>
+                        </div>
+                    </div>
+                    <div class="super-card">
+                        <h3 style="margin-top:0; color:#1a1a2e; border-bottom:1px solid #eee; padding-bottom:10px;">🛡️ Status Sistem</h3>
+                        <div style="margin-top:15px; line-height:1.8;">
+                            <div style="display:flex; justify-content:space-between;"><span>API Koneksi:</span> <b style="color:#198754;">🟢 Terhubung</b></div>
+                            <div style="display:flex; justify-content:space-between;"><span>Database Lokal:</span> <b>Versi 7</b></div>
+                            <div style="display:flex; justify-content:space-between;"><span>Sistem Keamanan:</span> <b style="color:#0984e3;">🔒 Aktif (Token)</b></div>
+                            <div style="display:flex; justify-content:space-between;"><span>Pembaruan Terakhir:</span> <b>${new Date().toLocaleDateString('id-ID')}</b></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Proses Sinkronisasi Angka Statistik ke Server di Latar Belakang
+        const loadStats = async () => {
+            const sheetsToFetch = [
+                { name: 'USER_LOGIN', id: 'dash-count-user' },
+                { name: 'MASTER_PERTANYAAN', id: 'dash-count-q' },
+                { name: 'MASTER_MENU', id: 'dash-count-m' },
+                { name: 'MASTER_WIDGET', id: 'dash-count-w' }
+            ];
+
+            for (let s of sheetsToFetch) {
+                try {
+                    let el = document.getElementById(s.id);
+                    if(!el) continue;
+                    const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_ALL', token: SUPER_TOKEN, sheetName: s.name }) });
+                    const res = await response.json();
+                    if(res.status === 'success' && el) {
+                        el.innerText = res.data.length;
+                    }
+                } catch(e) {
+                    let el = document.getElementById(s.id);
+                    if(el) el.innerText = "?";
+                }
+            }
+        };
+        loadStats();
+    } 
+    
+    // --- 🧩 PABRIK HALAMAN & WIDGET ---
     else if (target === 'widget_management') {
         content.innerHTML = `
             <div class="super-card" style="margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px;">
@@ -279,7 +355,6 @@ window.renderSuperView = async (target) => {
         `;
 
         try {
-            // 🔥 SEDOT WIDGET DAN MENU SEKALIGUS (FIX V18.1)
             const [resW, resM] = await Promise.all([
                 fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_ALL', token: SUPER_TOKEN, sheetName: 'MASTER_WIDGET' }) }).then(r => r.json()),
                 fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_ALL', token: SUPER_TOKEN, sheetName: 'MASTER_MENU' }) }).then(r => r.json())
@@ -287,7 +362,7 @@ window.renderSuperView = async (target) => {
             
             if (resW.status === 'success') {
                 window.superWidgetData = resW.data;
-                if(resM.status === 'success') window.superMenuData = resM.data; // Simpan data menu untuk dropdown
+                if(resM.status === 'success') window.superMenuData = resM.data; 
 
                 window.renderWidgetTable();
                 
@@ -296,7 +371,6 @@ window.renderSuperView = async (target) => {
                 const wTipe = document.getElementById('w-tipe');
                 const panels = document.querySelectorAll('.widget-panel');
                 
-                // Populate Target Halaman from Menu Data + Default
                 const populateTarget = () => {
                     tHalaman.innerHTML = '<option value="">-- Pilih Halaman / Menu --</option>';
                     const defaultTargets = ['dashboard', 'registrasi', 'daftar_sasaran', 'pendampingan', 'rekap_bulanan', 'cetak_pdf', 'bantuan', 'setting'];
@@ -305,7 +379,7 @@ window.renderSuperView = async (target) => {
                     
                     uniqueTargets.forEach(t => tHalaman.innerHTML += `<option value="${t}">${t}</option>`);
                 };
-                populateTarget(); // Langsung panggil karena data sudah pasti siap
+                populateTarget(); 
 
                 wTipe.onchange = () => {
                     panels.forEach(p => p.style.display = 'none');
@@ -317,13 +391,12 @@ window.renderSuperView = async (target) => {
                 
                 document.getElementById('btn-show-add-w').onclick = () => { 
                     window.currentEditWidgetId = null; 
-                    populateTarget(); // Refresh target saat klik tambah
+                    populateTarget(); 
                     document.getElementById('modal-w-title').innerText = "➕ Buat Komponen Halaman";
                     document.getElementById('btn-submit-w').innerText = "Generate & Simpan";
                     tHalaman.value = ''; document.getElementById('w-posisi').value = 'atas';
                     wTipe.value = 'teks'; wTipe.dispatchEvent(new Event('change'));
                     
-                    // Reset fields
                     document.getElementById('w-txt-isi').value=''; document.getElementById('w-btn-teks').value='';
                     document.getElementById('w-ban-url').value=''; document.getElementById('w-konten-html').value='';
                     
@@ -340,7 +413,6 @@ window.renderSuperView = async (target) => {
 
                     if(!target) { alert("⚠️ Mohon pilih Target Halaman!"); return; }
 
-                    // 🔥 WIDGET GENERATOR LOGIC
                     if (tipe === 'html') {
                         finalKonten = document.getElementById('w-konten-html').value.trim();
                         if(!finalKonten) { alert("⚠️ Kode HTML tidak boleh kosong!"); return; }
@@ -403,7 +475,7 @@ window.renderSuperView = async (target) => {
         } catch (error) { document.getElementById('table-wrapper-w').innerHTML = `<div style="padding:50px; text-align:center; color:#e94560;"><h3>❌ Gagal Terhubung</h3></div>`; }
     }
 
-    // --- 🎚️ MENU MANAJEMEN MENU (V18.1 - SMART DROPDOWN) ---
+    // --- 🎚️ MENU MANAJEMEN MENU ---
     else if (target === 'menu_management') {
         content.innerHTML = `
             <div class="super-card" style="margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px;">
@@ -490,14 +562,11 @@ window.renderSuperView = async (target) => {
                 window.renderMenuTable();
                 
                 const modalM = document.getElementById('modal-add-m'); 
-                
-                // 🔥 SETUP EMOJI PICKER
                 const iconInput = document.getElementById('m-icon');
                 const picker = document.getElementById('emoji-picker');
                 picker.innerHTML = EMOJI_LIST.map(e => `<div class="emoji-item" onclick="document.getElementById('m-icon').value='${e}'; document.getElementById('emoji-picker').style.display='none';">${e}</div>`).join('');
                 iconInput.onclick = () => picker.style.display = picker.style.display === 'none' ? 'grid' : 'none';
 
-                // 🔥 SETUP SMART DROPDOWN
                 const targetSel = document.getElementById('m-target-sel');
                 const targetCus = document.getElementById('m-target-custom');
                 targetSel.onchange = () => {
@@ -570,8 +639,7 @@ window.renderSuperView = async (target) => {
         } catch (error) { document.getElementById('table-wrapper-m').innerHTML = `<div style="padding:50px; text-align:center; color:#e94560;"><h3>❌ Gagal Terhubung</h3></div>`; }
     }
 
-    // --- 📋 MENU MASTER KUESIONER (SAMA SEPERTI SEBELUMNYA) ---
-    // ... [Sisa kode kuesioner dan user_management di bawahnya tetap sama persis dan tidak saya kurangi] ...
+    // --- 📋 MENU MASTER KUESIONER ---
     else if (target === 'kuesioner') {
         content.innerHTML = `
             <div class="super-card" style="margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px;">
@@ -656,6 +724,7 @@ window.renderSuperView = async (target) => {
         } catch (error) { document.getElementById('table-wrapper-q').innerHTML = `<div style="padding:50px; text-align:center; color:#e94560;"><h3>❌ Gagal Terhubung</h3></div>`; }
     }
 
+    // --- 👥 MENU MANAJEMEN PENGGUNA ---
     else if (target === 'user_management') {
         content.innerHTML = `
             <div class="super-card" style="margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px;">
