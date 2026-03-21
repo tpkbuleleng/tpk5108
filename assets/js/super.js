@@ -1,5 +1,5 @@
 // ==========================================
-// 👑 GOD MODE: SUPER ADMIN DASHBOARD (V13 - Enterprise Edition)
+// 👑 GOD MODE: SUPER ADMIN DASHBOARD (V14 - LOGIKA KONDISIONAL)
 // ==========================================
 import { getAllData, clearStore } from './db.js';
 
@@ -53,13 +53,16 @@ window.renderKuesionerTable = () => {
         const modul = String(q.modul || '-').toUpperCase();
         const kat = String(q.jenis_sasaran || q.kategori_sasaran || q.kategori || '-').toUpperCase(); 
         const grup = q.grup_pertanyaan || '-';
-        const urutG = q.urutan_grup || '-'; // Tampilkan Urutan Grup di tabel
+        const urutG = q.urutan_grup || '-'; 
         const teks = q.label_pertanyaan || q.teks_pertanyaan || q.pertanyaan || '-'; 
         const tipe = String(q.tipe_input || q.tipe_jawaban || q.tipe || '-').toUpperCase();
         const opsi = q.opsi_json || q.pilihan_jawaban ? `<div style="font-size:0.75rem; color:#888; margin-top:5px; background:#f1f2f6; padding:4px; border-radius:4px;">Opsi: ${q.opsi_json || q.pilihan_jawaban}</div>` : '';
         const wajib = String(q.is_required || q.wajib || 'Y').toUpperCase() === 'Y' || String(q.is_required || q.wajib || 'Y').toUpperCase() === 'YA' ? '<span style="color:#d63031; font-weight:bold;">Wajib *</span>' : '<span style="color:#636e72;">Opsional</span>';
         const status = String(q.is_active || q.status || q.status_pertanyaan || 'Y').toUpperCase();
         
+        // 🔥 Label Kondisi
+        const kondisiLabel = q.kondisi_tampil ? `<div style="font-size:0.75rem; color:#d35400; margin-top:5px; padding:4px; background:#fdf3e8; border-radius:4px; border:1px dashed #fadbd8;">👁️ Muncul Jika: <b>${q.kondisi_tampil}</b></div>` : '';
+
         if (filterKat === 'ALL' || kat === filterKat) {
             count++; 
             const isAktif = status === 'AKTIF' || status === 'Y'; 
@@ -76,7 +79,7 @@ window.renderKuesionerTable = () => {
                         <span class="badge-role role-admin" style="display:block; text-align:center;">${kat}</span>
                     </td>
                     <td><span style="font-size:0.7rem; color:#666; font-weight:bold;">Urutan Tampil: ${urutG}</span><br><b>${grup}</b></td>
-                    <td><b>${teks}</b>${opsi}</td>
+                    <td><b>${teks}</b>${opsi}${kondisiLabel}</td>
                     <td><code style="color:#0984e3;">${tipe}</code></td>
                     <td>${wajib}</td>
                     <td><div style="font-size:0.7rem; font-weight:bold; margin-bottom:5px;">${textStatus}</div><button class="btn-action" style="background:${btnColor}; color:white; width:100%;" onclick="window.superToggleQuestion('${id}', '${status}')">${btnText}</button></td>
@@ -147,7 +150,7 @@ window.renderSuperView = async (target) => {
     
     if (target === 'dashboard') { content.innerHTML = `<div class="super-card"><h3>Dashboard sedang disiapkan...</h3><p>Silakan buka menu lain.</p></div>`; } 
     
-    // --- 📋 MENU MASTER KUESIONER (V13 - ENTERPRISE CONTROL) ---
+    // --- 📋 MENU MASTER KUESIONER (V14 - LOGIKA KONDISIONAL) ---
     else if (target === 'kuesioner') {
         content.innerHTML = `
             <div class="super-card" style="margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px;">
@@ -172,11 +175,11 @@ window.renderSuperView = async (target) => {
             </div>
 
             <div id="modal-add-q" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.7); z-index:1000; align-items:center; justify-content:center;">
-                <div style="background:white; padding:30px; border-radius:10px; width:90%; max-width:600px; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+                <div style="background:white; padding:30px; border-radius:10px; width:90%; max-width:600px; max-height:90vh; overflow-y:auto; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
                     <h3 style="margin-top:0; color:#1a1a2e; border-bottom:2px solid #eee; padding-bottom:10px;">➕ Rakit Pertanyaan Baru</h3>
                     
                     <div style="background:#f8f9fa; padding:15px; border-radius:8px; margin-bottom:15px; border: 1px solid #e1e8ed;">
-                        <p style="margin:0 0 10px 0; font-size:0.85rem; font-weight:bold; color:#d35400;">1. Tentukan Posisi Pertanyaan (Penempatan)</p>
+                        <p style="margin:0 0 10px 0; font-size:0.85rem; font-weight:bold; color:#0984e3;">1. Tentukan Posisi Pertanyaan (Penempatan)</p>
                         <div style="display:flex; gap:10px; margin-bottom:10px;">
                             <div style="flex:1;">
                                 <label style="display:block; font-size:0.8rem; font-weight:bold; margin-bottom:5px;">Modul (Fase)</label>
@@ -207,7 +210,6 @@ window.renderSuperView = async (target) => {
                                 <input type="number" id="q-urut-grup" class="filter-input" placeholder="Angka: 1, 2.." style="width:100%; box-sizing:border-box;" required>
                             </div>
                         </div>
-                        <div style="font-size:0.7rem; color:#888; margin-top:5px;">*Kotak Grup dengan "Urutan Tampil" terkecil akan digambar paling atas di HP Kader.</div>
                     </div>
 
                     <div style="margin-bottom:15px;">
@@ -234,10 +236,15 @@ window.renderSuperView = async (target) => {
                         </div>
                     </div>
 
-                    <div id="panel-opsi" style="display:block; background:#fff3cd; padding:15px; border-radius:8px; margin-bottom:20px; border:1px solid #ffeeba;">
+                    <div id="panel-opsi" style="display:block; background:#fff3cd; padding:15px; border-radius:8px; margin-bottom:15px; border:1px solid #ffeeba;">
                         <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:5px; color:#856404;">Pilihan Jawaban (Pisahkan dengan Koma)</label>
                         <input type="text" id="q-opsi" class="filter-input" placeholder="Cth: Ya, Tidak, Kadang-kadang" style="width:100%; box-sizing:border-box;">
-                        <div style="font-size:0.75rem; color:#856404; margin-top:5px; font-style:italic;">*Sistem akan merubahnya otomatis menjadi format JSON ["Ya", "Tidak"] sebelum masuk ke sheet.</div>
+                    </div>
+
+                    <div style="background:#fdf3e8; padding:15px; border-radius:8px; margin-bottom:20px; border: 1px dashed #e67e22;">
+                        <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:5px; color:#d35400;">4. Logika Percabangan (Opsional)</label>
+                        <input type="text" id="q-kondisi" class="filter-input" placeholder="Cth: Q-PEN-BDT-1234=Ya" style="width:100%; box-sizing:border-box;">
+                        <div style="font-size:0.75rem; color:#888; margin-top:5px;">*Format: <b>ID_PERTANYAAN_INDUK=JAWABAN</b>.<br>Kosongkan jika pertanyaan ini selalu tampil.</div>
                     </div>
 
                     <div style="display:flex; justify-content:flex-end; gap:10px;">
@@ -270,11 +277,12 @@ window.renderSuperView = async (target) => {
                     const modul = document.getElementById('q-modul').value;
                     const kat = document.getElementById('q-kat').value;
                     const grup = document.getElementById('q-grup').value.trim();
-                    const urutGrup = document.getElementById('q-urut-grup').value; // 🔥 BARU
+                    const urutGrup = document.getElementById('q-urut-grup').value; 
                     const teks = document.getElementById('q-teks').value.trim();
                     const tipe = document.getElementById('q-tipe').value;
                     const wajib = document.getElementById('q-wajib').value;
                     const opsiRaw = tipe === 'select' ? document.getElementById('q-opsi').value.trim() : '';
+                    const kondisiRaw = document.getElementById('q-kondisi').value.trim(); // 🔥 TANGKAP KONDISI
 
                     if(!grup || !urutGrup) { alert("⚠️ Grup Pertanyaan dan Angka Urutannya harus diisi!"); return; }
                     if(!teks) { alert("⚠️ Teks Pertanyaan tidak boleh kosong!"); return; }
@@ -300,19 +308,20 @@ window.renderSuperView = async (target) => {
                         modul: modul,
                         jenis_sasaran: kat, 
                         grup_pertanyaan: grup,
-                        urutan_grup: urutGrup, // 🔥 MASUKKAN KE PAYLOAD UNTUK SHEET
+                        urutan_grup: urutGrup, 
                         label_pertanyaan: teks, 
                         tipe_input: tipe, 
                         opsi_json: jsonOpsi, 
                         is_required: wajib, 
-                        is_active: 'Y' 
+                        is_active: 'Y',
+                        kondisi_tampil: kondisiRaw // 🔥 MASUKKAN KONDISI KE PAYLOAD
                     };
 
                     try {
                         const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_ADD_QUESTION', token: SUPER_TOKEN, data: payloadQ }) });
                         const res = await response.json();
                         if(res.status === 'success') { 
-                            alert("✅ Kuesioner baru berhasil mengudara!"); 
+                            alert("✅ Kuesioner Percabangan berhasil mengudara!"); 
                             modalQ.style.display = 'none'; 
                             document.getElementById('table-wrapper-q').innerHTML = `<div style="padding:50px; text-align:center; color:#0984e3;"><h3>🔄 MENYINKRONKAN KUESIONER...</h3></div>`;
                             await clearStore('master_pertanyaan'); 
