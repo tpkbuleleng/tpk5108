@@ -1,5 +1,5 @@
 const DB_NAME = 'TPK_Buleleng_DB';
-const DB_VERSION = 4; // 🔥 Naikkan ke Versi 4 untuk memusnahkan kebocoran data
+const DB_VERSION = 5; // 🔥 Naikkan ke Versi 5 untuk menyuntikkan tabel MASTER_MENU
 
 export const initDB = () => {
     return new Promise((resolve, reject) => {
@@ -12,10 +12,11 @@ export const initDB = () => {
             if (db.objectStoreNames.contains('master_user')) db.deleteObjectStore('master_user');
             if (db.objectStoreNames.contains('master_admin')) db.deleteObjectStore('master_admin');
 
+            // 🎯 DAFTAR TABEL YANG AKAN DIBUAT OTOMATIS OLEH HP KADER
             const stores = [
                 'master_kader', 'master_tim', 'master_tim_wilayah',
                 'master_pertanyaan', 'master_wilayah_bali', 'standar_antropometri', 
-                'master_kembang', 'master_wilayah'
+                'master_kembang', 'master_wilayah', 'master_menu' // 🚀 INJEKSI TABEL MENU DISINI
             ];
             stores.forEach(store => { if (!db.objectStoreNames.contains(store)) db.createObjectStore(store, { autoIncrement: true }); });
             if (!db.objectStoreNames.contains('kader_session')) db.createObjectStore('kader_session', { keyPath: 'id' });
