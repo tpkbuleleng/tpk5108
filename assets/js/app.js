@@ -215,7 +215,7 @@ window.renderKonten = async (target) => {
 };
 
 // ==========================================
-// 4. LOGIKA FORM REGISTRASI & MESIN PERAKIT FORM (ENTERPRISE)
+// 4. LOGIKA FORM REGISTRASI & MESIN PERAKIT FORM (V14 - CONDITIONAL LOGIC)
 // ==========================================
 const getKodeKecamatan = (kec) => {
     if (!kec) return "XXX";
@@ -223,7 +223,7 @@ const getKodeKecamatan = (kec) => {
     return map[kec.toUpperCase()] || "XXX";
 };
 
-// 🔥 MESIN PERAKIT KUESIONER DINAMIS DENGAN KENDALI URUTAN GRUP (V13)
+// 🔥 MESIN PERAKIT KUESIONER DINAMIS (CASCADING & LOGIKA KONDISIONAL)
 const renderPertanyaanDinamis = (jenis, modul, container, questions) => {
     if (!jenis) { container.innerHTML = ''; return; }
     
@@ -238,11 +238,10 @@ const renderPertanyaanDinamis = (jenis, modul, container, questions) => {
     }).sort((a,b)=> (parseInt(a.urutan)||0) - (parseInt(b.urutan)||0));
 
     if (filteredQ.length > 0) {
-        // 2. Kelompokkan berdasarkan 'grup_pertanyaan' dan simpan 'urutan_grup'
+        // 2. Kelompokkan berdasarkan 'grup_pertanyaan'
         const grouped = {};
         filteredQ.forEach(q => {
             let grup = q.grup_pertanyaan || 'Informasi Tambahan';
-            // Tangkap urutan_grup dari Google Sheet, jika kosong beri nilai 999 (taruh paling bawah)
             let urutG = parseInt(q.urutan_grup); 
             if (isNaN(urutG)) urutG = 999; 
 
@@ -252,11 +251,10 @@ const renderPertanyaanDinamis = (jenis, modul, container, questions) => {
             grouped[grup].questions.push(q);
         });
 
-        // 3. Konversi ke Array dan URUTKAN GRUP berdasarkan angka terkecil
         const groupArray = Object.keys(grouped).map(k => ({ nama_grup: k, ...grouped[k] }));
         groupArray.sort((a, b) => a.urutan_grup - b.urutan_grup);
 
-        // 4. Gambar Kotaknya di Layar secara Berurutan!
+        // 3. Render HTML
         let html = ``;
         groupArray.forEach(g => {
             html += `<div style="background:#fff; border:1px solid #e1e8ed; padding:15px; border-radius:8px; margin-bottom:15px; box-shadow:0 1px 2px rgba(0,0,0,0.05);">`;
@@ -264,7 +262,8 @@ const renderPertanyaanDinamis = (jenis, modul, container, questions) => {
             
             g.questions.forEach(q => {
                 let lbl = q.label_pertanyaan || q.teks_pertanyaan || 'Pertanyaan Tanpa Judul';
-                let req = String(q.is_required || q.wajib || 'Y').toUpperCase() === 'Y' || String(q.is_required || q.wajib || 'Y').toUpperCase() === 'YA' ? 'required' : ''; 
+                let isReq = String(q.is_required || q.wajib || 'Y').toUpperCase() === 'Y' || String(q.is_required || q.wajib || 'Y').toUpperCase() === 'YA';
+                let req = isReq ? 'required' : ''; 
                 let markerReq = req ? '<span style="color:red; font-weight:bold;">*</span>' : '';
 
                 let tInput = String(q.tipe_input || q.tipe_jawaban || 'text').toLowerCase();
@@ -276,7 +275,7 @@ const renderPertanyaanDinamis = (jenis, modul, container, questions) => {
                         const opsiRaw = q.opsi_json || q.pilihan_jawaban || '[]';
                         if(opsiRaw.startsWith('[')) { opsi = JSON.parse(opsiRaw); } 
                         else { opsi = opsiRaw.split(',').map(s=>s.trim()); }
-                    } catch(e) { console.error("Gagal parse opsi:", q.opsi_json); }
+                    } catch(e) {}
                     
                     inputHtml = `<select name="${q.id_pertanyaan}" id="${q.id_pertanyaan}" class="form-control" ${req}><option value="">-- Pilih Jawaban --</option>${opsi.map(o => `<option value="${o}">${o}</option>`).join('')}</select>`;
                 } else if(tInput === 'date' || tInput === 'tanggal') {
@@ -286,11 +285,63 @@ const renderPertanyaanDinamis = (jenis, modul, container, questions) => {
                     let typeReal = tInput === 'number' || tInput === 'angka' ? 'number' : 'text';
                     inputHtml = `<input type="${typeReal}" name="${q.id_pertanyaan}" id="${q.id_pertanyaan}" class="form-control" placeholder="${pHolder}" step="any" ${req}>`;
                 }
-                html += `<div class="form-group" style="margin-bottom: 12px;"><label style="font-weight:600; color:#444; font-size: 0.9rem;">${lbl} ${markerReq}</label>${inputHtml}</div>`;
+
+                // 🔥 LOGIKA PERCABANGAN: Tambahkan Atribut Kondisi
+                let kondisiTampil = q.kondisi_tampil ? q.kondisi_tampil.trim() : '';
+                let displayStyle = kondisiTampil ? 'display:none;' : 'display:block;';
+                
+                html += `<div class="form-group conditional-wrapper" id="wrap_${q.id_pertanyaan}" data-condition="${kondisiTampil}" data-required="${isReq}" style="${displayStyle} margin-bottom: 12px; padding: 10px; background: #fdfdfd; border-left: 3px solid #0984e3; border-radius: 4px;">
+                            <label style="font-weight:600; color:#444; font-size: 0.9rem;">${lbl} ${markerReq}</label>
+                            ${inputHtml}
+                         </div>`;
             });
             html += `</div>`;
         });
         container.innerHTML = html;
+
+        // 4. PASANG SENSOR (LISTENER) PERCABANGAN
+        const evaluateConditions = () => {
+            const wrappers = container.querySelectorAll('.conditional-wrapper[data-condition]');
+            wrappers.forEach(wrapper => {
+                const condition = wrapper.getAttribute('data-condition');
+                if (!condition) return;
+                
+                const parts = condition.split('=');
+                if (parts.length !== 2) return;
+                
+                const parentId = parts[0].trim();
+                const reqValue = parts[1].trim().toLowerCase();
+                
+                const parentInput = container.querySelector(`[name="${parentId}"]`);
+                if (parentInput) {
+                    const parentVal = parentInput.value.trim().toLowerCase();
+                    const inputElement = wrapper.querySelector('input, select');
+                    const isRequiredOrig = wrapper.getAttribute('data-required') === 'true';
+
+                    if (parentVal === reqValue) {
+                        wrapper.style.display = 'block';
+                        if (inputElement && isRequiredOrig) inputElement.setAttribute('required', 'true');
+                    } else {
+                        wrapper.style.display = 'none';
+                        if (inputElement) {
+                            inputElement.removeAttribute('required');
+                            if(inputElement.value !== '') {
+                                inputElement.value = ''; // Kosongkan nilainya agar tak tersimpan!
+                                inputElement.dispatchEvent(new Event('change')); // Memicu domino efek jika ada anak di dalam anak
+                            }
+                        }
+                    }
+                }
+            });
+        };
+
+        // Pasang kuping pendengar ke seluruh container
+        container.addEventListener('change', evaluateConditions);
+        container.addEventListener('input', evaluateConditions);
+
+        // Panggil evaluasi pertama kali saat layar dimuat (Penting untuk mode Edit!)
+        setTimeout(evaluateConditions, 400);
+
     } else { container.innerHTML = ''; }
 };
 
@@ -369,7 +420,6 @@ const initFormRegistrasi = async () => {
                 }
             }
 
-            // 🔥 Panggil Pembuat Form Kuesioner
             renderPertanyaanDinamis(jenis, 'REGISTRASI', containerQ, questions);
 
             if(window.editModeData) {
@@ -382,7 +432,6 @@ const initFormRegistrasi = async () => {
                     if(getEl('reg-desa')) getEl('reg-desa').dispatchEvent(new Event('change')); if(getEl('reg-dusun')) setTimeout(()=> { getEl('reg-dusun').value = eD.dusun || ''; }, 100);
                     if(getEl('reg-alamat')) getEl('reg-alamat').value = eD.data_laporan?.alamat || '';
 
-                    // Isi jawaban kuesioner dinamis dari riwayat
                     for (const [key, value] of Object.entries(eD.data_laporan || {})) { 
                         let field = document.querySelector(`[name="${key}"]`); 
                         if(field) { field.value = value; field.dispatchEvent(new Event('change')); } 
@@ -438,17 +487,12 @@ const initDaftarSasaran = async () => {
     const processedList = regList.map(r => {
         let isExpired = r.status_sasaran === 'SELESAI'; let statusRaw = r.status_sasaran || 'AKTIF'; let labelSelesai = '<span style="color: var(--primary); font-weight:bold;">Aktif</span>'; let alasanExpired = 'Selesai';
         const hariIni = new Date(); hariIni.setHours(0,0,0,0);
-        
         let tglNikahRaw = r.data_laporan?.tanggal_pernikahan;
         for (const key in r.data_laporan) { if(key.toLowerCase().includes('nikah')) tglNikahRaw = r.data_laporan[key]; }
-
         if (r.jenis_sasaran === 'CATIN' && tglNikahRaw) { const tglNikah = new Date(tglNikahRaw); if (tglNikah < hariIni) { isExpired = true; statusRaw = 'SELESAI'; alasanExpired = 'Sudah Menikah'; } }
-        
         let tglSalinRaw = r.data_laporan?.tgl_persalinan;
         for (const key in r.data_laporan) { if(key.toLowerCase().includes('salin') || key.toLowerCase().includes('lahir')) tglSalinRaw = r.data_laporan[key]; }
-
         if (r.jenis_sasaran === 'BUFAS' && tglSalinRaw) { const tglBatas = new Date(tglSalinRaw); tglBatas.setDate(tglBatas.getDate() + 42); if (hariIni > tglBatas) { isExpired = true; statusRaw = 'SELESAI'; alasanExpired = 'Masa Nifas > 42 Hari'; } }
-        
         if (isExpired || statusRaw === 'SELESAI') { isExpired = true; statusRaw = 'SELESAI'; if(alasanExpired === 'Selesai') { alasanExpired = r.jenis_sasaran === 'CATIN' ? 'Sudah Menikah' : (r.jenis_sasaran === 'BUMIL' ? 'Sudah Melahirkan' : 'Selesai'); } labelSelesai = `<span style="color: #dc3545; font-weight:bold;">SELESAI (${alasanExpired})</span>`; }
         let jk = r.data_laporan?.jenis_kelamin === 'Laki-laki' ? 'L' : 'P'; let jkDisplay = (r.jenis_sasaran === 'CATIN' || r.jenis_sasaran === 'BADUTA') ? `(${jk})` : '';
         let usiaTh = r.data_laporan?.usia_saat_daftar_tahun !== undefined ? r.data_laporan.usia_saat_daftar_tahun : '-'; let textBaris2 = `${r.jenis_sasaran} ${jkDisplay} ${usiaTh} Th`.trim();
@@ -561,7 +605,7 @@ const initDaftarSasaran = async () => {
 };
 
 // ==========================================
-// 6. FORM PENDAMPINGAN DINAMIS
+// 6. FORM PENDAMPINGAN DINAMIS (KONDISIONAL LOGIC)
 // ==========================================
 const initFormPendampingan = async () => {
     const session = window.currentUser;
@@ -603,7 +647,7 @@ const initFormPendampingan = async () => {
                 infoBox.innerHTML = `<div style="font-weight:bold; color:#0043a8; margin-bottom: 8px; background: #fff; padding: 6px 12px; border-radius: 6px; border: 1px solid #c6c6c6; text-align:center; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">📌 Profil Sasaran Terpilih</div><table style="width:100%; font-size: 0.85rem; background: #fff; padding: 12px; border-radius: 6px; border: 1px solid #ddd; line-height:1.5;"><tr><td style="width:35%; color:#555;">Nama</td><td>: <b>${sasaran.nama_sasaran}</b></td></tr><tr><td style="color:#555;">No. KK</td><td>: ${sasaran.data_laporan?.nomor_kk||'-'}</td></tr><tr><td style="color:#555;">Umur Daftar</td><td>: ${sasaran.data_laporan?.usia_saat_daftar_tahun||'-'} Tahun</td></tr></table>`;
             }
 
-            // PANGGIL MESIN PERAKIT FORM (Grup & Dinamis V13)
+            // PANGGIL MESIN PERAKIT FORM (Grup & Dinamis V14)
             renderPertanyaanDinamis(sasaran.jenis_sasaran, 'PENDAMPINGAN', containerQ, questions);
 
             // LOGIKA SPESIFIK KALKULATOR BADUTA (Disuntikkan setelah form dirender)
@@ -620,7 +664,7 @@ const initFormPendampingan = async () => {
                     let idInputBB = null, idInputTB = null;
                     const inputs = containerQ.querySelectorAll('input');
                     inputs.forEach(inp => {
-                        const lbl = inp.previousElementSibling.innerText.toLowerCase();
+                        const lbl = inp.previousElementSibling?.innerText.toLowerCase() || '';
                         if(lbl.includes('berat') || lbl==='bb*') idInputBB = inp.id;
                         if(lbl.includes('tinggi') || lbl.includes('panjang') || lbl.includes('tb') || lbl.includes('pb')) idInputTB = inp.id;
                     });
@@ -674,13 +718,13 @@ const initFormPendampingan = async () => {
                         if(field) { field.value = value; field.dispatchEvent(new Event('change')); field.dispatchEvent(new Event('input')); }
                     }
                 }
-            }, 100);
+            }, 300);
         };
 
         if(window.editModeLaporan) {
             selJenis.value = window.editModeLaporan.jenis_sasaran_saat_kunjungan || (window.editModeLaporan.id_sasaran_ref.startsWith('CTN')?'CATIN':window.editModeLaporan.id_sasaran_ref.startsWith('BML')?'BUMIL':window.editModeLaporan.id_sasaran_ref.startsWith('BFS')?'BUFAS':'BADUTA');
             selJenis.dispatchEvent(new Event('change'));
-            setTimeout(() => { selSasaran.value = window.editModeLaporan.id_sasaran_ref; selSasaran.dispatchEvent(new Event('change')); selJenis.disabled = true; selSasaran.disabled = true; }, 200);
+            setTimeout(() => { selSasaran.value = window.editModeLaporan.id_sasaran_ref; selSasaran.dispatchEvent(new Event('change')); selJenis.disabled = true; selSasaran.disabled = true; }, 300);
         }
     }
 
