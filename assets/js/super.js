@@ -1,5 +1,5 @@
 // ==========================================
-// 👑 GOD MODE: SUPER ADMIN DASHBOARD (V20 - MAIN DASHBOARD & LOBBY)
+// 👑 GOD MODE: SUPER ADMIN DASHBOARD (V21 - AUDIT LOG & SECURITY)
 // ==========================================
 import { getAllData, clearStore } from './db.js';
 
@@ -8,7 +8,7 @@ const SUPER_TOKEN = 'MasterKeyKubuSecure!001';
 
 window.superUsersData = []; window.superTimData = []; window.currentFilteredIds = [];
 window.superKuesionerData = []; window.superMenuData = []; window.superWidgetData = [];
-window.currentUser = null;
+window.superAuditData = []; window.currentUser = null;
 
 // ==========================================
 // 1. FUNGSI AKSI SUPER ADMIN (GLOBAL)
@@ -129,6 +129,37 @@ window.renderWidgetTable = () => {
     if(count === 0) tableHtml += `<tr><td colspan="6" style="text-align:center; padding:30px; color:#666;">Database Widget Injeksi masih kosong.</td></tr>`; tableHtml += `</tbody></table>`; document.getElementById('table-wrapper-w').innerHTML = tableHtml; document.getElementById('lbl-count-w').innerText = `${count} Widget Aktif`;
 };
 
+// 🔥 V21: RENDER TABEL AUDIT LOG
+window.renderAuditTable = () => {
+    let tableHtml = `<table class="super-table"><thead><tr><th width="15%">Waktu Sistem</th><th width="20%">Aksi Dilakukan</th><th width="20%">Target ID</th><th width="45%">Detail Keterangan</th></tr></thead><tbody>`;
+    if (!window.superAuditData || window.superAuditData.length === 0) {
+        tableHtml += `<tr><td colspan="4" style="text-align:center; padding:30px; color:#666;">Tidak ada rekaman log keamanan.</td></tr>`;
+    } else {
+        // Urutkan dari yang terbaru
+        const sortedLog = [...window.superAuditData].sort((a,b) => new Date(b.waktu) - new Date(a.waktu));
+        sortedLog.forEach(log => {
+            const time = new Date(log.waktu).toLocaleString('id-ID');
+            const aksi = String(log.aksi).toUpperCase();
+            let badgeColor = '#0984e3'; // Default biru
+            if(aksi.includes('TAMBAH')) badgeColor = '#198754';
+            else if(aksi.includes('STATUS') || aksi.includes('RESET')) badgeColor = '#fdcb6e';
+            else if(aksi.includes('HAPUS') || aksi.includes('BLOKIR')) badgeColor = '#e94560';
+
+            tableHtml += `
+                <tr>
+                    <td style="color:#666; font-size:0.85rem;">${time}</td>
+                    <td><span style="background:${badgeColor}; color:${badgeColor==='#fdcb6e'?'#333':'white'}; padding:3px 8px; border-radius:4px; font-size:0.75rem; font-weight:bold;">${aksi}</span></td>
+                    <td><code>${log.target || '-'}</code></td>
+                    <td style="color:#444;">${log.detail || '-'}</td>
+                </tr>
+            `;
+        });
+    }
+    tableHtml += `</tbody></table>`;
+    const wrp = document.getElementById('table-wrapper-log');
+    if(wrp) wrp.innerHTML = tableHtml;
+};
+
 // ==========================================
 // 3. INISIALISASI KERANGKA (SKELETON)
 // ==========================================
@@ -183,7 +214,6 @@ export const initSuperAdmin = async (session) => {
     const menuItems = document.querySelectorAll('.super-menu-item');
     menuItems.forEach(item => { item.onclick = () => { menuItems.forEach(m => m.classList.remove('active')); item.classList.add('active'); document.getElementById('super-page-title').innerText = item.innerText.replace(/[^\w\s]/gi, '').trim(); if (window.innerWidth <= 1024) { document.getElementById('super-sidebar').classList.remove('mobile-active'); document.getElementById('super-sidebar-overlay').classList.remove('mobile-active'); } window.renderSuperView(item.getAttribute('data-target')); }; });
 
-    // 🔥 V20: Mendarat langsung di Dashboard Utama!
     window.renderSuperView('dashboard');
 };
 
@@ -195,7 +225,7 @@ const EMOJI_LIST = ['📊','🏠','📝','🤝','🖨️','🆘','⚙️','🔁'
 window.renderSuperView = async (target) => {
     const content = document.getElementById('super-content');
     
-    // --- 🎛️ DASHBOARD UTAMA (V20) ---
+    // --- 🎛️ DASHBOARD UTAMA (V21) ---
     if (target === 'dashboard') { 
         content.innerHTML = `
             <div class="animate-fade">
@@ -225,28 +255,26 @@ window.renderSuperView = async (target) => {
 
                 <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 15px;">
                     <div class="super-card">
-                        <h3 style="margin-top:0; color:#1a1a2e; border-bottom:1px solid #eee; padding-bottom:10px;">⚡ Aksi Cepat (Quick Links)</h3>
-                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:15px;">
-                            <button class="quick-link-btn" onclick="document.querySelector('[data-target=user_management]').click()" style="padding:15px; background:#f8f9fa; border:1px solid #ddd; border-radius:8px; cursor:pointer; text-align:left; font-weight:bold; color:#333; transition:all 0.2s;">👥 Kelola Pengguna & Wilayah</button>
-                            <button class="quick-link-btn" onclick="document.querySelector('[data-target=kuesioner]').click()" style="padding:15px; background:#f8f9fa; border:1px solid #ddd; border-radius:8px; cursor:pointer; text-align:left; font-weight:bold; color:#333; transition:all 0.2s;">📋 Rakit Kuesioner Baru</button>
-                            <button class="quick-link-btn" onclick="document.querySelector('[data-target=menu_management]').click()" style="padding:15px; background:#f8f9fa; border:1px solid #ddd; border-radius:8px; cursor:pointer; text-align:left; font-weight:bold; color:#333; transition:all 0.2s;">🎚️ Atur Menu (RBAC)</button>
-                            <button class="quick-link-btn" onclick="document.querySelector('[data-target=widget_management]').click()" style="padding:15px; background:#f8f9fa; border:1px solid #ddd; border-radius:8px; cursor:pointer; text-align:left; font-weight:bold; color:#333; transition:all 0.2s;">🧩 Buat Halaman / Widget</button>
+                        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee; padding-bottom:10px; margin-bottom:15px;">
+                            <h3 style="margin:0; color:#1a1a2e;">🛡️ Log Keamanan Terakhir (CCTV)</h3>
+                            <button style="background:none; border:none; color:#0984e3; cursor:pointer; font-weight:bold; font-size:0.85rem;" onclick="document.querySelector('[data-target=audit_trail]').click()">Lihat Semua</button>
+                        </div>
+                        <div id="dash-audit-list">
+                            <div style="text-align:center; color:#999; padding:20px;">Menarik data CCTV dari satelit... ⏳</div>
                         </div>
                     </div>
                     <div class="super-card">
-                        <h3 style="margin-top:0; color:#1a1a2e; border-bottom:1px solid #eee; padding-bottom:10px;">🛡️ Status Sistem</h3>
-                        <div style="margin-top:15px; line-height:1.8;">
-                            <div style="display:flex; justify-content:space-between;"><span>API Koneksi:</span> <b style="color:#198754;">🟢 Terhubung</b></div>
-                            <div style="display:flex; justify-content:space-between;"><span>Database Lokal:</span> <b>Versi 7</b></div>
-                            <div style="display:flex; justify-content:space-between;"><span>Sistem Keamanan:</span> <b style="color:#0984e3;">🔒 Aktif (Token)</b></div>
-                            <div style="display:flex; justify-content:space-between;"><span>Pembaruan Terakhir:</span> <b>${new Date().toLocaleDateString('id-ID')}</b></div>
+                        <h3 style="margin-top:0; color:#1a1a2e; border-bottom:1px solid #eee; padding-bottom:10px;">⚡ Aksi Cepat</h3>
+                        <div style="display:grid; grid-template-columns: 1fr; gap:10px; margin-top:15px;">
+                            <button class="quick-link-btn" onclick="document.querySelector('[data-target=user_management]').click()" style="padding:15px; background:#f8f9fa; border:1px solid #ddd; border-radius:8px; cursor:pointer; text-align:left; font-weight:bold; color:#333; transition:all 0.2s;">👥 Kelola Pengguna</button>
+                            <button class="quick-link-btn" onclick="document.querySelector('[data-target=kuesioner]').click()" style="padding:15px; background:#f8f9fa; border:1px solid #ddd; border-radius:8px; cursor:pointer; text-align:left; font-weight:bold; color:#333; transition:all 0.2s;">📋 Rakit Kuesioner</button>
+                            <button class="quick-link-btn" onclick="document.querySelector('[data-target=widget_management]').click()" style="padding:15px; background:#f8f9fa; border:1px solid #ddd; border-radius:8px; cursor:pointer; text-align:left; font-weight:bold; color:#333; transition:all 0.2s;">🧩 Buat Widget</button>
                         </div>
                     </div>
                 </div>
             </div>
         `;
 
-        // Proses Sinkronisasi Angka Statistik ke Server di Latar Belakang
         const loadStats = async () => {
             const sheetsToFetch = [
                 { name: 'USER_LOGIN', id: 'dash-count-user' },
@@ -257,21 +285,73 @@ window.renderSuperView = async (target) => {
 
             for (let s of sheetsToFetch) {
                 try {
-                    let el = document.getElementById(s.id);
-                    if(!el) continue;
+                    let el = document.getElementById(s.id); if(!el) continue;
                     const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_ALL', token: SUPER_TOKEN, sheetName: s.name }) });
                     const res = await response.json();
-                    if(res.status === 'success' && el) {
-                        el.innerText = res.data.length;
-                    }
-                } catch(e) {
-                    let el = document.getElementById(s.id);
-                    if(el) el.innerText = "?";
-                }
+                    if(res.status === 'success' && el) el.innerText = res.data.length;
+                } catch(e) { let el = document.getElementById(s.id); if(el) el.innerText = "?"; }
             }
+
+            // Load 5 Audit Terakhir
+            try {
+                const responseA = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_AUDIT', token: SUPER_TOKEN }) });
+                const resA = await responseA.json();
+                if(resA.status === 'success') {
+                    window.superAuditData = resA.data || [];
+                    const dashList = document.getElementById('dash-audit-list');
+                    if(!dashList) return;
+                    if(window.superAuditData.length === 0) {
+                        dashList.innerHTML = `<div style="text-align:center; color:#999; padding:20px;">Belum ada rekaman aktivitas.</div>`;
+                    } else {
+                        const top5 = [...window.superAuditData].sort((a,b) => new Date(b.waktu) - new Date(a.waktu)).slice(0, 5);
+                        dashList.innerHTML = top5.map(log => {
+                            const time = new Date(log.waktu).toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'});
+                            return `
+                                <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid #f1f1f1;">
+                                    <div>
+                                        <b style="font-size:0.85rem; color:#e94560;">[${log.aksi}]</b> 
+                                        <span style="font-size:0.9rem; color:#333; margin-left:5px;">${log.target}</span>
+                                        <div style="font-size:0.75rem; color:#888; margin-top:2px;">${log.detail}</div>
+                                    </div>
+                                    <div style="font-size:0.8rem; color:#aaa; font-weight:bold;">${time}</div>
+                                </div>
+                            `;
+                        }).join('');
+                    }
+                }
+            } catch(e){}
         };
         loadStats();
-    } 
+    }
+
+    // --- 🛡️ MENU AUDIT LOG (V21) ---
+    else if (target === 'audit_trail') {
+        content.innerHTML = `
+            <div class="super-card" style="margin-bottom:20px;">
+                <h3 style="margin:0; color:#1a1a2e;">🛡️ Audit Log & CCTV Keamanan</h3>
+                <p style="margin:5px 0 0 0; color:#666; font-size:0.9rem;">Merekam setiap perubahan vital di dalam sistem yang dilakukan oleh Super Admin.</p>
+            </div>
+            <div class="super-card" style="padding:0; overflow:hidden;">
+                <div style="background:#fdf3e8; padding:15px; border-bottom:1px solid #ffeeba; border-left:4px solid #fdcb6e;">
+                    <span style="font-size:0.85rem; color:#856404; font-weight:bold;">⚠️ CATATAN: Semua perubahan pada Database Pengguna, Menu, dan Widget tidak dapat dihapus dari log ini.</span>
+                </div>
+                <div id="table-wrapper-log" class="super-table-container"><div style="padding:50px; text-align:center; color:#666;"><h3>⏳ Mengunduh Arsip Keamanan...</h3></div></div>
+            </div>
+        `;
+
+        try {
+            const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_AUDIT', token: SUPER_TOKEN }) });
+            const res = await response.json();
+            if(res.status === 'success') {
+                window.superAuditData = res.data || [];
+                window.renderAuditTable();
+            } else {
+                document.getElementById('table-wrapper-log').innerHTML = `<div style="padding:50px; text-align:center; color:#e94560;"><h3>❌ Gagal Mengunduh Log</h3><p>${res.message}</p></div>`;
+            }
+        } catch(e) {
+            document.getElementById('table-wrapper-log').innerHTML = `<div style="padding:50px; text-align:center; color:#e94560;"><h3>❌ Koneksi Terputus</h3></div>`;
+        }
+    }
     
     // --- 🧩 PABRIK HALAMAN & WIDGET ---
     else if (target === 'widget_management') {
