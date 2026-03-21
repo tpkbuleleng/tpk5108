@@ -1,5 +1,5 @@
 // ==========================================
-// 👑 GOD MODE: SUPER ADMIN DASHBOARD (V21 - AUDIT LOG & SECURITY)
+// 👑 GOD MODE: SUPER ADMIN DASHBOARD (V24 - CCTV MONITOR & FAST LOAD)
 // ==========================================
 import { getAllData, clearStore } from './db.js';
 
@@ -60,40 +60,28 @@ window.superEditWidget = (id) => {
 };
 
 // ==========================================
-// 2. FUNGSI RENDER TABEL (DIPERBARUI UNTUK MENAMPILKAN LAST LOGIN)
+// 2. FUNGSI RENDER TABEL (DENGAN LAST LOGIN)
 // ==========================================
 window.renderUserTable = () => {
     const searchVal = document.getElementById('flt-search').value.toLowerCase(); const roleVal = document.getElementById('flt-role').value; const kecVal = document.getElementById('flt-kec').value;
-    
-    // 🔥 Tambahkan Header "Aktivitas Terakhir"
     let tableHtml = `<table class="super-table"><thead><tr><th style="text-align:center; width:40px;"><input type="checkbox" id="chk-all-users" title="Pilih Semua yang Tampil"></th><th>ID / Username</th><th>Nama Pengguna</th><th>No. Tim</th><th>Desa/Kelurahan</th><th>Wilayah/Kecamatan</th><th>Role Akses</th><th>PIN / Password</th><th>Aktivitas Terakhir</th><th>Status & Aksi</th></tr></thead><tbody>`;
-    
     let count = 0; window.currentFilteredIds = [];
     window.superUsersData.forEach((u) => {
         const role = String(u.role_akses || u.role || 'KADER').toUpperCase(); const pin = u.password_awal_ref || u.password || u.pin || '***'; const id = u.id_pengguna || u.id_user || u.username || '-'; const nama = u.nama || u.username || '-'; const kec = String(u.scope_kecamatan || u.kecamatan || u.wilayah || 'ALL').toUpperCase(); const currentStatus = String(u.status_akun || 'AKTIF').toUpperCase(); const tim = u._nomor_tim || '-'; const desa = u._desa || '-';
         
-        // 🔥 Tangkap data login_terakhir dan jumlah_gagal
         const lastLoginRaw = u.login_terakhir || u.last_login;
         let lastLoginText = '<span style="color:#aaa; font-style:italic;">Belum pernah login</span>';
-        if (lastLoginRaw && String(lastLoginRaw).trim() !== '') {
-            const dateObj = new Date(lastLoginRaw);
-            if (!isNaN(dateObj.getTime())) {
-                lastLoginText = `<span style="color:#0984e3; font-weight:bold;">${dateObj.toLocaleDateString('id-ID', {day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'})}</span>`;
-            }
-        }
-        const failCount = parseInt(u.jumlah_gagal_login) || 0;
-        const failText = failCount > 0 ? `<br><span style="color:#e94560; font-size:0.75rem; font-weight:bold;">⚠️ ${failCount}x Gagal Login</span>` : '';
+        if (lastLoginRaw && String(lastLoginRaw).trim() !== '') { const dateObj = new Date(lastLoginRaw); if (!isNaN(dateObj.getTime())) { lastLoginText = `<span style="color:#0984e3; font-weight:bold;">${dateObj.toLocaleDateString('id-ID', {day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'})}</span>`; } }
+        const failCount = parseInt(u.jumlah_gagal_login) || 0; const failText = failCount > 0 ? `<br><span style="color:#e94560; font-size:0.75rem; font-weight:bold;">⚠️ ${failCount}x Gagal Login</span>` : '';
 
         const matchSearch = id.toLowerCase().includes(searchVal) || nama.toLowerCase().includes(searchVal) || tim.toLowerCase().includes(searchVal) || desa.toLowerCase().includes(searchVal);
         const matchRole = roleVal === 'ALL' || role.includes(roleVal); const matchKec = kecVal === 'ALL' || kec === kecVal || kec === 'ALL';
-        
         if (matchSearch && matchRole && matchKec) {
             count++; if (!role.includes('SUPER')) { window.currentFilteredIds.push(id); }
             let badgeClass = role.includes('ADMIN') ? 'role-admin' : (role.includes('SUPER') ? 'role-super' : 'role-kader');
             const isAktif = currentStatus === 'AKTIF'; const statusUI = isAktif ? '<span style="color:#00b894; font-weight:bold; display:block; margin-bottom:5px;">🟢 Aktif</span>' : '<span style="color:#ff7675; font-weight:bold; display:block; margin-bottom:5px;">🔴 Diblokir</span>'; const toggleText = isAktif ? 'Blokir' : 'Aktifkan'; const toggleColor = isAktif ? '#ff7675' : '#00b894';
             let chkBox = ''; let actionButtons = '';
             if (role.includes('SUPER')) { chkBox = `🔒`; actionButtons = `<span style="font-size:0.8rem; color:#b2bec3; font-style:italic; font-weight:bold;">🛡️ Akses Dilindungi</span>`; } else { chkBox = `<input type="checkbox" class="chk-user" value="${id}">`; actionButtons = `<button class="btn-action btn-edit" style="width:100%; margin-bottom:3px;" onclick="window.superResetPin('${id}', '${nama}')">Reset PIN</button><button class="btn-action" style="background:${toggleColor}; color:white; width:100%;" onclick="window.superToggleStatus('${id}', '${nama}', '${currentStatus}')">${toggleText}</button>`; }
-            
             tableHtml += `<tr style="opacity: ${isAktif ? '1' : '0.6'};"><td style="text-align:center;">${chkBox}</td><td><b>${id}</b></td><td>${nama}</td><td><b style="color:#0984e3;">${tim}</b></td><td>${desa}</td><td>${kec}</td><td><span class="badge-role ${badgeClass}">${role}</span></td><td><code style="background:#eee; padding:3px 6px; border-radius:3px; color:#e94560; font-weight:bold;">${pin}</code></td><td>${lastLoginText}${failText}</td><td>${statusUI}${actionButtons}</td></tr>`;
         }
     });
@@ -147,21 +135,20 @@ window.renderWidgetTable = () => {
     if(count === 0) tableHtml += `<tr><td colspan="6" style="text-align:center; padding:30px; color:#666;">Database Widget Injeksi masih kosong.</td></tr>`; tableHtml += `</tbody></table>`; document.getElementById('table-wrapper-w').innerHTML = tableHtml; document.getElementById('lbl-count-w').innerText = `${count} Widget Aktif`;
 };
 
-// 🔥 V21: RENDER TABEL AUDIT LOG
+// 🔥 V24: RENDER TABEL AUDIT LOG
 window.renderAuditTable = () => {
     let tableHtml = `<table class="super-table"><thead><tr><th width="15%">Waktu Sistem</th><th width="20%">Aksi Dilakukan</th><th width="20%">Target ID</th><th width="45%">Detail Keterangan</th></tr></thead><tbody>`;
     if (!window.superAuditData || window.superAuditData.length === 0) {
         tableHtml += `<tr><td colspan="4" style="text-align:center; padding:30px; color:#666;">Tidak ada rekaman log keamanan.</td></tr>`;
     } else {
-        // Urutkan dari yang terbaru
         const sortedLog = [...window.superAuditData].sort((a,b) => new Date(b.waktu) - new Date(a.waktu));
         sortedLog.forEach(log => {
             const time = new Date(log.waktu).toLocaleString('id-ID');
             const aksi = String(log.aksi).toUpperCase();
             let badgeColor = '#0984e3'; // Default biru
-            if(aksi.includes('TAMBAH')) badgeColor = '#198754';
-            else if(aksi.includes('STATUS') || aksi.includes('RESET')) badgeColor = '#fdcb6e';
-            else if(aksi.includes('HAPUS') || aksi.includes('BLOKIR')) badgeColor = '#e94560';
+            if(aksi.includes('TAMBAH') || aksi.includes('SUKSES')) badgeColor = '#198754'; // Hijau
+            else if(aksi.includes('STATUS') || aksi.includes('RESET')) badgeColor = '#fdcb6e'; // Kuning
+            else if(aksi.includes('HAPUS') || aksi.includes('BLOKIR') || aksi.includes('GAGAL')) badgeColor = '#e94560'; // Merah
 
             tableHtml += `
                 <tr>
@@ -243,7 +230,7 @@ const EMOJI_LIST = ['📊','🏠','📝','🤝','🖨️','🆘','⚙️','🔁'
 window.renderSuperView = async (target) => {
     const content = document.getElementById('super-content');
     
-    // --- 🎛️ DASHBOARD UTAMA (V21) ---
+    // --- 🎛️ DASHBOARD UTAMA ---
     if (target === 'dashboard') { 
         content.innerHTML = `
             <div class="animate-fade">
@@ -294,6 +281,7 @@ window.renderSuperView = async (target) => {
         `;
 
         const loadStats = async () => {
+            // 🔥 V24: Lakukan penarikan paralel agar CCTV muncul sangat cepat!
             const sheetsToFetch = [
                 { name: 'USER_LOGIN', id: 'dash-count-user' },
                 { name: 'MASTER_PERTANYAAN', id: 'dash-count-q' },
@@ -301,16 +289,14 @@ window.renderSuperView = async (target) => {
                 { name: 'MASTER_WIDGET', id: 'dash-count-w' }
             ];
 
-            for (let s of sheetsToFetch) {
-                try {
-                    let el = document.getElementById(s.id); if(!el) continue;
-                    const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_ALL', token: SUPER_TOKEN, sheetName: s.name }) });
-                    const res = await response.json();
-                    if(res.status === 'success' && el) el.innerText = res.data.length;
-                } catch(e) { let el = document.getElementById(s.id); if(el) el.innerText = "?"; }
-            }
+            sheetsToFetch.forEach(s => {
+                fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_ALL', token: SUPER_TOKEN, sheetName: s.name }) })
+                .then(r => r.json())
+                .then(res => { if(res.status === 'success') { let el = document.getElementById(s.id); if(el) el.innerText = res.data.length; } })
+                .catch(e => { let el = document.getElementById(s.id); if(el) el.innerText = "?"; });
+            });
 
-            // Load 5 Audit Terakhir
+            // Tarik Audit Log (Gabungan)
             try {
                 const responseA = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_AUDIT', token: SUPER_TOKEN }) });
                 const resA = await responseA.json();
@@ -321,14 +307,20 @@ window.renderSuperView = async (target) => {
                     if(window.superAuditData.length === 0) {
                         dashList.innerHTML = `<div style="text-align:center; color:#999; padding:20px;">Belum ada rekaman aktivitas.</div>`;
                     } else {
-                        const top5 = [...window.superAuditData].sort((a,b) => new Date(b.waktu) - new Date(a.waktu)).slice(0, 5);
+                        const top5 = [...window.superAuditData].slice(0, 6);
                         dashList.innerHTML = top5.map(log => {
                             const time = new Date(log.waktu).toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'});
+                            const aksi = String(log.aksi).toUpperCase();
+                            let badgeColor = '#0984e3'; 
+                            if(aksi.includes('TAMBAH') || aksi.includes('SUKSES')) badgeColor = '#198754';
+                            else if(aksi.includes('STATUS') || aksi.includes('RESET')) badgeColor = '#fdcb6e';
+                            else if(aksi.includes('HAPUS') || aksi.includes('BLOKIR') || aksi.includes('GAGAL')) badgeColor = '#e94560';
+
                             return `
                                 <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid #f1f1f1;">
                                     <div>
-                                        <b style="font-size:0.85rem; color:#e94560;">[${log.aksi}]</b> 
-                                        <span style="font-size:0.9rem; color:#333; margin-left:5px;">${log.target}</span>
+                                        <b style="font-size:0.75rem; color:${badgeColor};">[${aksi}]</b> 
+                                        <span style="font-size:0.9rem; color:#333; margin-left:5px; font-weight:bold;">${log.target}</span>
                                         <div style="font-size:0.75rem; color:#888; margin-top:2px;">${log.detail}</div>
                                     </div>
                                     <div style="font-size:0.8rem; color:#aaa; font-weight:bold;">${time}</div>
@@ -342,16 +334,16 @@ window.renderSuperView = async (target) => {
         loadStats();
     }
 
-    // --- 🛡️ MENU AUDIT LOG (V21) ---
+    // --- 🛡️ MENU AUDIT LOG ---
     else if (target === 'audit_trail') {
         content.innerHTML = `
             <div class="super-card" style="margin-bottom:20px;">
                 <h3 style="margin:0; color:#1a1a2e;">🛡️ Audit Log & CCTV Keamanan</h3>
-                <p style="margin:5px 0 0 0; color:#666; font-size:0.9rem;">Merekam setiap perubahan vital di dalam sistem yang dilakukan oleh Super Admin.</p>
+                <p style="margin:5px 0 0 0; color:#666; font-size:0.9rem;">Merekam setiap aktivitas vital (Aksi Super Admin & Login Kader).</p>
             </div>
             <div class="super-card" style="padding:0; overflow:hidden;">
                 <div style="background:#fdf3e8; padding:15px; border-bottom:1px solid #ffeeba; border-left:4px solid #fdcb6e;">
-                    <span style="font-size:0.85rem; color:#856404; font-weight:bold;">⚠️ CATATAN: Semua perubahan pada Database Pengguna, Menu, dan Widget tidak dapat dihapus dari log ini.</span>
+                    <span style="font-size:0.85rem; color:#856404; font-weight:bold;">⚠️ CATATAN: Ini adalah gabungan log dari Database Master dan Database Log Eksternal.</span>
                 </div>
                 <div id="table-wrapper-log" class="super-table-container"><div style="padding:50px; text-align:center; color:#666;"><h3>⏳ Mengunduh Arsip Keamanan...</h3></div></div>
             </div>
