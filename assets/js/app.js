@@ -78,15 +78,14 @@ const masukKeAplikasi = async (session) => {
 };
 
 // ==========================================
-// 3. MENU & KONTEN (PABRIK MENU DINAMIS V15)
+// 3. MENU & KONTEN (🔥 PABRIK SUB-MENU V17)
 // ==========================================
 const renderMenu = async (role) => {
     const container = getEl('dynamic-menu-container'); if (!container) return;
     
-    // 🔥 Sedot data menu dari memori HP
     let allMenu = await getAllData('master_menu').catch(()=>[]);
     
-    // Fallback darurat jika Kader belum menekan tombol sinkronisasi untuk pertama kali
+    // Fallback darurat jika Kader belum menekan tombol sinkronisasi
     if (allMenu.length === 0) {
         allMenu = [
             { id_menu: 'M1', label_menu: 'Dashboard', icon: '🏠', target_view: 'dashboard', role_akses: 'KADER', urutan: 1, is_active: 'Y' },
@@ -94,28 +93,52 @@ const renderMenu = async (role) => {
             { id_menu: 'M3', label_menu: 'Data Sasaran & Riwayat', icon: '📋', target_view: 'daftar_sasaran', role_akses: 'KADER', urutan: 3, is_active: 'Y' },
             { id_menu: 'M4', label_menu: 'Laporan Pendampingan', icon: '🤝', target_view: 'pendampingan', role_akses: 'KADER', urutan: 4, is_active: 'Y' },
             { id_menu: 'M5', label_menu: 'Rekap Bulanan', icon: '📊', target_view: 'rekap_bulanan', role_akses: 'KADER', urutan: 5, is_active: 'Y' },
-            { id_menu: 'M6', label_menu: 'Cetak PDF', icon: '🖨️', target_view: 'cetak_pdf', role_akses: 'KADER', urutan: 6, is_active: 'Y' },
-            { id_menu: 'M7', label_menu: 'Bantuan & Edukasi', icon: '🆘', target_view: 'bantuan', role_akses: 'KADER', urutan: 7, is_active: 'Y' },
-            { id_menu: 'M8', label_menu: 'Pengaturan', icon: '⚙️', target_view: 'setting', role_akses: 'KADER', urutan: 8, is_active: 'Y' },
-            { id_menu: 'M9', label_menu: 'Muat Ulang / Reset Layar', icon: '🔁', target_view: 'reload_app', role_akses: 'KADER', urutan: 9, is_active: 'Y' }
+            { id_menu: 'M6', label_menu: 'Bantuan & Pengaturan', icon: '⚙️', target_view: '', role_akses: 'KADER', urutan: 6, is_active: 'Y' },
+            { id_menu: 'M6A', label_menu: 'Pengaturan', icon: '🛠️', target_view: 'setting', parent_id: 'M6', role_akses: 'KADER', urutan: 1, is_active: 'Y' },
+            { id_menu: 'M6B', label_menu: 'Muat Ulang Layar', icon: '🔁', target_view: 'reload_app', parent_id: 'M6', role_akses: 'KADER', urutan: 2, is_active: 'Y' }
         ];
     }
 
-    // 🎯 Filter Menu berdasarkan Role & Status Aktif
     const filteredMenu = allMenu.filter(m => {
         const roles = String(m.role_akses || '').toUpperCase();
         const isActive = String(m.is_active || 'Y').toUpperCase() === 'Y';
         return isActive && roles.includes(String(role).toUpperCase());
     }).sort((a,b) => (parseInt(a.urutan)||0) - (parseInt(b.urutan)||0));
 
-    container.innerHTML = filteredMenu.map(m => `<a class="menu-item" data-target="${m.target_view}"><span class="icon">${m.icon || '📌'}</span> ${m.label_menu}</a>`).join('') + `<hr><a class="menu-item text-danger" id="btnLogout">🚪 Keluar (Hapus Sesi Lokal)</a>`;
+    // 🎯 Pisahkan Menu Induk dan Sub-Menu
+    const parents = filteredMenu.filter(m => !m.parent_id);
+    const children = filteredMenu.filter(m => m.parent_id);
+
+    let menuHtml = '';
+    parents.forEach(p => {
+        const myChildren = children.filter(c => c.parent_id === p.id_menu).sort((a,b) => (parseInt(a.urutan)||0) - (parseInt(b.urutan)||0));
+        
+        if(myChildren.length > 0) {
+            // Ini adalah Menu Dropdown (Miliki Anak)
+            menuHtml += `
+                <div style="margin-bottom: 2px;">
+                    <a class="menu-item" style="display:flex; justify-content:space-between; align-items:center;" onclick="var c = this.nextElementSibling; if(c.style.display==='none'){c.style.display='block'; this.style.background='rgba(0,0,0,0.05)';}else{c.style.display='none'; this.style.background='';}">
+                        <span><span class="icon">${p.icon || '📁'}</span> ${p.label_menu}</span>
+                        <span style="font-size:0.7rem; opacity:0.6;">▼</span>
+                    </a>
+                    <div style="display:none; background: rgba(0,0,0,0.03); border-left: 3px solid var(--primary);">
+                        ${myChildren.map(c => `<a class="menu-item" style="padding-left: 45px; font-size:0.9rem;" data-target="${c.target_view}"><span class="icon">${c.icon || '📄'}</span> ${c.label_menu}</a>`).join('')}
+                    </div>
+                </div>`;
+        } else {
+            // Ini Menu Biasa
+            menuHtml += `<a class="menu-item" data-target="${p.target_view}"><span class="icon">${p.icon || '📌'}</span> ${p.label_menu}</a>`;
+        }
+    });
+
+    container.innerHTML = menuHtml + `<hr><a class="menu-item text-danger" id="btnLogout">🚪 Keluar (Hapus Sesi Lokal)</a>`;
     container.style.overflowY = 'auto'; container.style.maxHeight = 'calc(100vh - 180px)'; container.style.paddingBottom = '20px';
 
     document.querySelectorAll('.menu-item[data-target]').forEach(item => {
         item.onclick = () => {
             getEl('sidebar').classList.remove('active'); getEl('sidebar-overlay').classList.remove('active');
             const target = item.getAttribute('data-target');
-            if (target === 'reload_app') { location.reload(true); } else { window.editModeData = null; window.editModeLaporan = null; renderKonten(target); }
+            if (target === 'reload_app') { location.reload(true); } else if (target) { window.editModeData = null; window.editModeLaporan = null; renderKonten(target); }
         };
     });
 
@@ -149,14 +172,8 @@ window.renderKonten = async (target) => {
 
         try {
             const [allWil, antrean] = await Promise.all([ getAllData('master_tim_wilayah').catch(()=>[]), getAllData('sync_queue').catch(()=>[]) ]);
-            let namaDesa = session.desa && session.desa !== '-' ? session.desa : '-';
-            let daftarDusun = session.dusun && session.dusun !== '-' ? session.dusun : '-';
-            
-            if (namaDesa === '-') {
-                const wilayahKerja = allWil.filter(w => String(w.id_tim) === String(session.id_tim));
-                daftarDusun = wilayahKerja.map(w => w.dusun_rw).join(', ') || '-';
-                namaDesa = wilayahKerja[0]?.desa_kelurahan || '-';
-            }
+            let namaDesa = session.desa && session.desa !== '-' ? session.desa : '-'; let daftarDusun = session.dusun && session.dusun !== '-' ? session.dusun : '-';
+            if (namaDesa === '-') { const wilayahKerja = allWil.filter(w => String(w.id_tim) === String(session.id_tim)); daftarDusun = wilayahKerja.map(w => w.dusun_rw).join(', ') || '-'; namaDesa = wilayahKerja[0]?.desa_kelurahan || '-'; }
 
             if (getEl('dash-detail-wilayah')) { getEl('dash-detail-wilayah').innerHTML = `<div style="background: rgba(255,255,255,0.2); display: inline-block; padding: 4px 10px; border-radius: 6px; font-weight: bold; font-size: 0.85rem; margin-bottom: 12px;">NO. TIM: ${session.nomor_tim || session.id_tim}</div><div style="line-height: 1.25;"><div style="margin-bottom: 6px;"><span style="opacity:0.8; font-size: 0.8rem;">📍 Wilayah Tugas (Dusun/RW):</span><br><span style="font-weight: 600; font-size: 0.9rem;">${daftarDusun}</span></div><div style="margin-bottom: 6px;"><span style="opacity:0.8; font-size: 0.8rem;">🏘️ Desa/Kelurahan:</span><br><span style="font-weight: 600; font-size: 0.9rem;">${namaDesa}</span></div><div><span style="opacity:0.8; font-size: 0.8rem;">🏛️ Kecamatan:</span><br><span style="font-weight: 600; font-size: 0.9rem;">${session.kecamatan || '-'}</span></div></div>`; }
 
@@ -230,10 +247,31 @@ window.renderKonten = async (target) => {
     } else if (target === 'cetak_pdf') { const tpl = getEl('template-cetak-pdf'); if(tpl) area.appendChild(tpl.content.cloneNode(true));
     } else if (target === 'setting') { const tpl = getEl('template-setting'); if(tpl) { area.appendChild(tpl.content.cloneNode(true)); initSetting(); }
     } else if (target === 'bantuan') { const tpl = getEl('template-bantuan'); if(tpl) { area.appendChild(tpl.content.cloneNode(true)); const btnCalc = getEl('btn-buka-kalkulator'); if(btnCalc) btnCalc.onclick = () => renderKonten('kalkulator'); } }
+
+    // 🎯 INJEKSI WIDGET SECARA GAIB (V17 MAGIC)
+    try {
+        const allWidgets = await getAllData('master_widget').catch(()=>[]);
+        const activeWidgets = allWidgets.filter(w => String(w.is_active || 'Y').toUpperCase() === 'Y' && String(w.target_halaman).toLowerCase() === target.toLowerCase());
+        
+        if (activeWidgets.length > 0) {
+            let htmlAtas = ''; let htmlBawah = '';
+            activeWidgets.forEach(w => {
+                // Jika tipe 'html', render mentah. Jika tipe 'teks', beri kotak peringatan.
+                const content = w.tipe === 'html' ? w.isi_konten : `<div style="background:#fff3cd; padding:12px; border-radius:6px; border-left:4px solid #ffc107; font-size:0.9rem; color:#856404; margin-bottom:15px; line-height:1.4;">${w.isi_konten}</div>`;
+                
+                if(w.posisi === 'bawah') htmlBawah += `<div style="margin-top:15px; width:100%;">${content}</div>`;
+                else htmlAtas += `<div style="margin-bottom:15px; width:100%;">${content}</div>`;
+            });
+
+            // Menyisipkan widget dengan aman tanpa merusak event listener Form yang sudah berjalan!
+            if(htmlAtas) area.insertAdjacentHTML('afterbegin', htmlAtas);
+            if(htmlBawah) area.insertAdjacentHTML('beforeend', htmlBawah);
+        }
+    } catch(e) { console.error("Widget Error:", e); }
 };
 
 // ==========================================
-// 4. LOGIKA FORM REGISTRASI & MESIN PERAKIT FORM (V14 - CONDITIONAL LOGIC)
+// 4. LOGIKA FORM REGISTRASI & MESIN PERAKIT FORM
 // ==========================================
 const getKodeKecamatan = (kec) => {
     if (!kec) return "XXX";
@@ -297,7 +335,7 @@ const renderPertanyaanDinamis = (jenis, modul, container, questions) => {
                     inputHtml = `<input type="${typeReal}" name="${q.id_pertanyaan}" id="${q.id_pertanyaan}" class="form-control" placeholder="${pHolder}" step="any" ${req}>`;
                 }
 
-                // 🔥 LOGIKA PERCABANGAN: Atribut Kondisi
+                // 🔥 LOGIKA PERCABANGAN
                 let kondisiTampil = q.kondisi_tampil ? q.kondisi_tampil.trim() : '';
                 let displayStyle = kondisiTampil ? 'display:none;' : 'display:block;';
                 
@@ -613,7 +651,7 @@ const initDaftarSasaran = async () => {
 };
 
 // ==========================================
-// 6. FORM PENDAMPINGAN DINAMIS (KONDISIONAL LOGIC)
+// 6. FORM PENDAMPINGAN DINAMIS
 // ==========================================
 const initFormPendampingan = async () => {
     const session = window.currentUser;
@@ -655,10 +693,8 @@ const initFormPendampingan = async () => {
                 infoBox.innerHTML = `<div style="font-weight:bold; color:#0043a8; margin-bottom: 8px; background: #fff; padding: 6px 12px; border-radius: 6px; border: 1px solid #c6c6c6; text-align:center; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">📌 Profil Sasaran Terpilih</div><table style="width:100%; font-size: 0.85rem; background: #fff; padding: 12px; border-radius: 6px; border: 1px solid #ddd; line-height:1.5;"><tr><td style="width:35%; color:#555;">Nama</td><td>: <b>${sasaran.nama_sasaran}</b></td></tr><tr><td style="color:#555;">No. KK</td><td>: ${sasaran.data_laporan?.nomor_kk||'-'}</td></tr><tr><td style="color:#555;">Umur Daftar</td><td>: ${sasaran.data_laporan?.usia_saat_daftar_tahun||'-'} Tahun</td></tr></table>`;
             }
 
-            // PANGGIL MESIN PERAKIT FORM (Grup & Dinamis V14)
             renderPertanyaanDinamis(sasaran.jenis_sasaran, 'PENDAMPINGAN', containerQ, questions);
 
-            // LOGIKA SPESIFIK KALKULATOR BADUTA
             setTimeout(() => {
                 if (sasaran.jenis_sasaran === 'BADUTA' && sasaran.data_laporan.tanggal_lahir) {
                     const tL = new Date(sasaran.data_laporan.tanggal_lahir); const tH = new Date();
