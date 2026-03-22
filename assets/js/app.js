@@ -236,8 +236,11 @@ window.renderKonten = async (target) => {
                 const queueTim = antrean.filter(a => String(a.id_tim) === String(session.id_tim));
                 if (getEl('dash-tunda')) { getEl('dash-tunda').innerText = `${queueTim.filter(a => a.is_synced).length}/${queueTim.filter(a => !a.is_synced).length}`; }
                 
-                const regList = queueTim.filter(a => a.tipe_laporan === 'REGISTRASI'); const pendList = queueTim.filter(a => a.tipe_laporan === 'PENDAMPINGAN');
-                const cReg = { CATIN: 0, BUMIL: 0, BUFAS: 0, BADUTA: 0 }; const cPend = { CATIN: 0, BUMIL: 0, BUFAS: 0, BADUTA: 0 }; 
+                const regList = queueTim.filter(a => a.tipe_laporan === 'REGISTRASI'); 
+                const pendList = queueTim.filter(a => a.tipe_laporan === 'PENDAMPINGAN');
+                
+                const cReg = { CATIN: 0, BUMIL: 0, BUFAS: 0, BADUTA: 0 }; 
+                const cPend = { CATIN: 0, BUMIL: 0, BUFAS: 0, BADUTA: 0 }; 
                 const hariIni = new Date(); hariIni.setHours(0,0,0,0);
                 
                 regList.forEach(r => { 
@@ -247,9 +250,17 @@ window.renderKonten = async (target) => {
                     if(cReg[r.jenis_sasaran] !== undefined && isAktif) cReg[r.jenis_sasaran]++; 
                 });
                 
+                // 🔥 PATCH PENGAMAN: Mencegah crash jika ID Sasaran kosong
                 pendList.forEach(p => { 
-                    let j = p.jenis_sasaran_saat_kunjungan || (p.id_sasaran_ref.startsWith('CTN')?'CATIN':p.id_sasaran_ref.startsWith('BML')?'BUMIL':p.id_sasaran_ref.startsWith('BFS')?'BUFAS':'BADUTA'); 
-                    if(cPend[j] !== undefined) cPend[j]++; 
+                    let j = p.jenis_sasaran_saat_kunjungan;
+                    if (!j) {
+                        const ref = String(p.id_sasaran_ref || '');
+                        if (ref.indexOf('CTN') > -1) j = 'CATIN';
+                        else if (ref.indexOf('BML') > -1) j = 'BUMIL';
+                        else if (ref.indexOf('BFS') > -1) j = 'BUFAS';
+                        else if (ref.indexOf('BDT') > -1) j = 'BADUTA';
+                    }
+                    if(j && cPend[j] !== undefined) cPend[j]++; 
                 });
                 
                 if(getEl('dash-summary')){ getEl('dash-summary').innerHTML = `<h4 style="font-size: 0.95rem; color: #555; margin-bottom: 12px; border-bottom: 1px solid #eee; padding-bottom: 8px;">📊 Total Data Kumulatif</h4><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 0.85rem;"><div><strong style="color:var(--primary);">🎯 Sasaran Terdaftar</strong><ul style="margin: 5px 0 0 15px; padding: 0; color: #444; list-style-type: square;"><li>CATIN: <b>${cReg.CATIN}</b></li><li>BUMIL: <b>${cReg.BUMIL}</b></li><li>BUFAS: <b>${cReg.BUFAS}</b></li><li>BADUTA: <b>${cReg.BADUTA}</b></li></ul></div><div><strong style="color:#198754;">🤝 Kunjungan Pendampingan</strong><ul style="margin: 5px 0 0 15px; padding: 0; color: #444; list-style-type: square;"><li>CATIN: <b>${cPend.CATIN}</b></li><li>BUMIL: <b>${cPend.BUMIL}</b></li><li>BUFAS: <b>${cPend.BUFAS}</b></li><li>BADUTA: <b>${cPend.BADUTA}</b></li></ul></div></div>`; }
@@ -637,7 +648,7 @@ const initFormPendampingan = async () => {
                         tipe_laporan: 'PENDAMPINGAN', 
                         username: session.username, 
                         id_tim: session.id_tim, 
-                        kecamatan: window.getKodeKecamatan(session.kecamatan), // 🔥 PATCH: Tambah Kode Wilayah!
+                        kecamatan: window.getKodeKecamatan(session.kecamatan), 
                         id_sasaran_ref: jawaban.id_sasaran || selSasaran.value, 
                         jenis_sasaran_saat_kunjungan: selJenis.value, 
                         data_laporan: jawaban, 
@@ -672,9 +683,16 @@ const initRekap = async () => {
                 if (isAktif && stats[r.jenis_sasaran]) { stats[r.jenis_sasaran].aktif++; stats.TOTAL.aktif++; }
             });
             
+            // 🔥 PATCH PENGAMAN: Mencegah crash rekapan
             pendList.forEach(p => {
                 let jenis = p.jenis_sasaran_saat_kunjungan;
-                if (!jenis && p.id_sasaran_ref) { if (p.id_sasaran_ref.startsWith('CTN')) jenis = 'CATIN'; else if (p.id_sasaran_ref.startsWith('BML')) jenis = 'BUMIL'; else if (p.id_sasaran_ref.startsWith('BFS')) jenis = 'BUFAS'; else if (p.id_sasaran_ref.startsWith('BDT')) jenis = 'BADUTA'; }
+                if (!jenis) { 
+                    const ref = String(p.id_sasaran_ref || '');
+                    if (ref.indexOf('CTN') > -1) jenis = 'CATIN'; 
+                    else if (ref.indexOf('BML') > -1) jenis = 'BUMIL'; 
+                    else if (ref.indexOf('BFS') > -1) jenis = 'BUFAS'; 
+                    else if (ref.indexOf('BDT') > -1) jenis = 'BADUTA'; 
+                }
                 if (jenis && stats[jenis]) { stats[jenis].pend++; stats.TOTAL.pend++; }
             });
             return stats;
