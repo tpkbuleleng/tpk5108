@@ -68,7 +68,6 @@ const dapatkanLokasiGPS = async () => {
                 else if (error.code === 3) msg = "Timeout Pencarian Satelit"; 
                 resolve(msg); 
             },
-            // 🔥 PATCH 1: Timeout diturunkan jadi 5 detik agar UI tidak hang, izinkan cache lokasi 10 detik terakhir
             { enableHighAccuracy: true, timeout: 5000, maximumAge: 10000 } 
         );
     });
@@ -256,10 +255,11 @@ const renderMenu = async (role) => {
     const container = getEl('dynamic-menu-container'); 
     if (!container) return;
     
-    let allMenu = await getAllData('master_menu').catch(()=>[]);
-    
-    // 🔥 KEMBALI KE FONDASI STANDAR (8 MENU INTI BAWAAN)
-    if (allMenu.length === 0) {
+    let allMenu = [];
+    const rUpper = String(role).toUpperCase();
+
+    // 🔥 KUNCI MATI MENU KADER (ABAIKAN DATABASE MASTER MENU)
+    if (rUpper === 'KADER') {
         allMenu = [
             { id_menu: 'M1', label_menu: 'Dashboard', icon: '🏠', target_view: 'dashboard', role_akses: 'KADER', urutan: 1, is_active: 'Y' },
             { id_menu: 'M2', label_menu: 'Registrasi Sasaran', icon: '📝', target_view: 'registrasi', role_akses: 'KADER', urutan: 2, is_active: 'Y' },
@@ -270,12 +270,22 @@ const renderMenu = async (role) => {
             { id_menu: 'M7', label_menu: 'Pengaturan Akun', icon: '⚙️', target_view: 'setting', role_akses: 'KADER', urutan: 7, is_active: 'Y' },
             { id_menu: 'M8', label_menu: 'Muat Ulang Aplikasi', icon: '🔁', target_view: 'reload_app', role_akses: 'KADER', urutan: 8, is_active: 'Y' }
         ];
+    } else {
+        // Untuk role lain, tarik dari database master_menu
+        allMenu = await getAllData('master_menu').catch(()=>[]);
+        // Fallback jika kosong untuk non-kader
+        if (allMenu.length === 0) {
+            allMenu = [
+                { id_menu: 'M1', label_menu: 'Dashboard', icon: '🏠', target_view: 'dashboard', role_akses: role, urutan: 1, is_active: 'Y' },
+                { id_menu: 'M8', label_menu: 'Muat Ulang Aplikasi', icon: '🔁', target_view: 'reload_app', role_akses: role, urutan: 8, is_active: 'Y' }
+            ];
+        }
     }
 
     const filteredMenu = allMenu.filter(m => {
         const roles = String(m.role_akses || '').toUpperCase();
         const isActive = String(m.is_active || 'Y').toUpperCase() === 'Y';
-        return isActive && roles.includes(String(role).toUpperCase());
+        return isActive && roles.includes(rUpper);
     }).sort((a,b) => (parseInt(a.urutan)||0) - (parseInt(b.urutan)||0));
 
     const parents = filteredMenu.filter(m => !m.parent_id);
@@ -344,7 +354,6 @@ window.mulaiSinkronisasiDashboard = async () => {
         const text = getEl('text-sync-dash'); 
         const card = getEl('card-sync-dashboard');
         
-        // 🔥 PATCH 3: Jebol Tembok Sinkronisasi (Hapus Pemblokiran Pura-pura Offline)
         if (!navigator.onLine) { 
             console.warn("⚠️ Sinyal internet dilaporkan mati oleh sistem operasi, namun aplikasi tetap akan mencoba menembus koneksi server."); 
         }
