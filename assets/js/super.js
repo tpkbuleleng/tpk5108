@@ -1,6 +1,3 @@
-// ==========================================
-// 👑 GOD MODE: SUPER ADMIN DASHBOARD (V36 - STRICT BLUE & GOLD PALETTE FIXED)
-// ==========================================
 import { getAllData, clearStore } from './db.js';
 
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzEmmn0wMJmC1OHij9JUxm8EIT2xW1AuV0597EYCWDIxG_nkpZYBPx1EGiNYe6OjEHniw/exec';
@@ -13,9 +10,6 @@ window.currentUser = null;
 
 const catatErrorSistem = (lokasi, error) => { if(window.logErrorToServer) window.logErrorToServer(`SuperAdmin: ${lokasi}`, error); else console.error(`[${lokasi}]`, error); };
 
-// ==========================================
-// 1. FUNGSI AKSI SUPER ADMIN (GLOBAL)
-// ==========================================
 window.superResetPin = async (idUser, namaUser) => { const newPin = prompt(`🔐 Reset PIN untuk:\nID: ${idUser}\nNama: ${namaUser}\n\nMasukkan PIN Baru (Min 5 karakter):`); if (!newPin || newPin.length < 5) return; if (!confirm(`Yakin mengubah PIN ${namaUser} menjadi: ${newPin} ?`)) return; try { const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_UPDATE_USER', token: SUPER_TOKEN, id_user: idUser, updateType: 'PIN', newPin: newPin }) }); const res = await response.json(); if (res.status === 'success') { alert(`✅ PIN berhasil direset!`); window.renderSuperView('user_management'); } else { alert("❌ Gagal: " + res.message); } } catch (e) { catatErrorSistem('superResetPin', e); alert("❌ Kesalahan Jaringan."); } };
 window.superToggleStatus = async (idUser, namaUser, currentStatus) => { const isAktif = (currentStatus || 'AKTIF').toUpperCase() === 'AKTIF'; const newStatus = isAktif ? 'NONAKTIF' : 'AKTIF'; if (!confirm(`⚠️ PERINGATAN!\nAnda akan ${isAktif ? 'MEMBLOKIR' : 'MENGAKTIFKAN'} akses untuk: ${namaUser}\n\nLanjutkan?`)) return; try { const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_UPDATE_USER', token: SUPER_TOKEN, id_user: idUser, updateType: 'STATUS', newStatus: newStatus }) }); const res = await response.json(); if (res.status === 'success') { alert(`✅ Status diubah menjadi ${newStatus}!`); window.renderSuperView('user_management'); } else { alert("❌ Gagal: " + res.message); } } catch (e) { catatErrorSistem('superToggleStatus', e); alert("❌ Kesalahan Jaringan."); } };
 window.superBulkAction = async (actionType) => { const checkedBoxes = document.querySelectorAll('.chk-user:checked'); const targetIds = Array.from(checkedBoxes).map(cb => cb.value); const totalTarget = targetIds.length; if (totalTarget === 0) { alert("Pilih minimal 1 pengguna!"); return; } let confirmMsg = ""; let updateType = ""; let newValue = ""; if (actionType === 'BLOKIR') { confirmMsg = `⚠️ MEMBLOKIR ${totalTarget} akun. Ketik "YAKIN":`; updateType = 'STATUS'; newValue = 'NONAKTIF'; } else if (actionType === 'AKTIFKAN') { confirmMsg = `MENGAKTIFKAN ${totalTarget} akun. Ketik "YAKIN":`; updateType = 'STATUS'; newValue = 'AKTIF'; } else if (actionType === 'RESETPIN') { const pinMasal = prompt(`PIN BARU untuk ${totalTarget} akun:`); if (!pinMasal || pinMasal.length < 5) return; confirmMsg = `⚠️ MERESET PIN ${totalTarget} akun menjadi "${pinMasal}". Ketik "YAKIN":`; updateType = 'PIN'; newValue = pinMasal; } if (prompt(confirmMsg) !== "YAKIN") return; document.getElementById('table-wrapper').innerHTML = `<div style="padding:50px; text-align:center;"><h3>🚀 MENGEKSEKUSI...</h3></div>`; try { const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_BULK_UPDATE_USER', token: SUPER_TOKEN, ids: targetIds, updateType: updateType, newValue: newValue }) }); const res = await response.json(); if (res.status === 'success') { alert(`✅ SUKSES! ${res.count} Akun diperbarui!`); } else { alert("❌ Gagal: " + res.message); } window.renderSuperView('user_management'); } catch (e) { catatErrorSistem('superBulkAction', e); alert("❌ Kesalahan."); window.renderSuperView('user_management'); } };
@@ -26,15 +20,11 @@ window.superToggleWidget = async (idWidget, statusSaatIni) => { const isAktif = 
 window.superEditMenu = (id) => { const menu = window.superMenuData.find(m => m.id_menu === id); if(!menu) return; window.currentEditMenuId = id; document.getElementById('modal-m-title').innerHTML = "✏️ Edit Menu Navigasi"; document.getElementById('btn-submit-m').innerText = "Update Menu"; document.getElementById('m-icon').value = menu.icon || ''; document.getElementById('m-label').value = menu.label_menu || ''; const targetSel = document.getElementById('m-target-sel'); const targetCus = document.getElementById('m-target-custom'); const opts = Array.from(targetSel.options).map(o => o.value); if (opts.includes(menu.target_view)) { targetSel.value = menu.target_view; targetCus.style.display = 'none'; targetCus.value = ''; } else { targetSel.value = 'CUSTOM'; targetCus.style.display = 'block'; targetCus.value = menu.target_view || ''; } document.getElementById('m-urut').value = menu.urutan || ''; const parentSelect = document.getElementById('m-parent'); parentSelect.innerHTML = '<option value="">-- Bukan Sub-Menu --</option>'; window.superMenuData.forEach(m => { if ((!m.parent_id || m.parent_id === '') && m.id_menu !== id) { parentSelect.innerHTML += `<option value="${m.id_menu}">${m.icon || ''} ${m.label_menu}</option>`; } }); if(menu.parent_id) parentSelect.value = menu.parent_id; const roles = (menu.role_akses || '').split(','); document.querySelectorAll('.m-role-chk').forEach(cb => { cb.checked = roles.includes(cb.value); }); document.getElementById('modal-add-m').style.display = 'flex'; };
 window.superEditWidget = (id) => { const widget = window.superWidgetData.find(w => w.id_widget === id); if(!widget) return; window.currentEditWidgetId = id; document.getElementById('modal-w-title').innerHTML = "✏️ Edit Komponen Halaman"; document.getElementById('btn-submit-w').innerText = "Update Komponen"; const tHalaman = document.getElementById('w-target-sel'); tHalaman.innerHTML = '<option value="">-- Pilih Halaman / Menu --</option>'; const defaultTargets = ['dashboard', 'registrasi', 'daftar_sasaran', 'pendampingan', 'rekap_bulanan', 'cetak_pdf', 'bantuan', 'setting']; const dynamicTargets = window.superMenuData.map(m => m.target_view).filter(Boolean); const uniqueTargets = [...new Set([...defaultTargets, ...dynamicTargets])]; uniqueTargets.forEach(t => tHalaman.innerHTML += `<option value="${t}">${t}</option>`); tHalaman.value = widget.target_halaman || ''; document.getElementById('w-posisi').value = widget.posisi || 'atas'; document.getElementById('w-tipe').value = 'html'; document.querySelectorAll('.widget-panel').forEach(p => p.style.display = 'none'); document.getElementById('panel-html').style.display = 'block'; document.getElementById('w-konten-html').value = widget.isi_konten || ''; document.getElementById('modal-add-w').style.display = 'flex'; };
 
-// ==========================================
-// 2. FUNGSI RENDER TABEL (Didefinisikan HANYA SEKALI di sini)
-// ==========================================
 window.renderUserTable = () => {
     try {
         const searchVal = document.getElementById('flt-search').value.toLowerCase(); const roleVal = document.getElementById('flt-role').value; const kecVal = document.getElementById('flt-kec').value;
         let tableHtml = `<table class="super-table"><thead><tr><th style="text-align:center; width:40px;"><input type="checkbox" id="chk-all-users" title="Pilih Semua yang Tampil"></th><th>ID / Username</th><th>Nama Pengguna</th><th>No. Tim</th><th>Desa/Kelurahan</th><th>Wilayah/Kecamatan</th><th>Role Akses</th><th>PIN / Password</th><th>Aktivitas Terakhir</th><th>Status & Aksi</th></tr></thead><tbody>`;
         let count = 0; window.currentFilteredIds = [];
-        
         window.superUsersData.forEach((u) => {
             const role = String(u.role_akses || u.role || 'KADER').toUpperCase(); const pin = u.password_awal_ref || u.password || u.pin || '***'; const id = u.id_pengguna || u.id_user || u.username || '-'; const nama = u.nama || u.username || '-'; const kec = String(u._kecamatan || u.scope_kecamatan || u.kecamatan || u.wilayah || 'ALL').toUpperCase(); const currentStatus = String(u.status_akun || 'AKTIF').toUpperCase(); const tim = u._nomor_tim || '-'; const desa = u._desa || '-';
             const lastLoginRaw = u.login_terakhir || u.last_login; let lastLoginText = '<span style="color:#aaa; font-style:italic;">Belum pernah login</span>';
@@ -46,15 +36,8 @@ window.renderUserTable = () => {
             
             if (matchSearch && matchRole && matchKec) {
                 count++; if (!role.includes('SUPER')) { window.currentFilteredIds.push(id); }
-                
-                // 🔥 V36: Logika Warna Ketat (Strict Palette)
                 let badgeClass = 'role-kader';
-                if (role.includes('SUPER')) badgeClass = 'role-super';
-                else if (role.includes('KABUPATEN')) badgeClass = 'role-adminkab';
-                else if (role.includes('KECAMATAN') || role === 'ADMIN') badgeClass = 'role-adminkec';
-                else if (role.includes('DESA')) badgeClass = 'role-desa';
-                else if (role.includes('PKB')) badgeClass = 'role-pkb';
-                else if (role.includes('MITRA')) badgeClass = 'role-mitra';
+                if (role.includes('SUPER')) badgeClass = 'role-super'; else if (role.includes('KABUPATEN')) badgeClass = 'role-adminkab'; else if (role.includes('KECAMATAN') || role === 'ADMIN') badgeClass = 'role-adminkec'; else if (role.includes('DESA')) badgeClass = 'role-desa'; else if (role.includes('PKB')) badgeClass = 'role-pkb'; else if (role.includes('MITRA')) badgeClass = 'role-mitra';
                 
                 const isAktif = currentStatus === 'AKTIF'; const statusUI = isAktif ? '<span style="color:#00b894; font-weight:bold; display:block; margin-bottom:5px;">🟢 Aktif</span>' : '<span style="color:#ff7675; font-weight:bold; display:block; margin-bottom:5px;">🔴 Diblokir</span>'; const toggleText = isAktif ? 'Blokir' : 'Aktifkan'; const toggleColor = isAktif ? '#ff7675' : '#00b894';
                 let chkBox = ''; let actionButtons = '';
@@ -144,7 +127,7 @@ export const initSuperAdmin = async (session) => {
                 #btn-super-logout:hover { background: #F1C40F; color: #0A2342; }
                 .super-table-container { max-height: calc(100vh - 280px); overflow-y: auto; border-radius: 8px; border: 1px solid #eee; background:white; } .super-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; min-width: 1100px; } .super-table th { position: sticky; top: 0; z-index: 10; background: #0A2342; color: white; padding: 15px; text-align: left; font-weight:600; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border-bottom: 3px solid #F1C40F; } .super-table td { padding: 12px 15px; border-bottom: 1px solid #eee; color: #444; vertical-align: top;} .super-table tr:hover td { background: #f8f9fa; }
                 
-                /* 🔥 V36: STRICT BLUE & GOLD LENCANA PALETTE */
+                /* 🔥 V37: STRICT BLUE & GOLD LENCANA PALETTE */
                 .badge-role { padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; text-transform:uppercase; border: 1px solid transparent; } 
                 .role-kader { background: #E8F4FD; color: #2980B9; border-color: #b6d4fe; } /* Light Blue + Medium Blue */
                 .role-adminkab { background: #0043A8; color: #F1C40F; border-color: #0043A8; } /* Royal Blue + Gold */
@@ -333,7 +316,7 @@ window.renderSuperView = async (target) => {
                                 if(window.dashAnalyticData.logs.length === 0) { dashList.innerHTML = `<div style="text-align:center; color:#999; padding:20px;">Belum ada rekaman aktivitas.</div>`; } else {
                                     const top5 = [...window.dashAnalyticData.logs].slice(0, 5);
                                     dashList.innerHTML = top5.map(log => {
-                                        const time = new Date(log.waktu).toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'}); const aksi = String(log.aksi).toUpperCase(); let badgeColor = '#0043A8'; if(aksi.includes('TAMBAH') || aksi.includes('SUKSES')) badgeColor = '#198754'; else if(aksi.includes('STATUS') || aksi.includes('RESET')) badgeColor = '#B8860B'; else if(aksi.includes('HAPUS') || aksi.includes('BLOKIR') || aksi.includes('GAGAL')) badgeColor = '#e94560';
+                                        const time = new Date(log.waktu).toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'}); const aksi = String(log.aksi).toUpperCase(); let badgeColor = '#0043A8'; if(aksi.includes('TAMBAH') || aksi.includes('SUKSES')) badgeColor = '#198754'; else if(aksi.includes('STATUS') || aksi.includes('RESET')) badgeColor = '#F1C40F'; else if(aksi.includes('HAPUS') || aksi.includes('BLOKIR') || aksi.includes('GAGAL')) badgeColor = '#e94560';
                                         return `<div style="display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid #f1f1f1;"><div><b style="font-size:0.75rem; color:${badgeColor};">[${aksi}]</b> <span style="font-size:0.9rem; color:#0A2342; margin-left:5px; font-weight:bold;">${log.target}</span><div style="font-size:0.75rem; color:#888; margin-top:2px;">${log.detail}</div></div><div style="font-size:0.8rem; color:#aaa; font-weight:bold;">${time}</div></div>`;
                                     }).join('');
                                 }
@@ -346,6 +329,7 @@ window.renderSuperView = async (target) => {
             loadDashboardData();
         }
 
+        // [MENU AUDIT LOG, USER_MANAGEMENT, KUESIONER, MENU_MANAGEMENT, WIDGET_MANAGEMENT]
         else if (target === 'audit_trail') {
             content.innerHTML = `
                 <div class="super-card" style="margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px; border-left:4px solid #F1C40F;">
@@ -362,7 +346,6 @@ window.renderSuperView = async (target) => {
                     <div id="table-wrapper-log" class="super-table-container"><div style="padding:50px; text-align:center; color:#0043A8;"><h3>⏳ Menyedot Rekaman CCTV...</h3></div></div>
                 </div>
             `;
-
             try {
                 const [resA, resU, resT, resK, resP] = await Promise.all([
                     fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_AUDIT', token: SUPER_TOKEN }) }).then(r => r.json()),
@@ -371,25 +354,18 @@ window.renderSuperView = async (target) => {
                     fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_ALL', token: SUPER_TOKEN, sheetName: 'MASTER_KADER' }) }).then(r => r.json()),
                     fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_ALL', token: SUPER_TOKEN, sheetName: 'MASTER_PKB' }) }).then(r => r.json())
                 ]);
-
                 if(resA.status === 'success' && resU.status === 'success') {
                     window.superAuditData = resA.data || [];
                     const rawUsers = resU.data || []; const tims = resT.data || []; const kaders = resK.data || []; const pkbs = resP.data || [];
-                    
                     window.superUsersData = rawUsers.map(u => {
                         let nKec = String(u.scope_kecamatan || u.kecamatan || 'ALL').toUpperCase(); let nDesa = String(u.scope_desa || u.desa_kelurahan || u.desa || '-').toUpperCase(); const role = String(u.role_akses || u.role || 'KADER').toUpperCase(); const refId = u.ref_id || u.id_pengguna || u.id_user || u.username;
                         if (role.includes('KADER')) { const k = kaders.find(kd => String(kd.id_kader) === String(refId) || String(kd.nik) === String(refId)); if (k) { const idTim = k.id_tim || k.tim; const t = tims.find(td => String(td.id_tim) === String(idTim) || String(td.id) === String(idTim)); if (t) { let d = t.desa_kelurahan || t.desa || k.desa_kelurahan || k.desa || nDesa; nDesa = String(d).toUpperCase(); let c = t.kecamatan || t.wilayah || k.kecamatan || nKec; nKec = String(c).toUpperCase(); } } }
                         if (role.includes('PKB')) { if(nDesa === '-' || nDesa === '') { const p = pkbs.find(pk => String(pk.id_pkb) === String(refId) || String(pk.nip_pkb) === String(refId)); if (p) { nKec = String(p.kecamatan || nKec).toUpperCase(); nDesa = String(p.desa_kelurahan || p.desa || nDesa).toUpperCase(); } } }
                         if (nDesa === 'UNDEFINED' || nDesa === '') nDesa = '-'; u._desa = nDesa; u._kecamatan = nKec; return u;
                     });
-
-                    window.renderAuditTable();
-                    document.getElementById('log-flt-waktu').addEventListener('change', window.renderAuditTable);
-                    document.getElementById('log-flt-aksi').addEventListener('change', window.renderAuditTable);
-                    document.getElementById('log-flt-search').addEventListener('input', window.renderAuditTable);
-
+                    window.renderAuditTable(); document.getElementById('log-flt-waktu').addEventListener('change', window.renderAuditTable); document.getElementById('log-flt-aksi').addEventListener('change', window.renderAuditTable); document.getElementById('log-flt-search').addEventListener('input', window.renderAuditTable);
                 } else { document.getElementById('table-wrapper-log').innerHTML = `<div style="padding:50px; text-align:center; color:#e94560;"><h3>❌ Gagal Mengunduh Log</h3><p>Server menolak koneksi. Coba Muat Ulang.</p></div>`; }
-            } catch(e) { catatErrorSistem('Menu Audit Trail', e); document.getElementById('table-wrapper-log').innerHTML = `<div style="padding:50px; text-align:center; color:#e94560;"><h3>❌ Izin Akses Tertahan (Koneksi Terputus)</h3><p>Google meminta Otorisasi Izin Ulang untuk mengakses Database CCTV Bapak.<br><br><b>Solusi Cepat:</b> Buka Tab <code>Code.gs</code> di App Script, klik <b>Jalankan</b>, lalu klik <b>Tinjau Izin</b> (Review Permissions).</p></div>`; }
+            } catch(e) { catatErrorSistem('Menu Audit Trail', e); document.getElementById('table-wrapper-log').innerHTML = `<div style="padding:50px; text-align:center; color:#e94560;"><h3>❌ Izin Akses Tertahan (Koneksi Terputus)</h3></div>`; }
         }
         
         else if (target === 'user_management') {
@@ -434,24 +410,14 @@ window.renderSuperView = async (target) => {
                         </div>
                         <div id="panel-kader-area" style="display:block; background:#e8f4fd; padding:15px; border-radius:8px; margin-bottom:15px; border:1px solid #b6d4fe;">
                             <p id="lbl-penempatan" style="margin:0 0 10px 0; font-size:0.85rem; font-weight:bold; color:#0043A8;">📍 Penempatan Tugas</p>
-                            
                             <label id="lbl-desa-1" style="display:block; font-size:0.8rem; color:#666; margin-bottom:5px;">1. Pilih Desa / Kelurahan</label>
                             <select id="add-desa" class="filter-input" style="width:100%; box-sizing:border-box; margin-bottom:10px;"><option value="">-- Pilih Desa --</option></select>
-                            
                             <div id="box-desa-pkb" style="display:none;">
-                                <label style="display:block; font-size:0.8rem; color:#666; margin-bottom:5px;">2. Pilih Desa / Kelurahan Binaan 2 <span style="color:red; font-weight:bold;">(Wajib)</span></label>
-                                <select id="add-desa-2" class="filter-input" style="width:100%; box-sizing:border-box; margin-bottom:10px;"><option value="">-- Pilih Desa --</option></select>
-
-                                <label style="display:block; font-size:0.8rem; color:#666; margin-bottom:5px;">3. Pilih Desa / Kelurahan Binaan 3 (Opsional)</label>
-                                <select id="add-desa-3" class="filter-input" style="width:100%; box-sizing:border-box; margin-bottom:10px;"><option value="">-- Pilih Desa --</option></select>
-
-                                <label style="display:block; font-size:0.8rem; color:#666; margin-bottom:5px;">4. Pilih Desa / Kelurahan Binaan 4 (Opsional)</label>
-                                <select id="add-desa-4" class="filter-input" style="width:100%; box-sizing:border-box; margin-bottom:10px;"><option value="">-- Pilih Desa --</option></select>
-
-                                <label style="display:block; font-size:0.8rem; color:#666; margin-bottom:5px;">5. Pilih Desa / Kelurahan Binaan 5 (Opsional)</label>
-                                <select id="add-desa-5" class="filter-input" style="width:100%; box-sizing:border-box; margin-bottom:10px;"><option value="">-- Pilih Desa --</option></select>
+                                <label style="display:block; font-size:0.8rem; color:#666; margin-bottom:5px;">2. Pilih Desa / Kelurahan Binaan 2 <span style="color:red; font-weight:bold;">(Wajib)</span></label><select id="add-desa-2" class="filter-input" style="width:100%; box-sizing:border-box; margin-bottom:10px;"><option value="">-- Pilih Desa --</option></select>
+                                <label style="display:block; font-size:0.8rem; color:#666; margin-bottom:5px;">3. Pilih Desa / Kelurahan Binaan 3 (Opsional)</label><select id="add-desa-3" class="filter-input" style="width:100%; box-sizing:border-box; margin-bottom:10px;"><option value="">-- Pilih Desa --</option></select>
+                                <label style="display:block; font-size:0.8rem; color:#666; margin-bottom:5px;">4. Pilih Desa / Kelurahan Binaan 4 (Opsional)</label><select id="add-desa-4" class="filter-input" style="width:100%; box-sizing:border-box; margin-bottom:10px;"><option value="">-- Pilih Desa --</option></select>
+                                <label style="display:block; font-size:0.8rem; color:#666; margin-bottom:5px;">5. Pilih Desa / Kelurahan Binaan 5 (Opsional)</label><select id="add-desa-5" class="filter-input" style="width:100%; box-sizing:border-box; margin-bottom:10px;"><option value="">-- Pilih Desa --</option></select>
                             </div>
-
                             <div id="box-add-tim">
                                 <label style="display:block; font-size:0.8rem; color:#666; margin-bottom:5px;">2. Pilih Tim / Dusun</label><select id="add-tim" class="filter-input" style="width:100%; box-sizing:border-box;"><option value="">-- Pilih Tim / Dusun --</option></select>
                                 <div style="font-size:0.7rem; color:#888; margin-top:5px; font-style:italic;">*Sistem otomatis membuat profil ini di Database Master.</div>
@@ -462,7 +428,6 @@ window.renderSuperView = async (target) => {
                     </div>
                 </div>
             `;
-
             try {
                 let kaderData = await getAllData('master_kader').catch(()=>[]); let timData = await getAllData('master_tim').catch(()=>[]); let pkbData = await getAllData('master_pkb').catch(()=>[]);
                 if (kaderData.length === 0 || timData.length === 0) {
@@ -471,10 +436,8 @@ window.renderSuperView = async (target) => {
                     if(masterRes.status === 'success') { kaderData = masterRes.data.master_kader || []; timData = masterRes.data.master_tim || []; pkbData = masterRes.data.master_pkb || [];}
                 }
                 window.superTimData = timData || [];
-
                 const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_ALL', token: SUPER_TOKEN, sheetName: 'USER_LOGIN' }) });
                 const res = await response.json();
-                
                 if (res.status === 'success') {
                     window.superUsersData = res.data.map(u => {
                         let nTim = '-'; let nDesa = String(u.scope_desa || u.desa_kelurahan || u.desa || u.wilayah_desa || '-').toUpperCase(); const role = String(u.role_akses || u.role || 'KADER').toUpperCase(); const refId = u.ref_id || u.id_pengguna || u.id_user || u.username;
@@ -482,99 +445,51 @@ window.renderSuperView = async (target) => {
                         if (role.includes('PKB')) { const p = pkbData.find(pk => String(pk.id_pkb) === String(refId) || String(pk.nip_pkb) === String(refId)); if (p) { nDesa = String(p.desa_kelurahan || p.desa || nDesa).toUpperCase(); } }
                         if (nDesa === 'UNDEFINED' || nDesa === '') nDesa = '-'; u._nomor_tim = nTim; u._desa = nDesa; return u;
                     });
-
                     const kecSet = new Set(); window.superUsersData.forEach(u => { const k = String(u.scope_kecamatan || u.kecamatan || u.wilayah || '').toUpperCase().trim(); if(k && k !== 'ALL' && k !== 'SEMUA' && k !== '-') kecSet.add(k); });
                     const selectKec = document.getElementById('flt-kec'); Array.from(kecSet).sort().forEach(k => { const opt = document.createElement('option'); opt.value = k; opt.innerText = k; selectKec.appendChild(opt); });
-                    
                     const searchInput = document.getElementById('flt-search'); const clearBtn = document.getElementById('btn-clear-search');
                     window.renderUserTable(); searchInput.addEventListener('input', () => { clearBtn.style.display = searchInput.value ? 'block' : 'none'; window.renderUserTable(); }); clearBtn.addEventListener('click', () => { searchInput.value = ''; clearBtn.style.display = 'none'; searchInput.focus(); window.renderUserTable(); }); document.getElementById('flt-role').addEventListener('change', window.renderUserTable); document.getElementById('flt-kec').addEventListener('change', window.renderUserTable);
-
                     const modalAdd = document.getElementById('modal-add-user'); const roleSelect = document.getElementById('add-role'); const formKecSelect = document.getElementById('add-kec'); const panelKader = document.getElementById('panel-kader-area'); const formDesaSelect = document.getElementById('add-desa'); const timSelect = document.getElementById('add-tim');
                     document.getElementById('btn-show-add').onclick = () => { if(roleSelect.value === 'KADER') populateDesaDropdown(); modalAdd.style.display = 'flex'; }; document.getElementById('btn-close-add').onclick = () => modalAdd.style.display = 'none';
-
                     const populateDesaDropdown = () => {
-                        const selectedKec = formKecSelect.value; 
-                        const defOpt = '<option value="">-- Pilih Desa / Kelurahan --</option>';
+                        const selectedKec = formKecSelect.value; const defOpt = '<option value="">-- Pilih Desa / Kelurahan --</option>';
                         formDesaSelect.innerHTML = defOpt; document.getElementById('add-desa-2').innerHTML = defOpt; document.getElementById('add-desa-3').innerHTML = defOpt; document.getElementById('add-desa-4').innerHTML = defOpt; document.getElementById('add-desa-5').innerHTML = defOpt;
                         timSelect.innerHTML = '<option value="">-- Pilih Tim / Dusun --</option>'; 
                         if (!selectedKec || selectedKec === 'ALL') return; 
                         const desaSet = new Set();
                         window.superTimData.forEach(t => { const k = String(t.kecamatan || t.wilayah || '').toUpperCase(); if (k === selectedKec) { const d = String(t.desa_kelurahan || t.desa || '').toUpperCase(); if (d && d !== 'UNDEFINED' && d !== '-') desaSet.add(d); } }); 
-                        Array.from(desaSet).sort().forEach(d => { 
-                            const opt = `<option value="${d}">${d}</option>`;
-                            formDesaSelect.innerHTML += opt; document.getElementById('add-desa-2').innerHTML += opt; document.getElementById('add-desa-3').innerHTML += opt; document.getElementById('add-desa-4').innerHTML += opt; document.getElementById('add-desa-5').innerHTML += opt;
-                        });
+                        Array.from(desaSet).sort().forEach(d => { const opt = `<option value="${d}">${d}</option>`; formDesaSelect.innerHTML += opt; document.getElementById('add-desa-2').innerHTML += opt; document.getElementById('add-desa-3').innerHTML += opt; document.getElementById('add-desa-4').innerHTML += opt; document.getElementById('add-desa-5').innerHTML += opt; });
                     };
-
                     const populateTimDropdown = () => {
                         const selectedKec = formKecSelect.value; const selectedDesa = formDesaSelect.value; timSelect.innerHTML = '<option value="">-- Pilih Tim / Dusun --</option>'; if (!selectedDesa) return;
                         const filteredTim = window.superTimData.filter(t => { const k = String(t.kecamatan || t.wilayah || '').toUpperCase(); const d = String(t.desa_kelurahan || t.desa || '').toUpperCase(); return k === selectedKec && d === selectedDesa; }); filteredTim.sort((a,b) => String(a.nama_tim || a.nomor_tim).localeCompare(String(b.nama_tim || b.nomor_tim))); filteredTim.forEach(t => { const idTim = t.id_tim || t.id; const namaTim = t.nama_tim || t.nomor_tim || idTim; const dusun = t.dusun_rw || t.dusun || '-'; const label = `${namaTim} (Dusun: ${dusun})`; const opt = document.createElement('option'); opt.value = idTim; opt.setAttribute('data-desa', selectedDesa); opt.setAttribute('data-dusun', dusun); opt.innerText = label; timSelect.appendChild(opt); });
                     };
-
                     roleSelect.addEventListener('change', () => { 
-                        const boxPkb = document.getElementById('box-desa-pkb');
-                        const lblDesa1 = document.getElementById('lbl-desa-1');
-
-                        if (roleSelect.value === 'ADMIN_KABUPATEN') { 
-                            formKecSelect.value = 'ALL'; formKecSelect.style.backgroundColor = '#e9ecef'; formKecSelect.style.pointerEvents = 'none'; panelKader.style.display = 'none'; 
-                        } else if (roleSelect.value === 'ADMIN_KECAMATAN' || roleSelect.value === 'MITRA') { 
-                            formKecSelect.style.backgroundColor = 'white'; formKecSelect.style.pointerEvents = 'auto'; 
-                            if(formKecSelect.value === 'ALL' && roleSelect.value === 'ADMIN_KECAMATAN') formKecSelect.value = 'GEROKGAK'; 
-                            panelKader.style.display = 'none'; 
-                        } else if (roleSelect.value === 'ADMIN_DESA') { 
-                            formKecSelect.style.backgroundColor = 'white'; formKecSelect.style.pointerEvents = 'auto'; if(formKecSelect.value === 'ALL') formKecSelect.value = 'GEROKGAK'; 
-                            panelKader.style.display = 'block'; document.getElementById('box-add-tim').style.display = 'none'; 
-                            boxPkb.style.display = 'none'; document.getElementById('lbl-penempatan').innerHTML = "📍 Wilayah Admin Desa"; 
-                            lblDesa1.innerHTML = "1. Pilih Desa / Kelurahan <span style='color:red; font-weight:bold;'>(Wajib)</span>"; populateDesaDropdown(); 
-                        } else if (roleSelect.value === 'PKB') { 
-                            formKecSelect.style.backgroundColor = 'white'; formKecSelect.style.pointerEvents = 'auto'; if(formKecSelect.value === 'ALL') formKecSelect.value = 'GEROKGAK'; 
-                            panelKader.style.display = 'block'; document.getElementById('box-add-tim').style.display = 'none'; 
-                            boxPkb.style.display = 'block'; document.getElementById('lbl-penempatan').innerHTML = "📍 Wilayah Binaan PKB"; 
-                            lblDesa1.innerHTML = "1. Pilih Desa / Kelurahan Binaan 1 <span style='color:red; font-weight:bold;'>(Wajib)</span>"; populateDesaDropdown(); 
-                        } else { 
-                            formKecSelect.style.backgroundColor = 'white'; formKecSelect.style.pointerEvents = 'auto'; if(formKecSelect.value === 'ALL') formKecSelect.value = 'GEROKGAK'; 
-                            panelKader.style.display = 'block'; document.getElementById('box-add-tim').style.display = 'block'; 
-                            boxPkb.style.display = 'none'; document.getElementById('lbl-penempatan').innerHTML = "📍 Penempatan Tugas Kader"; 
-                            lblDesa1.innerHTML = "1. Pilih Desa / Kelurahan"; populateDesaDropdown(); 
-                        } 
+                        const boxPkb = document.getElementById('box-desa-pkb'); const lblDesa1 = document.getElementById('lbl-desa-1');
+                        if (roleSelect.value === 'ADMIN_KABUPATEN') { formKecSelect.value = 'ALL'; formKecSelect.style.backgroundColor = '#e9ecef'; formKecSelect.style.pointerEvents = 'none'; panelKader.style.display = 'none'; } 
+                        else if (roleSelect.value === 'ADMIN_KECAMATAN' || roleSelect.value === 'MITRA') { formKecSelect.style.backgroundColor = 'white'; formKecSelect.style.pointerEvents = 'auto'; if(formKecSelect.value === 'ALL' && roleSelect.value === 'ADMIN_KECAMATAN') formKecSelect.value = 'GEROKGAK'; panelKader.style.display = 'none'; } 
+                        else if (roleSelect.value === 'ADMIN_DESA') { formKecSelect.style.backgroundColor = 'white'; formKecSelect.style.pointerEvents = 'auto'; if(formKecSelect.value === 'ALL') formKecSelect.value = 'GEROKGAK'; panelKader.style.display = 'block'; document.getElementById('box-add-tim').style.display = 'none'; boxPkb.style.display = 'none'; document.getElementById('lbl-penempatan').innerHTML = "📍 Wilayah Admin Desa"; lblDesa1.innerHTML = "1. Pilih Desa / Kelurahan <span style='color:red; font-weight:bold;'>(Wajib)</span>"; populateDesaDropdown(); } 
+                        else if (roleSelect.value === 'PKB') { formKecSelect.style.backgroundColor = 'white'; formKecSelect.style.pointerEvents = 'auto'; if(formKecSelect.value === 'ALL') formKecSelect.value = 'GEROKGAK'; panelKader.style.display = 'block'; document.getElementById('box-add-tim').style.display = 'none'; boxPkb.style.display = 'block'; document.getElementById('lbl-penempatan').innerHTML = "📍 Wilayah Binaan PKB"; lblDesa1.innerHTML = "1. Pilih Desa / Kelurahan Binaan 1 <span style='color:red; font-weight:bold;'>(Wajib)</span>"; populateDesaDropdown(); } 
+                        else { formKecSelect.style.backgroundColor = 'white'; formKecSelect.style.pointerEvents = 'auto'; if(formKecSelect.value === 'ALL') formKecSelect.value = 'GEROKGAK'; panelKader.style.display = 'block'; document.getElementById('box-add-tim').style.display = 'block'; boxPkb.style.display = 'none'; document.getElementById('lbl-penempatan').innerHTML = "📍 Penempatan Tugas Kader"; lblDesa1.innerHTML = "1. Pilih Desa / Kelurahan"; populateDesaDropdown(); } 
                     }); 
-                    
                     formKecSelect.addEventListener('change', () => { if(roleSelect.value === 'KADER' || roleSelect.value === 'PKB' || roleSelect.value === 'ADMIN_DESA') populateDesaDropdown(); }); formDesaSelect.addEventListener('change', populateTimDropdown);
-
                     document.getElementById('btn-submit-add').onclick = async () => {
                         const id = document.getElementById('add-id').value.trim(); const nama = document.getElementById('add-nama').value.trim(); const role = document.getElementById('add-role').value; const kec = document.getElementById('add-kec').value.trim().toUpperCase(); const pin = document.getElementById('add-pin').value.trim();
                         if(!id || !nama || !kec || !pin) { alert("⚠️ Mohon isi semua kolom dasar!"); return; } 
-                        
                         let payloadKader = null; let finalDesa = '';
-
-                        if (role === 'KADER') { 
-                            if(!formDesaSelect.value || !timSelect.value) { alert("⚠️ Mohon lengkapi pilihan Desa dan Tim penugasan kader!"); return; } 
-                            finalDesa = formDesaSelect.value;
-                            const selectedOpt = timSelect.options[timSelect.selectedIndex]; payloadKader = { id_kader: id, nik: id, id_pengguna: id, nama: nama, nama_kader: nama, nama_lengkap: nama, id_tim: timSelect.value, tim: timSelect.value, desa: selectedOpt.getAttribute('data-desa'), desa_kelurahan: selectedOpt.getAttribute('data-desa'), dusun: selectedOpt.getAttribute('data-dusun'), dusun_rw: selectedOpt.getAttribute('data-dusun') }; 
-                        }
-                        else if (role === 'ADMIN_DESA') { 
-                            if(!formDesaSelect.value) { alert("⚠️ Mohon pilih Desa/Kelurahan!"); return; } 
-                            finalDesa = formDesaSelect.value;
-                        }
-                        else if (role === 'PKB') { 
-                            const d1 = formDesaSelect.value; const d2 = document.getElementById('add-desa-2').value; const d3 = document.getElementById('add-desa-3').value; const d4 = document.getElementById('add-desa-4').value; const d5 = document.getElementById('add-desa-5').value;
-                            if(!d1 || !d2) { alert("⚠️ Mohon lengkapi minimal Desa Binaan 1 dan 2 untuk PKB!"); return; } 
-                            const arrDesa = [d1, d2, d3, d4, d5].filter(Boolean); finalDesa = [...new Set(arrDesa)].join(', ');
-                        }
-
+                        if (role === 'KADER') { if(!formDesaSelect.value || !timSelect.value) { alert("⚠️ Mohon lengkapi pilihan Desa dan Tim penugasan kader!"); return; } finalDesa = formDesaSelect.value; const selectedOpt = timSelect.options[timSelect.selectedIndex]; payloadKader = { id_kader: id, nik: id, id_pengguna: id, nama: nama, nama_kader: nama, nama_lengkap: nama, id_tim: timSelect.value, tim: timSelect.value, desa: selectedOpt.getAttribute('data-desa'), desa_kelurahan: selectedOpt.getAttribute('data-desa'), dusun: selectedOpt.getAttribute('data-dusun'), dusun_rw: selectedOpt.getAttribute('data-dusun') }; }
+                        else if (role === 'ADMIN_DESA') { if(!formDesaSelect.value) { alert("⚠️ Mohon pilih Desa/Kelurahan!"); return; } finalDesa = formDesaSelect.value; }
+                        else if (role === 'PKB') { const d1 = formDesaSelect.value; const d2 = document.getElementById('add-desa-2').value; const d3 = document.getElementById('add-desa-3').value; const d4 = document.getElementById('add-desa-4').value; const d5 = document.getElementById('add-desa-5').value; if(!d1 || !d2) { alert("⚠️ Mohon lengkapi minimal Desa Binaan 1 dan 2 untuk PKB!"); return; } const arrDesa = [d1, d2, d3, d4, d5].filter(Boolean); finalDesa = [...new Set(arrDesa)].join(', '); }
                         const btnSubmit = document.getElementById('btn-submit-add'); btnSubmit.innerText = "Menyimpan & Sinkronisasi..."; btnSubmit.disabled = true;
-                        
                         const payloadData = { id_user: id, id_pengguna: id, username: id, nama: nama, nama_lengkap: nama, role_akses: role, role: role, scope_kecamatan: kec, kecamatan: kec, scope_desa: finalDesa, password: pin, password_awal_ref: pin, pin: pin, status_akun: 'AKTIF', status: 'AKTIF', ref_type: role, ref_id: id };
-
-                        try {
-                            const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_ADD_USER', token: SUPER_TOKEN, data: payloadData, data_kader: payloadKader }) }); const res = await response.json();
-                            if(res.status === 'success') { alert("✅ Pengguna berhasil ditambahkan!"); modalAdd.style.display = 'none'; await clearStore('master_kader'); await clearStore('master_tim'); document.getElementById('table-wrapper').innerHTML = `<div style="padding:50px; text-align:center; color:#0043A8;"><h3>🔄 MENYINKRONKAN DATABASE...</h3><p>Memuat data terbaru dari Google Server.</p></div>`; setTimeout(() => { window.renderSuperView('user_management'); }, 1000); } else { alert("❌ Gagal menyimpan: " + res.message); }
-                        } catch(e) { catatErrorSistem('Simpan User Baru', e); alert("❌ Kesalahan Jaringan."); } finally { btnSubmit.innerText = "Simpan ke Server"; btnSubmit.disabled = false; }
+                        try { const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_ADD_USER', token: SUPER_TOKEN, data: payloadData, data_kader: payloadKader }) }); const res = await response.json(); if(res.status === 'success') { alert("✅ Pengguna berhasil ditambahkan!"); document.getElementById('modal-add-user').style.display = 'none'; document.getElementById('table-wrapper').innerHTML = `<div style="padding:50px; text-align:center; color:#0043A8;"><h3>🔄 MENYINKRONKAN DATABASE...</h3><p>Memuat data terbaru dari Google Server.</p></div>`; await clearStore('master_kader'); await clearStore('master_tim'); setTimeout(() => { window.renderSuperView('user_management'); }, 1000); } else { alert("❌ Gagal menyimpan: " + res.message); } } catch(e) { catatErrorSistem('Simpan User Baru', e); alert("❌ Kesalahan Jaringan."); } finally { btnSubmit.innerText = "Simpan ke Server"; btnSubmit.disabled = false; }
                     };
-
                 } else { document.getElementById('table-wrapper').innerHTML = `<div style="padding:50px; text-align:center; color:#e94560;"><h3>❌ Akses Ditolak</h3><p>${res.message}</p></div>`; }
             } catch (error) { catatErrorSistem('Menu Manajemen Pengguna', error); document.getElementById('table-wrapper').innerHTML = `<div style="padding:50px; text-align:center; color:#e94560;"><h3>❌ Gagal Terhubung</h3></div>`; }
         }
+        else if (target === 'kuesioner') { window.renderKuesionerTable(); }
+        else if (target === 'menu_management') { window.renderMenuTable(); }
+        else if (target === 'widget_management') { window.renderWidgetTable(); }
         
     } catch(e) { catatErrorSistem(`Global Routing [${target}]`, e); }
 };
