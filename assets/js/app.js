@@ -2,6 +2,7 @@ import { initDB, putData, getDataById, deleteData, getAllData, clearStore } from
 import { downloadMasterData, uploadData } from './sync.js';
 import { initAdmin } from './admin.js';
 
+// 🔥 EKSPOS DATABASE KE GLOBAL
 window.AppDB = { getAllData, getDataById, putData };
 const getEl = (id) => document.getElementById(id);
 const SCRIPT_URL_GLOBAL = 'https://script.google.com/macros/s/AKfycbzEmmn0wMJmC1OHij9JUxm8EIT2xW1AuV0597EYCWDIxG_nkpZYBPx1EGiNYe6OjEHniw/exec';
@@ -62,6 +63,9 @@ const updateNetworkStatus = () => {
     if (status) { const isOnline = navigator.onLine; status.innerText = isOnline ? 'Online' : 'Offline'; status.style.backgroundColor = isOnline ? '#198754' : '#6c757d'; }
 };
 
+// ==========================================
+// 2. INISIALISASI APLIKASI & ROUTER PINTAR
+// ==========================================
 const initApp = async () => {
     try {
         await initDB();
@@ -69,11 +73,18 @@ const initApp = async () => {
         const vSplash = document.getElementById('view-splash'); const vLogin = document.getElementById('view-login'); const vApp = document.getElementById('view-app');
 
         if (session) {
-            if (String(session.role).toUpperCase().includes('SUPER')) {
+            const roleUpper = String(session.role).toUpperCase();
+            
+            // 🔥 ROUTING BERDASARKAN ROLE (V32 COMPLIANT)
+            if (roleUpper.includes('SUPER')) {
                 import('./super.js').then(module => { module.initSuperAdmin(session); }).catch(err => { alert("Modul Super Admin tidak ditemukan!"); window.logErrorToServer('Load Super Module', err); });
-            } else if (String(session.role).toUpperCase().includes('ADMIN') || String(session.role).toUpperCase().includes('PKB')) {
+            } 
+            else if (roleUpper.includes('ADMIN') || roleUpper.includes('PKB') || roleUpper.includes('MITRA') || roleUpper === 'ADMIN_DESA') {
                 if (typeof initAdmin === 'function') { initAdmin(session); } else { import('./admin.js').then(module => module.initAdmin(session)).catch(err => window.logErrorToServer('Load Admin Module', err)); }
-            } else { masukKeAplikasi(session); }
+            } 
+            else { 
+                masukKeAplikasi(session); 
+            }
         } else {
             if(vSplash) vSplash.style.display = 'none';
             if(vApp) vApp.classList.add('hidden');
@@ -87,7 +98,7 @@ const masukKeAplikasi = async (session) => {
         window.currentUser = session;
         const allWil = await getAllData('master_tim_wilayah').catch(() => []);
         const wilayahKader = allWil.find(w => String(w.id_tim) === String(session.id_tim));
-        const namaKec = wilayahKader && wilayahKader.kecamatan ? wilayahKader.kecamatan.toUpperCase() : "BULELENG";
+        const namaKec = wilayahKader && wilayahKader.kecamatan ? wilayahKader.kecamatan.toUpperCase() : (session.kecamatan || "BULELENG");
 
         const greeting = getEl('user-greeting');
         if (greeting) { greeting.innerHTML = `DASHBOARD KADER<br>KECAMATAN ${namaKec}`; greeting.style.textAlign = 'center'; greeting.style.lineHeight = '1.15'; greeting.style.fontSize = '1.05rem'; }
@@ -101,6 +112,9 @@ const masukKeAplikasi = async (session) => {
     } catch (e) { window.logErrorToServer('masukKeAplikasi', e); }
 };
 
+// ==========================================
+// 3. PABRIK SUB-MENU
+// ==========================================
 const renderMenu = async (role) => {
     const container = getEl('dynamic-menu-container'); if (!container) return;
     let allMenu = await getAllData('master_menu').catch(()=>[]);
@@ -1014,8 +1028,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     await initDB(); await putData('kader_session', res.session);
                     getEl('kader-id').value = ''; getEl('kader-pin').value = '';
 
-                    if (res.session.role.includes('SUPER')) { import('./super.js').then(module => { module.initSuperAdmin(res.session); }).catch(err => { alert("❌ Peringatan Keamanan: Modul Super Admin tidak ditemukan di server!"); window.logErrorToServer('Login - Load Super', err); }); } 
-                    else if (res.session.role.includes('ADMIN') || res.session.role.includes('PKB')) { 
+                    const rUpper = String(res.session.role).toUpperCase();
+                    if (rUpper.includes('SUPER')) { 
+                        import('./super.js').then(module => { module.initSuperAdmin(res.session); }).catch(err => { alert("❌ Modul Super Admin tidak ditemukan!"); window.logErrorToServer('Login - Load Super', err); }); 
+                    } 
+                    else if (rUpper.includes('ADMIN') || rUpper.includes('PKB') || rUpper.includes('MITRA') || rUpper === 'ADMIN_DESA') { 
                         if (typeof initAdmin === 'function') { initAdmin(res.session); } else { import('./admin.js').then(module => module.initAdmin(res.session)).catch(err => window.logErrorToServer('Login - Load Admin', err)); }
                     } 
                     else { masukKeAplikasi(res.session); }
