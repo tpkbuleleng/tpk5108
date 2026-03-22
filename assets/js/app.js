@@ -36,34 +36,27 @@ const applySettings = () => {
 };
 applySettings();
 
-// Pengekstrak Kode Kecamatan Global
 window.getKodeKecamatan = (kec) => {
     if (!kec) return "XXX";
     const map = { 'GEROKGAK': 'GRK', 'SERIRIT': 'SRT', 'BUSUNGBIU': 'BSB', 'BANJAR': 'BJR', 'SUKASADA': 'SKS', 'BULELENG': 'BLL', 'SAWAN': 'SWN', 'KUBUTAMBAHAN': 'KBT', 'TEJAKULA': 'TJK' };
     return map[kec.toUpperCase()] || "XXX";
 };
 
-// 🔥 FUNGSI PENYEDOT RIWAYAT KADER OTOMATIS (DOKTRIN HYBRID)
 window.pullDataKaderFromServer = async (session) => {
     try {
         const antrean = await window.AppDB.getAllData('sync_queue');
-        if (antrean.length > 0) return; // Jika memori sudah terisi, lewati (Kecuali kader clear cache/login baru)
+        if (antrean.length > 0) return; 
         
         console.log("🕵️ Agen Siluman: Menyedot riwayat data tim dari satelit...");
         const response = await fetch(SCRIPT_URL_GLOBAL, {
             method: 'POST',
-            body: JSON.stringify({
-                action: 'PULL_DATA_KADER',
-                kecamatan: window.getKodeKecamatan(session.kecamatan),
-                id_tim: session.id_tim
-            })
+            body: JSON.stringify({ action: 'PULL_DATA_KADER', kecamatan: window.getKodeKecamatan(session.kecamatan), id_tim: session.id_tim })
         });
         
         const res = await response.json();
         if (res.status === 'success' && res.data && res.data.length > 0) {
             for (let d of res.data) { await window.AppDB.putData('sync_queue', d); }
             console.log(`✅ Berhasil merampas ${res.data.length} riwayat ke memori HP.`);
-            // Update UI agar angka 0/0 langsung berubah!
             if (document.getElementById('content-area')) window.renderKonten('dashboard');
         }
     } catch(e) { window.logErrorToServer('pullDataKader', e); }
@@ -74,11 +67,7 @@ const dapatkanLokasiGPS = async () => {
         if (!navigator.geolocation) { resolve("Browser tidak mendukung GPS"); return; }
         navigator.geolocation.getCurrentPosition(
             (position) => { resolve(`${position.coords.latitude}, ${position.coords.longitude}`); },
-            (error) => { 
-                let msg = "Gagal (Tidak Diketahui)"; 
-                if (error.code === 1) msg = "Ditolak Pengguna"; else if (error.code === 2) msg = "Sinyal GPS Hilang"; else if (error.code === 3) msg = "Timeout Pencarian Satelit"; 
-                resolve(msg); 
-            },
+            (error) => { let msg = "Gagal (Tidak Diketahui)"; if (error.code === 1) msg = "Ditolak Pengguna"; else if (error.code === 2) msg = "Sinyal GPS Hilang"; else if (error.code === 3) msg = "Timeout Pencarian Satelit"; resolve(msg); },
             { enableHighAccuracy: true, timeout: 5000, maximumAge: 10000 } 
         );
     });
@@ -106,29 +95,14 @@ const tampilkanPopUpPengumuman = (p, id_p) => {
     const overlay = document.createElement('div');
     overlay.style.cssText = 'position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(10, 35, 66, 0.85); z-index:99999; display:flex; align-items:center; justify-content:center; padding:20px; backdrop-filter: blur(5px);';
     const tgl = p.tanggal ? new Date(p.tanggal).toLocaleDateString('id-ID', {day:'numeric', month:'long', year:'numeric'}) : 'Info Terbaru';
-    overlay.innerHTML = `
-        <div style="background:white; border-radius:16px; width:100%; max-width:400px; box-shadow:0 15px 35px rgba(0,0,0,0.4); overflow:hidden; animation: slideDownAlert 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);">
-            <div style="background:linear-gradient(135deg, #0A2342 0%, #0043A8 100%); color:#F1C40F; padding:20px; text-align:center; border-bottom: 4px solid #F1C40F;">
-                <div style="font-size:3rem; margin-bottom:5px; animation: ringBell 2s infinite;">📢</div>
-                <h3 style="margin:0; font-size:1.3rem; font-weight:900; letter-spacing:1px;">PENGUMUMAN</h3>
-            </div>
-            <div style="padding:25px 20px;">
-                <div style="font-size:0.8rem; color:#888; text-align:center; margin-bottom:10px; font-weight:bold;">🕒 ${tgl}</div>
-                <h4 style="margin:0 0 15px 0; color:#0A2342; text-align:center; font-size:1.2rem; font-weight:800;">${p.judul}</h4>
-                <div style="font-size:1rem; color:#444; line-height:1.6; margin-bottom:25px; text-align:center; white-space:pre-wrap; background:#f8f9fa; padding:15px; border-radius:8px; border:1px dashed #ccc;">${p.isi_pesan}</div>
-                <button id="btn-mengerti-${id_p}" style="width:100%; background:#F1C40F; color:#0A2342; border:none; padding:15px; border-radius:8px; font-weight:900; font-size:1.1rem; cursor:pointer; box-shadow:0 4px 6px rgba(0,0,0,0.1); transition: transform 0.1s;">✅ SAYA MENGERTI</button>
-            </div>
-        </div>
-        <style>@keyframes slideDownAlert { from { transform:translateY(-50px) scale(0.9); opacity:0; } to { transform:translateY(0) scale(1); opacity:1; } } @keyframes ringBell { 0% { transform: rotate(0); } 10% { transform: rotate(15deg); } 20% { transform: rotate(-10deg); } 30% { transform: rotate(5deg); } 40% { transform: rotate(-5deg); } 50% { transform: rotate(0); } 100% { transform: rotate(0); } }</style>
-    `;
+    overlay.innerHTML = `<div style="background:white; border-radius:16px; width:100%; max-width:400px; box-shadow:0 15px 35px rgba(0,0,0,0.4); overflow:hidden; animation: slideDownAlert 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);"><div style="background:linear-gradient(135deg, #0A2342 0%, #0043A8 100%); color:#F1C40F; padding:20px; text-align:center; border-bottom: 4px solid #F1C40F;"><div style="font-size:3rem; margin-bottom:5px; animation: ringBell 2s infinite;">📢</div><h3 style="margin:0; font-size:1.3rem; font-weight:900; letter-spacing:1px;">PENGUMUMAN</h3></div><div style="padding:25px 20px;"><div style="font-size:0.8rem; color:#888; text-align:center; margin-bottom:10px; font-weight:bold;">🕒 ${tgl}</div><h4 style="margin:0 0 15px 0; color:#0A2342; text-align:center; font-size:1.2rem; font-weight:800;">${p.judul}</h4><div style="font-size:1rem; color:#444; line-height:1.6; margin-bottom:25px; text-align:center; white-space:pre-wrap; background:#f8f9fa; padding:15px; border-radius:8px; border:1px dashed #ccc;">${p.isi_pesan}</div><button id="btn-mengerti-${id_p}" style="width:100%; background:#F1C40F; color:#0A2342; border:none; padding:15px; border-radius:8px; font-weight:900; font-size:1.1rem; cursor:pointer; box-shadow:0 4px 6px rgba(0,0,0,0.1); transition: transform 0.1s;">✅ SAYA MENGERTI</button></div></div><style>@keyframes slideDownAlert { from { transform:translateY(-50px) scale(0.9); opacity:0; } to { transform:translateY(0) scale(1); opacity:1; } } @keyframes ringBell { 0% { transform: rotate(0); } 10% { transform: rotate(15deg); } 20% { transform: rotate(-10deg); } 30% { transform: rotate(5deg); } 40% { transform: rotate(-5deg); } 50% { transform: rotate(0); } 100% { transform: rotate(0); } }</style>`;
     document.body.appendChild(overlay);
     document.getElementById(`btn-mengerti-${id_p}`).onclick = () => { localStorage.setItem(`read_info_${id_p}`, 'true'); document.body.removeChild(overlay); cekPengumuman(window.currentUser.role); };
 };
 
 const cekPengumuman = async (userRole) => {
     try {
-        const pengumuman = await getAllData('master_pengumuman').catch(() => []);
-        if (!pengumuman || pengumuman.length === 0) return;
+        const pengumuman = await getAllData('master_pengumuman').catch(() => []); if (!pengumuman || pengumuman.length === 0) return;
         const activePengumuman = pengumuman.filter(p => String(p.is_active || 'Y').toUpperCase() === 'Y' && (p.target_role === 'SEMUA' || String(p.target_role).toUpperCase() === String(userRole).toUpperCase())).sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal));
         for (const p of activePengumuman) { const id_p = p.id_pengumuman || p.id || 'unknown_id'; const isRead = localStorage.getItem(`read_info_${id_p}`); if (!isRead) { tampilkanPopUpPengumuman(p, id_p); break; } }
     } catch (e) { window.logErrorToServer('cekPengumuman', e); }
@@ -139,8 +113,7 @@ const cekPengumuman = async (userRole) => {
 // ==========================================
 const initApp = async () => {
     try {
-        await initDB();
-        const session = await getDataById('kader_session', 'active_user');
+        await initDB(); const session = await getDataById('kader_session', 'active_user');
         const vSplash = document.getElementById('view-splash'); const vLogin = document.getElementById('view-login'); const vApp = document.getElementById('view-app');
 
         if (session) {
@@ -148,38 +121,21 @@ const initApp = async () => {
             if (roleUpper.includes('SUPER')) { import('./super.js').then(module => { module.initSuperAdmin(session); }).catch(err => { alert("Modul Super Admin tidak ditemukan!"); window.logErrorToServer('Load Super Module', err); }); } 
             else if (roleUpper.includes('ADMIN') || roleUpper.includes('PKB') || roleUpper.includes('MITRA') || roleUpper === 'ADMIN_DESA') { if (typeof initAdmin === 'function') { initAdmin(session); } else { import('./admin.js').then(module => module.initAdmin(session)).catch(err => window.logErrorToServer('Load Admin Module', err)); } } 
             else { masukKeAplikasi(session); }
-        } else {
-            if(vSplash) vSplash.style.display = 'none'; if(vApp) vApp.classList.add('hidden'); if(vLogin) vLogin.classList.remove('hidden');
-        }
+        } else { if(vSplash) vSplash.style.display = 'none'; if(vApp) vApp.classList.add('hidden'); if(vLogin) vLogin.classList.remove('hidden'); }
     } catch (e) { window.logErrorToServer('initApp', e); }
 };
 
 const masukKeAplikasi = async (session) => {
     try {
         window.currentUser = session;
-        const allWil = await getAllData('master_tim_wilayah').catch(() => []);
-        const wilayahKader = allWil.find(w => String(w.id_tim) === String(session.id_tim));
-        const namaKec = wilayahKader && wilayahKader.kecamatan ? wilayahKader.kecamatan.toUpperCase() : (session.kecamatan || "BULELENG");
+        const allWil = await getAllData('master_tim_wilayah').catch(() => []); const wilayahKader = allWil.find(w => String(w.id_tim) === String(session.id_tim)); const namaKec = wilayahKader && wilayahKader.kecamatan ? wilayahKader.kecamatan.toUpperCase() : (session.kecamatan || "BULELENG");
 
-        const greeting = getEl('user-greeting');
-        if (greeting) { greeting.innerHTML = `DASHBOARD KADER<br>KECAMATAN ${namaKec}`; greeting.style.textAlign = 'center'; greeting.style.lineHeight = '1.15'; greeting.style.fontSize = '1.05rem'; }
-        
-        const hInfo = document.querySelector('.header-info');
-        if (hInfo) { hInfo.style.display = 'flex'; hInfo.style.alignItems = 'center'; hInfo.style.gap = '12px'; hInfo.style.flexDirection = 'row-reverse'; }
+        const greeting = getEl('user-greeting'); if (greeting) { greeting.innerHTML = `DASHBOARD KADER<br>KECAMATAN ${namaKec}`; greeting.style.textAlign = 'center'; greeting.style.lineHeight = '1.15'; greeting.style.fontSize = '1.05rem'; }
+        const hInfo = document.querySelector('.header-info'); if (hInfo) { hInfo.style.display = 'flex'; hInfo.style.alignItems = 'center'; hInfo.style.gap = '12px'; hInfo.style.flexDirection = 'row-reverse'; }
+        if (getEl('sidebar-nama')) getEl('sidebar-nama').innerText = session.nama; if (getEl('sidebar-role')) getEl('sidebar-role').innerText = session.role;
 
-        if (getEl('sidebar-nama')) getEl('sidebar-nama').innerText = session.nama;
-        if (getEl('sidebar-role')) getEl('sidebar-role').innerText = session.role;
-
-        renderMenu(session.role); 
-        renderKonten('dashboard'); 
-        tampilkanLayar('app');
-
-        // 🔥 TRIGGER RADAR PENGUMUMAN & AGEN SILUMAN (PULL DATA)
-        setTimeout(() => { 
-            cekPengumuman(session.role); 
-            if (String(session.role).toUpperCase() === 'KADER') window.pullDataKaderFromServer(session);
-        }, 800);
-
+        renderMenu(session.role); renderKonten('dashboard'); tampilkanLayar('app');
+        setTimeout(() => { cekPengumuman(session.role); if (String(session.role).toUpperCase() === 'KADER') window.pullDataKaderFromServer(session); }, 800);
     } catch (e) { window.logErrorToServer('masukKeAplikasi', e); }
 };
 
@@ -187,9 +143,7 @@ const masukKeAplikasi = async (session) => {
 // 3. PABRIK SUB-MENU (STANDAR KADER ONLY)
 // ==========================================
 const renderMenu = async (role) => {
-    const container = getEl('dynamic-menu-container'); if (!container) return;
-    let allMenu = [];
-    const rUpper = String(role).toUpperCase();
+    const container = getEl('dynamic-menu-container'); if (!container) return; let allMenu = []; const rUpper = String(role).toUpperCase();
 
     if (rUpper === 'KADER') {
         allMenu = [
@@ -204,17 +158,11 @@ const renderMenu = async (role) => {
         ];
     } else {
         allMenu = await getAllData('master_menu').catch(()=>[]);
-        if (allMenu.length === 0) {
-            allMenu = [ { id_menu: 'M1', label_menu: 'Dashboard', icon: '🏠', target_view: 'dashboard', role_akses: role, urutan: 1, is_active: 'Y' }, { id_menu: 'M8', label_menu: 'Muat Ulang Aplikasi', icon: '🔁', target_view: 'reload_app', role_akses: role, urutan: 8, is_active: 'Y' } ];
-        }
+        if (allMenu.length === 0) { allMenu = [ { id_menu: 'M1', label_menu: 'Dashboard', icon: '🏠', target_view: 'dashboard', role_akses: role, urutan: 1, is_active: 'Y' }, { id_menu: 'M8', label_menu: 'Muat Ulang Aplikasi', icon: '🔁', target_view: 'reload_app', role_akses: role, urutan: 8, is_active: 'Y' } ]; }
     }
 
-    const filteredMenu = allMenu.filter(m => {
-        const roles = String(m.role_akses || '').toUpperCase(); const isActive = String(m.is_active || 'Y').toUpperCase() === 'Y'; return isActive && roles.includes(rUpper);
-    }).sort((a,b) => (parseInt(a.urutan)||0) - (parseInt(b.urutan)||0));
-
-    const parents = filteredMenu.filter(m => !m.parent_id); const children = filteredMenu.filter(m => m.parent_id);
-    let menuHtml = '';
+    const filteredMenu = allMenu.filter(m => { const roles = String(m.role_akses || '').toUpperCase(); const isActive = String(m.is_active || 'Y').toUpperCase() === 'Y'; return isActive && roles.includes(rUpper); }).sort((a,b) => (parseInt(a.urutan)||0) - (parseInt(b.urutan)||0));
+    const parents = filteredMenu.filter(m => !m.parent_id); const children = filteredMenu.filter(m => m.parent_id); let menuHtml = '';
     
     parents.forEach(p => {
         const myChildren = children.filter(c => c.parent_id === p.id_menu).sort((a,b) => (parseInt(a.urutan)||0) - (parseInt(b.urutan)||0));
@@ -244,9 +192,7 @@ window.mulaiSinkronisasiDashboard = async () => {
     try {
         const icon = getEl('icon-sync-dash'); const text = getEl('text-sync-dash'); const card = getEl('card-sync-dashboard');
         if (!navigator.onLine) console.warn("⚠️ Mencoba sinkronisasi tanpa sinyal OS terdeteksi."); 
-        
         if(icon) icon.innerHTML = '⏳'; if(text) { text.innerHTML = 'SINKRONISASI...'; text.style.color = '#dc3545'; } if(card) card.style.pointerEvents = 'none';
-        
         if(window.jalankanSinkronisasi) { await window.jalankanSinkronisasi(); } 
         else { alert("Sistem sinkronisasi belum siap. Memuat ulang..."); location.reload(); }
     } catch (e) { window.logErrorToServer('mulaiSinkronisasiDashboard', e); }
@@ -266,9 +212,7 @@ window.renderKonten = async (target) => {
                         <hr style="margin-bottom: 12px; border: 0; border-top: 1px solid rgba(255,255,255,0.2);">
                         <div id="dash-detail-wilayah">Memuat detail...</div>
                     </div>
-                    
                     <div id="dash-summary" style="background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; border: 1px solid #eee;">Memuat ringkasan data...</div>
-                    
                     <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
                         <div class="card" style="text-align:center; padding: 15px 5px; cursor:pointer; border-bottom: 4px solid #0d6efd;" onclick="renderKonten('registrasi')"><div style="font-size: 1.6rem;">📝</div><h3 style="font-size: 0.95rem; margin: 5px 0 0 0;">BARU</h3><p style="font-size: 0.65rem; color: #666; font-weight: bold; margin: 2px 0 0 0;">REGISTRASI</p></div>
                         <div class="card" id="card-sync-dashboard" style="text-align:center; padding: 15px 5px; cursor:pointer; border-bottom: 4px solid orange; background:#fffdf8;" onclick="window.mulaiSinkronisasiDashboard()"><div id="icon-sync-dash" style="font-size: 1.6rem;">🔄</div><h3 id="dash-tunda" style="font-size: 1rem; margin: 5px 0 0 0;">0/0</h3><p id="text-sync-dash" style="font-size: 0.65rem; color: #d63384; font-weight: bold; margin: 2px 0 0 0;">KLIK SINKRON</p></div>
@@ -688,7 +632,19 @@ const initFormPendampingan = async () => {
                     let createdDate = window.editModeLaporan ? window.editModeLaporan.created_at : new Date().toISOString();
                     if(window.editModeLaporan) { jawaban.id_sasaran = selSasaran.value; }
                     
-                    await putData('sync_queue', { id: idLapor, tipe_laporan: 'PENDAMPINGAN', username: session.username, id_tim: session.id_tim, id_sasaran_ref: jawaban.id_sasaran || selSasaran.value, jenis_sasaran_saat_kunjungan: selJenis.value, data_laporan: jawaban, is_synced: false, created_at: createdDate, lokasi_gps: gpsLocation });
+                    await putData('sync_queue', { 
+                        id: idLapor, 
+                        tipe_laporan: 'PENDAMPINGAN', 
+                        username: session.username, 
+                        id_tim: session.id_tim, 
+                        kecamatan: window.getKodeKecamatan(session.kecamatan), // 🔥 PATCH: Tambah Kode Wilayah!
+                        id_sasaran_ref: jawaban.id_sasaran || selSasaran.value, 
+                        jenis_sasaran_saat_kunjungan: selJenis.value, 
+                        data_laporan: jawaban, 
+                        is_synced: false, 
+                        created_at: createdDate, 
+                        lokasi_gps: gpsLocation 
+                    });
                     window.editModeLaporan = null; alert("✅ Laporan Pendampingan Tersimpan!"); renderKonten('daftar_sasaran');
                 } catch (err) { window.logErrorToServer('formPend.onsubmit', err); alert("Gagal menyimpan."); } finally { btn.disabled = false; }
             };
