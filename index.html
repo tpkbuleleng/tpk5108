@@ -45,7 +45,7 @@
                     <span id="network-status" class="status-badge offline">Offline</span>
                 </div>
             </div>
-            <button class="btn-logout-icon" onclick="window.logout()">🚪</button>
+            <button class="btn-logout-icon" onclick="confirm('Tutup Aplikasi dan hapus sesi login?') ? (async () => { await import('./assets/js/db.js').then(m => m.clearStore('kader_session')); location.reload(); })() : false;">🚪</button>
         </header>
 
         <div id="sidebar-overlay" class="sidebar-overlay"></div>
@@ -232,7 +232,6 @@
                     </tbody>
                 </table>
             </div>
-            
         </div>
     </template>
 
@@ -280,56 +279,6 @@
                     <div class="form-group"><label>Konfirmasi Password</label><input type="password" id="pass-konfirm" class="form-control" required></div>
                     <button type="submit" class="btn-primary" style="margin-top: 10px; width:100%;">🔄 Update Password</button>
                 </form>
-            </div>
-        </div>
-    </template>
-
-    <template id="template-bantuan">
-        <div class="card animate-fade">
-            <h3 style="margin-bottom: 20px; color: var(--primary);">🆘 Bantuan & Edukasi</h3>
-            
-            <div style="display: grid; grid-template-columns: 1fr; gap: 12px;">
-                <div class="menu-item" style="background: #e8f4fd; border-radius: 8px; padding: 15px; border-left: 5px solid #0d6efd; cursor: pointer;" onclick="renderKonten('kalkulator')">
-                    <span style="font-size: 1.5rem; margin-right: 10px;">🧮</span>
-                    <div style="display: inline-block; vertical-align: middle;">
-                        <div style="font-weight: bold; color: #0d6efd;">Kalkulator Cerdas TPK</div>
-                        <div style="font-size: 0.8rem; color: #666;">Hitung HPL, IMT, dan Cek KKA Balita</div>
-                    </div>
-                </div>
-
-                <div class="menu-item" style="background: #e8f4fd; border-radius: 8px; padding: 15px; border-left: 5px solid #0d6efd; cursor: pointer;" onclick="alert('Fitur E-Library akan terhubung ke Server PDF BKKBN.')">
-                    <span style="font-size: 1.5rem; margin-right: 10px;">📚</span>
-                    <div style="display: inline-block; vertical-align: middle;">
-                        <div style="font-weight: bold; color: #0d6efd;">Pojok Edukasi</div>
-                        <div style="font-size: 0.8rem; color: #666;">Buku KIA & Modul Stunting (PDF)</div>
-                    </div>
-                </div>
-
-                <div class="menu-item" style="background: #e8f4fd; border-radius: 8px; padding: 15px; border-left: 5px solid #0d6efd; cursor: pointer;" onclick="alert('Pertanyaan: Bagaimana cara edit data sasaran?\\n\\nJawab: Data yang sudah tersimpan hanya bisa diedit oleh Admin Kecamatan melalui Master Data.')">
-                    <span style="font-size: 1.5rem; margin-right: 10px;">❓</span>
-                    <div style="display: inline-block; vertical-align: middle;">
-                        <div style="font-weight: bold; color: #0d6efd;">Tanya Jawab (FAQ)</div>
-                        <div style="font-size: 0.8rem; color: #666;">Pertanyaan yang sering diajukan Kader</div>
-                    </div>
-                </div>
-
-                <a href="https://chat.whatsapp.com/contohlinkgrup" target="_blank" style="text-decoration: none;">
-                    <div class="menu-item" style="background: #e8ecef; border-radius: 8px; padding: 15px; border-left: 5px solid #198754;">
-                        <span style="font-size: 1.5rem; margin-right: 10px;">💬</span>
-                        <div style="display: inline-block; vertical-align: middle;">
-                            <div style="font-weight: bold; color: #198754;">Gabung Grup WA TPK</div>
-                            <div style="font-size: 0.8rem; color: #666;">Komunitas Kader se-Kabupaten Buleleng</div>
-                        </div>
-                    </div>
-                </a>
-
-                <div class="menu-item" style="background: #fdf3f4; border-radius: 8px; padding: 15px; border-left: 5px solid #dc3545; cursor: pointer;" onclick="alert('Nomor Darurat:\\n1. Ambulans RSUD: (0362) 123456\\n2. Bidan Koordinator: 0812-3456-7890')">
-                    <span style="font-size: 1.5rem; margin-right: 10px;">📞</span>
-                    <div style="display: inline-block; vertical-align: middle;">
-                        <div style="font-weight: bold; color: #dc3545;">Kontak Darurat</div>
-                        <div style="font-size: 0.8rem; color: #666;">Ambulans & Call Center Puskesmas</div>
-                    </div>
-                </div>
             </div>
         </div>
     </template>
