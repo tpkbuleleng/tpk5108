@@ -1,5 +1,5 @@
 // ==========================================
-// 👑 GOD MODE: SUPER ADMIN DASHBOARD (V30 - MITRA KERJA ROLE)
+// 👑 GOD MODE: SUPER ADMIN DASHBOARD (V31 - ROLE ADMIN DESA ADDED)
 // ==========================================
 import { getAllData, clearStore } from './db.js';
 
@@ -26,9 +26,6 @@ window.superToggleWidget = async (idWidget, statusSaatIni) => { const isAktif = 
 window.superEditMenu = (id) => { const menu = window.superMenuData.find(m => m.id_menu === id); if(!menu) return; window.currentEditMenuId = id; document.getElementById('modal-m-title').innerHTML = "✏️ Edit Menu Navigasi"; document.getElementById('btn-submit-m').innerText = "Update Menu"; document.getElementById('m-icon').value = menu.icon || ''; document.getElementById('m-label').value = menu.label_menu || ''; const targetSel = document.getElementById('m-target-sel'); const targetCus = document.getElementById('m-target-custom'); const opts = Array.from(targetSel.options).map(o => o.value); if (opts.includes(menu.target_view)) { targetSel.value = menu.target_view; targetCus.style.display = 'none'; targetCus.value = ''; } else { targetSel.value = 'CUSTOM'; targetCus.style.display = 'block'; targetCus.value = menu.target_view || ''; } document.getElementById('m-urut').value = menu.urutan || ''; const parentSelect = document.getElementById('m-parent'); parentSelect.innerHTML = '<option value="">-- Bukan Sub-Menu --</option>'; window.superMenuData.forEach(m => { if ((!m.parent_id || m.parent_id === '') && m.id_menu !== id) { parentSelect.innerHTML += `<option value="${m.id_menu}">${m.icon || ''} ${m.label_menu}</option>`; } }); if(menu.parent_id) parentSelect.value = menu.parent_id; const roles = (menu.role_akses || '').split(','); document.querySelectorAll('.m-role-chk').forEach(cb => { cb.checked = roles.includes(cb.value); }); document.getElementById('modal-add-m').style.display = 'flex'; };
 window.superEditWidget = (id) => { const widget = window.superWidgetData.find(w => w.id_widget === id); if(!widget) return; window.currentEditWidgetId = id; document.getElementById('modal-w-title').innerHTML = "✏️ Edit Komponen Halaman"; document.getElementById('btn-submit-w').innerText = "Update Komponen"; const tHalaman = document.getElementById('w-target-sel'); tHalaman.innerHTML = '<option value="">-- Pilih Halaman / Menu --</option>'; const defaultTargets = ['dashboard', 'registrasi', 'daftar_sasaran', 'pendampingan', 'rekap_bulanan', 'cetak_pdf', 'bantuan', 'setting']; const dynamicTargets = window.superMenuData.map(m => m.target_view).filter(Boolean); const uniqueTargets = [...new Set([...defaultTargets, ...dynamicTargets])]; uniqueTargets.forEach(t => tHalaman.innerHTML += `<option value="${t}">${t}</option>`); tHalaman.value = widget.target_halaman || ''; document.getElementById('w-posisi').value = widget.posisi || 'atas'; document.getElementById('w-tipe').value = 'html'; document.querySelectorAll('.widget-panel').forEach(p => p.style.display = 'none'); document.getElementById('panel-html').style.display = 'block'; document.getElementById('w-konten-html').value = widget.isi_konten || ''; document.getElementById('modal-add-w').style.display = 'flex'; };
 
-// ==========================================
-// 2. FUNGSI RENDER TABEL USER
-// ==========================================
 window.renderUserTable = () => {
     try {
         const searchVal = document.getElementById('flt-search').value.toLowerCase(); const roleVal = document.getElementById('flt-role').value; const kecVal = document.getElementById('flt-kec').value;
@@ -46,8 +43,8 @@ window.renderUserTable = () => {
             if (matchSearch && matchRole && matchKec) {
                 count++; if (!role.includes('SUPER')) { window.currentFilteredIds.push(id); }
                 
-                // 🔥 Lencana Role Baru
-                let badgeClass = role.includes('SUPER') ? 'role-super' : (role.includes('ADMIN') ? 'role-admin' : (role.includes('PKB') ? 'role-pkb' : (role.includes('MITRA') ? 'role-mitra' : 'role-kader')));
+                // 🔥 Lencana Role Baru (Desa)
+                let badgeClass = role.includes('SUPER') ? 'role-super' : (role === 'ADMIN_DESA' ? 'role-desa' : (role.includes('ADMIN') ? 'role-admin' : (role.includes('PKB') ? 'role-pkb' : (role.includes('MITRA') ? 'role-mitra' : 'role-kader'))));
                 
                 const isAktif = currentStatus === 'AKTIF'; const statusUI = isAktif ? '<span style="color:#00b894; font-weight:bold; display:block; margin-bottom:5px;">🟢 Aktif</span>' : '<span style="color:#ff7675; font-weight:bold; display:block; margin-bottom:5px;">🔴 Diblokir</span>'; const toggleText = isAktif ? 'Blokir' : 'Aktifkan'; const toggleColor = isAktif ? '#ff7675' : '#00b894';
                 let chkBox = ''; let actionButtons = '';
@@ -62,7 +59,6 @@ window.renderUserTable = () => {
     } catch (e) { catatErrorSistem('renderUserTable', e); }
 };
 
-// [Fungsi Render Kuesioner, Menu, Widget, Audit Log SAMA]
 window.renderKuesionerTable = () => { try { const filterKat = document.getElementById('flt-kategori-q').value.toUpperCase(); let tableHtml = `<table class="super-table"><thead><tr><th width="12%">ID Form</th><th width="15%">Posisi (Modul -> Sasaran)</th><th width="15%">Grup & Urutan</th><th width="30%">Teks Pertanyaan</th><th width="10%">Tipe Jawaban</th><th width="8%">Sifat</th><th width="10%">Aksi</th></tr></thead><tbody>`; let count = 0; window.superKuesionerData.forEach(q => { const id = q.id_pertanyaan || q.id || '-'; const modul = String(q.modul || '-').toUpperCase(); const kat = String(q.jenis_sasaran || q.kategori_sasaran || q.kategori || '-').toUpperCase(); const grup = q.grup_pertanyaan || '-'; const urutG = q.urutan_grup || '-'; const teks = q.label_pertanyaan || q.teks_pertanyaan || q.pertanyaan || '-'; const tipe = String(q.tipe_input || q.tipe_jawaban || q.tipe || '-').toUpperCase(); const opsi = q.opsi_json || q.pilihan_jawaban ? `<div style="font-size:0.75rem; color:#888; margin-top:5px; background:#f1f2f6; padding:4px; border-radius:4px;">Opsi: ${q.opsi_json || q.pilihan_jawaban}</div>` : ''; const wajib = String(q.is_required || q.wajib || 'Y').toUpperCase() === 'Y' || String(q.is_required || q.wajib || 'Y').toUpperCase() === 'YA' ? '<span style="color:#d63031; font-weight:bold;">Wajib *</span>' : '<span style="color:#636e72;">Opsional</span>'; const status = String(q.is_active || q.status || q.status_pertanyaan || 'Y').toUpperCase(); const kondisiLabel = q.kondisi_tampil ? `<div style="font-size:0.75rem; color:#d35400; margin-top:5px; padding:4px; background:#fdf3e8; border-radius:4px; border:1px dashed #fadbd8;">👁️ Muncul Jika: <b>${q.kondisi_tampil}</b></div>` : ''; if (filterKat === 'ALL' || kat === filterKat) { count++; const isAktif = status === 'AKTIF' || status === 'Y'; const bgRow = isAktif ? 'transparent' : '#fdfaf6'; const textStatus = isAktif ? '🟢 Aktif' : '🔴 Mati'; const btnColor = isAktif ? '#ff7675' : '#00b894'; const btnText = isAktif ? 'Matikan' : 'Hidupkan'; tableHtml += `<tr style="background:${bgRow}; opacity: ${isAktif ? '1' : '0.6'};"><td><code>${id}</code></td><td><span class="badge-role role-kader" style="display:block; margin-bottom:3px; text-align:center;">${modul}</span><span class="badge-role role-admin" style="display:block; text-align:center;">${kat}</span></td><td><span style="font-size:0.7rem; color:#666; font-weight:bold;">Urutan Tampil: ${urutG}</span><br><b>${grup}</b></td><td><b>${teks}</b>${opsi}${kondisiLabel}</td><td><code style="color:#0984e3;">${tipe}</code></td><td>${wajib}</td><td><div style="font-size:0.7rem; font-weight:bold; margin-bottom:5px;">${textStatus}</div><button class="btn-action" style="background:${btnColor}; color:white; width:100%;" onclick="window.superToggleQuestion('${id}', '${status}')">${btnText}</button></td></tr>`; } }); if(count === 0) tableHtml += `<tr><td colspan="7" style="text-align:center; padding:30px; color:#666;">Belum ada pertanyaan untuk kategori ini.</td></tr>`; tableHtml += `</tbody></table>`; document.getElementById('table-wrapper-q').innerHTML = tableHtml; document.getElementById('lbl-count-q').innerText = `${count} Pertanyaan`; } catch(e) { catatErrorSistem('renderKuesionerTable', e); } };
 window.renderMenuTable = () => { try { let tableHtml = `<table class="super-table"><thead><tr><th width="10%">Urutan</th><th width="20%">Nama Menu</th><th width="15%">Aksi Aplikasi (ID)</th><th width="35%">Target Role (Bisa Melihat)</th><th width="10%">Status</th><th width="10%">Aksi</th></tr></thead><tbody>`; let count = 0; let sortedMenus = [...window.superMenuData].sort((a,b) => { if(a.parent_id === b.parent_id) return (parseInt(a.urutan)||0) - (parseInt(b.urutan)||0); return (a.parent_id || '').localeCompare(b.parent_id || ''); }); sortedMenus.forEach(m => { if(!m.id_menu) return; count++; const id = m.id_menu; const isChild = m.parent_id && m.parent_id !== ''; const parentName = isChild ? (window.superMenuData.find(p => p.id_menu === m.parent_id)?.label_menu || 'Induk Unknown') : ''; const label = isChild ? `<span style="color:#aaa;">↳ (Anak dari ${parentName})</span><br>${m.icon || '📌'} ${m.label_menu}` : `<b style="font-size:1.05rem;">${m.icon || '📌'} ${m.label_menu}</b>`; const target = m.target_view || '-'; const role = (m.role_akses || 'KADER').toUpperCase().replace(/,/g, ', '); const status = String(m.is_active || 'Y').toUpperCase(); const isAktif = status === 'Y'; const bgRow = isChild ? (isAktif ? '#f8fafd' : '#f1f2f6') : (isAktif ? 'transparent' : '#fdfaf6'); const textStatus = isAktif ? '🟢 Muncul' : '🔴 Sembunyi'; const btnColor = isAktif ? '#ff7675' : '#00b894'; const btnText = isAktif ? 'Sembunyikan' : 'Munculkan'; tableHtml += `<tr style="background:${bgRow}; opacity: ${isAktif ? '1' : '0.6'};"><td style="font-weight:bold; font-size:1.1rem; color:#0984e3; text-align:center;">${m.urutan || 0}</td><td style="color:#2c3e50;">${label}</td><td><code>${target}</code></td><td><div style="font-size:0.75rem; background:#eef2f5; padding:4px 8px; border-radius:4px; display:inline-block; border:1px solid #dcdde1;">${role}</div></td><td><b>${textStatus}</b></td><td style="display:flex; flex-direction:column; gap:5px;"><button class="btn-action btn-edit" style="width:100%;" onclick="window.superEditMenu('${id}')">✏️ Edit</button><button class="btn-action" style="background:${btnColor}; color:white; width:100%;" onclick="window.superToggleMenu('${id}', '${status}')">${btnText}</button></td></tr>`; }); if(count === 0) tableHtml += `<tr><td colspan="6" style="text-align:center; padding:30px; color:#666;">Database Menu masih kosong.</td></tr>`; tableHtml += `</tbody></table>`; document.getElementById('table-wrapper-m').innerHTML = tableHtml; document.getElementById('lbl-count-m').innerText = `${count} Menu Aktif`; } catch(e) { catatErrorSistem('renderMenuTable', e); } };
 window.renderWidgetTable = () => { try { let tableHtml = `<table class="super-table"><thead><tr><th width="15%">Target Halaman</th><th width="10%">Posisi</th><th width="15%">Tipe Terbaca</th><th width="40%">Isi Konten (Preview)</th><th width="10%">Status</th><th width="10%">Aksi</th></tr></thead><tbody>`; let count = 0; window.superWidgetData.forEach(w => { if(!w.id_widget) return; count++; const id = w.id_widget; const target = w.target_halaman || '-'; const posisi = w.posisi || '-'; const tipe = w.tipe || 'html'; const konten = (w.isi_konten || '').substring(0, 80) + '...'; const status = String(w.is_active || 'Y').toUpperCase(); const isAktif = status === 'Y'; const bgRow = isAktif ? 'transparent' : '#fdfaf6'; const textStatus = isAktif ? '🟢 Aktif' : '🔴 Mati'; const btnColor = isAktif ? '#ff7675' : '#00b894'; const btnText = isAktif ? 'Matikan' : 'Hidupkan'; tableHtml += `<tr style="background:${bgRow}; opacity: ${isAktif ? '1' : '0.6'};"><td><b><code style="color:#e94560;">${target}</code></b></td><td><span style="background:#e8f4fd; color:#0984e3; padding:3px 8px; border-radius:4px; font-size:0.8rem; font-weight:bold;">${posisi.toUpperCase()}</span></td><td>${tipe.toUpperCase()}</td><td><div style="font-size:0.8rem; background:#eee; padding:5px; border-radius:4px; font-family:monospace; color:#555; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${konten.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div></td><td><b>${textStatus}</b></td><td style="display:flex; flex-direction:column; gap:5px;"><button class="btn-action btn-edit" style="width:100%;" onclick="window.superEditWidget('${id}')">✏️ Edit</button><button class="btn-action" style="background:${btnColor}; color:white; width:100%;" onclick="window.superToggleWidget('${id}', '${status}')">${btnText}</button></td></tr>`; }); if(count === 0) tableHtml += `<tr><td colspan="6" style="text-align:center; padding:30px; color:#666;">Database Widget Injeksi masih kosong.</td></tr>`; tableHtml += `</tbody></table>`; document.getElementById('table-wrapper-w').innerHTML = tableHtml; document.getElementById('lbl-count-w').innerText = `${count} Widget Aktif`; } catch(e) { catatErrorSistem('renderWidgetTable', e); } };
@@ -105,7 +101,7 @@ export const initSuperAdmin = async (session) => {
             <style>
                 .super-menu-item { padding: 14px 25px; color: #a5b1c2; font-weight: 600; cursor: pointer; transition: all 0.3s; border-left: 4px solid transparent; font-size: 0.95rem; } .super-menu-item:hover { background: rgba(255,255,255,0.05); color: #fff; } .super-menu-item.active { background: rgba(233, 69, 96, 0.1); color: #fff; border-left: 4px solid #e94560; } .super-card { background: white; border-radius: 10px; padding: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); border: 1px solid #e1e8ed; } #btn-super-logout:hover { background: #e94560; color: white; }
                 .super-table-container { max-height: calc(100vh - 280px); overflow-y: auto; border-radius: 8px; border: 1px solid #eee; background:white; } .super-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; min-width: 1100px; } .super-table th { position: sticky; top: 0; z-index: 10; background: #1a1a2e; color: white; padding: 15px; text-align: left; font-weight:600; box-shadow: 0 2px 4px rgba(0,0,0,0.1); } .super-table td { padding: 12px 15px; border-bottom: 1px solid #eee; color: #444; vertical-align: top;} .super-table tr:hover td { background: #f8f9fa; }
-                .badge-role { padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; text-transform:uppercase; } .role-kader { background: #e8f4fd; color: #0984e3; } .role-admin { background: #fdf3e8; color: #d35400; } .role-super { background: #fbebf0; color: #e94560; } .role-pkb { background: #f3e8ff; color: #6f42c1; } .role-mitra { background: #fff3cd; color: #d35400; } /* 🔥 Lencana Mitra */
+                .badge-role { padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; text-transform:uppercase; } .role-kader { background: #e8f4fd; color: #0984e3; } .role-admin { background: #fdf3e8; color: #d35400; } .role-super { background: #fbebf0; color: #e94560; } .role-pkb { background: #f3e8ff; color: #6f42c1; } .role-mitra { background: #fff3cd; color: #d35400; } .role-desa { background: #e2fbf5; color: #16a085; }
                 .btn-action { padding: 6px 12px; border: none; border-radius: 4px; font-size: 0.8rem; font-weight: bold; cursor: pointer; margin-right: 5px; transition: opacity 0.2s;} .btn-action:hover { opacity: 0.8; } .btn-edit { background: #fdcb6e; color: #2d3436; } .filter-input { padding:8px 12px; border:1px solid #ccc; border-radius:6px; outline:none; font-family:inherit; } .filter-input:focus { border-color:#0984e3; box-shadow: 0 0 0 2px rgba(9, 132, 227, 0.2); }
                 .btn-mass { padding: 8px 15px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; color: white; display: flex; align-items: center; gap: 5px; font-size:0.85rem;}
                 .chk-user { cursor:pointer; transform:scale(1.3); accent-color: #0984e3; } #chk-all-users { cursor:pointer; transform:scale(1.3); accent-color: #e94560; } #btn-clear-search:hover { color: #e94560 !important; }
@@ -136,68 +132,8 @@ window.renderSuperView = async (target) => {
     
     try {
         if (target === 'dashboard') { 
-            content.innerHTML = `
-                <div class="animate-fade">
-                    <div class="super-card" style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); color: white; margin-bottom: 20px; border: none; padding: 25px 30px;">
-                        <h2 style="margin:0 0 5px 0; font-size:1.6rem;">Selamat Datang, ${window.currentUser?.nama || 'Komandan'}! 🚀</h2>
-                        <p style="margin:0; opacity:0.8; font-size:0.95rem;">Pusat Kendali Utama (God Mode) Sistem Pendataan Kader TPK.</p>
-                    </div>
-
-                    <div class="super-card" style="margin-bottom: 20px; padding: 15px;">
-                        <div style="font-size:0.85rem; font-weight:bold; color:#e94560; margin-bottom:10px;">🔍 FILTER STATISTIK PENGGUNAAN APLIKASI</div>
-                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
-                            <select id="dash-flt-waktu" class="filter-input"><option value="ALL">🗓️ Sepanjang Masa</option><option value="TODAY">⏳ Hari Ini</option><option value="7D">📅 7 Hari Terakhir</option><option value="30D">📆 30 Hari Terakhir</option></select>
-                            <select id="dash-flt-role" class="filter-input"><option value="ALL">👥 Semua Role</option><option value="KADER">Kader TPK</option><option value="PKB">PKB / Supervisor</option><option value="ADMIN">Admin / Fasilitator</option><option value="MITRA">Mitra Kerja</option><option value="SUPER">Super Admin</option></select>
-                            <select id="dash-flt-kec" class="filter-input"><option value="ALL">🌍 Semua Kecamatan</option></select>
-                            <select id="dash-flt-desa" class="filter-input"><option value="ALL">🏘️ Semua Desa</option></select>
-                        </div>
-                    </div>
-
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; margin-bottom: 20px;">
-                        <div class="super-card" style="border-left: 5px solid #0984e3; display:flex; flex-direction:column; justify-content:center; padding: 15px;">
-                            <div style="font-size:0.8rem; color:#666; font-weight:bold;">PENGGUNA AKTIF (PERNAH LOGIN)</div>
-                            <div id="st-aktif" style="font-size:2rem; font-weight:900; color:#0984e3; margin-top:5px;">⏳</div>
-                        </div>
-                        <div class="super-card" style="border-left: 5px solid #636e72; display:flex; flex-direction:column; justify-content:center; padding: 15px;">
-                            <div style="font-size:0.8rem; color:#666; font-weight:bold;">PASIF (BELUM PERNAH LOGIN)</div>
-                            <div id="st-pasif" style="font-size:2rem; font-weight:900; color:#636e72; margin-top:5px;">⏳</div>
-                        </div>
-                        <div class="super-card" style="border-left: 5px solid #198754; display:flex; flex-direction:column; justify-content:center; padding: 15px;">
-                            <div style="font-size:0.8rem; color:#666; font-weight:bold;">TOTAL LOGIN BERHASIL</div>
-                            <div id="st-sukses" style="font-size:2rem; font-weight:900; color:#198754; margin-top:5px;">⏳</div>
-                        </div>
-                        <div class="super-card" style="border-left: 5px solid #e94560; display:flex; flex-direction:column; justify-content:center; padding: 15px;">
-                            <div style="font-size:0.8rem; color:#666; font-weight:bold;">TOTAL LOGIN GAGAL</div>
-                            <div id="st-gagal" style="font-size:2rem; font-weight:900; color:#e94560; margin-top:5px;">⏳</div>
-                        </div>
-                    </div>
-
-                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 20px;">
-                        <div class="super-card" style="text-align:center; padding:15px;"><div style="font-size:0.75rem; color:#666; font-weight:bold;">TOTAL AKUN</div><div id="dash-count-user" style="font-size:1.5rem; font-weight:900; color:#2c3e50;">⏳</div></div>
-                        <div class="super-card" style="text-align:center; padding:15px;"><div style="font-size:0.75rem; color:#666; font-weight:bold;">KUESIONER</div><div id="dash-count-q" style="font-size:1.5rem; font-weight:900; color:#2c3e50;">⏳</div></div>
-                        <div class="super-card" style="text-align:center; padding:15px;"><div style="font-size:0.75rem; color:#666; font-weight:bold;">MENU AKTIF</div><div id="dash-count-m" style="font-size:1.5rem; font-weight:900; color:#2c3e50;">⏳</div></div>
-                        <div class="super-card" style="text-align:center; padding:15px;"><div style="font-size:0.75rem; color:#666; font-weight:bold;">WIDGET INJEKSI</div><div id="dash-count-w" style="font-size:1.5rem; font-weight:900; color:#2c3e50;">⏳</div></div>
-                    </div>
-
-                    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 15px;">
-                        <div class="super-card">
-                            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee; padding-bottom:10px; margin-bottom:15px;">
-                                <h3 style="margin:0; color:#1a1a2e;">🛡️ Log Keamanan Terakhir (CCTV)</h3>
-                                <button style="background:none; border:none; color:#0984e3; cursor:pointer; font-weight:bold; font-size:0.85rem;" onclick="document.querySelector('[data-target=audit_trail]').click()">Lihat Detail & Filter</button>
-                            </div>
-                            <div id="dash-audit-list"><div style="text-align:center; color:#999; padding:20px;">Menarik data CCTV dari satelit... ⏳</div></div>
-                        </div>
-                        <div class="super-card">
-                            <h3 style="margin-top:0; color:#1a1a2e; border-bottom:1px solid #eee; padding-bottom:10px;">⚡ Aksi Cepat</h3>
-                            <div style="display:grid; grid-template-columns: 1fr; gap:10px; margin-top:15px;">
-                                <button class="quick-link-btn" onclick="document.querySelector('[data-target=user_management]').click()" style="padding:15px; background:#f8f9fa; border:1px solid #ddd; border-radius:8px; cursor:pointer; text-align:left; font-weight:bold; color:#333; transition:all 0.2s;">👥 Kelola Pengguna</button>
-                                <button class="quick-link-btn" onclick="document.querySelector('[data-target=kuesioner]').click()" style="padding:15px; background:#f8f9fa; border:1px solid #ddd; border-radius:8px; cursor:pointer; text-align:left; font-weight:bold; color:#333; transition:all 0.2s;">📋 Rakit Kuesioner</button>
-                                <button class="quick-link-btn" onclick="document.querySelector('[data-target=widget_management]').click()" style="padding:15px; background:#f8f9fa; border:1px solid #ddd; border-radius:8px; cursor:pointer; text-align:left; font-weight:bold; color:#333; transition:all 0.2s;">🧩 Buat Widget</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
+            // [Kode Dashboard SAMA dengan V30]
+            content.innerHTML = `<div class="animate-fade"><div class="super-card" style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); color: white; margin-bottom: 20px; border: none; padding: 25px 30px;"><h2 style="margin:0 0 5px 0; font-size:1.6rem;">Selamat Datang, ${window.currentUser?.nama || 'Komandan'}! 🚀</h2><p style="margin:0; opacity:0.8; font-size:0.95rem;">Pusat Kendali Utama (God Mode) Sistem Pendataan Kader TPK.</p></div><div class="super-card" style="margin-bottom: 20px; padding: 15px;"><div style="font-size:0.85rem; font-weight:bold; color:#e94560; margin-bottom:10px;">🔍 FILTER STATISTIK PENGGUNAAN APLIKASI</div><div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;"><select id="dash-flt-waktu" class="filter-input"><option value="ALL">🗓️ Sepanjang Masa</option><option value="TODAY">⏳ Hari Ini</option><option value="7D">📅 7 Hari Terakhir</option><option value="30D">📆 30 Hari Terakhir</option></select><select id="dash-flt-role" class="filter-input"><option value="ALL">👥 Semua Role</option><option value="KADER">Kader TPK</option><option value="PKB">PKB / Supervisor</option><option value="ADMIN_DESA">Admin Desa/Kelurahan</option><option value="ADMIN">Admin Kecamatan</option><option value="MITRA">Mitra Kerja</option><option value="SUPER">Super Admin</option></select><select id="dash-flt-kec" class="filter-input"><option value="ALL">🌍 Semua Kecamatan</option></select><select id="dash-flt-desa" class="filter-input"><option value="ALL">🏘️ Semua Desa</option></select></div></div><div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; margin-bottom: 20px;"><div class="super-card" style="border-left: 5px solid #0984e3; display:flex; flex-direction:column; justify-content:center; padding: 15px;"><div style="font-size:0.8rem; color:#666; font-weight:bold;">PENGGUNA AKTIF (PERNAH LOGIN)</div><div id="st-aktif" style="font-size:2rem; font-weight:900; color:#0984e3; margin-top:5px;">⏳</div></div><div class="super-card" style="border-left: 5px solid #636e72; display:flex; flex-direction:column; justify-content:center; padding: 15px;"><div style="font-size:0.8rem; color:#666; font-weight:bold;">PASIF (BELUM PERNAH LOGIN)</div><div id="st-pasif" style="font-size:2rem; font-weight:900; color:#636e72; margin-top:5px;">⏳</div></div><div class="super-card" style="border-left: 5px solid #198754; display:flex; flex-direction:column; justify-content:center; padding: 15px;"><div style="font-size:0.8rem; color:#666; font-weight:bold;">TOTAL LOGIN BERHASIL</div><div id="st-sukses" style="font-size:2rem; font-weight:900; color:#198754; margin-top:5px;">⏳</div></div><div class="super-card" style="border-left: 5px solid #e94560; display:flex; flex-direction:column; justify-content:center; padding: 15px;"><div style="font-size:0.8rem; color:#666; font-weight:bold;">TOTAL LOGIN GAGAL</div><div id="st-gagal" style="font-size:2rem; font-weight:900; color:#e94560; margin-top:5px;">⏳</div></div></div><div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 20px;"><div class="super-card" style="text-align:center; padding:15px;"><div style="font-size:0.75rem; color:#666; font-weight:bold;">TOTAL AKUN</div><div id="dash-count-user" style="font-size:1.5rem; font-weight:900; color:#2c3e50;">⏳</div></div><div class="super-card" style="text-align:center; padding:15px;"><div style="font-size:0.75rem; color:#666; font-weight:bold;">KUESIONER</div><div id="dash-count-q" style="font-size:1.5rem; font-weight:900; color:#2c3e50;">⏳</div></div><div class="super-card" style="text-align:center; padding:15px;"><div style="font-size:0.75rem; color:#666; font-weight:bold;">MENU AKTIF</div><div id="dash-count-m" style="font-size:1.5rem; font-weight:900; color:#2c3e50;">⏳</div></div><div class="super-card" style="text-align:center; padding:15px;"><div style="font-size:0.75rem; color:#666; font-weight:bold;">WIDGET INJEKSI</div><div id="dash-count-w" style="font-size:1.5rem; font-weight:900; color:#2c3e50;">⏳</div></div></div><div style="display: grid; grid-template-columns: 2fr 1fr; gap: 15px;"><div class="super-card"><div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee; padding-bottom:10px; margin-bottom:15px;"><h3 style="margin:0; color:#1a1a2e;">🛡️ Log Keamanan Terakhir (CCTV)</h3><button style="background:none; border:none; color:#0984e3; cursor:pointer; font-weight:bold; font-size:0.85rem;" onclick="document.querySelector('[data-target=audit_trail]').click()">Lihat Detail & Filter</button></div><div id="dash-audit-list"><div style="text-align:center; color:#999; padding:20px;">Menarik data CCTV dari satelit... ⏳</div></div></div><div class="super-card"><h3 style="margin:0; color:#1a1a2e; border-bottom:1px solid #eee; padding-bottom:10px;">⚡ Aksi Cepat</h3><div style="display:grid; grid-template-columns: 1fr; gap:10px; margin-top:15px;"><button class="quick-link-btn" onclick="document.querySelector('[data-target=user_management]').click()" style="padding:15px; background:#f8f9fa; border:1px solid #ddd; border-radius:8px; cursor:pointer; text-align:left; font-weight:bold; color:#333; transition:all 0.2s;">👥 Kelola Pengguna</button><button class="quick-link-btn" onclick="document.querySelector('[data-target=kuesioner]').click()" style="padding:15px; background:#f8f9fa; border:1px solid #ddd; border-radius:8px; cursor:pointer; text-align:left; font-weight:bold; color:#333; transition:all 0.2s;">📋 Rakit Kuesioner</button><button class="quick-link-btn" onclick="document.querySelector('[data-target=widget_management]').click()" style="padding:15px; background:#f8f9fa; border:1px solid #ddd; border-radius:8px; cursor:pointer; text-align:left; font-weight:bold; color:#333; transition:all 0.2s;">🧩 Buat Widget</button></div></div></div></div>`;
 
             const renderAnalytics = () => {
                 if (window.dashAnalyticData.users.length === 0) return;
@@ -246,13 +182,7 @@ window.renderSuperView = async (target) => {
                             let nKec = String(u.scope_kecamatan || u.kecamatan || 'ALL').toUpperCase(); let nDesa = String(u.scope_desa || u.desa_kelurahan || u.desa || '-').toUpperCase(); const role = String(u.role_akses || u.role || 'KADER').toUpperCase(); const refId = u.ref_id || u.id_pengguna || u.id_user || u.username;
                             
                             if (role.includes('KADER')) { const k = kaders.find(kd => String(kd.id_kader) === String(refId) || String(kd.nik) === String(refId)); if (k) { const idTim = k.id_tim || k.tim; const t = tims.find(td => String(td.id_tim) === String(idTim) || String(td.id) === String(idTim)); if (t) { let d = t.desa_kelurahan || t.desa || k.desa_kelurahan || k.desa || nDesa; nDesa = String(d).toUpperCase(); let c = t.kecamatan || t.wilayah || k.kecamatan || nKec; nKec = String(c).toUpperCase(); } } }
-                            
-                            if (role.includes('PKB')) {
-                                if(nDesa === '-' || nDesa === '') {
-                                    const p = pkbs.find(pk => String(pk.id_pkb) === String(refId) || String(pk.nip_pkb) === String(refId));
-                                    if (p) { nKec = String(p.kecamatan || nKec).toUpperCase(); nDesa = String(p.desa_kelurahan || p.desa || nDesa).toUpperCase(); }
-                                }
-                            }
+                            if (role.includes('PKB')) { if(nDesa === '-' || nDesa === '') { const p = pkbs.find(pk => String(pk.id_pkb) === String(refId) || String(pk.nip_pkb) === String(refId)); if (p) { nKec = String(p.kecamatan || nKec).toUpperCase(); nDesa = String(p.desa_kelurahan || p.desa || nDesa).toUpperCase(); } } }
 
                             if (nDesa === 'UNDEFINED' || nDesa === '') nDesa = '-'; u._desa = nDesa; u._kecamatan = nKec; return u;
                         });
@@ -298,52 +228,29 @@ window.renderSuperView = async (target) => {
             loadDashboardData();
         }
 
+        // --- 🛡️ MENU AUDIT LOG ---
         else if (target === 'audit_trail') {
-            content.innerHTML = `
-                <div class="super-card" style="margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px;">
-                    <div><h3 style="margin:0; color:#1a1a2e;">🛡️ Audit Log & Rincian CCTV</h3><p style="margin:5px 0 0 0; color:#666; font-size:0.9rem;">Rincian aktivitas pengguna dan log keamanan sistem.</p></div>
-                </div>
-                
-                <div class="super-card" style="padding:0; overflow:hidden;">
-                    <div style="background:#f8f9fa; padding:15px; border-bottom:1px solid #eee; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
-                        <div style="position: relative; flex: 1; min-width: 200px;"><input type="text" id="log-flt-search" class="filter-input" placeholder="🔍 Cari Nama / ID / Keterangan..." style="width: 100%; box-sizing: border-box;"></div>
-                        <select id="log-flt-waktu" class="filter-input"><option value="ALL">🗓️ Sepanjang Masa</option><option value="TODAY">⏳ Hari Ini</option><option value="7D">📅 7 Hari Terakhir</option><option value="30D">📆 30 Hari Terakhir</option></select>
-                        <select id="log-flt-aksi" class="filter-input"><option value="ALL">⚡ Semua Aktivitas</option><option value="LOGIN_SUKSES">✅ Login Berhasil</option><option value="LOGIN_GAGAL">❌ Login Gagal</option><option value="ADMIN">🛡️ Aksi Super Admin</option></select>
-                        <div style="font-size:0.85rem; font-weight:bold; color:#666; background:#fff; padding:8px 12px; border:1px solid #ddd; border-radius:6px;" id="lbl-count-log">0 Log</div>
-                    </div>
-                    <div id="table-wrapper-log" class="super-table-container"><div style="padding:50px; text-align:center; color:#666;"><h3>⏳ Menyedot Rekaman CCTV...</h3></div></div>
-                </div>
-            `;
-
+            // [KODE AUDIT LOG SAMA DENGAN V30]
+            content.innerHTML = `<div class="super-card" style="margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px;"><div><h3 style="margin:0; color:#1a1a2e;">🛡️ Audit Log & Rincian CCTV</h3><p style="margin:5px 0 0 0; color:#666; font-size:0.9rem;">Rincian aktivitas pengguna dan log keamanan sistem.</p></div></div><div class="super-card" style="padding:0; overflow:hidden;"><div style="background:#f8f9fa; padding:15px; border-bottom:1px solid #eee; display:flex; gap:10px; flex-wrap:wrap; align-items:center;"><div style="position: relative; flex: 1; min-width: 200px;"><input type="text" id="log-flt-search" class="filter-input" placeholder="🔍 Cari Nama / ID / Keterangan..." style="width: 100%; box-sizing: border-box;"></div><select id="log-flt-waktu" class="filter-input"><option value="ALL">🗓️ Sepanjang Masa</option><option value="TODAY">⏳ Hari Ini</option><option value="7D">📅 7 Hari Terakhir</option><option value="30D">📆 30 Hari Terakhir</option></select><select id="log-flt-aksi" class="filter-input"><option value="ALL">⚡ Semua Aktivitas</option><option value="LOGIN_SUKSES">✅ Login Berhasil</option><option value="LOGIN_GAGAL">❌ Login Gagal</option><option value="ADMIN">🛡️ Aksi Super Admin</option></select><div style="font-size:0.85rem; font-weight:bold; color:#666; background:#fff; padding:8px 12px; border:1px solid #ddd; border-radius:6px;" id="lbl-count-log">0 Log</div></div><div id="table-wrapper-log" class="super-table-container"><div style="padding:50px; text-align:center; color:#666;"><h3>⏳ Menyedot Rekaman CCTV...</h3></div></div></div>`;
             try {
                 const [resA, resU, resT, resK, resP] = await Promise.all([
-                    fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_AUDIT', token: SUPER_TOKEN }) }).then(r => r.json()),
-                    fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_ALL', token: SUPER_TOKEN, sheetName: 'USER_LOGIN' }) }).then(r => r.json()),
-                    fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_ALL', token: SUPER_TOKEN, sheetName: 'MASTER_TIM' }) }).then(r => r.json()),
-                    fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_ALL', token: SUPER_TOKEN, sheetName: 'MASTER_KADER' }) }).then(r => r.json()),
-                    fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_ALL', token: SUPER_TOKEN, sheetName: 'MASTER_PKB' }) }).then(r => r.json())
+                    fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_AUDIT', token: SUPER_TOKEN }) }).then(r => r.json()), fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_ALL', token: SUPER_TOKEN, sheetName: 'USER_LOGIN' }) }).then(r => r.json()), fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_ALL', token: SUPER_TOKEN, sheetName: 'MASTER_TIM' }) }).then(r => r.json()), fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_ALL', token: SUPER_TOKEN, sheetName: 'MASTER_KADER' }) }).then(r => r.json()), fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_ALL', token: SUPER_TOKEN, sheetName: 'MASTER_PKB' }) }).then(r => r.json())
                 ]);
-
                 if(resA.status === 'success' && resU.status === 'success') {
                     window.superAuditData = resA.data || [];
                     const rawUsers = resU.data || []; const tims = resT.data || []; const kaders = resK.data || []; const pkbs = resP.data || [];
-                    
                     window.superUsersData = rawUsers.map(u => {
                         let nKec = String(u.scope_kecamatan || u.kecamatan || 'ALL').toUpperCase(); let nDesa = String(u.scope_desa || u.desa_kelurahan || u.desa || '-').toUpperCase(); const role = String(u.role_akses || u.role || 'KADER').toUpperCase(); const refId = u.ref_id || u.id_pengguna || u.id_user || u.username;
                         if (role.includes('KADER')) { const k = kaders.find(kd => String(kd.id_kader) === String(refId) || String(kd.nik) === String(refId)); if (k) { const idTim = k.id_tim || k.tim; const t = tims.find(td => String(td.id_tim) === String(idTim) || String(td.id) === String(idTim)); if (t) { let d = t.desa_kelurahan || t.desa || k.desa_kelurahan || k.desa || nDesa; nDesa = String(d).toUpperCase(); let c = t.kecamatan || t.wilayah || k.kecamatan || nKec; nKec = String(c).toUpperCase(); } } }
                         if (role.includes('PKB')) { if(nDesa === '-' || nDesa === '') { const p = pkbs.find(pk => String(pk.id_pkb) === String(refId) || String(pk.nip_pkb) === String(refId)); if (p) { nKec = String(p.kecamatan || nKec).toUpperCase(); nDesa = String(p.desa_kelurahan || p.desa || nDesa).toUpperCase(); } } }
                         if (nDesa === 'UNDEFINED' || nDesa === '') nDesa = '-'; u._desa = nDesa; u._kecamatan = nKec; return u;
                     });
-
-                    window.renderAuditTable();
-                    document.getElementById('log-flt-waktu').addEventListener('change', window.renderAuditTable);
-                    document.getElementById('log-flt-aksi').addEventListener('change', window.renderAuditTable);
-                    document.getElementById('log-flt-search').addEventListener('input', window.renderAuditTable);
-
+                    window.renderAuditTable(); document.getElementById('log-flt-waktu').addEventListener('change', window.renderAuditTable); document.getElementById('log-flt-aksi').addEventListener('change', window.renderAuditTable); document.getElementById('log-flt-search').addEventListener('input', window.renderAuditTable);
                 } else { document.getElementById('table-wrapper-log').innerHTML = `<div style="padding:50px; text-align:center; color:#e94560;"><h3>❌ Gagal Mengunduh Log</h3><p>Server menolak koneksi. Coba Muat Ulang.</p></div>`; }
             } catch(e) { catatErrorSistem('Menu Audit Trail', e); document.getElementById('table-wrapper-log').innerHTML = `<div style="padding:50px; text-align:center; color:#e94560;"><h3>❌ Izin Akses Tertahan (Koneksi Terputus)</h3><p>Google meminta Otorisasi Izin Ulang untuk mengakses Database CCTV Bapak.<br><br><b>Solusi Cepat:</b> Buka Tab <code>Code.gs</code> di App Script, klik <b>Jalankan</b>, lalu klik <b>Tinjau Izin</b> (Review Permissions).</p></div>`; }
         }
         
+        // --- 👥 MENU MANAJEMEN PENGGUNA ---
         else if (target === 'user_management') {
             content.innerHTML = `
                 <div class="super-card" style="margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px;">
@@ -354,7 +261,7 @@ window.renderSuperView = async (target) => {
                 <div class="super-card" style="padding:0; overflow:hidden;">
                     <div style="background:#f8f9fa; padding:15px; border-bottom:1px solid #eee; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
                         <div style="position: relative; flex: 1; min-width: 200px;"><input type="text" id="flt-search" class="filter-input" placeholder="🔍 Cari ID/Nama/Desa/Tim..." style="width: 100%; padding-right: 35px; box-sizing: border-box;"><button id="btn-clear-search" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; font-size: 1.3rem; font-weight: bold; color: #aaa; cursor: pointer; display: none; padding: 0;" title="Bersihkan Pencarian">&times;</button></div>
-                        <select id="flt-role" class="filter-input"><option value="ALL">📋 Semua Role</option><option value="KADER">KADER</option><option value="PKB">PKB / Penyuluh</option><option value="ADMIN_KECAMATAN">ADMIN KECAMATAN</option><option value="ADMIN_KABUPATEN">ADMIN KABUPATEN</option><option value="MITRA">MITRA KERJA</option></select>
+                        <select id="flt-role" class="filter-input"><option value="ALL">📋 Semua Role</option><option value="KADER">KADER</option><option value="ADMIN_DESA">ADMIN DESA</option><option value="PKB">PKB / Penyuluh</option><option value="ADMIN_KECAMATAN">ADMIN KECAMATAN</option><option value="ADMIN_KABUPATEN">ADMIN KABUPATEN</option><option value="MITRA">MITRA KERJA</option></select>
                         <select id="flt-kec" class="filter-input" id="flt-kec-container"><option value="ALL">🌍 Semua Wilayah</option></select>
                         <div style="font-size:0.85rem; font-weight:bold; color:#666; background:#fff; padding:8px 12px; border:1px solid #ddd; border-radius:6px;" id="lbl-count">0 Pengguna</div>
                     </div>
@@ -375,6 +282,7 @@ window.renderSuperView = async (target) => {
                                 <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:5px;">Role Akses</label>
                                 <select id="add-role" class="filter-input" style="width:100%; box-sizing:border-box;">
                                     <option value="KADER">KADER TPK</option>
+                                    <option value="ADMIN_DESA" style="color:#16a085; font-weight:bold;">ADMIN DESA / KELURAHAN</option>
                                     <option value="PKB" style="color:#6f42c1; font-weight:bold;">PKB (Penyuluh KB)</option>
                                     <option value="ADMIN_KECAMATAN">ADMIN KECAMATAN</option>
                                     <option value="ADMIN_KABUPATEN">ADMIN KABUPATEN</option>
@@ -429,7 +337,7 @@ window.renderSuperView = async (target) => {
                 if (res.status === 'success') {
                     window.superUsersData = res.data.map(u => {
                         let nTim = '-'; let nDesa = String(u.scope_desa || u.desa_kelurahan || u.desa || u.wilayah_desa || '-').toUpperCase(); const role = String(u.role_akses || u.role || 'KADER').toUpperCase(); const refId = u.ref_id || u.id_pengguna || u.id_user || u.username;
-                        if (role.includes('KADER')) { const k = kaderData.find(kd => String(kd.id_kader) === String(refId) || String(kd.nik) === String(refId)); if (k) { const idTim = k.id_tim || k.tim; const t = timData.find(td => String(td.id_tim) === String(idTim) || String(td.id) === String(idTim)); if (t) { nTim = String(t.nomor_tim || t.nama_tim || idTim); let d = t.desa_kelurahan || t.desa || k.desa_kelurahan || k.desa || nDesa; nDesa = String(d).toUpperCase(); } } }
+                        if (role.includes('KADER')) { const k = kaders.find(kd => String(kd.id_kader) === String(refId) || String(kd.nik) === String(refId)); if (k) { const idTim = k.id_tim || k.tim; const t = tims.find(td => String(td.id_tim) === String(idTim) || String(td.id) === String(idTim)); if (t) { nTim = String(t.nomor_tim || t.nama_tim || idTim); let d = t.desa_kelurahan || t.desa || k.desa_kelurahan || k.desa || nDesa; nDesa = String(d).toUpperCase(); } } }
                         if (role.includes('PKB')) { const p = pkbData.find(pk => String(pk.id_pkb) === String(refId) || String(pk.nip_pkb) === String(refId)); if (p) { nDesa = String(p.desa_kelurahan || p.desa || nDesa).toUpperCase(); } }
                         if (nDesa === 'UNDEFINED' || nDesa === '') nDesa = '-'; u._nomor_tim = nTim; u._desa = nDesa; return u;
                     });
@@ -462,7 +370,6 @@ window.renderSuperView = async (target) => {
                         const filteredTim = window.superTimData.filter(t => { const k = String(t.kecamatan || t.wilayah || '').toUpperCase(); const d = String(t.desa_kelurahan || t.desa || '').toUpperCase(); return k === selectedKec && d === selectedDesa; }); filteredTim.sort((a,b) => String(a.nama_tim || a.nomor_tim).localeCompare(String(b.nama_tim || b.nomor_tim))); filteredTim.forEach(t => { const idTim = t.id_tim || t.id; const namaTim = t.nama_tim || t.nomor_tim || idTim; const dusun = t.dusun_rw || t.dusun || '-'; const label = `${namaTim} (Dusun: ${dusun})`; const opt = document.createElement('option'); opt.value = idTim; opt.setAttribute('data-desa', selectedDesa); opt.setAttribute('data-dusun', dusun); opt.innerText = label; timSelect.appendChild(opt); });
                     };
 
-                    // 🔥 V30: LOGIKA ROLE MITRA KERJA DITAMBAHKAN DI SINI
                     roleSelect.addEventListener('change', () => { 
                         const boxPkb = document.getElementById('box-desa-pkb');
                         const lblDesa1 = document.getElementById('lbl-desa-1');
@@ -473,6 +380,11 @@ window.renderSuperView = async (target) => {
                             formKecSelect.style.backgroundColor = 'white'; formKecSelect.style.pointerEvents = 'auto'; 
                             if(formKecSelect.value === 'ALL' && roleSelect.value === 'ADMIN_KECAMATAN') formKecSelect.value = 'GEROKGAK'; 
                             panelKader.style.display = 'none'; 
+                        } else if (roleSelect.value === 'ADMIN_DESA') { 
+                            formKecSelect.style.backgroundColor = 'white'; formKecSelect.style.pointerEvents = 'auto'; if(formKecSelect.value === 'ALL') formKecSelect.value = 'GEROKGAK'; 
+                            panelKader.style.display = 'block'; document.getElementById('box-add-tim').style.display = 'none'; 
+                            boxPkb.style.display = 'none'; document.getElementById('lbl-penempatan').innerHTML = "📍 Wilayah Admin Desa"; 
+                            lblDesa1.innerHTML = "1. Pilih Desa / Kelurahan <span style='color:red; font-weight:bold;'>(Wajib)</span>"; populateDesaDropdown(); 
                         } else if (roleSelect.value === 'PKB') { 
                             formKecSelect.style.backgroundColor = 'white'; formKecSelect.style.pointerEvents = 'auto'; if(formKecSelect.value === 'ALL') formKecSelect.value = 'GEROKGAK'; 
                             panelKader.style.display = 'block'; document.getElementById('box-add-tim').style.display = 'none'; 
@@ -486,7 +398,7 @@ window.renderSuperView = async (target) => {
                         } 
                     }); 
                     
-                    formKecSelect.addEventListener('change', () => { if(roleSelect.value === 'KADER' || roleSelect.value === 'PKB') populateDesaDropdown(); }); formDesaSelect.addEventListener('change', populateTimDropdown);
+                    formKecSelect.addEventListener('change', () => { if(roleSelect.value === 'KADER' || roleSelect.value === 'PKB' || roleSelect.value === 'ADMIN_DESA') populateDesaDropdown(); }); formDesaSelect.addEventListener('change', populateTimDropdown);
 
                     document.getElementById('btn-submit-add').onclick = async () => {
                         const id = document.getElementById('add-id').value.trim(); const nama = document.getElementById('add-nama').value.trim(); const role = document.getElementById('add-role').value; const kec = document.getElementById('add-kec').value.trim().toUpperCase(); const pin = document.getElementById('add-pin').value.trim();
@@ -499,12 +411,15 @@ window.renderSuperView = async (target) => {
                             finalDesa = formDesaSelect.value;
                             const selectedOpt = timSelect.options[timSelect.selectedIndex]; payloadKader = { id_kader: id, nik: id, id_pengguna: id, nama: nama, nama_kader: nama, nama_lengkap: nama, id_tim: timSelect.value, tim: timSelect.value, desa: selectedOpt.getAttribute('data-desa'), desa_kelurahan: selectedOpt.getAttribute('data-desa'), dusun: selectedOpt.getAttribute('data-dusun'), dusun_rw: selectedOpt.getAttribute('data-dusun') }; 
                         }
+                        else if (role === 'ADMIN_DESA') { 
+                            if(!formDesaSelect.value) { alert("⚠️ Mohon pilih Desa/Kelurahan!"); return; } 
+                            finalDesa = formDesaSelect.value;
+                        }
                         else if (role === 'PKB') { 
                             const d1 = formDesaSelect.value; const d2 = document.getElementById('add-desa-2').value; const d3 = document.getElementById('add-desa-3').value; const d4 = document.getElementById('add-desa-4').value; const d5 = document.getElementById('add-desa-5').value;
                             if(!d1 || !d2) { alert("⚠️ Mohon lengkapi minimal Desa Binaan 1 dan 2 untuk PKB!"); return; } 
                             const arrDesa = [d1, d2, d3, d4, d5].filter(Boolean); finalDesa = [...new Set(arrDesa)].join(', ');
                         }
-                        // Untuk MITRA, ADMIN_KECAMATAN, ADMIN_KABUPATEN, desa dikosongkan karena mereka memantau level makro
 
                         const btnSubmit = document.getElementById('btn-submit-add'); btnSubmit.innerText = "Menyimpan & Sinkronisasi..."; btnSubmit.disabled = true;
                         
