@@ -1,5 +1,5 @@
 // ==========================================
-// 👑 GOD MODE: SUPER ADMIN DASHBOARD (V41 - VARIABLE FIXED & FULL CORE)
+// 👑 GOD MODE: SUPER ADMIN DASHBOARD (V42 - DATA CENTER & BROADCAST)
 // ==========================================
 import { getAllData, clearStore } from './db.js';
 
@@ -8,9 +8,8 @@ const SUPER_TOKEN = 'MasterKeyKubuSecure!001';
 
 window.superUsersData = []; window.superTimData = []; window.currentFilteredIds = [];
 window.superKuesionerData = []; window.superMenuData = []; window.superWidgetData = [];
-window.superAuditData = []; window.superErrorData = []; window.dashAnalyticData = { users: [], logs: [] };
-window.currentUser = null;
-window.activeAuditTab = 'CCTV'; 
+window.superAuditData = []; window.superErrorData = []; window.superPengumumanData = []; window.dashAnalyticData = { users: [], logs: [] };
+window.currentUser = null; window.activeAuditTab = 'CCTV'; 
 
 const catatErrorSistem = (lokasi, error) => { if(window.logErrorToServer) window.logErrorToServer(`SuperAdmin: ${lokasi}`, error); else console.error(`[${lokasi}]`, error); };
 
@@ -23,13 +22,97 @@ window.superBulkAction = async (actionType) => { const checkedBoxes = document.q
 window.superToggleQuestion = async (idPertanyaan, statusSaatIni) => { const isAktif = (statusSaatIni || 'AKTIF').toUpperCase() === 'AKTIF' || statusSaatIni === 'Y'; const newStatus = isAktif ? 'N' : 'Y'; const aksi = isAktif ? 'MEMATIKAN' : 'MENGHIDUPKAN'; if(!confirm(`⚠️ PERINGATAN!\nAnda akan ${aksi} pertanyaan ini dari HP Kader.\nLanjutkan?`)) return; try { document.getElementById('table-wrapper-q').innerHTML = `<div style="padding:30px; text-align:center; color:#0043A8;">⏳ Memproses...</div>`; const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_UPDATE_QUESTION', token: SUPER_TOKEN, id_pertanyaan: idPertanyaan, newStatus: newStatus }) }); const res = await response.json(); if (res.status === 'success') { alert(`✅ Pertanyaan berhasil diupdate!`); await clearStore('master_pertanyaan'); window.renderSuperView('kuesioner'); } else { alert("❌ Gagal: " + res.message); window.renderSuperView('kuesioner');} } catch(e) { catatErrorSistem('superToggleQuestion', e); alert("❌ Kesalahan Jaringan."); window.renderSuperView('kuesioner');} };
 window.superToggleMenu = async (idMenu, statusSaatIni) => { const isAktif = (statusSaatIni || 'Y').toUpperCase() === 'Y'; const newStatus = isAktif ? 'N' : 'Y'; const aksi = isAktif ? 'MENYEMBUNYIKAN' : 'MEMUNCULKAN'; if(!confirm(`⚠️ PERINGATAN!\nAnda akan ${aksi} menu ini dari Aplikasi.\nLanjutkan?`)) return; try { document.getElementById('table-wrapper-m').innerHTML = `<div style="padding:30px; text-align:center; color:#0043A8;">⏳ Memproses...</div>`; const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_UPDATE_MENU', token: SUPER_TOKEN, id_menu: idMenu, newStatus: newStatus }) }); const res = await response.json(); if (res.status === 'success') { alert(`✅ Status menu berhasil diubah!`); await clearStore('master_menu'); window.renderSuperView('menu_management'); } else { alert("❌ Gagal: " + res.message); window.renderSuperView('menu_management');} } catch(e) { catatErrorSistem('superToggleMenu', e); alert("❌ Kesalahan Jaringan."); window.renderSuperView('menu_management');} };
 window.superToggleWidget = async (idWidget, statusSaatIni) => { const isAktif = (statusSaatIni || 'Y').toUpperCase() === 'Y'; const newStatus = isAktif ? 'N' : 'Y'; const aksi = isAktif ? 'MENYEMBUNYIKAN' : 'MEMUNCULKAN'; if(!confirm(`⚠️ PERINGATAN!\nAnda akan ${aksi} widget ini dari Aplikasi.\nLanjutkan?`)) return; try { document.getElementById('table-wrapper-w').innerHTML = `<div style="padding:30px; text-align:center; color:#0043A8;">⏳ Memproses...</div>`; const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_UPDATE_WIDGET', token: SUPER_TOKEN, id_widget: idWidget, newStatus: newStatus }) }); const res = await response.json(); if (res.status === 'success') { alert(`✅ Status widget berhasil diubah!`); await clearStore('master_widget'); window.renderSuperView('widget_management'); } else { alert("❌ Gagal: " + res.message); window.renderSuperView('widget_management');} } catch(e) { catatErrorSistem('superToggleWidget', e); alert("❌ Kesalahan Jaringan."); window.renderSuperView('widget_management');} };
+window.superTogglePengumuman = async (idPengumuman, statusSaatIni) => { const isAktif = (statusSaatIni || 'Y').toUpperCase() === 'Y'; const newStatus = isAktif ? 'N' : 'Y'; const aksi = isAktif ? 'MENARIK/MEMATIKAN' : 'MENYIARKAN'; if(!confirm(`⚠️ PERINGATAN!\nAnda akan ${aksi} pengumuman ini.\nLanjutkan?`)) return; try { document.getElementById('table-wrapper-p').innerHTML = `<div style="padding:30px; text-align:center; color:#0043A8;">⏳ Memproses...</div>`; const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_UPDATE_PENGUMUMAN', token: SUPER_TOKEN, id_pengumuman: idPengumuman, newStatus: newStatus }) }); const res = await response.json(); if (res.status === 'success') { alert(`✅ Status pengumuman berhasil diubah!`); window.renderSuperView('pengumuman'); } else { alert("❌ Gagal: " + res.message); window.renderSuperView('pengumuman');} } catch(e) { catatErrorSistem('superTogglePengumuman', e); alert("❌ Kesalahan Jaringan."); window.renderSuperView('pengumuman');} };
 
 window.superEditMenu = (id) => { const menu = window.superMenuData.find(m => m.id_menu === id); if(!menu) return; window.currentEditMenuId = id; document.getElementById('modal-m-title').innerHTML = "✏️ Edit Menu Navigasi"; document.getElementById('btn-submit-m').innerText = "Update Menu"; document.getElementById('m-icon').value = menu.icon || ''; document.getElementById('m-label').value = menu.label_menu || ''; const targetSel = document.getElementById('m-target-sel'); const targetCus = document.getElementById('m-target-custom'); const opts = Array.from(targetSel.options).map(o => o.value); if (opts.includes(menu.target_view)) { targetSel.value = menu.target_view; targetCus.style.display = 'none'; targetCus.value = ''; } else { targetSel.value = 'CUSTOM'; targetCus.style.display = 'block'; targetCus.value = menu.target_view || ''; } document.getElementById('m-urut').value = menu.urutan || ''; const parentSelect = document.getElementById('m-parent'); parentSelect.innerHTML = '<option value="">-- Bukan Sub-Menu --</option>'; window.superMenuData.forEach(m => { if ((!m.parent_id || m.parent_id === '') && m.id_menu !== id) { parentSelect.innerHTML += `<option value="${m.id_menu}">${m.icon || ''} ${m.label_menu}</option>`; } }); if(menu.parent_id) parentSelect.value = menu.parent_id; const roles = (menu.role_akses || '').split(','); document.querySelectorAll('.m-role-chk').forEach(cb => { cb.checked = roles.includes(cb.value); }); document.getElementById('modal-add-m').style.display = 'flex'; };
 window.superEditWidget = (id) => { const widget = window.superWidgetData.find(w => w.id_widget === id); if(!widget) return; window.currentEditWidgetId = id; document.getElementById('modal-w-title').innerHTML = "✏️ Edit Komponen Halaman"; document.getElementById('btn-submit-w').innerText = "Update Komponen"; const tHalaman = document.getElementById('w-target-sel'); tHalaman.innerHTML = '<option value="">-- Pilih Halaman / Menu --</option>'; const defaultTargets = ['dashboard', 'registrasi', 'daftar_sasaran', 'pendampingan', 'rekap_bulanan', 'cetak_pdf', 'bantuan', 'setting']; const dynamicTargets = window.superMenuData.map(m => m.target_view).filter(Boolean); const uniqueTargets = [...new Set([...defaultTargets, ...dynamicTargets])]; uniqueTargets.forEach(t => tHalaman.innerHTML += `<option value="${t}">${t}</option>`); tHalaman.value = widget.target_halaman || ''; document.getElementById('w-posisi').value = widget.posisi || 'atas'; document.getElementById('w-tipe').value = 'html'; document.querySelectorAll('.widget-panel').forEach(p => p.style.display = 'none'); document.getElementById('panel-html').style.display = 'block'; document.getElementById('w-konten-html').value = widget.isi_konten || ''; document.getElementById('modal-add-w').style.display = 'flex'; };
 
+window.superEksporDataCenter = async () => {
+    const btn = document.getElementById('btn-ekspor-dc');
+    const dFrom = document.getElementById('dc-date-from').value;
+    const dTo = document.getElementById('dc-date-to').value;
+    const isReg = document.getElementById('dc-chk-reg').checked;
+    const isPend = document.getElementById('dc-chk-pend').checked;
+    
+    if(!isReg && !isPend) { alert("Pilih minimal 1 jenis data (Registrasi / Pendampingan)!"); return; }
+    
+    btn.disabled = true; btn.innerText = "⏳ Sedang Menyatukan Data 9 Kecamatan...";
+    
+    try {
+        const url = `${SCRIPT_URL}?action=getAdminData&role=KABUPATEN`; // role KABUPATEN akan menyedot semua spreadsheet
+        const response = await fetch(url);
+        const res = await response.json();
+        
+        if (res.status === 'success') {
+            let regData = res.data.registrasi || [];
+            let pendData = res.data.pendampingan || [];
+            
+            // Filter By Date
+            if (dFrom || dTo) {
+                const limitF = dFrom ? new Date(dFrom) : new Date('2000-01-01');
+                const limitT = dTo ? new Date(dTo) : new Date('2099-12-31');
+                limitF.setHours(0,0,0,0); limitT.setHours(23,59,59,999);
+                
+                regData = regData.filter(r => { const d = new Date(r.created_at); return d >= limitF && d <= limitT; });
+                pendData = pendData.filter(p => { 
+                    let rData = {}; try { rData = JSON.parse(p.data_laporan || '{}'); } catch(e){}
+                    const d = rData.tgl_kunjungan ? new Date(rData.tgl_kunjungan) : new Date(p.created_at);
+                    return d >= limitF && d <= limitT; 
+                });
+            }
+            
+            if(isReg && regData.length > 0) {
+                const flatReg = regData.map(r => {
+                    let detail = {}; try { detail = JSON.parse(r.data_laporan || '{}'); } catch(e){}
+                    return { Kecamatan: r.sumber_kecamatan, ID_Registrasi: r.id, Tgl_Daftar: r.created_at, Kader_Pendata: r.username, Tim: r.id_tim, Jenis: r.jenis_sasaran, Nama: r.nama_sasaran, Desa: r.desa, Dusun: r.dusun, NIK: detail.nik || '', No_KK: detail.nomor_kk || '', Tgl_Lahir: detail.tanggal_lahir || '', Usia_Tahun: detail.usia_saat_daftar_tahun || '', Status: r.status_sasaran };
+                });
+                exportToCSV('DataCenter_Registrasi_TPK.csv', flatReg);
+            }
+            
+            if(isPend && pendData.length > 0) {
+                const flatPend = pendData.map(p => {
+                    let detail = {}; try { detail = JSON.parse(p.data_laporan || '{}'); } catch(e){}
+                    return { Kecamatan: p.sumber_kecamatan, ID_Laporan: p.id, Tgl_Input: p.created_at, Kader_Pelapor: p.username, Target_Sasaran: p.id_sasaran_ref, Tgl_Kunjungan: detail.tgl_kunjungan || '', Catatan: detail.catatan || '', Lokasi_GPS: p.lokasi_gps || '' };
+                });
+                exportToCSV('DataCenter_Pendampingan_TPK.csv', flatPend);
+            }
+            
+            if((isReg && regData.length === 0) && (isPend && pendData.length === 0)) { alert("Data pada rentang tanggal tersebut kosong."); }
+            else { alert("✅ Data berhasil diunduh!"); }
+        } else { alert("❌ Gagal menyedot data: " + res.message); }
+    } catch(e) { catatErrorSistem('DataCenter Export', e); alert("Terjadi kesalahan jaringan/timeout."); }
+    
+    btn.disabled = false; btn.innerText = "💾 Tarik & Download Excel (CSV)";
+};
+
+const exportToCSV = (filename, rows) => {
+    if(!rows || !rows.length) return;
+    const separator = ',';
+    const keys = Object.keys(rows[0]);
+    const csvContent = keys.join(separator) + '\n' + rows.map(row => {
+            return keys.map(k => {
+                let cell = row[k] === null || row[k] === undefined ? '' : row[k];
+                cell = cell instanceof Date ? cell.toLocaleString() : cell.toString().replace(/"/g, '""');
+                if (cell.search(/("|,|\n)/g) >= 0) cell = `"${cell}"`;
+                return cell;
+            }).join(separator);
+        }).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    if (link.download !== undefined) {
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url); link.setAttribute('download', filename);
+        link.style.visibility = 'hidden'; document.body.appendChild(link);
+        link.click(); document.body.removeChild(link);
+    }
+};
+
+// ==========================================
+// 2. FUNGSI RENDER TABEL
+// ==========================================
 window.renderUserTable = () => {
     try {
-        const searchVal = document.getElementById('flt-search').value.toLowerCase(); const roleVal = document.getElementById('flt-role').value; const kecVal = document.getElementById('flt-kec').value;
+        const searchVal = document.getElementById('flt-search').value.toLowerCase(); const roleVal = document.getElementById('flt-role').value; const kecVal = document.getElementById('flt-kec-filter').value;
         let tableHtml = `<table class="super-table"><thead><tr><th style="text-align:center; width:40px;"><input type="checkbox" id="chk-all-users" title="Pilih Semua yang Tampil"></th><th>ID / Username</th><th>Nama Pengguna</th><th>No. Tim</th><th>Desa/Kelurahan</th><th>Wilayah/Kecamatan</th><th>Role Akses</th><th>PIN / Password</th><th>Aktivitas Terakhir</th><th>Status & Aksi</th></tr></thead><tbody>`;
         let count = 0; window.currentFilteredIds = [];
         window.superUsersData.forEach((u) => {
@@ -99,6 +182,41 @@ window.renderAuditTable = () => {
     } catch(e) { catatErrorSistem('renderAuditTable', e); } 
 };
 
+window.renderPengumumanTable = () => {
+    try {
+        let tableHtml = `<table class="super-table"><thead><tr><th width="15%">Waktu Terbit</th><th width="20%">Judul Siaran</th><th width="35%">Isi Pesan</th><th width="15%">Target Audience</th><th width="15%">Status & Aksi</th></tr></thead><tbody>`;
+        let count = 0;
+        const sortedP = [...window.superPengumumanData].sort((a,b) => new Date(b.tanggal) - new Date(a.tanggal));
+        sortedP.forEach(p => {
+            if(!p.id_pengumuman) return;
+            count++;
+            const tgl = new Date(p.tanggal).toLocaleDateString('id-ID', {day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'});
+            const judul = p.judul || '-';
+            const isi = p.isi_pesan || '-';
+            const target = p.target_role || 'SEMUA';
+            const status = String(p.is_active || 'Y').toUpperCase();
+            
+            const isAktif = status === 'Y';
+            const bgRow = isAktif ? 'transparent' : '#fdfaf6';
+            const textStatus = isAktif ? '🟢 Tersiar (Live)' : '🔴 Ditarik';
+            const btnColor = isAktif ? '#e94560' : '#198754';
+            const btnText = isAktif ? 'Tarik Pesan' : 'Siarkan Ulang';
+            
+            tableHtml += `<tr style="background:${bgRow}; opacity: ${isAktif ? '1' : '0.6'};">
+                <td><span style="font-size:0.8rem; color:#666;">${tgl}</span><br><code style="font-size:0.7rem; color:#0984e3;">${p.id_pengumuman}</code></td>
+                <td><b style="color:#0A2342;">${judul}</b></td>
+                <td><div style="font-size:0.85rem; color:#444; line-height:1.4;">${isi}</div></td>
+                <td><span class="badge-role role-admin">${target}</span></td>
+                <td><div style="font-size:0.75rem; font-weight:bold; margin-bottom:5px;">${textStatus}</div><button class="btn-action" style="background:${btnColor}; color:white; width:100%;" onclick="window.superTogglePengumuman('${p.id_pengumuman}', '${status}')">${btnText}</button></td>
+            </tr>`;
+        });
+        if(count === 0) tableHtml += `<tr><td colspan="5" style="text-align:center; padding:30px; color:#666;">Belum ada pengumuman yang disiarkan.</td></tr>`;
+        tableHtml += `</tbody></table>`;
+        const wrp = document.getElementById('table-wrapper-p'); if(wrp) wrp.innerHTML = tableHtml;
+        const lbl = document.getElementById('lbl-count-p'); if(lbl) lbl.innerText = `${count} Pengumuman`;
+    } catch(e) { catatErrorSistem('renderPengumumanTable', e); }
+};
+
 // ==========================================
 // 3. INISIALISASI KERANGKA (SKELETON)
 // ==========================================
@@ -115,10 +233,12 @@ export const initSuperAdmin = async (session) => {
                     <div style="padding: 25px 20px; border-bottom: 1px solid rgba(255,255,255,0.1); text-align:center;"><div style="font-size: 3rem; margin-bottom: 10px;">👑</div><h3 style="margin:0; font-weight:900; line-height:1.2; letter-spacing:1px;"><span style="font-size:1.1rem; color:#F1C40F; display:block;">PUSAT KENDALI</span><span style="font-size:1.3rem; color:#ffffff; display:block;">SUPER ADMIN</span></h3></div>
                     <div style="flex:1; padding: 20px 0; overflow-y:auto; min-height:0;">
                         <div class="super-menu-item active" data-target="dashboard">🎛️ Dashboard Utama</div>
+                        <div class="super-menu-item" data-target="pengumuman">📢 Pusat Siaran (Broadcast)</div>
                         <div class="super-menu-item" data-target="user_management">👥 Manajemen Pengguna</div>
                         <div class="super-menu-item" data-target="kuesioner">📋 Master Kuesioner (Form)</div>
                         <div class="super-menu-item" data-target="menu_management">🎚️ Manajemen Menu (RBAC)</div>
                         <div class="super-menu-item" data-target="widget_management">🧩 Pabrik Halaman (Widget)</div>
+                        <div class="super-menu-item" data-target="ekspor_data">💾 Data Center (Ekspor)</div>
                         <div class="super-menu-item" data-target="referensi">🏗️ Master Wilayah & Referensi</div>
                         <div class="super-menu-item" data-target="audit_trail">🛡️ Audit Log & Keamanan</div>
                     </div>
@@ -244,9 +364,8 @@ window.renderSuperView = async (target) => {
                             <div class="super-card">
                                 <h3 style="margin-top:0; color:#0A2342; border-bottom:2px solid #F1C40F; padding-bottom:10px;">⚡ Aksi Cepat</h3>
                                 <div style="display:grid; grid-template-columns: 1fr; gap:10px; margin-top:15px;">
-                                    <button class="quick-link-btn" onclick="document.querySelector('[data-target=user_management]').click()" style="padding:12px; background:#f8f9fa; border:1px solid #ddd; border-radius:8px; cursor:pointer; text-align:left; font-weight:bold; color:#0A2342; transition:all 0.2s;">👥 Kelola Pengguna</button>
-                                    <button class="quick-link-btn" onclick="document.querySelector('[data-target=kuesioner]').click()" style="padding:12px; background:#f8f9fa; border:1px solid #ddd; border-radius:8px; cursor:pointer; text-align:left; font-weight:bold; color:#0A2342; transition:all 0.2s;">📋 Rakit Kuesioner</button>
-                                    <button class="quick-link-btn" onclick="document.querySelector('[data-target=widget_management]').click()" style="padding:12px; background:#f8f9fa; border:1px solid #ddd; border-radius:8px; cursor:pointer; text-align:left; font-weight:bold; color:#0A2342; transition:all 0.2s;">🧩 Buat Widget</button>
+                                    <button class="quick-link-btn" onclick="document.querySelector('[data-target=pengumuman]').click()" style="padding:12px; background:#f8f9fa; border:1px solid #ddd; border-radius:8px; cursor:pointer; text-align:left; font-weight:bold; color:#0A2342; transition:all 0.2s;">📢 Buat Pengumuman</button>
+                                    <button class="quick-link-btn" onclick="document.querySelector('[data-target=ekspor_data]').click()" style="padding:12px; background:#f8f9fa; border:1px solid #ddd; border-radius:8px; cursor:pointer; text-align:left; font-weight:bold; color:#0A2342; transition:all 0.2s;">💾 Ekspor Data Excel</button>
                                 </div>
                             </div>
                         </div>
@@ -362,6 +481,95 @@ window.renderSuperView = async (target) => {
             loadDashboardData();
         }
 
+        // --- 📢 MENU PUSAT PENGUMUMAN ---
+        else if (target === 'pengumuman') {
+            content.innerHTML = `
+                <div class="super-card" style="margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px; border-left:4px solid #F1C40F;">
+                    <div><h3 style="margin:0; color:#0A2342;">📢 Pusat Siaran (Broadcast)</h3><p style="margin:5px 0 0 0; color:#666; font-size:0.9rem;">Kirimkan pesan Pop-Up langsung ke layar HP seluruh Kader atau pengguna lainnya.</p></div>
+                    <button id="btn-show-add-p" style="background:#0043A8; color:white; border:none; padding:10px 20px; border-radius:6px; font-weight:bold; cursor:pointer; box-shadow: 0 4px 6px rgba(0, 67, 168, 0.3);">+ Buat Siaran Baru</button>
+                </div>
+                <div class="super-card" style="padding:0; overflow:hidden;">
+                    <div style="background:#f8f9fa; padding:15px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
+                        <div style="font-size:0.85rem; color:#856404; font-weight:bold;">💡 Pengumuman aktif akan muncul sebagai Pop-Up setiap kali target masuk ke aplikasi.</div>
+                        <div style="font-size:0.85rem; font-weight:bold; color:#0A2342; background:#F1C40F; padding:8px 12px; border-radius:6px;" id="lbl-count-p">0 Pengumuman</div>
+                    </div>
+                    <div id="table-wrapper-p" class="super-table-container"><div style="padding:50px; text-align:center; color:#0043A8;"><h3>⏳ Menyedot Riwayat Siaran...</h3></div></div>
+                </div>
+
+                <div id="modal-add-p" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.7); z-index:1000; align-items:center; justify-content:center;">
+                    <div style="background:white; padding:30px; border-radius:10px; width:90%; max-width:600px; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+                        <h3 style="margin-top:0; color:#0A2342; border-bottom:2px solid #F1C40F; padding-bottom:10px;">📢 Buat Siaran Pengumuman Baru</h3>
+                        <div style="margin-bottom:15px;"><label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:5px;">Judul Pengumuman</label><input type="text" id="p-judul" class="filter-input" placeholder="Cth: MAINTENANCE SERVER" style="width:100%; box-sizing:border-box;" required></div>
+                        <div style="margin-bottom:15px;"><label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:5px;">Target Penerima (Role)</label><select id="p-target" class="filter-input" style="width:100%; box-sizing:border-box;"><option value="SEMUA">Semua Pengguna (Kader, PKB, dll)</option><option value="KADER">Hanya Kader Lapangan</option><option value="PKB">Hanya Penyuluh KB (PKB)</option></select></div>
+                        <div style="margin-bottom:20px;"><label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:5px;">Isi Pesan Lengkap</label><textarea id="p-isi" class="filter-input" rows="4" placeholder="Ketik instruksi atau pengumuman di sini..." style="width:100%; box-sizing:border-box;" required></textarea></div>
+                        <div style="display:flex; justify-content:flex-end; gap:10px;"><button type="button" id="btn-close-p" style="padding:10px 20px; border:none; background:#eee; color:#333; border-radius:5px; cursor:pointer; font-weight:bold;">Batal</button><button type="button" id="btn-submit-p" style="padding:10px 20px; border:none; background:#0043A8; color:white; border-radius:5px; cursor:pointer; font-weight:bold;">Siarkan Sekarang 🚀</button></div>
+                    </div>
+                </div>
+            `;
+            
+            try {
+                const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_ALL', token: SUPER_TOKEN, sheetName: 'MASTER_PENGUMUMAN' }) });
+                const res = await response.json();
+                if(res.status === 'success') {
+                    window.superPengumumanData = res.data || [];
+                    window.renderPengumumanTable();
+                    
+                    const modalP = document.getElementById('modal-add-p');
+                    document.getElementById('btn-show-add-p').onclick = () => { document.getElementById('p-judul').value = ''; document.getElementById('p-isi').value = ''; document.getElementById('p-target').value = 'SEMUA'; modalP.style.display = 'flex'; };
+                    document.getElementById('btn-close-p').onclick = () => modalP.style.display = 'none';
+                    document.getElementById('btn-submit-p').onclick = async () => {
+                        const judul = document.getElementById('p-judul').value.trim(); const isi = document.getElementById('p-isi').value.trim(); const target = document.getElementById('p-target').value;
+                        if(!judul || !isi) { alert("Judul dan isi tidak boleh kosong!"); return; }
+                        
+                        const btnSubmit = document.getElementById('btn-submit-p'); btnSubmit.innerText = "Menyiarkan..."; btnSubmit.disabled = true;
+                        const newId = `INFO-${Date.now()}`;
+                        const payloadData = { id_pengumuman: newId, tanggal: new Date().toISOString(), judul: judul, isi_pesan: isi, target_role: target, is_active: 'Y' };
+                        
+                        try {
+                            const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_ADD_PENGUMUMAN', token: SUPER_TOKEN, data: payloadData }) }); const res = await response.json();
+                            if(res.status === 'success') { alert("✅ Pengumuman berhasil disiarkan!"); modalP.style.display = 'none'; window.renderSuperView('pengumuman'); } else { alert("❌ Gagal: " + res.message); }
+                        } catch(e) { alert("❌ Kesalahan Jaringan."); } finally { btnSubmit.innerText = "Siarkan Sekarang 🚀"; btnSubmit.disabled = false; }
+                    };
+                } else { document.getElementById('table-wrapper-p').innerHTML = `<div style="padding:50px; text-align:center; color:#e94560;"><h3>❌ Gagal Mengunduh Data</h3></div>`; }
+            } catch(e) { document.getElementById('table-wrapper-p').innerHTML = `<div style="padding:50px; text-align:center; color:#e94560;"><h3>❌ Kesalahan Jaringan</h3></div>`; }
+        }
+
+        // --- 💾 MENU DATA CENTER ---
+        else if (target === 'ekspor_data') {
+            content.innerHTML = `
+                <div class="super-card" style="margin-bottom:20px; border-left:4px solid #198754;">
+                    <h3 style="margin:0; color:#0A2342;">💾 Data Center (Pusat Rekapitulasi)</h3>
+                    <p style="margin:5px 0 0 0; color:#666; font-size:0.9rem;">Unduh data mentah Laporan dan Registrasi gabungan dari ke-9 Kecamatan di Kabupaten Buleleng secara utuh.</p>
+                </div>
+                
+                <div class="super-card" style="background:#f8f9fa; border:1px solid #e1e8ed;">
+                    <div style="display:flex; gap:15px; margin-bottom:20px; flex-wrap:wrap;">
+                        <div style="flex:1;">
+                            <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:5px;">Mulai Tanggal Input</label>
+                            <input type="date" id="dc-date-from" class="filter-input" style="width:100%; box-sizing:border-box;">
+                        </div>
+                        <div style="flex:1;">
+                            <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:5px;">Sampai Tanggal Input</label>
+                            <input type="date" id="dc-date-to" class="filter-input" style="width:100%; box-sizing:border-box;">
+                        </div>
+                    </div>
+                    
+                    <div style="background:#fff; padding:15px; border-radius:8px; border:1px solid #ddd; margin-bottom:20px;">
+                        <label style="display:block; font-size:0.9rem; font-weight:bold; margin-bottom:10px; color:#0A2342;">Jenis Data Laporan (Pilih minimal 1):</label>
+                        <div style="display:flex; gap:20px;">
+                            <label style="cursor:pointer; font-size:0.95rem; display:flex; align-items:center; gap:5px;"><input type="checkbox" id="dc-chk-reg" checked style="transform:scale(1.2);"> Data Registrasi Sasaran Baru</label>
+                            <label style="cursor:pointer; font-size:0.95rem; display:flex; align-items:center; gap:5px;"><input type="checkbox" id="dc-chk-pend" checked style="transform:scale(1.2);"> Data Log Pendampingan Rutin</label>
+                        </div>
+                    </div>
+                    
+                    <div style="text-align:right;">
+                        <button id="btn-ekspor-dc" style="background:#198754; color:white; border:none; padding:15px 30px; border-radius:6px; font-weight:bold; cursor:pointer; font-size:1.1rem; box-shadow: 0 4px 6px rgba(25, 135, 84, 0.3); transition:all 0.2s;" onclick="window.superEksporDataCenter()">💾 Tarik & Download Excel (CSV)</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // --- 🛡️ MENU AUDIT LOG ---
         else if (target === 'audit_trail') {
             window.activeAuditTab = 'CCTV'; 
 
@@ -438,7 +646,6 @@ window.renderSuperView = async (target) => {
             } catch(e) { catatErrorSistem('Menu Audit Trail', e); document.getElementById('table-wrapper-log').innerHTML = `<div style="padding:50px; text-align:center; color:#e94560;"><h3>❌ Izin Akses Tertahan (Koneksi Terputus)</h3></div>`; }
         }
         
-        // --- 👥 MENU MANAJEMEN PENGGUNA ---
         else if (target === 'user_management') {
             content.innerHTML = `
                 <div class="super-card" style="margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px; border-left:4px solid #F1C40F;">
@@ -516,7 +723,7 @@ window.renderSuperView = async (target) => {
                         if (nDesa === 'UNDEFINED' || nDesa === '') nDesa = '-'; u._nomor_tim = nTim; u._desa = nDesa; return u;
                     });
                     const kecSet = new Set(); window.superUsersData.forEach(u => { const k = String(u.scope_kecamatan || u.kecamatan || u.wilayah || '').toUpperCase().trim(); if(k && k !== 'ALL' && k !== 'SEMUA' && k !== '-') kecSet.add(k); });
-                    const selectKec = document.getElementById('flt-kec'); Array.from(kecSet).sort().forEach(k => { const opt = document.createElement('option'); opt.value = k; opt.innerText = k; selectKec.appendChild(opt); });
+                    const selectKec = document.getElementById('flt-kec-filter') || document.getElementById('flt-kec'); if(selectKec){ Array.from(kecSet).sort().forEach(k => { const opt = document.createElement('option'); opt.value = k; opt.innerText = k; selectKec.appendChild(opt); });}
                     const searchInput = document.getElementById('flt-search'); const clearBtn = document.getElementById('btn-clear-search');
                     window.renderUserTable(); searchInput.addEventListener('input', () => { clearBtn.style.display = searchInput.value ? 'block' : 'none'; window.renderUserTable(); }); clearBtn.addEventListener('click', () => { searchInput.value = ''; clearBtn.style.display = 'none'; searchInput.focus(); window.renderUserTable(); }); document.getElementById('flt-role').addEventListener('change', window.renderUserTable); document.getElementById('flt-kec').addEventListener('change', window.renderUserTable);
                     const modalAdd = document.getElementById('modal-add-user'); const roleSelect = document.getElementById('add-role'); const formKecSelect = document.getElementById('add-kec'); const panelKader = document.getElementById('panel-kader-area'); const formDesaSelect = document.getElementById('add-desa'); const timSelect = document.getElementById('add-tim');
@@ -585,52 +792,5 @@ window.renderSuperView = async (target) => {
             } catch (error) { catatErrorSistem('Menu Widget', error); document.getElementById('table-wrapper-w').innerHTML = `<div style="padding:50px; text-align:center; color:#e94560;"><h3>❌ Gagal Terhubung</h3></div>`; }
         }
         
-        // --- 🏗️ MENU MASTER WILAYAH ---
-        else if (target === 'referensi') {
-            content.innerHTML = `
-                <div class="super-card" style="margin-bottom:20px; border-left:4px solid #F1C40F;">
-                    <h3 style="margin:0; color:#0A2342;">🏗️ Master Wilayah & Referensi Tim</h3>
-                    <p style="margin:5px 0 0 0; color:#666; font-size:0.9rem;">Peta wilayah penugasan (Kecamatan, Desa, Dusun, dan Tim Kader).</p>
-                </div>
-                <div class="super-card">
-                    <div style="background:#FFF8E7; padding:15px; border-radius:8px; border-left:5px solid #F1C40F; color:#B8860B; margin-bottom:15px;">
-                        <b>⚠️ INFO:</b> Untuk menjaga integritas data hirarki, penambahan atau perubahan Master Wilayah dan Referensi Tim saat ini hanya bisa diatur secara aman melalui <a href="https://docs.google.com/spreadsheets/d/1KIEyfN4BVd2nQDeMI71wxt_jVnAivudqGAo99MQzopQ/edit" target="_blank" style="color:#0043A8; font-weight:bold;">Google Sheet Master Database</a>.
-                    </div>
-                    <div id="table-wrapper-ref" class="super-table-container"><div style="padding:40px; text-align:center; color:#0043A8;">⏳ Menarik data wilayah dari server...</div></div>
-                </div>
-            `;
-            
-            try {
-                if(window.superTimData.length === 0) {
-                    const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_ALL', token: SUPER_TOKEN, sheetName: 'MASTER_TIM' }) });
-                    const res = await response.json();
-                    if(res.status === 'success') window.superTimData = res.data || [];
-                }
-                
-                let html = `<table class="super-table"><thead><tr><th>Kecamatan</th><th>Desa/Kelurahan</th><th>Dusun/RW</th><th>ID Tim</th><th>Nama Tim</th></tr></thead><tbody>`;
-                let tData = [...window.superTimData].sort((a,b) => {
-                    if((a.kecamatan||'') === (b.kecamatan||'')) return String(a.desa_kelurahan||'').localeCompare(String(b.desa_kelurahan||''));
-                    return String(a.kecamatan||'').localeCompare(String(b.kecamatan||''));
-                });
-
-                if (tData.length > 0) {
-                    tData.forEach(t => {
-                        html += `<tr>
-                            <td><span style="background:#e8f4fd; padding:3px 8px; border-radius:4px; font-size:0.8rem; color:#0043A8; font-weight:bold;">${t.kecamatan || t.wilayah || '-'}</span></td>
-                            <td><b style="color:#0A2342;">${t.desa_kelurahan || t.desa || '-'}</b></td>
-                            <td>${t.dusun_rw || t.dusun || '-'}</td>
-                            <td><code style="color:#e94560;">${t.id_tim || t.id || '-'}</code></td>
-                            <td>${t.nama_tim || t.nomor_tim || '-'}</td>
-                        </tr>`;
-                    });
-                } else {
-                    html += `<tr><td colspan="5" style="text-align:center; padding:30px; color:#999;">Data wilayah kosong atau belum dimuat.</td></tr>`;
-                }
-                html += `</tbody></table>`;
-                
-                setTimeout(() => { const wrp = document.getElementById('table-wrapper-ref'); if(wrp) wrp.innerHTML = html; }, 300);
-            } catch(e) { catatErrorSistem('Menu Referensi', e); document.getElementById('table-wrapper-ref').innerHTML = `<div style="padding:40px; text-align:center; color:#e94560;">❌ Gagal menarik data wilayah.</div>`; }
-        }
-
     } catch(e) { catatErrorSistem(`Global Routing [${target}]`, e); }
 };
