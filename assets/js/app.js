@@ -68,7 +68,8 @@ const dapatkanLokasiGPS = async () => {
                 else if (error.code === 3) msg = "Timeout Pencarian Satelit"; 
                 resolve(msg); 
             },
-            { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 } 
+            // 🔥 PATCH 1: Timeout diturunkan jadi 5 detik agar UI tidak hang, izinkan cache lokasi 10 detik terakhir
+            { enableHighAccuracy: true, timeout: 5000, maximumAge: 10000 } 
         );
     });
 };
@@ -341,9 +342,9 @@ window.mulaiSinkronisasiDashboard = async () => {
         const text = getEl('text-sync-dash'); 
         const card = getEl('card-sync-dashboard');
         
+        // 🔥 PATCH 3: Jebol Tembok Sinkronisasi (Hapus Pemblokiran Pura-pura Offline)
         if (!navigator.onLine) { 
-            alert("❌ Koneksi internet terputus! Sinkronisasi membutuhkan internet."); 
-            return; 
+            console.warn("⚠️ Sinyal internet dilaporkan mati oleh sistem operasi, namun aplikasi tetap akan mencoba menembus koneksi server."); 
         }
         
         if(icon) icon.innerHTML = '⏳'; 
@@ -818,7 +819,7 @@ const renderPertanyaanDinamis = (jenis, modul, container, questions) => {
             };
 
             container.addEventListener('change', evaluateConditions); 
-            container.addEventListener('input', evaluateConditions);
+            // 🔥 PATCH 2: Event Listener `input` dihapus dari seluruh kontainer agar tidak memicu memory leak / UI lag saat kader mengetik
             setTimeout(evaluateConditions, 400);
         } else { 
             container.innerHTML = ''; 
@@ -1264,41 +1265,43 @@ const initDaftarSasaran = async () => {
 
             let syncStatusHtml = r.is_synced ? '<span style="color:#198754;">✅ Tersinkron (Server)</span>' : '<span style="color:#fd7e14;">⏳ Belum Sinkron (Lokal)</span>';
 
-            kontenDetail.innerHTML = `
-                <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #ddd; line-height: 1.4;">
-                    <div style="font-size: 0.8rem; color: #666; margin-bottom: 4px;">Nama Sasaran</div>
-                    <div style="font-size: 1.15rem; font-weight: bold; color: #0043a8; margin-bottom: 15px; text-transform: uppercase; background: #ffffff; padding: 10px 12px; border-radius: 6px; border: 1px solid #c6c6c6; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
-                        <span>${r.nama_sasaran || '-'}</span>
-                        <span style="font-size: 0.85rem; color: #0d6efd; cursor: pointer; text-transform: none; font-weight: normal; background: #e8f4fd; padding: 4px 8px; border-radius: 4px;" onclick="window.bukaEditSasaran('${r.id}')">✏️ (edit)</span>
+            // 🔥 PATCH 4: Pengecekan DOM sebelum injeksi HTML
+            if (kontenDetail) {
+                kontenDetail.innerHTML = `
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #ddd; line-height: 1.4;">
+                        <div style="font-size: 0.8rem; color: #666; margin-bottom: 4px;">Nama Sasaran</div>
+                        <div style="font-size: 1.15rem; font-weight: bold; color: #0043a8; margin-bottom: 15px; text-transform: uppercase; background: #ffffff; padding: 10px 12px; border-radius: 6px; border: 1px solid #c6c6c6; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                            <span>${r.nama_sasaran || '-'}</span>
+                            <span style="font-size: 0.85rem; color: #0d6efd; cursor: pointer; text-transform: none; font-weight: normal; background: #e8f4fd; padding: 4px 8px; border-radius: 4px;" onclick="window.bukaEditSasaran('${r.id}')">✏️ (edit)</span>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                            <div>
+                                <div style="font-size: 0.8rem; color: #666;">ID / No NIK</div>
+                                <div style="font-size: 0.95rem; color: #222; font-weight: 500;">${r.id} <br> ${r.data_laporan?.nik || '-'}</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 0.8rem; color: #666;">Kategori</div>
+                                <div style="font-size: 0.95rem; color: #222; font-weight: bold;">${r.textBaris2}</div>
+                            </div>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                            <div>
+                                <div style="font-size: 0.8rem; color: #666;">Status Pendampingan</div>
+                                <div style="font-size: 0.95rem;">${r.labelSelesai}</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 0.8rem; color: #666;">Status Sinkronisasi</div>
+                                <div style="font-size: 0.95rem; font-weight: bold;">${syncStatusHtml}</div>
+                            </div>
+                        </div>
+                        <div style="font-size: 0.8rem; color: #666;">Alamat Lengkap</div>
+                        <div style="font-size: 0.95rem; color: #222;">${r.data_laporan?.alamat || '-'}</div>
                     </div>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
-                        <div>
-                            <div style="font-size: 0.8rem; color: #666;">ID / No NIK</div>
-                            <div style="font-size: 0.95rem; color: #222; font-weight: 500;">${r.id} <br> ${r.data_laporan?.nik || '-'}</div>
-                        </div>
-                        <div>
-                            <div style="font-size: 0.8rem; color: #666;">Kategori</div>
-                            <div style="font-size: 0.95rem; color: #222; font-weight: bold;">${r.textBaris2}</div>
-                        </div>
-                    </div>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
-                        <div>
-                            <div style="font-size: 0.8rem; color: #666;">Status Pendampingan</div>
-                            <div style="font-size: 0.95rem;">${r.labelSelesai}</div>
-                        </div>
-                        <div>
-                            <div style="font-size: 0.8rem; color: #666;">Status Sinkronisasi</div>
-                            <div style="font-size: 0.95rem; font-weight: bold;">${syncStatusHtml}</div>
-                        </div>
-                    </div>
-                    <div style="font-size: 0.8rem; color: #666;">Alamat Lengkap</div>
-                    <div style="font-size: 0.95rem; color: #222;">${r.data_laporan?.alamat || '-'}</div>
-                </div>
-                <h4 style="margin-bottom: 15px; color: #0043a8; background: #ffffff; padding: 12px; border-radius: 6px; border: 1px solid #c6c6c6; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05); font-weight: 700;">
-                    ${r.jenis_sasaran === 'BADUTA' ? '📈 Buku KIA/KKA Digital' : 'Riwayat Kunjungan'} (${riwayat.length})
-                </h4>
-                <div style="max-height: 400px; overflow-y: auto; padding-right: 5px;">${htmlRiwayat}</div>`;
-            
+                    <h4 style="margin-bottom: 15px; color: #0043a8; background: #ffffff; padding: 12px; border-radius: 6px; border: 1px solid #c6c6c6; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05); font-weight: 700;">
+                        ${r.jenis_sasaran === 'BADUTA' ? '📈 Buku KIA/KKA Digital' : 'Riwayat Kunjungan'} (${riwayat.length})
+                    </h4>
+                    <div style="max-height: 400px; overflow-y: auto; padding-right: 5px;">${htmlRiwayat}</div>`;
+            }
             if(modal) modal.style.display = 'block';
         };
 
