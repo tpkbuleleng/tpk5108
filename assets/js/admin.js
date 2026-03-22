@@ -1,5 +1,5 @@
 // ==========================================
-// 📊 DASHBOARD SUPERVISOR (PKB & ADMIN KECAMATAN) - V32
+// 📊 DASHBOARD SUPERVISOR (PKB, ADMIN, MITRA) - V33
 // ==========================================
 import { clearStore } from './db.js';
 
@@ -18,9 +18,11 @@ const fetchAdminData = async () => {
             let rawReg = res.data.registrasi || [];
             let rawPend = res.data.pendampingan || [];
             
-            // 🔥 V32 FILTER CERDAS: Saring berdasarkan multiple scope_desa
-            const isPKB = String(window.adminSession.role).toUpperCase().includes('PKB');
-            if (isPKB) {
+            const roleUpper = String(window.adminSession.role).toUpperCase();
+            
+            // 🔥 V33 FILTER: Jika PKB atau ADMIN_DESA, saring berdasarkan scope_desa mereka
+            const isRestrictedByDesa = roleUpper.includes('PKB') || roleUpper === 'ADMIN_DESA';
+            if (isRestrictedByDesa) {
                 const allowedDesa = String(window.adminSession.desa || '').toUpperCase().split(',').map(d => d.trim());
                 if (!allowedDesa.includes('ALL') && !allowedDesa.includes('-') && allowedDesa.length > 0 && allowedDesa[0] !== "") {
                     rawReg = rawReg.filter(r => allowedDesa.includes(String(r.desa || '').toUpperCase()));
@@ -88,8 +90,7 @@ window.renderAdminView = async (target) => {
 
         const topKader = Object.entries(kaderKinerja).sort((a,b) => b[1] - a[1]).slice(0, 5);
         
-        // 🔥 V32: Tampilan Desa yang Fleksibel (Word-wrap untuk multi-desa)
-        let displayDesa = window.adminSession.desa === '-' || window.adminSession.desa === 'ALL' ? window.adminSession.kecamatan : window.adminSession.desa;
+        let displayDesa = window.adminSession.desa === '-' || window.adminSession.desa === 'ALL' || window.adminSession.desa === '' ? window.adminSession.kecamatan : window.adminSession.desa;
 
         content.innerHTML = `
             <div class="animate-fade">
