@@ -770,50 +770,85 @@ window.renderSuperView = async (target) => {
             } catch (error) { catatErrorSistem('Menu Widget', error); document.getElementById('table-wrapper-w').innerHTML = `<div style="padding:50px; text-align:center; color:#e94560;"><h3>❌ Gagal Terhubung</h3></div>`; }
         }
         
-        else if (target === 'referensi') {
+        else if (target === 'audit_trail') {
             content.innerHTML = `
-                <div class="super-card" style="margin-bottom:20px; border-left:4px solid #F1C40F;">
-                    <h3 style="margin:0; color:#0A2342;">🏗️ Master Wilayah & Referensi Tim</h3>
-                    <p style="margin:5px 0 0 0; color:#666; font-size:0.9rem;">Peta wilayah penugasan (Kecamatan, Desa, Dusun, dan Tim Kader).</p>
-                </div>
-                <div class="super-card">
-                    <div style="background:#FFF8E7; padding:15px; border-radius:8px; border-left:5px solid #F1C40F; color:#B8860B; margin-bottom:15px;">
-                        <b>⚠️ INFO:</b> Untuk menjaga integritas data hirarki, penambahan atau perubahan Master Wilayah dan Referensi Tim saat ini hanya bisa diatur secara aman melalui <a href="https://docs.google.com/spreadsheets/d/1KIEyfN4BVd2nQDeMI71wxt_jVnAivudqGAo99MQzopQ/edit" target="_blank" style="color:#0043A8; font-weight:bold;">Google Sheet Master Database</a>.
+                <div class="super-card" style="margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px; border-left:4px solid #F1C40F;">
+                    <div><h3 style="margin:0; color:#0A2342;">🛡️ Audit Log & Keamanan</h3><p style="margin:5px 0 0 0; color:#666; font-size:0.9rem;">Rekaman CCTV aktivitas pengguna dan kotak hitam (Black Box) error sistem.</p></div>
+                    <div style="display:flex; gap:10px; background:#eef2f5; padding:5px; border-radius:8px;">
+                        <button id="btn-tab-cctv" style="padding:8px 15px; border:none; border-radius:6px; cursor:pointer; font-weight:bold; background:${window.activeAuditTab === 'CCTV' ? '#0A2342' : 'transparent'}; color:${window.activeAuditTab === 'CCTV' ? '#F1C40F' : '#666'}; transition:all 0.3s;">🎥 CCTV Log Aktivitas</button>
+                        <button id="btn-tab-error" style="padding:8px 15px; border:none; border-radius:6px; cursor:pointer; font-weight:bold; background:${window.activeAuditTab === 'ERROR' ? '#e94560' : 'transparent'}; color:${window.activeAuditTab === 'ERROR' ? 'white' : '#666'}; transition:all 0.3s;">🚨 Radar Error (Black Box)</button>
                     </div>
-                    <div id="table-wrapper-ref" class="super-table-container"><div style="padding:40px; text-align:center; color:#0043A8;">⏳ Menarik data wilayah dari server...</div></div>
+                </div>
+
+                <div class="super-card" style="padding:0; overflow:hidden;">
+                    <div id="filter-area-log" style="background:#f8f9fa; padding:15px; border-bottom:1px solid #eee; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+                        </div>
+                    <div id="table-wrapper-log" class="super-table-container"><div style="padding:50px; text-align:center; color:#0043A8;"><h3>⏳ Memutar Rekaman CCTV...</h3></div></div>
                 </div>
             `;
-            
-            try {
-                if(window.superTimData.length === 0) {
-                    const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_ALL', token: SUPER_TOKEN, sheetName: 'MASTER_TIM' }) });
-                    const res = await response.json();
-                    if(res.status === 'success') window.superTimData = res.data || [];
-                }
-                
-                let html = `<table class="super-table"><thead><tr><th>Kecamatan</th><th>Desa/Kelurahan</th><th>Dusun/RW</th><th>ID Tim</th><th>Nama Tim</th></tr></thead><tbody>`;
-                let tData = [...window.superTimData].sort((a,b) => {
-                    if((a.kecamatan||'') === (b.kecamatan||'')) return String(a.desa_kelurahan||'').localeCompare(String(b.desa_kelurahan||''));
-                    return String(a.kecamatan||'').localeCompare(String(b.kecamatan||''));
-                });
 
-                if (tData.length > 0) {
-                    tData.forEach(t => {
-                        html += `<tr>
-                            <td><span style="background:#e8f4fd; padding:3px 8px; border-radius:4px; font-size:0.8rem; color:#0043A8; font-weight:bold;">${t.kecamatan || t.wilayah || '-'}</span></td>
-                            <td><b style="color:#0A2342;">${t.desa_kelurahan || t.desa || '-'}</b></td>
-                            <td>${t.dusun_rw || t.dusun || '-'}</td>
-                            <td><code style="color:#e94560;">${t.id_tim || t.id || '-'}</code></td>
-                            <td>${t.nama_tim || t.nomor_tim || '-'}</td>
-                        </tr>`;
-                    });
+            const renderFilters = () => {
+                const fltArea = document.getElementById('filter-area-log');
+                if(window.activeAuditTab === 'CCTV') {
+                    fltArea.innerHTML = `
+                        <div style="position: relative; flex: 1; min-width: 200px;"><input type="text" id="log-flt-search" class="filter-input" placeholder="🔍 Cari ID/Nama/Detail..." style="width: 100%; box-sizing: border-box;"></div>
+                        <select id="log-flt-waktu" class="filter-input"><option value="ALL">🗓️ Semua Waktu</option><option value="TODAY">⏳ Hari Ini</option><option value="7D">📅 7 Hari Terakhir</option><option value="30D">📆 30 Hari Terakhir</option></select>
+                        <select id="log-flt-aksi" class="filter-input"><option value="ALL">Semua Aksi</option><option value="LOGIN_SUKSES">Login Sukses</option><option value="LOGIN_GAGAL">Login Gagal</option><option value="TAMBAH">Tambah Data</option><option value="HAPUS">Hapus Data</option><option value="UPDATE">Update Data</option></select>
+                        <div style="font-size:0.85rem; font-weight:bold; color:#0A2342; background:#F1C40F; padding:8px 12px; border-radius:6px;" id="lbl-count-log">0 Log</div>
+                    `;
+                    document.getElementById('log-flt-search').addEventListener('input', window.renderAuditTable);
+                    document.getElementById('log-flt-waktu').addEventListener('change', window.renderAuditTable);
+                    document.getElementById('log-flt-aksi').addEventListener('change', window.renderAuditTable);
                 } else {
-                    html += `<tr><td colspan="5" style="text-align:center; padding:30px; color:#999;">Data wilayah kosong atau belum dimuat.</td></tr>`;
+                    fltArea.innerHTML = `
+                        <div style="position: relative; flex: 1; min-width: 200px;"><input type="text" id="log-flt-search" class="filter-input" placeholder="🔍 Cari ID/Lokasi/Pesan Error..." style="width: 100%; box-sizing: border-box;"></div>
+                        <div style="font-size:0.85rem; font-weight:bold; color:white; background:#e94560; padding:8px 12px; border-radius:6px;" id="lbl-count-log">0 Error</div>
+                    `;
+                    document.getElementById('log-flt-search').addEventListener('input', window.renderAuditTable);
                 }
-                html += `</tbody></table>`;
+            };
+
+            const switchTab = (tab) => {
+                window.activeAuditTab = tab;
+                const btnCCTV = document.getElementById('btn-tab-cctv');
+                const btnError = document.getElementById('btn-tab-error');
+                if(tab === 'CCTV') {
+                    btnCCTV.style.background = '#0A2342'; btnCCTV.style.color = '#F1C40F';
+                    btnError.style.background = 'transparent'; btnError.style.color = '#666';
+                } else {
+                    btnError.style.background = '#e94560'; btnError.style.color = 'white';
+                    btnCCTV.style.background = 'transparent'; btnCCTV.style.color = '#666';
+                }
+                renderFilters();
+                window.renderAuditTable();
+            };
+
+            document.getElementById('btn-tab-cctv').onclick = () => switchTab('CCTV');
+            document.getElementById('btn-tab-error').onclick = () => switchTab('ERROR');
+
+            try {
+                // Tarik data nama user jika kosong untuk dicocokkan dengan ID di Log
+                if(window.superUsersData.length === 0) {
+                    const resU = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_ALL', token: SUPER_TOKEN, sheetName: 'USER_LOGIN' }) }).then(r=>r.json());
+                    if(resU.status === 'success') window.superUsersData = resU.data || [];
+                }
+
+                // Sedot data Log CCTV & Error
+                const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_AUDIT', token: SUPER_TOKEN }) });
+                const res = await response.json();
                 
-                setTimeout(() => { const wrp = document.getElementById('table-wrapper-ref'); if(wrp) wrp.innerHTML = html; }, 300);
-            } catch(e) { catatErrorSistem('Menu Referensi', e); document.getElementById('table-wrapper-ref').innerHTML = `<div style="padding:40px; text-align:center; color:#e94560;">❌ Gagal menarik data wilayah.</div>`; }
+                if (res.status === 'success') {
+                    window.superAuditData = res.data || [];
+                    window.superErrorData = res.error_data || [];
+                    renderFilters();
+                    window.renderAuditTable();
+                } else {
+                    document.getElementById('table-wrapper-log').innerHTML = `<div style="padding:50px; text-align:center; color:#e94560;"><h3>❌ Gagal Membuka CCTV</h3><p>${res.message}</p></div>`;
+                }
+            } catch(e) {
+                catatErrorSistem('Menu Audit Log', e);
+                document.getElementById('table-wrapper-log').innerHTML = `<div style="padding:50px; text-align:center; color:#e94560;"><h3>❌ Sambungan Terputus</h3></div>`;
+            }
         }
 
     } catch(e) { catatErrorSistem(`Global Routing [${target}]`, e); }
