@@ -114,7 +114,7 @@ window.renderUserTable = () => {
     try {
         const searchEl = document.getElementById('flt-search');
         const roleEl = document.getElementById('flt-role');
-        const kecEl = document.getElementById('flt-kec-filter'); // Sesuai ID di HTML
+        const kecEl = document.getElementById('flt-kec'); // [PATCHED] ID sudah diperbaiki
         
         if (!searchEl || !roleEl || !kecEl) return;
         
@@ -604,7 +604,7 @@ window.renderSuperView = async (target) => {
                     <div style="background:#f8f9fa; padding:15px; border-bottom:1px solid #eee; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
                         <div style="position: relative; flex: 1; min-width: 200px;"><input type="text" id="flt-search" class="filter-input" placeholder="🔍 Cari ID/Nama/Desa/Tim..." style="width: 100%; padding-right: 35px; box-sizing: border-box;"><button id="btn-clear-search" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; font-size: 1.3rem; font-weight: bold; color: #aaa; cursor: pointer; display: none; padding: 0;" title="Bersihkan Pencarian">×</button></div>
                         <select id="flt-role" class="filter-input"><option value="ALL">📋 Semua Role</option><option value="KADER">KADER</option><option value="ADMIN_DESA">ADMIN DESA</option><option value="PKB">PKB / Penyuluh</option><option value="ADMIN_KECAMATAN">ADMIN KECAMATAN</option><option value="ADMIN_KABUPATEN">ADMIN KABUPATEN</option><option value="MITRA">MITRA KERJA</option></select>
-                        <select id="flt-kec" class="filter-input" id="flt-kec-filter"><option value="ALL">🌍 Semua Wilayah</option></select>
+                        <select id="flt-kec" class="filter-input"><option value="ALL">🌍 Semua Wilayah</option></select>
                         <div style="font-size:0.85rem; font-weight:bold; color:#0A2342; background:#F1C40F; padding:8px 12px; border-radius:6px;" id="lbl-count">0 Pengguna</div>
                     </div>
                     <div style="background:#fff3cd; padding:10px 15px; border-bottom:1px solid #ffeeba; display:flex; justify-content:space-between; align-items:center;">
@@ -654,14 +654,26 @@ window.renderSuperView = async (target) => {
             `;
             try {
                 let kaderData = await getAllData('master_kader').catch(()=>[]); let timData = await getAllData('master_tim').catch(()=>[]); let pkbData = await getAllData('master_pkb').catch(()=>[]);
+                
                 if (kaderData.length === 0 || timData.length === 0) {
-                    document.getElementById('table-wrapper').innerHTML = `<div style="padding:50px; text-align:center; color:#0043A8;"><h3 style="margin:0;">📥 Mengunduh Peta Wilayah...</h3><p>Menyelaraskan data dari Server Google.</p></div>`;
-                    const masterReq = await fetch(SCRIPT_URL); const masterRes = await masterReq.json();
-                    if(masterRes.status === 'success') { kaderData = masterRes.data.master_kader || []; timData = masterRes.data.master_tim || []; pkbData = masterRes.data.master_pkb || [];}
+                    const wrp = document.getElementById('table-wrapper');
+                    if(wrp) wrp.innerHTML = `<div style="padding:50px; text-align:center; color:#0043A8;"><h3 style="margin:0;">📥 Mengunduh Peta Wilayah...</h3><p>Menyelaraskan data dari Server Google.</p></div>`;
+                    try {
+                        const [resK, resT, resP] = await Promise.all([
+                            fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_ALL', token: SUPER_TOKEN, sheetName: 'MASTER_KADER' }) }).then(r => r.json()),
+                            fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_ALL', token: SUPER_TOKEN, sheetName: 'MASTER_TIM' }) }).then(r => r.json()),
+                            fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_ALL', token: SUPER_TOKEN, sheetName: 'MASTER_PKB' }) }).then(r => r.json())
+                        ]);
+                        if(resK.status === 'success') kaderData = resK.data || [];
+                        if(resT.status === 'success') timData = resT.data || [];
+                        if(resP.status === 'success') pkbData = resP.data || [];
+                    } catch(e) { catatErrorSistem('Fetch Master Mapping', e); }
                 }
+
                 window.superTimData = timData || [];
                 const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_ALL', token: SUPER_TOKEN, sheetName: 'USER_LOGIN' }) });
                 const res = await response.json();
+                
                 if (res.status === 'success') {
                     window.superUsersData = res.data.map(u => {
                         let nTim = '-'; let nDesa = String(u.scope_desa || u.desa_kelurahan || u.desa || u.wilayah_desa || '-').toUpperCase(); const role = String(u.role_akses || u.role || 'KADER').toUpperCase(); const refId = u.ref_id || u.id_pengguna || u.id_user || u.username;
@@ -669,10 +681,25 @@ window.renderSuperView = async (target) => {
                         if (role.includes('PKB')) { const p = pkbData.find(pk => String(pk.id_pkb) === String(refId) || String(pk.nip_pkb) === String(refId)); if (p) { nDesa = String(p.desa_kelurahan || p.desa || nDesa).toUpperCase(); } }
                         if (nDesa === 'UNDEFINED' || nDesa === '') nDesa = '-'; u._nomor_tim = nTim; u._desa = nDesa; return u;
                     });
+                    
                     const kecSet = new Set(); window.superUsersData.forEach(u => { const k = String(u.scope_kecamatan || u.kecamatan || u.wilayah || '').toUpperCase().trim(); if(k && k !== 'ALL' && k !== 'SEMUA' && k !== '-') kecSet.add(k); });
-                    const selectKec = document.getElementById('flt-kec-filter') || document.getElementById('flt-kec'); if(selectKec){ Array.from(kecSet).sort().forEach(k => { const opt = document.createElement('option'); opt.value = k; opt.innerText = k; selectKec.appendChild(opt); });}
+                    const selectKec = document.getElementById('flt-kec');
+                    
+                    if(selectKec){ 
+                        Array.from(kecSet).sort().forEach(k => { const opt = document.createElement('option'); opt.value = k; opt.innerText = k; selectKec.appendChild(opt); });
+                    }
+                    
                     const searchInput = document.getElementById('flt-search'); const clearBtn = document.getElementById('btn-clear-search');
-                    window.renderUserTable(); searchInput.addEventListener('input', () => { clearBtn.style.display = searchInput.value ? 'block' : 'none'; window.renderUserTable(); }); clearBtn.addEventListener('click', () => { searchInput.value = ''; clearBtn.style.display = 'none'; searchInput.focus(); window.renderUserTable(); }); document.getElementById('flt-role').addEventListener('change', window.renderUserTable); document.getElementById('flt-kec').addEventListener('change', window.renderUserTable);
+                    window.renderUserTable(); 
+                    
+                    if(searchInput) {
+                        searchInput.addEventListener('input', () => { clearBtn.style.display = searchInput.value ? 'block' : 'none'; window.renderUserTable(); }); 
+                        clearBtn.addEventListener('click', () => { searchInput.value = ''; clearBtn.style.display = 'none'; searchInput.focus(); window.renderUserTable(); }); 
+                    }
+                    
+                    const fltRole = document.getElementById('flt-role'); if(fltRole) fltRole.addEventListener('change', window.renderUserTable); 
+                    if(selectKec) selectKec.addEventListener('change', window.renderUserTable);
+
                     const modalAdd = document.getElementById('modal-add-user'); const roleSelect = document.getElementById('add-role'); const formKecSelect = document.getElementById('add-kec'); const panelKader = document.getElementById('panel-kader-area'); const formDesaSelect = document.getElementById('add-desa'); const timSelect = document.getElementById('add-tim');
                     document.getElementById('btn-show-add').onclick = () => { if(roleSelect.value === 'KADER') populateDesaDropdown(); modalAdd.style.display = 'flex'; }; document.getElementById('btn-close-add').onclick = () => modalAdd.style.display = 'none';
                     const populateDesaDropdown = () => {
@@ -708,8 +735,15 @@ window.renderSuperView = async (target) => {
                         const payloadData = { id_user: id, id_pengguna: id, username: id, nama: nama, nama_lengkap: nama, role_akses: role, role: role, scope_kecamatan: kec, kecamatan: kec, scope_desa: finalDesa, password: pin, password_awal_ref: pin, pin: pin, status_akun: 'AKTIF', status: 'AKTIF', ref_type: role, ref_id: id };
                         try { const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_ADD_USER', token: SUPER_TOKEN, data: payloadData, data_kader: payloadKader }) }); const res = await response.json(); if(res.status === 'success') { alert("✅ Pengguna berhasil ditambahkan!"); document.getElementById('modal-add-user').style.display = 'none'; document.getElementById('table-wrapper').innerHTML = `<div style="padding:50px; text-align:center; color:#0043A8;"><h3>🔄 MENYINKRONKAN DATABASE...</h3><p>Memuat data terbaru dari Google Server.</p></div>`; await clearStore('master_kader'); await clearStore('master_tim'); setTimeout(() => { window.renderSuperView('user_management'); }, 1000); } else { alert("❌ Gagal menyimpan: " + res.message); } } catch(e) { catatErrorSistem('Simpan User Baru', e); alert("❌ Kesalahan Jaringan."); } finally { btnSubmit.innerText = "Simpan ke Server"; btnSubmit.disabled = false; }
                     };
-                } else { document.getElementById('table-wrapper').innerHTML = `<div style="padding:50px; text-align:center; color:#e94560;"><h3>❌ Akses Ditolak</h3><p>${res.message}</p></div>`; }
-            } catch (error) { catatErrorSistem('Menu Manajemen Pengguna', error); document.getElementById('table-wrapper').innerHTML = `<div style="padding:50px; text-align:center; color:#e94560;"><h3>❌ Gagal Terhubung</h3></div>`; }
+                } else { 
+                    const wrp = document.getElementById('table-wrapper');
+                    if(wrp) wrp.innerHTML = `<div style="padding:50px; text-align:center; color:#e94560;"><h3>❌ Akses Ditolak</h3><p>${res.message}</p></div>`; 
+                }
+            } catch (error) { 
+                catatErrorSistem('Menu Manajemen Pengguna', error); 
+                const wrp = document.getElementById('table-wrapper');
+                if(wrp) wrp.innerHTML = `<div style="padding:50px; text-align:center; color:#e94560;"><h3>❌ Gagal Terhubung</h3></div>`; 
+            }
         }
         
         else if (target === 'kuesioner') { 
