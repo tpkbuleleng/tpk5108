@@ -1,5 +1,5 @@
 // ==========================================
-// 📊 DASHBOARD SUPERVISOR (PKB & ADMIN KECAMATAN) - V31
+// 📊 DASHBOARD SUPERVISOR (PKB & ADMIN KECAMATAN) - V32
 // ==========================================
 import { clearStore } from './db.js';
 
@@ -8,9 +8,6 @@ const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzEmmn0wMJmC1OHij9JU
 window.adminData = { registrasi: [], pendampingan: [] };
 window.adminSession = null;
 
-// ==========================================
-// 1. FUNGSI TARIK DATA & FILTER WILAYAH
-// ==========================================
 const fetchAdminData = async () => {
     try {
         const url = `${SCRIPT_URL}?action=getAdminData&role=${window.adminSession.role}&kecamatan=${window.adminSession.kecamatan}`;
@@ -21,13 +18,12 @@ const fetchAdminData = async () => {
             let rawReg = res.data.registrasi || [];
             let rawPend = res.data.pendampingan || [];
             
-            // 🔥 FILTER CERDAS: Jika PKB, saring berdasarkan scope_desa (bisa banyak desa)
+            // 🔥 V32 FILTER CERDAS: Saring berdasarkan multiple scope_desa
             const isPKB = String(window.adminSession.role).toUpperCase().includes('PKB');
             if (isPKB) {
                 const allowedDesa = String(window.adminSession.desa || '').toUpperCase().split(',').map(d => d.trim());
                 if (!allowedDesa.includes('ALL') && !allowedDesa.includes('-') && allowedDesa.length > 0 && allowedDesa[0] !== "") {
                     rawReg = rawReg.filter(r => allowedDesa.includes(String(r.desa || '').toUpperCase()));
-                    // Untuk pendampingan, kita perlu filter berdasarkan ID Sasaran yang ada di rawReg
                     const allowedIds = new Set(rawReg.map(r => r.id));
                     rawPend = rawPend.filter(p => allowedIds.has(p.id_sasaran_ref));
                 }
@@ -38,23 +34,14 @@ const fetchAdminData = async () => {
             return true;
         }
         return false;
-    } catch (e) {
-        console.error("Gagal menarik data:", e);
-        return false;
-    }
+    } catch (e) { console.error("Gagal menarik data:", e); return false; }
 };
 
-// ==========================================
-// 2. FUNGSI EXPORT KE EXCEL (CSV)
-// ==========================================
 const exportToCSV = (filename, rows) => {
     if(!rows || !rows.length) return;
     const separator = ',';
     const keys = Object.keys(rows[0]);
-    const csvContent =
-        keys.join(separator) +
-        '\n' +
-        rows.map(row => {
+    const csvContent = keys.join(separator) + '\n' + rows.map(row => {
             return keys.map(k => {
                 let cell = row[k] === null || row[k] === undefined ? '' : row[k];
                 cell = cell instanceof Date ? cell.toLocaleString() : cell.toString().replace(/"/g, '""');
@@ -67,22 +54,15 @@ const exportToCSV = (filename, rows) => {
     const link = document.createElement('a');
     if (link.download !== undefined) {
         const url = URL.createObjectURL(blob);
-        link.setAttribute('href', url);
-        link.setAttribute('download', filename);
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        link.setAttribute('href', url); link.setAttribute('download', filename);
+        link.style.visibility = 'hidden'; document.body.appendChild(link);
+        link.click(); document.body.removeChild(link);
     }
 };
 
-// ==========================================
-// 3. RENDER TAMPILAN (VIEWS)
-// ==========================================
 window.renderAdminView = async (target) => {
     const content = document.getElementById('admin-content');
     
-    // --- 🎛️ DASHBOARD UTAMA PKB ---
     if (target === 'dashboard') {
         const reg = window.adminData.registrasi;
         const pend = window.adminData.pendampingan;
@@ -91,30 +71,31 @@ window.renderAdminView = async (target) => {
         let pCatin = 0, pBumil = 0, pBufas = 0, pBaduta = 0;
 
         reg.forEach(r => {
-            if(r.status_duplikasi && r.status_duplikasi.includes('DUPLIKAT')) return; // Abaikan duplikat
+            if(r.status_duplikasi && r.status_duplikasi.includes('DUPLIKAT')) return; 
             if(r.jenis_sasaran === 'CATIN') cCatin++;
             else if(r.jenis_sasaran === 'BUMIL') cBumil++;
             else if(r.jenis_sasaran === 'BUFAS') cBufas++;
             else if(r.jenis_sasaran === 'BADUTA') cBaduta++;
         });
 
-        // Rekap Kinerja Kader (Siapa yang paling rajin lapor)
         const kaderKinerja = {};
         pend.forEach(p => {
             let jenis = p.id_sasaran_ref.substring(0,3);
             if(jenis === 'CTN') pCatin++; else if(jenis === 'BML') pBumil++; else if(jenis === 'BFS') pBufas++; else if(jenis === 'BDT') pBaduta++;
-            
             if(!kaderKinerja[p.username]) kaderKinerja[p.username] = 0;
             kaderKinerja[p.username]++;
         });
 
         const topKader = Object.entries(kaderKinerja).sort((a,b) => b[1] - a[1]).slice(0, 5);
+        
+        // 🔥 V32: Tampilan Desa yang Fleksibel (Word-wrap untuk multi-desa)
+        let displayDesa = window.adminSession.desa === '-' || window.adminSession.desa === 'ALL' ? window.adminSession.kecamatan : window.adminSession.desa;
 
         content.innerHTML = `
             <div class="animate-fade">
                 <div style="background: linear-gradient(135deg, #6f42c1 0%, #4a2b82 100%); color: white; border-radius: 12px; padding: 25px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
                     <p style="margin:0; opacity: 0.9; font-weight: 800; font-size: 0.85rem; letter-spacing:1px;">RADAR PEMANTAUAN TPK</p>
-                    <h2 style="margin: 5px 0 10px 0; font-size: 1.6rem;">Wilayah: ${window.adminSession.desa === '-' || window.adminSession.desa === 'ALL' ? window.adminSession.kecamatan : window.adminSession.desa}</h2>
+                    <h2 style="margin: 5px 0 10px 0; font-size: 1.6rem; word-wrap: break-word;">Wilayah: ${displayDesa}</h2>
                     <p style="margin:0; font-size:0.9rem; opacity:0.8;">Total Data Terhimpun: <b>${reg.length} Sasaran</b> & <b>${pend.length} Kunjungan</b>.</p>
                 </div>
 
@@ -165,7 +146,6 @@ window.renderAdminView = async (target) => {
         `;
     }
 
-    // --- 📋 TABEL REKAP SASARAN ---
     else if (target === 'sasaran') {
         const reg = window.adminData.registrasi;
         content.innerHTML = `
@@ -200,7 +180,7 @@ window.renderAdminView = async (target) => {
                 const matchNama = r.nama_sasaran.toLowerCase().includes(filterNama) || (r.id||'').toLowerCase().includes(filterNama) || (r.desa||'').toLowerCase().includes(filterNama);
                 const matchJenis = filterJenis === 'ALL' || r.jenis_sasaran === filterJenis;
                 return matchNama && matchJenis;
-            }).sort((a,b) => new Date(b.created_at) - new Date(a.created_at)); // Urut terbaru
+            }).sort((a,b) => new Date(b.created_at) - new Date(a.created_at)); 
 
             if(filtered.length === 0) { tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:20px; color:#999;">Tidak ada data yang cocok.</td></tr>`; return; }
 
@@ -226,7 +206,6 @@ window.renderAdminView = async (target) => {
         renderTabelSasaran();
     }
 
-    // --- 🤝 TABEL RIWAYAT PENDAMPINGAN ---
     else if (target === 'pendampingan') {
         const pend = window.adminData.pendampingan;
         content.innerHTML = `
@@ -314,7 +293,6 @@ window.exportCSV = (jenis) => {
 export const initAdmin = async (session) => {
     window.adminSession = session;
     
-    // Tampilan Skeleton
     document.body.innerHTML = `
         <div id="admin-root" style="position:absolute; top:0; left:0; right:0; bottom:0; display:flex; background:#eef2f5; font-family: 'Segoe UI', sans-serif; overflow: hidden;">
             <div id="admin-sidebar" style="width:260px; background: #ffffff; color:#333; display:flex; flex-direction:column; box-shadow: 2px 0 10px rgba(0,0,0,0.05); z-index:100; flex-shrink: 0; border-right:1px solid #e1e8ed;">
@@ -359,7 +337,6 @@ export const initAdmin = async (session) => {
         </style>
     `;
 
-    // Logout & Menu Logic
     document.getElementById('btn-admin-logout').onclick = async () => { if(confirm("Keluar dari Panel Supervisor?")) { await clearStore('kader_session'); location.reload(); } };
     
     const menuItems = document.querySelectorAll('.admin-menu-item');
@@ -385,7 +362,6 @@ export const initAdmin = async (session) => {
         btn.innerText = "🔄 Segarkan Data"; btn.disabled = false;
     };
 
-    // Mulai Eksekusi Pertama
     const success = await fetchAdminData();
     if(success) {
         document.getElementById('admin-page-title').innerText = 'Dashboard Pemantauan';
