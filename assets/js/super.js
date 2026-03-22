@@ -1,5 +1,5 @@
 // ==========================================
-// 👑 GOD MODE: SUPER ADMIN DASHBOARD (V31 - ROLE ADMIN DESA ADDED)
+// 👑 GOD MODE: SUPER ADMIN DASHBOARD (V32 FIXED - KABEL TERSAMBUNG)
 // ==========================================
 import { getAllData, clearStore } from './db.js';
 
@@ -26,6 +26,9 @@ window.superToggleWidget = async (idWidget, statusSaatIni) => { const isAktif = 
 window.superEditMenu = (id) => { const menu = window.superMenuData.find(m => m.id_menu === id); if(!menu) return; window.currentEditMenuId = id; document.getElementById('modal-m-title').innerHTML = "✏️ Edit Menu Navigasi"; document.getElementById('btn-submit-m').innerText = "Update Menu"; document.getElementById('m-icon').value = menu.icon || ''; document.getElementById('m-label').value = menu.label_menu || ''; const targetSel = document.getElementById('m-target-sel'); const targetCus = document.getElementById('m-target-custom'); const opts = Array.from(targetSel.options).map(o => o.value); if (opts.includes(menu.target_view)) { targetSel.value = menu.target_view; targetCus.style.display = 'none'; targetCus.value = ''; } else { targetSel.value = 'CUSTOM'; targetCus.style.display = 'block'; targetCus.value = menu.target_view || ''; } document.getElementById('m-urut').value = menu.urutan || ''; const parentSelect = document.getElementById('m-parent'); parentSelect.innerHTML = '<option value="">-- Bukan Sub-Menu --</option>'; window.superMenuData.forEach(m => { if ((!m.parent_id || m.parent_id === '') && m.id_menu !== id) { parentSelect.innerHTML += `<option value="${m.id_menu}">${m.icon || ''} ${m.label_menu}</option>`; } }); if(menu.parent_id) parentSelect.value = menu.parent_id; const roles = (menu.role_akses || '').split(','); document.querySelectorAll('.m-role-chk').forEach(cb => { cb.checked = roles.includes(cb.value); }); document.getElementById('modal-add-m').style.display = 'flex'; };
 window.superEditWidget = (id) => { const widget = window.superWidgetData.find(w => w.id_widget === id); if(!widget) return; window.currentEditWidgetId = id; document.getElementById('modal-w-title').innerHTML = "✏️ Edit Komponen Halaman"; document.getElementById('btn-submit-w').innerText = "Update Komponen"; const tHalaman = document.getElementById('w-target-sel'); tHalaman.innerHTML = '<option value="">-- Pilih Halaman / Menu --</option>'; const defaultTargets = ['dashboard', 'registrasi', 'daftar_sasaran', 'pendampingan', 'rekap_bulanan', 'cetak_pdf', 'bantuan', 'setting']; const dynamicTargets = window.superMenuData.map(m => m.target_view).filter(Boolean); const uniqueTargets = [...new Set([...defaultTargets, ...dynamicTargets])]; uniqueTargets.forEach(t => tHalaman.innerHTML += `<option value="${t}">${t}</option>`); tHalaman.value = widget.target_halaman || ''; document.getElementById('w-posisi').value = widget.posisi || 'atas'; document.getElementById('w-tipe').value = 'html'; document.querySelectorAll('.widget-panel').forEach(p => p.style.display = 'none'); document.getElementById('panel-html').style.display = 'block'; document.getElementById('w-konten-html').value = widget.isi_konten || ''; document.getElementById('modal-add-w').style.display = 'flex'; };
 
+// ==========================================
+// 2. FUNGSI RENDER TABEL USER
+// ==========================================
 window.renderUserTable = () => {
     try {
         const searchVal = document.getElementById('flt-search').value.toLowerCase(); const roleVal = document.getElementById('flt-role').value; const kecVal = document.getElementById('flt-kec').value;
@@ -43,7 +46,6 @@ window.renderUserTable = () => {
             if (matchSearch && matchRole && matchKec) {
                 count++; if (!role.includes('SUPER')) { window.currentFilteredIds.push(id); }
                 
-                // 🔥 Lencana Role Baru (Desa)
                 let badgeClass = role.includes('SUPER') ? 'role-super' : (role === 'ADMIN_DESA' ? 'role-desa' : (role.includes('ADMIN') ? 'role-admin' : (role.includes('PKB') ? 'role-pkb' : (role.includes('MITRA') ? 'role-mitra' : 'role-kader'))));
                 
                 const isAktif = currentStatus === 'AKTIF'; const statusUI = isAktif ? '<span style="color:#00b894; font-weight:bold; display:block; margin-bottom:5px;">🟢 Aktif</span>' : '<span style="color:#ff7675; font-weight:bold; display:block; margin-bottom:5px;">🔴 Diblokir</span>'; const toggleText = isAktif ? 'Blokir' : 'Aktifkan'; const toggleColor = isAktif ? '#ff7675' : '#00b894';
@@ -132,8 +134,68 @@ window.renderSuperView = async (target) => {
     
     try {
         if (target === 'dashboard') { 
-            // [Kode Dashboard SAMA dengan V30]
-            content.innerHTML = `<div class="animate-fade"><div class="super-card" style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); color: white; margin-bottom: 20px; border: none; padding: 25px 30px;"><h2 style="margin:0 0 5px 0; font-size:1.6rem;">Selamat Datang, ${window.currentUser?.nama || 'Komandan'}! 🚀</h2><p style="margin:0; opacity:0.8; font-size:0.95rem;">Pusat Kendali Utama (God Mode) Sistem Pendataan Kader TPK.</p></div><div class="super-card" style="margin-bottom: 20px; padding: 15px;"><div style="font-size:0.85rem; font-weight:bold; color:#e94560; margin-bottom:10px;">🔍 FILTER STATISTIK PENGGUNAAN APLIKASI</div><div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;"><select id="dash-flt-waktu" class="filter-input"><option value="ALL">🗓️ Sepanjang Masa</option><option value="TODAY">⏳ Hari Ini</option><option value="7D">📅 7 Hari Terakhir</option><option value="30D">📆 30 Hari Terakhir</option></select><select id="dash-flt-role" class="filter-input"><option value="ALL">👥 Semua Role</option><option value="KADER">Kader TPK</option><option value="PKB">PKB / Supervisor</option><option value="ADMIN_DESA">Admin Desa/Kelurahan</option><option value="ADMIN">Admin Kecamatan</option><option value="MITRA">Mitra Kerja</option><option value="SUPER">Super Admin</option></select><select id="dash-flt-kec" class="filter-input"><option value="ALL">🌍 Semua Kecamatan</option></select><select id="dash-flt-desa" class="filter-input"><option value="ALL">🏘️ Semua Desa</option></select></div></div><div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; margin-bottom: 20px;"><div class="super-card" style="border-left: 5px solid #0984e3; display:flex; flex-direction:column; justify-content:center; padding: 15px;"><div style="font-size:0.8rem; color:#666; font-weight:bold;">PENGGUNA AKTIF (PERNAH LOGIN)</div><div id="st-aktif" style="font-size:2rem; font-weight:900; color:#0984e3; margin-top:5px;">⏳</div></div><div class="super-card" style="border-left: 5px solid #636e72; display:flex; flex-direction:column; justify-content:center; padding: 15px;"><div style="font-size:0.8rem; color:#666; font-weight:bold;">PASIF (BELUM PERNAH LOGIN)</div><div id="st-pasif" style="font-size:2rem; font-weight:900; color:#636e72; margin-top:5px;">⏳</div></div><div class="super-card" style="border-left: 5px solid #198754; display:flex; flex-direction:column; justify-content:center; padding: 15px;"><div style="font-size:0.8rem; color:#666; font-weight:bold;">TOTAL LOGIN BERHASIL</div><div id="st-sukses" style="font-size:2rem; font-weight:900; color:#198754; margin-top:5px;">⏳</div></div><div class="super-card" style="border-left: 5px solid #e94560; display:flex; flex-direction:column; justify-content:center; padding: 15px;"><div style="font-size:0.8rem; color:#666; font-weight:bold;">TOTAL LOGIN GAGAL</div><div id="st-gagal" style="font-size:2rem; font-weight:900; color:#e94560; margin-top:5px;">⏳</div></div></div><div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 20px;"><div class="super-card" style="text-align:center; padding:15px;"><div style="font-size:0.75rem; color:#666; font-weight:bold;">TOTAL AKUN</div><div id="dash-count-user" style="font-size:1.5rem; font-weight:900; color:#2c3e50;">⏳</div></div><div class="super-card" style="text-align:center; padding:15px;"><div style="font-size:0.75rem; color:#666; font-weight:bold;">KUESIONER</div><div id="dash-count-q" style="font-size:1.5rem; font-weight:900; color:#2c3e50;">⏳</div></div><div class="super-card" style="text-align:center; padding:15px;"><div style="font-size:0.75rem; color:#666; font-weight:bold;">MENU AKTIF</div><div id="dash-count-m" style="font-size:1.5rem; font-weight:900; color:#2c3e50;">⏳</div></div><div class="super-card" style="text-align:center; padding:15px;"><div style="font-size:0.75rem; color:#666; font-weight:bold;">WIDGET INJEKSI</div><div id="dash-count-w" style="font-size:1.5rem; font-weight:900; color:#2c3e50;">⏳</div></div></div><div style="display: grid; grid-template-columns: 2fr 1fr; gap: 15px;"><div class="super-card"><div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee; padding-bottom:10px; margin-bottom:15px;"><h3 style="margin:0; color:#1a1a2e;">🛡️ Log Keamanan Terakhir (CCTV)</h3><button style="background:none; border:none; color:#0984e3; cursor:pointer; font-weight:bold; font-size:0.85rem;" onclick="document.querySelector('[data-target=audit_trail]').click()">Lihat Detail & Filter</button></div><div id="dash-audit-list"><div style="text-align:center; color:#999; padding:20px;">Menarik data CCTV dari satelit... ⏳</div></div></div><div class="super-card"><h3 style="margin:0; color:#1a1a2e; border-bottom:1px solid #eee; padding-bottom:10px;">⚡ Aksi Cepat</h3><div style="display:grid; grid-template-columns: 1fr; gap:10px; margin-top:15px;"><button class="quick-link-btn" onclick="document.querySelector('[data-target=user_management]').click()" style="padding:15px; background:#f8f9fa; border:1px solid #ddd; border-radius:8px; cursor:pointer; text-align:left; font-weight:bold; color:#333; transition:all 0.2s;">👥 Kelola Pengguna</button><button class="quick-link-btn" onclick="document.querySelector('[data-target=kuesioner]').click()" style="padding:15px; background:#f8f9fa; border:1px solid #ddd; border-radius:8px; cursor:pointer; text-align:left; font-weight:bold; color:#333; transition:all 0.2s;">📋 Rakit Kuesioner</button><button class="quick-link-btn" onclick="document.querySelector('[data-target=widget_management]').click()" style="padding:15px; background:#f8f9fa; border:1px solid #ddd; border-radius:8px; cursor:pointer; text-align:left; font-weight:bold; color:#333; transition:all 0.2s;">🧩 Buat Widget</button></div></div></div></div>`;
+            content.innerHTML = `
+                <div class="animate-fade">
+                    <div class="super-card" style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); color: white; margin-bottom: 20px; border: none; padding: 25px 30px;">
+                        <h2 style="margin:0 0 5px 0; font-size:1.6rem;">Selamat Datang, ${window.currentUser?.nama || 'Komandan'}! 🚀</h2>
+                        <p style="margin:0; opacity:0.8; font-size:0.95rem;">Pusat Kendali Utama (God Mode) Sistem Pendataan Kader TPK.</p>
+                    </div>
+
+                    <div class="super-card" style="margin-bottom: 20px; padding: 15px;">
+                        <div style="font-size:0.85rem; font-weight:bold; color:#e94560; margin-bottom:10px;">🔍 FILTER STATISTIK PENGGUNAAN APLIKASI</div>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
+                            <select id="dash-flt-waktu" class="filter-input"><option value="ALL">🗓️ Sepanjang Masa</option><option value="TODAY">⏳ Hari Ini</option><option value="7D">📅 7 Hari Terakhir</option><option value="30D">📆 30 Hari Terakhir</option></select>
+                            <select id="dash-flt-role" class="filter-input"><option value="ALL">👥 Semua Role</option><option value="KADER">Kader TPK</option><option value="PKB">PKB / Supervisor</option><option value="ADMIN_DESA">Admin Desa/Kelurahan</option><option value="ADMIN">Admin Kecamatan</option><option value="MITRA">Mitra Kerja</option><option value="SUPER">Super Admin</option></select>
+                            <select id="dash-flt-kec" class="filter-input"><option value="ALL">🌍 Semua Kecamatan</option></select>
+                            <select id="dash-flt-desa" class="filter-input"><option value="ALL">🏘️ Semua Desa</option></select>
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; margin-bottom: 20px;">
+                        <div class="super-card" style="border-left: 5px solid #0984e3; display:flex; flex-direction:column; justify-content:center; padding: 15px;">
+                            <div style="font-size:0.8rem; color:#666; font-weight:bold;">PENGGUNA AKTIF (PERNAH LOGIN)</div>
+                            <div id="st-aktif" style="font-size:2rem; font-weight:900; color:#0984e3; margin-top:5px;">⏳</div>
+                        </div>
+                        <div class="super-card" style="border-left: 5px solid #636e72; display:flex; flex-direction:column; justify-content:center; padding: 15px;">
+                            <div style="font-size:0.8rem; color:#666; font-weight:bold;">PASIF (BELUM PERNAH LOGIN)</div>
+                            <div id="st-pasif" style="font-size:2rem; font-weight:900; color:#636e72; margin-top:5px;">⏳</div>
+                        </div>
+                        <div class="super-card" style="border-left: 5px solid #198754; display:flex; flex-direction:column; justify-content:center; padding: 15px;">
+                            <div style="font-size:0.8rem; color:#666; font-weight:bold;">TOTAL LOGIN BERHASIL</div>
+                            <div id="st-sukses" style="font-size:2rem; font-weight:900; color:#198754; margin-top:5px;">⏳</div>
+                        </div>
+                        <div class="super-card" style="border-left: 5px solid #e94560; display:flex; flex-direction:column; justify-content:center; padding: 15px;">
+                            <div style="font-size:0.8rem; color:#666; font-weight:bold;">TOTAL LOGIN GAGAL</div>
+                            <div id="st-gagal" style="font-size:2rem; font-weight:900; color:#e94560; margin-top:5px;">⏳</div>
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 20px;">
+                        <div class="super-card" style="text-align:center; padding:15px;"><div style="font-size:0.75rem; color:#666; font-weight:bold;">TOTAL AKUN</div><div id="dash-count-user" style="font-size:1.5rem; font-weight:900; color:#2c3e50;">⏳</div></div>
+                        <div class="super-card" style="text-align:center; padding:15px;"><div style="font-size:0.75rem; color:#666; font-weight:bold;">KUESIONER</div><div id="dash-count-q" style="font-size:1.5rem; font-weight:900; color:#2c3e50;">⏳</div></div>
+                        <div class="super-card" style="text-align:center; padding:15px;"><div style="font-size:0.75rem; color:#666; font-weight:bold;">MENU AKTIF</div><div id="dash-count-m" style="font-size:1.5rem; font-weight:900; color:#2c3e50;">⏳</div></div>
+                        <div class="super-card" style="text-align:center; padding:15px;"><div style="font-size:0.75rem; color:#666; font-weight:bold;">WIDGET INJEKSI</div><div id="dash-count-w" style="font-size:1.5rem; font-weight:900; color:#2c3e50;">⏳</div></div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 15px;">
+                        <div class="super-card">
+                            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee; padding-bottom:10px; margin-bottom:15px;">
+                                <h3 style="margin:0; color:#1a1a2e;">🛡️ Log Keamanan Terakhir (CCTV)</h3>
+                                <button style="background:none; border:none; color:#0984e3; cursor:pointer; font-weight:bold; font-size:0.85rem;" onclick="document.querySelector('[data-target=audit_trail]').click()">Lihat Detail & Filter</button>
+                            </div>
+                            <div id="dash-audit-list"><div style="text-align:center; color:#999; padding:20px;">Menarik data CCTV dari satelit... ⏳</div></div>
+                        </div>
+                        <div class="super-card">
+                            <h3 style="margin-top:0; color:#1a1a2e; border-bottom:1px solid #eee; padding-bottom:10px;">⚡ Aksi Cepat</h3>
+                            <div style="display:grid; grid-template-columns: 1fr; gap:10px; margin-top:15px;">
+                                <button class="quick-link-btn" onclick="document.querySelector('[data-target=user_management]').click()" style="padding:15px; background:#f8f9fa; border:1px solid #ddd; border-radius:8px; cursor:pointer; text-align:left; font-weight:bold; color:#333; transition:all 0.2s;">👥 Kelola Pengguna</button>
+                                <button class="quick-link-btn" onclick="document.querySelector('[data-target=kuesioner]').click()" style="padding:15px; background:#f8f9fa; border:1px solid #ddd; border-radius:8px; cursor:pointer; text-align:left; font-weight:bold; color:#333; transition:all 0.2s;">📋 Rakit Kuesioner</button>
+                                <button class="quick-link-btn" onclick="document.querySelector('[data-target=widget_management]').click()" style="padding:15px; background:#f8f9fa; border:1px solid #ddd; border-radius:8px; cursor:pointer; text-align:left; font-weight:bold; color:#333; transition:all 0.2s;">🧩 Buat Widget</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
 
             const renderAnalytics = () => {
                 if (window.dashAnalyticData.users.length === 0) return;
@@ -182,7 +244,13 @@ window.renderSuperView = async (target) => {
                             let nKec = String(u.scope_kecamatan || u.kecamatan || 'ALL').toUpperCase(); let nDesa = String(u.scope_desa || u.desa_kelurahan || u.desa || '-').toUpperCase(); const role = String(u.role_akses || u.role || 'KADER').toUpperCase(); const refId = u.ref_id || u.id_pengguna || u.id_user || u.username;
                             
                             if (role.includes('KADER')) { const k = kaders.find(kd => String(kd.id_kader) === String(refId) || String(kd.nik) === String(refId)); if (k) { const idTim = k.id_tim || k.tim; const t = tims.find(td => String(td.id_tim) === String(idTim) || String(td.id) === String(idTim)); if (t) { let d = t.desa_kelurahan || t.desa || k.desa_kelurahan || k.desa || nDesa; nDesa = String(d).toUpperCase(); let c = t.kecamatan || t.wilayah || k.kecamatan || nKec; nKec = String(c).toUpperCase(); } } }
-                            if (role.includes('PKB')) { if(nDesa === '-' || nDesa === '') { const p = pkbs.find(pk => String(pk.id_pkb) === String(refId) || String(pk.nip_pkb) === String(refId)); if (p) { nKec = String(p.kecamatan || nKec).toUpperCase(); nDesa = String(p.desa_kelurahan || p.desa || nDesa).toUpperCase(); } } }
+                            
+                            if (role.includes('PKB')) {
+                                if(nDesa === '-' || nDesa === '') {
+                                    const p = pkbs.find(pk => String(pk.id_pkb) === String(refId) || String(pk.nip_pkb) === String(refId));
+                                    if (p) { nKec = String(p.kecamatan || nKec).toUpperCase(); nDesa = String(p.desa_kelurahan || p.desa || nDesa).toUpperCase(); }
+                                }
+                            }
 
                             if (nDesa === 'UNDEFINED' || nDesa === '') nDesa = '-'; u._desa = nDesa; u._kecamatan = nKec; return u;
                         });
@@ -230,22 +298,47 @@ window.renderSuperView = async (target) => {
 
         // --- 🛡️ MENU AUDIT LOG ---
         else if (target === 'audit_trail') {
-            // [KODE AUDIT LOG SAMA DENGAN V30]
-            content.innerHTML = `<div class="super-card" style="margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px;"><div><h3 style="margin:0; color:#1a1a2e;">🛡️ Audit Log & Rincian CCTV</h3><p style="margin:5px 0 0 0; color:#666; font-size:0.9rem;">Rincian aktivitas pengguna dan log keamanan sistem.</p></div></div><div class="super-card" style="padding:0; overflow:hidden;"><div style="background:#f8f9fa; padding:15px; border-bottom:1px solid #eee; display:flex; gap:10px; flex-wrap:wrap; align-items:center;"><div style="position: relative; flex: 1; min-width: 200px;"><input type="text" id="log-flt-search" class="filter-input" placeholder="🔍 Cari Nama / ID / Keterangan..." style="width: 100%; box-sizing: border-box;"></div><select id="log-flt-waktu" class="filter-input"><option value="ALL">🗓️ Sepanjang Masa</option><option value="TODAY">⏳ Hari Ini</option><option value="7D">📅 7 Hari Terakhir</option><option value="30D">📆 30 Hari Terakhir</option></select><select id="log-flt-aksi" class="filter-input"><option value="ALL">⚡ Semua Aktivitas</option><option value="LOGIN_SUKSES">✅ Login Berhasil</option><option value="LOGIN_GAGAL">❌ Login Gagal</option><option value="ADMIN">🛡️ Aksi Super Admin</option></select><div style="font-size:0.85rem; font-weight:bold; color:#666; background:#fff; padding:8px 12px; border:1px solid #ddd; border-radius:6px;" id="lbl-count-log">0 Log</div></div><div id="table-wrapper-log" class="super-table-container"><div style="padding:50px; text-align:center; color:#666;"><h3>⏳ Menyedot Rekaman CCTV...</h3></div></div></div>`;
+            content.innerHTML = `
+                <div class="super-card" style="margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px;">
+                    <div><h3 style="margin:0; color:#1a1a2e;">🛡️ Audit Log & Rincian CCTV</h3><p style="margin:5px 0 0 0; color:#666; font-size:0.9rem;">Rincian aktivitas pengguna dan log keamanan sistem.</p></div>
+                </div>
+                
+                <div class="super-card" style="padding:0; overflow:hidden;">
+                    <div style="background:#f8f9fa; padding:15px; border-bottom:1px solid #eee; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+                        <div style="position: relative; flex: 1; min-width: 200px;"><input type="text" id="log-flt-search" class="filter-input" placeholder="🔍 Cari Nama / ID / Keterangan..." style="width: 100%; box-sizing: border-box;"></div>
+                        <select id="log-flt-waktu" class="filter-input"><option value="ALL">🗓️ Sepanjang Masa</option><option value="TODAY">⏳ Hari Ini</option><option value="7D">📅 7 Hari Terakhir</option><option value="30D">📆 30 Hari Terakhir</option></select>
+                        <select id="log-flt-aksi" class="filter-input"><option value="ALL">⚡ Semua Aktivitas</option><option value="LOGIN_SUKSES">✅ Login Berhasil</option><option value="LOGIN_GAGAL">❌ Login Gagal</option><option value="ADMIN">🛡️ Aksi Super Admin</option></select>
+                        <div style="font-size:0.85rem; font-weight:bold; color:#666; background:#fff; padding:8px 12px; border:1px solid #ddd; border-radius:6px;" id="lbl-count-log">0 Log</div>
+                    </div>
+                    <div id="table-wrapper-log" class="super-table-container"><div style="padding:50px; text-align:center; color:#666;"><h3>⏳ Menyedot Rekaman CCTV...</h3></div></div>
+                </div>
+            `;
+
             try {
                 const [resA, resU, resT, resK, resP] = await Promise.all([
-                    fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_AUDIT', token: SUPER_TOKEN }) }).then(r => r.json()), fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_ALL', token: SUPER_TOKEN, sheetName: 'USER_LOGIN' }) }).then(r => r.json()), fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_ALL', token: SUPER_TOKEN, sheetName: 'MASTER_TIM' }) }).then(r => r.json()), fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_ALL', token: SUPER_TOKEN, sheetName: 'MASTER_KADER' }) }).then(r => r.json()), fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_ALL', token: SUPER_TOKEN, sheetName: 'MASTER_PKB' }) }).then(r => r.json())
+                    fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_AUDIT', token: SUPER_TOKEN }) }).then(r => r.json()),
+                    fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_ALL', token: SUPER_TOKEN, sheetName: 'USER_LOGIN' }) }).then(r => r.json()),
+                    fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_ALL', token: SUPER_TOKEN, sheetName: 'MASTER_TIM' }) }).then(r => r.json()),
+                    fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_ALL', token: SUPER_TOKEN, sheetName: 'MASTER_KADER' }) }).then(r => r.json()),
+                    fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_ALL', token: SUPER_TOKEN, sheetName: 'MASTER_PKB' }) }).then(r => r.json())
                 ]);
+
                 if(resA.status === 'success' && resU.status === 'success') {
                     window.superAuditData = resA.data || [];
                     const rawUsers = resU.data || []; const tims = resT.data || []; const kaders = resK.data || []; const pkbs = resP.data || [];
+                    
                     window.superUsersData = rawUsers.map(u => {
                         let nKec = String(u.scope_kecamatan || u.kecamatan || 'ALL').toUpperCase(); let nDesa = String(u.scope_desa || u.desa_kelurahan || u.desa || '-').toUpperCase(); const role = String(u.role_akses || u.role || 'KADER').toUpperCase(); const refId = u.ref_id || u.id_pengguna || u.id_user || u.username;
                         if (role.includes('KADER')) { const k = kaders.find(kd => String(kd.id_kader) === String(refId) || String(kd.nik) === String(refId)); if (k) { const idTim = k.id_tim || k.tim; const t = tims.find(td => String(td.id_tim) === String(idTim) || String(td.id) === String(idTim)); if (t) { let d = t.desa_kelurahan || t.desa || k.desa_kelurahan || k.desa || nDesa; nDesa = String(d).toUpperCase(); let c = t.kecamatan || t.wilayah || k.kecamatan || nKec; nKec = String(c).toUpperCase(); } } }
                         if (role.includes('PKB')) { if(nDesa === '-' || nDesa === '') { const p = pkbs.find(pk => String(pk.id_pkb) === String(refId) || String(pk.nip_pkb) === String(refId)); if (p) { nKec = String(p.kecamatan || nKec).toUpperCase(); nDesa = String(p.desa_kelurahan || p.desa || nDesa).toUpperCase(); } } }
                         if (nDesa === 'UNDEFINED' || nDesa === '') nDesa = '-'; u._desa = nDesa; u._kecamatan = nKec; return u;
                     });
-                    window.renderAuditTable(); document.getElementById('log-flt-waktu').addEventListener('change', window.renderAuditTable); document.getElementById('log-flt-aksi').addEventListener('change', window.renderAuditTable); document.getElementById('log-flt-search').addEventListener('input', window.renderAuditTable);
+
+                    window.renderAuditTable();
+                    document.getElementById('log-flt-waktu').addEventListener('change', window.renderAuditTable);
+                    document.getElementById('log-flt-aksi').addEventListener('change', window.renderAuditTable);
+                    document.getElementById('log-flt-search').addEventListener('input', window.renderAuditTable);
+
                 } else { document.getElementById('table-wrapper-log').innerHTML = `<div style="padding:50px; text-align:center; color:#e94560;"><h3>❌ Gagal Mengunduh Log</h3><p>Server menolak koneksi. Coba Muat Ulang.</p></div>`; }
             } catch(e) { catatErrorSistem('Menu Audit Trail', e); document.getElementById('table-wrapper-log').innerHTML = `<div style="padding:50px; text-align:center; color:#e94560;"><h3>❌ Izin Akses Tertahan (Koneksi Terputus)</h3><p>Google meminta Otorisasi Izin Ulang untuk mengakses Database CCTV Bapak.<br><br><b>Solusi Cepat:</b> Buka Tab <code>Code.gs</code> di App Script, klik <b>Jalankan</b>, lalu klik <b>Tinjau Izin</b> (Review Permissions).</p></div>`; }
         }
@@ -337,8 +430,11 @@ window.renderSuperView = async (target) => {
                 if (res.status === 'success') {
                     window.superUsersData = res.data.map(u => {
                         let nTim = '-'; let nDesa = String(u.scope_desa || u.desa_kelurahan || u.desa || u.wilayah_desa || '-').toUpperCase(); const role = String(u.role_akses || u.role || 'KADER').toUpperCase(); const refId = u.ref_id || u.id_pengguna || u.id_user || u.username;
-                        if (role.includes('KADER')) { const k = kaders.find(kd => String(kd.id_kader) === String(refId) || String(kd.nik) === String(refId)); if (k) { const idTim = k.id_tim || k.tim; const t = tims.find(td => String(td.id_tim) === String(idTim) || String(td.id) === String(idTim)); if (t) { nTim = String(t.nomor_tim || t.nama_tim || idTim); let d = t.desa_kelurahan || t.desa || k.desa_kelurahan || k.desa || nDesa; nDesa = String(d).toUpperCase(); } } }
+                        
+                        // 🔥 V32 PERBAIKAN: Menggunakan kaderData dan timData yang benar
+                        if (role.includes('KADER')) { const k = kaderData.find(kd => String(kd.id_kader) === String(refId) || String(kd.nik) === String(refId)); if (k) { const idTim = k.id_tim || k.tim; const t = timData.find(td => String(td.id_tim) === String(idTim) || String(td.id) === String(idTim)); if (t) { nTim = String(t.nomor_tim || t.nama_tim || idTim); let d = t.desa_kelurahan || t.desa || k.desa_kelurahan || k.desa || nDesa; nDesa = String(d).toUpperCase(); } } }
                         if (role.includes('PKB')) { const p = pkbData.find(pk => String(pk.id_pkb) === String(refId) || String(pk.nip_pkb) === String(refId)); if (p) { nDesa = String(p.desa_kelurahan || p.desa || nDesa).toUpperCase(); } }
+                        
                         if (nDesa === 'UNDEFINED' || nDesa === '') nDesa = '-'; u._nomor_tim = nTim; u._desa = nDesa; return u;
                     });
 
