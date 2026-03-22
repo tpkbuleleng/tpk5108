@@ -1,5 +1,5 @@
 // ==========================================
-// 📊 DASHBOARD SUPERVISOR (V38 - DYNAMIC THEME FIXED CONTRAST)
+// 📊 DASHBOARD SUPERVISOR (V38 - DYNAMIC THEME FIXED CONTRAST - PATCH KABUPATEN)
 // ==========================================
 import { clearStore } from './db.js';
 
@@ -97,7 +97,12 @@ window.renderAdminView = async (target) => {
         });
 
         const topKader = Object.entries(kaderKinerja).sort((a,b) => b[1] - a[1]).slice(0, 5);
+        
+        // 🔥 PATCH KAMUFLASE DASHBOARD
         let displayDesa = window.adminSession.desa === '-' || window.adminSession.desa === 'ALL' || window.adminSession.desa === '' ? window.adminSession.kecamatan : window.adminSession.desa;
+        if (String(displayDesa).toUpperCase() === 'ALL') {
+            displayDesa = 'KABUPATEN BULELENG';
+        }
 
         content.innerHTML = `
             <div class="animate-fade">
@@ -294,6 +299,9 @@ export const initAdmin = async (session) => {
     window.adminSession = session;
     const th = getRoleTheme(session.role);
     
+    // 🔥 PATCH KAMUFLASE SIDEBAR
+    const displayKecamatan = String(session.kecamatan || '').toUpperCase() === 'ALL' ? 'KABUPATEN BULELENG' : session.kecamatan;
+
     document.body.innerHTML = `
         <div id="admin-root" style="position:absolute; top:0; left:0; right:0; bottom:0; display:flex; background:#eef2f5; font-family: 'Segoe UI', sans-serif; overflow: hidden;">
             <style>
@@ -331,7 +339,7 @@ export const initAdmin = async (session) => {
                     <div class="admin-menu-item" data-target="pendampingan">🤝 Riwayat Pendampingan</div>
                 </div>
                 <div style="padding: 20px; border-top: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.2);">
-                    <div style="font-size:0.8rem; margin-bottom:10px; color:var(--th-text);">Supervisor:<br><b style="color:var(--th-accent); font-size:0.95rem;">${session.nama}</b><br><span style="font-size:0.75rem; opacity:0.8;">${session.kecamatan}</span></div>
+                    <div style="font-size:0.8rem; margin-bottom:10px; color:var(--th-text);">Supervisor:<br><b style="color:var(--th-accent); font-size:0.95rem;">${session.nama}</b><br><span style="font-size:0.75rem; opacity:0.8;">${displayKecamatan}</span></div>
                     <button id="btn-admin-logout" style="width:100%; background:transparent; color:var(--th-accent); border:1px solid var(--th-accent); padding:10px; border-radius:6px; cursor:pointer; font-weight:bold; transition: all 0.3s;">🔒 Keluar Sistem</button>
                 </div>
             </div>
