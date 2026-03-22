@@ -62,7 +62,7 @@ body, html {
 .form-group { width: 100%; margin-bottom: 15px; text-align: left; }
 .form-group label { display: block; margin-bottom: 5px; font-weight: 600; font-size: 0.9rem; }
 .form-control {
-    width: 100% !important;
+    width: 100%; /* 🔥 PATCH: Hapus !important agar Flexbox di HTML bisa bekerja */
     padding: 12px 15px;
     border: 1px solid #ddd;
     border-radius: 8px;
