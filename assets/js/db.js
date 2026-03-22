@@ -1,5 +1,5 @@
 const DB_NAME = 'TPK_Buleleng_DB';
-const DB_VERSION = 7; // 🔥 Naikkan ke Versi 7 untuk menyuntikkan MASTER_PKB
+const DB_VERSION = 8; // 🔥 Naikkan ke Versi 8 untuk menyuntikkan MASTER_PENGUMUMAN
 
 export const initDB = () => {
     return new Promise((resolve, reject) => {
@@ -15,7 +15,8 @@ export const initDB = () => {
                 'master_kader', 'master_tim', 'master_tim_wilayah',
                 'master_pertanyaan', 'master_wilayah_bali', 'standar_antropometri', 
                 'master_kembang', 'master_wilayah', 'master_menu', 'master_widget',
-                'master_pkb' // 🚀 INJEKSI TABEL PKB
+                'master_pkb', // 🚀 INJEKSI TABEL PKB
+                'master_pengumuman' // 📢 INJEKSI TABEL PUSAT SIARAN
             ];
             stores.forEach(store => { if (!db.objectStoreNames.contains(store)) db.createObjectStore(store, { autoIncrement: true }); });
             if (!db.objectStoreNames.contains('kader_session')) db.createObjectStore('kader_session', { keyPath: 'id' });
