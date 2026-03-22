@@ -1,5 +1,5 @@
 // ==========================================
-// 👑 GOD MODE: SUPER ADMIN DASHBOARD (V40 - MENU REFERENSI RESTORED)
+// 👑 GOD MODE: SUPER ADMIN DASHBOARD (V41 - VARIABLE FIXED & FULL CORE)
 // ==========================================
 import { getAllData, clearStore } from './db.js';
 
@@ -43,8 +43,7 @@ window.renderUserTable = () => {
             
             if (matchSearch && matchRole && matchKec) {
                 count++; if (!role.includes('SUPER')) { window.currentFilteredIds.push(id); }
-                let badgeClass = 'role-kader';
-                if (role.includes('SUPER')) badgeClass = 'role-super'; else if (role.includes('KABUPATEN')) badgeClass = 'role-adminkab'; else if (role.includes('KECAMATAN') || role === 'ADMIN') badgeClass = 'role-adminkec'; else if (role === 'ADMIN_DESA') badgeClass = 'role-desa'; else if (role.includes('PKB')) badgeClass = 'role-pkb'; else if (role.includes('MITRA')) badgeClass = 'role-mitra';
+                let badgeClass = 'role-kader'; if (role.includes('SUPER')) badgeClass = 'role-super'; else if (role.includes('KABUPATEN')) badgeClass = 'role-adminkab'; else if (role.includes('KECAMATAN') || role === 'ADMIN') badgeClass = 'role-adminkec'; else if (role.includes('DESA')) badgeClass = 'role-desa'; else if (role.includes('PKB')) badgeClass = 'role-pkb'; else if (role.includes('MITRA')) badgeClass = 'role-mitra';
                 
                 const isAktif = currentStatus === 'AKTIF'; const statusUI = isAktif ? '<span style="color:#198754; font-weight:bold; display:block; margin-bottom:5px;">🟢 Aktif</span>' : '<span style="color:#e94560; font-weight:bold; display:block; margin-bottom:5px;">🔴 Diblokir</span>'; const toggleText = isAktif ? 'Blokir' : 'Aktifkan'; const toggleColor = isAktif ? '#e94560' : '#198754';
                 let chkBox = ''; let actionButtons = '';
@@ -297,11 +296,11 @@ window.renderSuperView = async (target) => {
                     ]);
 
                     if (resU.status === 'success') {
-                        const rawUsers = resU.data || []; const tims = resT.data || []; const kaderData = resK.data || []; const pkbs = resP.data || [];
+                        const rawUsers = resU.data || []; const timData = resT.data || []; const kaderData = resK.data || []; const pkbData = resP.data || [];
                         window.dashAnalyticData.users = rawUsers.map(u => {
                             let nKec = String(u.scope_kecamatan || u.kecamatan || 'ALL').toUpperCase(); let nDesa = String(u.scope_desa || u.desa_kelurahan || u.desa || '-').toUpperCase(); const role = String(u.role_akses || u.role || 'KADER').toUpperCase(); const refId = u.ref_id || u.id_pengguna || u.id_user || u.username;
-                            if (role.includes('KADER')) { const k = kaderData.find(kd => String(kd.id_kader) === String(refId) || String(kd.nik) === String(refId)); if (k) { const idTim = k.id_tim || k.tim; const t = tims.find(td => String(td.id_tim) === String(idTim) || String(td.id) === String(idTim)); if (t) { let d = t.desa_kelurahan || t.desa || k.desa_kelurahan || k.desa || nDesa; nDesa = String(d).toUpperCase(); let c = t.kecamatan || t.wilayah || k.kecamatan || nKec; nKec = String(c).toUpperCase(); } } }
-                            if (role.includes('PKB')) { if(nDesa === '-' || nDesa === '') { const p = pkbs.find(pk => String(pk.id_pkb) === String(refId) || String(pk.nip_pkb) === String(refId)); if (p) { nKec = String(p.kecamatan || nKec).toUpperCase(); nDesa = String(p.desa_kelurahan || p.desa || nDesa).toUpperCase(); } } }
+                            if (role.includes('KADER')) { const k = kaderData.find(kd => String(kd.id_kader) === String(refId) || String(kd.nik) === String(refId)); if (k) { const idTim = k.id_tim || k.tim; const t = timData.find(td => String(td.id_tim) === String(idTim) || String(td.id) === String(idTim)); if (t) { let d = t.desa_kelurahan || t.desa || k.desa_kelurahan || k.desa || nDesa; nDesa = String(d).toUpperCase(); let c = t.kecamatan || t.wilayah || k.kecamatan || nKec; nKec = String(c).toUpperCase(); } } }
+                            if (role.includes('PKB')) { if(nDesa === '-' || nDesa === '') { const p = pkbData.find(pk => String(pk.id_pkb) === String(refId) || String(pk.nip_pkb) === String(refId)); if (p) { nKec = String(p.kecamatan || nKec).toUpperCase(); nDesa = String(p.desa_kelurahan || p.desa || nDesa).toUpperCase(); } } }
                             if (nDesa === 'UNDEFINED' || nDesa === '') nDesa = '-'; u._desa = nDesa; u._kecamatan = nKec; return u;
                         });
 
@@ -363,7 +362,6 @@ window.renderSuperView = async (target) => {
             loadDashboardData();
         }
 
-        // --- 🛡️ MENU AUDIT LOG ---
         else if (target === 'audit_trail') {
             window.activeAuditTab = 'CCTV'; 
 
@@ -399,11 +397,11 @@ window.renderSuperView = async (target) => {
                     window.superAuditData = resA.data || [];
                     window.superErrorData = resA.error_data || []; 
                     
-                    const rawUsers = resU.data || []; const tims = resT.data || []; const kaderData = resK.data || []; const pkbs = resP.data || [];
+                    const rawUsers = resU.data || []; const timData = resT.data || []; const kaderData = resK.data || []; const pkbData = resP.data || [];
                     window.superUsersData = rawUsers.map(u => {
                         let nKec = String(u.scope_kecamatan || u.kecamatan || 'ALL').toUpperCase(); let nDesa = String(u.scope_desa || u.desa_kelurahan || u.desa || '-').toUpperCase(); const role = String(u.role_akses || u.role || 'KADER').toUpperCase(); const refId = u.ref_id || u.id_pengguna || u.id_user || u.username;
-                        if (role.includes('KADER')) { const k = kaderData.find(kd => String(kd.id_kader) === String(refId) || String(kd.nik) === String(refId)); if (k) { const idTim = k.id_tim || k.tim; const t = tims.find(td => String(td.id_tim) === String(idTim) || String(td.id) === String(idTim)); if (t) { let d = t.desa_kelurahan || t.desa || k.desa_kelurahan || k.desa || nDesa; nDesa = String(d).toUpperCase(); let c = t.kecamatan || t.wilayah || k.kecamatan || nKec; nKec = String(c).toUpperCase(); } } }
-                        if (role.includes('PKB')) { if(nDesa === '-' || nDesa === '') { const p = pkbs.find(pk => String(pk.id_pkb) === String(refId) || String(pk.nip_pkb) === String(refId)); if (p) { nKec = String(p.kecamatan || nKec).toUpperCase(); nDesa = String(p.desa_kelurahan || p.desa || nDesa).toUpperCase(); } } }
+                        if (role.includes('KADER')) { const k = kaderData.find(kd => String(kd.id_kader) === String(refId) || String(kd.nik) === String(refId)); if (k) { const idTim = k.id_tim || k.tim; const t = timData.find(td => String(td.id_tim) === String(idTim) || String(td.id) === String(idTim)); if (t) { let d = t.desa_kelurahan || t.desa || k.desa_kelurahan || k.desa || nDesa; nDesa = String(d).toUpperCase(); let c = t.kecamatan || t.wilayah || k.kecamatan || nKec; nKec = String(c).toUpperCase(); } } }
+                        if (role.includes('PKB')) { if(nDesa === '-' || nDesa === '') { const p = pkbData.find(pk => String(pk.id_pkb) === String(refId) || String(pk.nip_pkb) === String(refId)); if (p) { nKec = String(p.kecamatan || nKec).toUpperCase(); nDesa = String(p.desa_kelurahan || p.desa || nDesa).toUpperCase(); } } }
                         if (nDesa === 'UNDEFINED' || nDesa === '') nDesa = '-'; u._desa = nDesa; u._kecamatan = nKec; return u;
                     });
                     
@@ -513,7 +511,7 @@ window.renderSuperView = async (target) => {
                 if (res.status === 'success') {
                     window.superUsersData = res.data.map(u => {
                         let nTim = '-'; let nDesa = String(u.scope_desa || u.desa_kelurahan || u.desa || u.wilayah_desa || '-').toUpperCase(); const role = String(u.role_akses || u.role || 'KADER').toUpperCase(); const refId = u.ref_id || u.id_pengguna || u.id_user || u.username;
-                        if (role.includes('KADER')) { const k = kaderData.find(kd => String(kd.id_kader) === String(refId) || String(kd.nik) === String(refId)); if (k) { const idTim = k.id_tim || k.tim; const t = tims.find(td => String(td.id_tim) === String(idTim) || String(td.id) === String(idTim)); if (t) { nTim = String(t.nomor_tim || t.nama_tim || idTim); let d = t.desa_kelurahan || t.desa || k.desa_kelurahan || k.desa || nDesa; nDesa = String(d).toUpperCase(); } } }
+                        if (role.includes('KADER')) { const k = kaderData.find(kd => String(kd.id_kader) === String(refId) || String(kd.nik) === String(refId)); if (k) { const idTim = k.id_tim || k.tim; const t = timData.find(td => String(td.id_tim) === String(idTim) || String(td.id) === String(idTim)); if (t) { nTim = String(t.nomor_tim || t.nama_tim || idTim); let d = t.desa_kelurahan || t.desa || k.desa_kelurahan || k.desa || nDesa; nDesa = String(d).toUpperCase(); } } }
                         if (role.includes('PKB')) { const p = pkbData.find(pk => String(pk.id_pkb) === String(refId) || String(pk.nip_pkb) === String(refId)); if (p) { nDesa = String(p.desa_kelurahan || p.desa || nDesa).toUpperCase(); } }
                         if (nDesa === 'UNDEFINED' || nDesa === '') nDesa = '-'; u._nomor_tim = nTim; u._desa = nDesa; return u;
                     });
