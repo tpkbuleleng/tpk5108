@@ -236,11 +236,8 @@ window.renderKonten = async (target) => {
                 const queueTim = antrean.filter(a => String(a.id_tim) === String(session.id_tim));
                 if (getEl('dash-tunda')) { getEl('dash-tunda').innerText = `${queueTim.filter(a => a.is_synced).length}/${queueTim.filter(a => !a.is_synced).length}`; }
                 
-                const regList = queueTim.filter(a => a.tipe_laporan === 'REGISTRASI'); 
-                const pendList = queueTim.filter(a => a.tipe_laporan === 'PENDAMPINGAN');
-                
-                const cReg = { CATIN: 0, BUMIL: 0, BUFAS: 0, BADUTA: 0 }; 
-                const cPend = { CATIN: 0, BUMIL: 0, BUFAS: 0, BADUTA: 0 }; 
+                const regList = queueTim.filter(a => a.tipe_laporan === 'REGISTRASI'); const pendList = queueTim.filter(a => a.tipe_laporan === 'PENDAMPINGAN');
+                const cReg = { CATIN: 0, BUMIL: 0, BUFAS: 0, BADUTA: 0 }; const cPend = { CATIN: 0, BUMIL: 0, BUFAS: 0, BADUTA: 0 }; 
                 const hariIni = new Date(); hariIni.setHours(0,0,0,0);
                 
                 regList.forEach(r => { 
@@ -250,16 +247,9 @@ window.renderKonten = async (target) => {
                     if(cReg[r.jenis_sasaran] !== undefined && isAktif) cReg[r.jenis_sasaran]++; 
                 });
                 
-                // 🔥 PATCH PENGAMAN: Mencegah crash jika ID Sasaran kosong
                 pendList.forEach(p => { 
                     let j = p.jenis_sasaran_saat_kunjungan;
-                    if (!j) {
-                        const ref = String(p.id_sasaran_ref || '');
-                        if (ref.indexOf('CTN') > -1) j = 'CATIN';
-                        else if (ref.indexOf('BML') > -1) j = 'BUMIL';
-                        else if (ref.indexOf('BFS') > -1) j = 'BUFAS';
-                        else if (ref.indexOf('BDT') > -1) j = 'BADUTA';
-                    }
+                    if (!j) { const ref = String(p.id_sasaran_ref || ''); if (ref.indexOf('CTN') > -1) j = 'CATIN'; else if (ref.indexOf('BML') > -1) j = 'BUMIL'; else if (ref.indexOf('BFS') > -1) j = 'BUFAS'; else if (ref.indexOf('BDT') > -1) j = 'BADUTA'; }
                     if(j && cPend[j] !== undefined) cPend[j]++; 
                 });
                 
@@ -683,7 +673,6 @@ const initRekap = async () => {
                 if (isAktif && stats[r.jenis_sasaran]) { stats[r.jenis_sasaran].aktif++; stats.TOTAL.aktif++; }
             });
             
-            // 🔥 PATCH PENGAMAN: Mencegah crash rekapan
             pendList.forEach(p => {
                 let jenis = p.jenis_sasaran_saat_kunjungan;
                 if (!jenis) { 
@@ -737,11 +726,64 @@ const initKalkulator = () => {
 // ==========================================
 const initSetting = () => {
     try {
-        const session = window.currentUser; if(getEl('set-nama')) getEl('set-nama').value = session.nama; if(getEl('set-id')) getEl('set-id').value = session.username;
-        const toggleDark = getEl('toggle-dark-mode'); if (toggleDark) { toggleDark.checked = localStorage.getItem('theme') === 'dark'; toggleDark.onchange = () => { localStorage.setItem('theme', toggleDark.checked ? 'dark' : 'light'); applySettings(); }; }
-        const btnMin = getEl('btn-text-min'); const btnPlus = getEl('btn-text-plus');
-        if (btnMin && btnPlus) { btnMin.onclick = () => { let size = parseInt(localStorage.getItem('fontSize') || '16'); if (size > 12) { size -= 2; localStorage.setItem('fontSize', size); applySettings(); } }; btnPlus.onclick = () => { let size = parseInt(localStorage.getItem('fontSize') || '16'); if (size < 24) { size += 2; localStorage.setItem('fontSize', size); applySettings(); } }; }
-        const formP = getEl('form-ganti-pass'); if(formP) { formP.onsubmit = (e) => { e.preventDefault(); alert("Permintaan ganti password disimpan."); e.target.reset(); renderKonten('dashboard'); }; }
+        const session = window.currentUser; 
+        if(getEl('set-nama')) getEl('set-nama').value = session.nama || ''; 
+        if(getEl('set-id')) getEl('set-id').value = session.username || '';
+        
+        // 🔥 LOAD DATA PROFIL TAMBAHAN DARI MEMORI LOKAL
+        if(getEl('set-status-kader')) getEl('set-status-kader').value = session.status_kader || '';
+        if(getEl('set-bpjs')) getEl('set-bpjs').value = session.bpjs || '';
+        if(getEl('set-mbg')) getEl('set-mbg').value = session.mbg || '';
+        
+        const btnSaveProfil = getEl('btn-save-profil');
+        if (btnSaveProfil) {
+            btnSaveProfil.onclick = async () => {
+                session.status_kader = getEl('set-status-kader').value;
+                session.bpjs = getEl('set-bpjs').value;
+                session.mbg = getEl('set-mbg').value;
+                
+                await window.AppDB.putData('kader_session', session);
+                window.currentUser = session;
+                alert("✅ Data Profil Tambahan berhasil disimpan di perangkat Anda!");
+            };
+        }
+
+        const toggleDark = getEl('toggle-dark-mode'); 
+        if (toggleDark) { 
+            toggleDark.checked = localStorage.getItem('theme') === 'dark'; 
+            toggleDark.onchange = () => { 
+                localStorage.setItem('theme', toggleDark.checked ? 'dark' : 'light'); 
+                applySettings(); 
+            }; 
+        }
+        
+        const btnMin = getEl('btn-text-min'); 
+        const btnNormal = getEl('btn-text-normal'); 
+        const btnPlus = getEl('btn-text-plus');
+        
+        if (btnMin && btnPlus && btnNormal) { 
+            btnMin.onclick = () => { 
+                let size = parseInt(localStorage.getItem('fontSize') || '16'); 
+                if (size > 12) { size -= 2; localStorage.setItem('fontSize', size); applySettings(); } 
+            }; 
+            btnNormal.onclick = () => { 
+                localStorage.setItem('fontSize', 16); applySettings(); 
+            }; 
+            btnPlus.onclick = () => { 
+                let size = parseInt(localStorage.getItem('fontSize') || '16'); 
+                if (size < 24) { size += 2; localStorage.setItem('fontSize', size); applySettings(); } 
+            }; 
+        }
+        
+        const formP = getEl('form-ganti-pass'); 
+        if(formP) {
+            formP.onsubmit = (e) => { 
+                e.preventDefault(); 
+                alert("Permintaan ganti password disimpan."); 
+                e.target.reset(); 
+                renderKonten('dashboard'); 
+            };
+        }
     } catch(e) { window.logErrorToServer('initSetting', e); }
 };
 
