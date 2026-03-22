@@ -250,7 +250,7 @@ const masukKeAplikasi = async (session) => {
 };
 
 // ==========================================
-// 3. PABRIK SUB-MENU
+// 3. PABRIK SUB-MENU (STANDAR KADER ONLY)
 // ==========================================
 const renderMenu = async (role) => {
     const container = getEl('dynamic-menu-container'); 
@@ -258,6 +258,7 @@ const renderMenu = async (role) => {
     
     let allMenu = await getAllData('master_menu').catch(()=>[]);
     
+    // 🔥 KEMBALI KE FONDASI STANDAR (8 MENU INTI BAWAAN)
     if (allMenu.length === 0) {
         allMenu = [
             { id_menu: 'M1', label_menu: 'Dashboard', icon: '🏠', target_view: 'dashboard', role_akses: 'KADER', urutan: 1, is_active: 'Y' },
@@ -266,7 +267,8 @@ const renderMenu = async (role) => {
             { id_menu: 'M4', label_menu: 'Laporan Pendampingan', icon: '🤝', target_view: 'pendampingan', role_akses: 'KADER', urutan: 4, is_active: 'Y' },
             { id_menu: 'M5', label_menu: 'Rekap Bulanan', icon: '📊', target_view: 'rekap_bulanan', role_akses: 'KADER', urutan: 5, is_active: 'Y' },
             { id_menu: 'M6', label_menu: 'Bantuan & FAQ', icon: '🆘', target_view: 'bantuan', role_akses: 'KADER', urutan: 6, is_active: 'Y' },
-            { id_menu: 'M7', label_menu: 'Pengaturan Akun', icon: '⚙️', target_view: 'setting', role_akses: 'KADER', urutan: 7, is_active: 'Y' }
+            { id_menu: 'M7', label_menu: 'Pengaturan Akun', icon: '⚙️', target_view: 'setting', role_akses: 'KADER', urutan: 7, is_active: 'Y' },
+            { id_menu: 'M8', label_menu: 'Muat Ulang Aplikasi', icon: '🔁', target_view: 'reload_app', role_akses: 'KADER', urutan: 8, is_active: 'Y' }
         ];
     }
 
