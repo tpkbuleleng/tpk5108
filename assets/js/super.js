@@ -1,5 +1,5 @@
 // ==========================================
-// 👑 GOD MODE: SUPER ADMIN DASHBOARD (V44 - THE ULTIMATE FULL CORE)
+// 👑 GOD MODE: SUPER ADMIN DASHBOARD (V44 - FINAL)
 // ==========================================
 import { getAllData, clearStore } from './db.js';
 
@@ -114,7 +114,7 @@ window.renderUserTable = () => {
     try {
         const searchEl = document.getElementById('flt-search');
         const roleEl = document.getElementById('flt-role');
-        const kecEl = document.getElementById('flt-kec'); // [PATCHED] ID sudah diperbaiki
+        const kecEl = document.getElementById('flt-kec'); // PATCH: ID Diperbaiki
         
         if (!searchEl || !roleEl || !kecEl) return;
         
@@ -770,6 +770,81 @@ window.renderSuperView = async (target) => {
             } catch (error) { catatErrorSistem('Menu Widget', error); document.getElementById('table-wrapper-w').innerHTML = `<div style="padding:50px; text-align:center; color:#e94560;"><h3>❌ Gagal Terhubung</h3></div>`; }
         }
         
+        else if (target === 'ekspor_data') {
+            content.innerHTML = `
+                <div class="super-card" style="margin-bottom:20px; border-left:4px solid #F1C40F;">
+                    <h3 style="margin:0; color:#0A2342;">💾 Data Center (Ekspor Excel/CSV)</h3>
+                    <p style="margin:5px 0 0 0; color:#666; font-size:0.9rem;">Tarik gabungan data dari seluruh 9 Kecamatan Buleleng dalam satu file.</p>
+                </div>
+                <div class="super-card">
+                    <div style="display:flex; gap:15px; flex-wrap:wrap; margin-bottom:20px;">
+                        <div style="flex:1;">
+                            <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:5px;">Mulai Tanggal (Tgl Daftar/Kunjungan)</label>
+                            <input type="date" id="dc-date-from" class="filter-input" style="width:100%; box-sizing:border-box;">
+                        </div>
+                        <div style="flex:1;">
+                            <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:5px;">Sampai Tanggal</label>
+                            <input type="date" id="dc-date-to" class="filter-input" style="width:100%; box-sizing:border-box;">
+                        </div>
+                    </div>
+                    <div style="background:#e8f4fd; padding:15px; border-radius:8px; border:1px solid #b6d4fe; margin-bottom:20px;">
+                        <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:10px; color:#0043A8;">Pilih Jenis Data yang Ditarik:</label>
+                        <div style="display:flex; gap:20px;">
+                            <label style="cursor:pointer; font-weight:bold; color:#333;"><input type="checkbox" id="dc-chk-reg" checked style="transform:scale(1.2); margin-right:8px; accent-color:#0043A8;"> Data Registrasi Sasaran</label>
+                            <label style="cursor:pointer; font-weight:bold; color:#333;"><input type="checkbox" id="dc-chk-pend" checked style="transform:scale(1.2); margin-right:8px; accent-color:#0043A8;"> Data Laporan Pendampingan</label>
+                        </div>
+                    </div>
+                    <button id="btn-ekspor-dc" style="background:#198754; color:white; border:none; padding:15px; width:100%; border-radius:8px; font-weight:bold; font-size:1.1rem; cursor:pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: opacity 0.3s;" onclick="window.superEksporDataCenter()">💾 Tarik & Download Excel (CSV)</button>
+                </div>
+            `;
+        }
+
+        else if (target === 'referensi') {
+            content.innerHTML = `
+                <div class="super-card" style="margin-bottom:20px; border-left:4px solid #F1C40F;">
+                    <h3 style="margin:0; color:#0A2342;">🏗️ Master Wilayah & Referensi Tim</h3>
+                    <p style="margin:5px 0 0 0; color:#666; font-size:0.9rem;">Peta wilayah penugasan (Kecamatan, Desa, Dusun, dan Tim Kader).</p>
+                </div>
+                <div class="super-card">
+                    <div style="background:#FFF8E7; padding:15px; border-radius:8px; border-left:5px solid #F1C40F; color:#B8860B; margin-bottom:15px;">
+                        <b>⚠️ INFO:</b> Untuk menjaga integritas data hirarki, penambahan atau perubahan Master Wilayah dan Referensi Tim saat ini hanya bisa diatur secara aman melalui <a href="https://docs.google.com/spreadsheets/d/1KIEyfN4BVd2nQDeMI71wxt_jVnAivudqGAo99MQzopQ/edit" target="_blank" style="color:#0043A8; font-weight:bold;">Google Sheet Master Database</a>.
+                    </div>
+                    <div id="table-wrapper-ref" class="super-table-container"><div style="padding:40px; text-align:center; color:#0043A8;">⏳ Menarik data wilayah dari server...</div></div>
+                </div>
+            `;
+            
+            try {
+                if(window.superTimData.length === 0) {
+                    const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_ALL', token: SUPER_TOKEN, sheetName: 'MASTER_TIM' }) });
+                    const res = await response.json();
+                    if(res.status === 'success') window.superTimData = res.data || [];
+                }
+                
+                let html = `<table class="super-table"><thead><tr><th>Kecamatan</th><th>Desa/Kelurahan</th><th>Dusun/RW</th><th>ID Tim</th><th>Nama Tim</th></tr></thead><tbody>`;
+                let tData = [...window.superTimData].sort((a,b) => {
+                    if((a.kecamatan||'') === (b.kecamatan||'')) return String(a.desa_kelurahan||'').localeCompare(String(b.desa_kelurahan||''));
+                    return String(a.kecamatan||'').localeCompare(String(b.kecamatan||''));
+                });
+
+                if (tData.length > 0) {
+                    tData.forEach(t => {
+                        html += `<tr>
+                            <td><span style="background:#e8f4fd; padding:3px 8px; border-radius:4px; font-size:0.8rem; color:#0043A8; font-weight:bold;">${t.kecamatan || t.wilayah || '-'}</span></td>
+                            <td><b style="color:#0A2342;">${t.desa_kelurahan || t.desa || '-'}</b></td>
+                            <td>${t.dusun_rw || t.dusun || '-'}</td>
+                            <td><code style="color:#e94560;">${t.id_tim || t.id || '-'}</code></td>
+                            <td>${t.nama_tim || t.nomor_tim || '-'}</td>
+                        </tr>`;
+                    });
+                } else {
+                    html += `<tr><td colspan="5" style="text-align:center; padding:30px; color:#999;">Data wilayah kosong atau belum dimuat.</td></tr>`;
+                }
+                html += `</tbody></table>`;
+                
+                setTimeout(() => { const wrp = document.getElementById('table-wrapper-ref'); if(wrp) wrp.innerHTML = html; }, 300);
+            } catch(e) { catatErrorSistem('Menu Referensi', e); document.getElementById('table-wrapper-ref').innerHTML = `<div style="padding:40px; text-align:center; color:#e94560;">❌ Gagal menarik data wilayah.</div>`; }
+        }
+
         else if (target === 'audit_trail') {
             content.innerHTML = `
                 <div class="super-card" style="margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px; border-left:4px solid #F1C40F;">
@@ -781,8 +856,7 @@ window.renderSuperView = async (target) => {
                 </div>
 
                 <div class="super-card" style="padding:0; overflow:hidden;">
-                    <div id="filter-area-log" style="background:#f8f9fa; padding:15px; border-bottom:1px solid #eee; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
-                        </div>
+                    <div id="filter-area-log" style="background:#f8f9fa; padding:15px; border-bottom:1px solid #eee; display:flex; gap:10px; flex-wrap:wrap; align-items:center;"></div>
                     <div id="table-wrapper-log" class="super-table-container"><div style="padding:50px; text-align:center; color:#0043A8;"><h3>⏳ Memutar Rekaman CCTV...</h3></div></div>
                 </div>
             `;
@@ -827,13 +901,11 @@ window.renderSuperView = async (target) => {
             document.getElementById('btn-tab-error').onclick = () => switchTab('ERROR');
 
             try {
-                // Tarik data nama user jika kosong untuk dicocokkan dengan ID di Log
                 if(window.superUsersData.length === 0) {
                     const resU = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_ALL', token: SUPER_TOKEN, sheetName: 'USER_LOGIN' }) }).then(r=>r.json());
                     if(resU.status === 'success') window.superUsersData = resU.data || [];
                 }
 
-                // Sedot data Log CCTV & Error
                 const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'SECURE_GET_AUDIT', token: SUPER_TOKEN }) });
                 const res = await response.json();
                 
