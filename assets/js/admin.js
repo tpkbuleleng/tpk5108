@@ -1,5 +1,5 @@
 // ==========================================
-// 📊 DASHBOARD SUPERVISOR (V37 - DYNAMIC THEME ENGINE)
+// 📊 DASHBOARD SUPERVISOR (V38 - DYNAMIC THEME FIXED CONTRAST)
 // ==========================================
 import { clearStore } from './db.js';
 
@@ -8,14 +8,15 @@ const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzEmmn0wMJmC1OHij9JU
 window.adminData = { registrasi: [], pendampingan: [] };
 window.adminSession = null;
 
+// 🔥 V38: Menambahkan variabel btnText khusus agar tidak tabrakan (Kamuflase)
 const getRoleTheme = (roleStr) => {
     const r = String(roleStr).toUpperCase();
-    if(r.includes('KABUPATEN')) return { main: '#0043A8', dark: '#0A2342', light: '#E8F4FD', accent: '#F1C40F', text: '#FFFFFF', icon: '#F1C40F' }; // Royal Blue
-    if(r.includes('KECAMATAN') || r === 'ADMIN') return { main: '#2980B9', dark: '#1A5276', light: '#E8F4FD', accent: '#F1C40F', text: '#FFFFFF', icon: '#FFFFFF' }; // Steel Blue
-    if(r === 'ADMIN_DESA') return { main: '#B8860B', dark: '#8B6508', light: '#FDF8E7', accent: '#0A2342', text: '#FFFFFF', icon: '#FFFFFF' }; // Dark Gold
-    if(r.includes('PKB')) return { main: '#8CA8D1', dark: '#5C7A9E', light: '#F0F4F8', accent: '#0A2342', text: '#0A2342', icon: '#0A2342' }; // Ice Blue
-    if(r.includes('MITRA')) return { main: '#F1C40F', dark: '#D4AF37', light: '#FFF8E7', accent: '#0A2342', text: '#0A2342', icon: '#0A2342' }; // Pale Gold
-    return { main: '#0A2342', dark: '#051221', light: '#E8F4FD', accent: '#F1C40F', text: '#FFFFFF', icon: '#F1C40F' }; // Super Admin Default
+    if(r.includes('KABUPATEN')) return { main: '#0043A8', dark: '#0A2342', light: '#E8F4FD', accent: '#F1C40F', text: '#FFFFFF', icon: '#F1C40F', btnText: '#0A2342' }; 
+    if(r.includes('KECAMATAN') || r === 'ADMIN') return { main: '#2980B9', dark: '#1A5276', light: '#E8F4FD', accent: '#F1C40F', text: '#FFFFFF', icon: '#FFFFFF', btnText: '#0A2342' }; 
+    if(r === 'ADMIN_DESA') return { main: '#B8860B', dark: '#8B6508', light: '#FDF8E7', accent: '#0A2342', text: '#FFFFFF', icon: '#FFFFFF', btnText: '#F1C40F' }; 
+    if(r.includes('PKB')) return { main: '#8CA8D1', dark: '#5C7A9E', light: '#F0F4F8', accent: '#0A2342', text: '#0A2342', icon: '#0A2342', btnText: '#F1C40F' }; 
+    if(r.includes('MITRA')) return { main: '#F1C40F', dark: '#D4AF37', light: '#FFF8E7', accent: '#0A2342', text: '#0A2342', icon: '#0A2342', btnText: '#F1C40F' }; 
+    return { main: '#0A2342', dark: '#051221', light: '#E8F4FD', accent: '#F1C40F', text: '#FFFFFF', icon: '#F1C40F', btnText: '#0A2342' }; 
 };
 
 const fetchAdminData = async () => {
@@ -141,7 +142,7 @@ window.renderAdminView = async (target) => {
                     <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); border: 1px solid #e1e8ed;">
                         <h3 style="margin:0 0 15px 0; font-size:1.1rem; color:var(--th-dark); border-bottom:2px solid var(--th-accent); padding-bottom:10px; display:inline-block;">🏆 Top 5 Kader Teraktif</h3>
                         <div style="margin-top:10px;">
-                        ${topKader.length === 0 ? '<div style="color:#999; text-align:center; padding:20px 0;">Belum ada laporan masuk.</div>' : ''}
+                        ${topKader.length === 0 ? '<div style="color:#555; text-align:center; padding:20px 0; font-weight:500;">Belum ada laporan masuk.</div>' : ''}
                         ${topKader.map((k, idx) => `
                             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; border-bottom:1px dashed #eee; padding-bottom:8px;">
                                 <div style="font-size:0.85rem;"><span style="color:var(--th-accent); font-weight:bold; margin-right:5px;">#${idx+1}</span> <b style="color:var(--th-dark);">${k[0]}</b></div>
@@ -303,11 +304,12 @@ export const initAdmin = async (session) => {
                     --th-accent: ${th.accent};
                     --th-text: ${th.text};
                     --th-icon: ${th.icon};
+                    --th-btn-text: ${th.btnText};
                 }
                 .admin-menu-item { padding: 14px 25px; color: var(--th-light); font-weight: 600; cursor: pointer; transition: all 0.2s; border-left: 4px solid transparent; font-size: 0.95rem; } 
                 .admin-menu-item:hover { background: rgba(255,255,255, 0.1); color: var(--th-icon); } 
                 .admin-menu-item.active { background: rgba(255,255,255, 0.2); color: var(--th-icon); border-left: 4px solid var(--th-accent); } 
-                #btn-admin-logout:hover { background: var(--th-accent); color: var(--th-dark); }
+                #btn-admin-logout:hover { background: var(--th-accent); color: var(--th-btn-text); }
                 .admin-input { padding:10px 12px; border:1px solid #ced4da; border-radius:6px; outline:none; font-family:inherit; } 
                 .admin-input:focus { border-color:var(--th-main); box-shadow: 0 0 0 2px rgba(0,0,0, 0.1); }
                 .btn-action:hover { opacity: 0.8; transform:translateY(-1px); }
@@ -336,7 +338,7 @@ export const initAdmin = async (session) => {
             <div style="flex:1; display:flex; flex-direction:column; overflow:hidden; width:100%;">
                 <div style="background:white; padding: 15px 25px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); z-index:5; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #e1e8ed;">
                     <h2 id="admin-page-title" style="margin:0; font-size:1.3rem; color:var(--th-dark); font-weight:800;">Memuat Data...</h2>
-                    <button id="btn-admin-refresh" style="background:var(--th-accent); color:var(--th-text); border:none; padding:8px 15px; border-radius:6px; font-weight:bold; cursor:pointer; font-size:0.85rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">🔄 Segarkan Data</button>
+                    <button id="btn-admin-refresh" style="background:var(--th-accent); color:var(--th-btn-text); border:none; padding:8px 15px; border-radius:6px; font-weight:bold; cursor:pointer; font-size:0.85rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">🔄 Segarkan Data</button>
                 </div>
                 <div id="admin-content" style="flex:1; padding: 25px; overflow-y:auto; background:#eef2f5;">
                     <div style="padding:50px; text-align:center; color:var(--th-main);"><h3>⏳ Menyedot Data dari Satelit Pusat...</h3><p>Tunggu sebentar ya, Bapak/Ibu.</p></div>
