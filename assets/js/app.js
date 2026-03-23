@@ -273,10 +273,9 @@ window.renderKonten = async (target) => {
                                 <div class="form-group"><label>Fasilitas Buang Air Besar (BAB) <span style="color:red">*</span></label><select name="fasilitas_bab" class="form-control" required><option value="">-- Pilih --</option><option value="Jamban Milik Sendiri Dengan Leher Angsa Dan Tangki Septik / Ipal">Jamban Milik Sendiri Dengan Leher Angsa Dan Tangki Septik / Ipal</option><option value="Jamban Pada Mck Komunal Dengan Leher Angsa Dan Tangki Septik / Ipal">Jamban Pada Mck Komunal Dengan Leher Angsa Dan Tangki Septik / Ipal</option><option value="Ya Lainnya">Ya Lainnya</option><option value="Tidak Ada">Tidak Ada</option></select></div>
                             </div>
 
-                            <div id="box-catin-pasangan" style="display:none; background:#e8f4fd; padding:15px; border-radius:8px; border-left:4px solid #0d6efd; margin-bottom:15px;">
-                                <h4 style="margin:0 0 15px 0; color:#0d6efd; font-size:1rem;">Data Pasangan (CATIN)</h4>
-                                <div class="form-group"><label>NIK Pasangan <span style="color:red">*</span></label><input type="text" name="nik_pasangan" id="f_nik_pasangan" class="form-control" maxlength="16" minlength="16" pattern="[0-9]{16}" oninput="this.value=this.value.replace(/[^0-9]/g,'')" placeholder="16 digit angka"></div>
-                                <div class="form-group"><label>Nama Pasangan <span style="color:red">*</span></label><input type="text" name="nama_pasangan" id="f_nama_pasangan" class="form-control" placeholder="Nama Pasangan"></div>
+                            <div class="form-group" id="box-tgl-nikah" style="display: none; background: #e8f4fd; padding: 15px; border-radius: 8px; border-left: 4px solid #0d6efd; margin-bottom:15px;">
+                                <label style="color: #0d6efd; font-weight: bold; margin-bottom:5px; display:block;">📅 Tanggal Pernikahan (Khusus CATIN)</label>
+                                <input type="date" id="input-tgl-nikah" name="tanggal_pernikahan" class="form-control">
                             </div>
 
                             <div id="box-bumil-status" style="display:none; background:#fcf1f6; padding:15px; border-radius:8px; border-left:4px solid #d63384; margin-bottom:15px;">
@@ -284,6 +283,12 @@ window.renderKonten = async (target) => {
                                 <div class="form-group"><label>Kehamilan ke <span style="color:red">*</span></label><input type="text" name="kehamilan_ke" id="f_kehamilan_ke" class="form-control" maxlength="1" pattern="[1-9]" oninput="this.value=this.value.replace(/[^1-9]/g,'')" placeholder="Cth: 1"></div>
                                 <div class="form-group"><label>Keinginan Hamil <span style="color:red">*</span></label><select name="keinginan_hamil" id="f_keinginan_hamil" class="form-control"><option value="">-- Pilih --</option><option value="Ingin Hamil Saat ini">Ingin Hamil Saat ini</option><option value="Ingin Hamil setelah >2 th">Ingin Hamil setelah >2 th</option><option value="Tidak Ingin Hamil Lagi">Tidak Ingin Hamil Lagi</option></select></div>
                                 <div class="form-group"><label>Berat Badan Sebelum Hamil (Kg)</label><input type="number" step="any" name="bb_sebelum_hamil" id="f_bb_sebelum_hamil" class="form-control" placeholder="Cth: 50.5"></div>
+                            </div>
+
+                            <div class="form-group" id="box-tgl-salin-reg" style="display: none; background: #e2f0cb; padding: 15px; border-radius: 8px; border-left: 4px solid #27ae60; margin-bottom:15px;">
+                                <label style="color: #27ae60; font-weight: bold; margin-bottom:5px; display:block;">👶 Tanggal Persalinan / Melahirkan (Khusus BUFAS)</label>
+                                <p style="font-size: 0.75rem; color: #666; margin-top: 0; margin-bottom: 8px;">*Sasaran akan aktif selama masa nifas (42 Hari).</p>
+                                <input type="date" id="input-tgl-salin-reg" name="tgl_persalinan" class="form-control">
                             </div>
 
                             <div id="box-bufas-status" style="display:none; background:#e2f0cb; padding:15px; border-radius:8px; border-left:4px solid #27ae60; margin-bottom:15px;">
@@ -300,7 +305,7 @@ window.renderKonten = async (target) => {
 
                             <div id="pertanyaan-dinamis"></div>
                             <div id="wilayah-domisili" style="margin-top:15px; border-top: 1px dashed #ccc; padding-top:15px;"><div class="form-group"><label>Desa / Kelurahan <span style="color:red">*</span></label><select name="desa" id="reg-desa" class="form-control"></select></div><div class="form-group"><label>Dusun / RW <span style="color:red">*</span></label><select name="dusun" id="reg-dusun" class="form-control"></select></div><div class="form-group"><label>Alamat Lengkap <span style="color:red">*</span></label><textarea name="alamat" id="reg-alamat" class="form-control" rows="2"></textarea></div></div>
-                            <div id="wilayah-catin" style="display:none; padding:10px; background:#e8f4fd; border-radius:6px; border:1px solid #b6d4fe; margin-top:15px;"><label style="font-weight:bold; color:var(--primary); margin-bottom:10px; display:block;">📍 Alamat Domisili Setelah Menikah</label><div class="form-group"><label>Kabupaten/Kota <span style="color:red">*</span></label><select name="catin_kab" id="catin-kab" class="form-control"></select></div><div class="form-group"><label>Kecamatan <span style="color:red">*</span></label><select name="catin_kec" id="catin-kec" class="form-control"></select></div><div class="form-group"><label>Desa/Kelurahan <span style="color:red">*</span></label><select name="catin_desa" id="catin-desa" class="form-control"></select></div><div class="form-group"><label>Dusun / RW <span style="color:red">*</span></label><select id="catin-dusun-sel" class="form-control" style="display:none;"></select><input type="text" id="catin-dusun-txt" class="form-control" placeholder="Ketik nama Dusun/RW..."></div><div class="form-group"><label>Alamat Lengkap <span style="color:red">*</span></label><textarea name="catin_alamat" id="catin-alamat" class="form-control" rows="2"></textarea></div></div>
+                            <div id="wilayah-catin" style="display:none; padding:10px; background:#e8f4fd; border-radius:6px; border:1px solid #b6d4fe; margin-top:15px;"><label style="font-weight:bold; color:var(--primary); margin-bottom:10px; display:block;">📍 Alamat Domisili Setelah Menikah (CATIN)</label><div class="form-group"><label>Kabupaten/Kota <span style="color:red">*</span></label><select name="catin_kab" id="catin-kab" class="form-control"></select></div><div class="form-group"><label>Kecamatan <span style="color:red">*</span></label><select name="catin_kec" id="catin-kec" class="form-control"></select></div><div class="form-group"><label>Desa/Kelurahan <span style="color:red">*</span></label><select name="catin_desa" id="catin-desa" class="form-control"></select></div><div class="form-group"><label>Dusun / RW <span style="color:red">*</span></label><select id="catin-dusun-sel" class="form-control" style="display:none;"></select><input type="text" id="catin-dusun-txt" class="form-control" placeholder="Ketik nama Dusun/RW..."></div><div class="form-group"><label>Alamat Lengkap <span style="color:red">*</span></label><textarea name="catin_alamat" id="catin-alamat" class="form-control" rows="2"></textarea></div></div>
                             <button type="submit" class="btn btn-primary" style="width:100%; margin-top:15px; font-size:1.1rem; padding:12px;">💾 ${isEdit ? 'Update Data Sasaran' : 'Simpan Sasaran'}</button>
                             ${isEdit ? `<button type="button" class="btn btn-danger" style="width:100%; margin-top:10px; font-size:1rem; padding:10px;" onclick="window.editModeData=null; renderKonten('daftar_sasaran')">❌ Batal Edit</button>` : ''}
                         </div>
@@ -402,7 +407,7 @@ const initFormRegistrasi = async () => {
         const session = window.currentUser;
         const allWil = await getAllData('master_tim_wilayah').catch(()=>[]); const allWilBali = await getAllData('master_wilayah_bali').catch(()=>[]); const masterWilayah = await getAllData('master_wilayah').catch(()=>[]); 
         const tugas = allWil.filter(w => String(w.id_tim) === String(session.id_tim));
-        const selJenis = getEl('reg-jenis'); const containerQ = getEl('pertanyaan-dinamis'); const boxCatin = getEl('wilayah-catin'); const boxDomisili = getEl('wilayah-domisili'); const selDesa = getEl('reg-desa'); const selDusun = getEl('reg-dusun'); const regAlamat = getEl('reg-alamat'); const selJk = getEl('reg-jk');
+        const selJenis = getEl('reg-jenis'); const containerQ = getEl('pertanyaan-dinamis'); const boxDomisili = getEl('wilayah-domisili'); const selDesa = getEl('reg-desa'); const selDusun = getEl('reg-dusun'); const regAlamat = getEl('reg-alamat'); const selJk = getEl('reg-jk');
 
         if (selDesa && tugas.length > 0) {
             const dDesa = [...new Set(tugas.map(w => w.desa_kelurahan))].filter(Boolean);
@@ -434,9 +439,14 @@ const initFormRegistrasi = async () => {
                 if (selJk) { if (jenis === 'BUMIL' || jenis === 'BUFAS') { selJk.value = 'Perempuan'; selJk.style.pointerEvents = 'none'; selJk.style.backgroundColor = '#e9ecef'; } else { selJk.style.pointerEvents = 'auto'; selJk.style.backgroundColor = '#fff'; } }
                 
                 // 🔥 PATCH V48: TOGGLE BLOCK SPESIFIK & ATUR REQUIRED
-                const boxCatinPasangan = getEl('box-catin-pasangan'); const boxBumilStatus = getEl('box-bumil-status'); const boxBufasStatus = getEl('box-bufas-status'); const boxBadutaStatus = getEl('box-baduta-status');
+                const boxCatin = getEl('wilayah-catin'); 
+                const boxTglNikah = getEl('box-tgl-nikah'); const inputTglNikah = getEl('input-tgl-nikah');
+                const boxTglSalinReg = getEl('box-tgl-salin-reg'); const inputTglSalinReg = getEl('input-tgl-salin-reg');
+                const boxBumilStatus = getEl('box-bumil-status'); const boxBufasStatus = getEl('box-bufas-status'); const boxBadutaStatus = getEl('box-baduta-status');
                 
-                if (boxCatinPasangan) { boxCatinPasangan.style.display = jenis === 'CATIN' ? 'block' : 'none'; getEl('f_nik_pasangan').required = jenis === 'CATIN'; getEl('f_nama_pasangan').required = jenis === 'CATIN'; }
+                if(boxTglNikah) { boxTglNikah.style.display = jenis === 'CATIN' ? 'block' : 'none'; if(inputTglNikah) inputTglNikah.required = jenis === 'CATIN'; }
+                if(boxTglSalinReg) { boxTglSalinReg.style.display = jenis === 'BUFAS' ? 'block' : 'none'; if(inputTglSalinReg) inputTglSalinReg.required = jenis === 'BUFAS'; }
+
                 if (boxBumilStatus) { boxBumilStatus.style.display = jenis === 'BUMIL' ? 'block' : 'none'; getEl('f_kehamilan_ke').required = jenis === 'BUMIL'; getEl('f_keinginan_hamil').required = jenis === 'BUMIL'; }
                 if (boxBufasStatus) { boxBufasStatus.style.display = jenis === 'BUFAS' ? 'block' : 'none'; getEl('f_jumlah_anak').required = jenis === 'BUFAS'; }
                 if (boxBadutaStatus) { boxBadutaStatus.style.display = jenis === 'BADUTA' ? 'block' : 'none'; getEl('f_anak_ke').required = jenis === 'BADUTA'; getEl('f_bb_lahir').required = jenis === 'BADUTA'; getEl('f_tb_lahir').required = jenis === 'BADUTA'; }
