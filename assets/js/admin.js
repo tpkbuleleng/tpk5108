@@ -1,5 +1,5 @@
 // ==========================================
-// 📊 DASHBOARD SUPERVISOR (V38 - DYNAMIC THEME FIXED CONTRAST - PATCH KABUPATEN)
+// 📊 DASHBOARD SUPERVISOR (V39 - LIVE REGIONAL FILTER)
 // ==========================================
 import { clearStore } from './db.js';
 
@@ -7,8 +7,9 @@ const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzEmmn0wMJmC1OHij9JU
 
 window.adminData = { registrasi: [], pendampingan: [] };
 window.adminSession = null;
+window.currentFilterKec = 'ALL';
+window.currentFilterDesa = 'ALL';
 
-// 🔥 V38: Menambahkan variabel btnText khusus agar tidak tabrakan (Kamuflase)
 const getRoleTheme = (roleStr) => {
     const r = String(roleStr).toUpperCase();
     if(r.includes('KABUPATEN')) return { main: '#0043A8', dark: '#0A2342', light: '#E8F4FD', accent: '#F1C40F', text: '#FFFFFF', icon: '#F1C40F', btnText: '#0A2342' }; 
@@ -72,15 +73,28 @@ const exportToCSV = (filename, rows) => {
 
 window.renderAdminView = async (target) => {
     const content = document.getElementById('admin-content');
+    const roleUpper = String(window.adminSession.role).toUpperCase();
     
+    // 🔥 FILTER DATA BERDASARKAN DROPDOWN (Jika ada)
+    let filteredReg = window.adminData.registrasi;
+    let filteredPend = window.adminData.pendampingan;
+    
+    if (window.currentFilterKec !== 'ALL') {
+        filteredReg = filteredReg.filter(r => (r.sumber_kecamatan || '').toUpperCase() === window.currentFilterKec);
+        const allowedIds = new Set(filteredReg.map(r => r.id));
+        filteredPend = filteredPend.filter(p => allowedIds.has(p.id_sasaran_ref));
+    }
+    if (window.currentFilterDesa !== 'ALL') {
+        filteredReg = filteredReg.filter(r => (r.desa || '').toUpperCase() === window.currentFilterDesa);
+        const allowedIds = new Set(filteredReg.map(r => r.id));
+        filteredPend = filteredPend.filter(p => allowedIds.has(p.id_sasaran_ref));
+    }
+
     if (target === 'dashboard') {
-        const reg = window.adminData.registrasi;
-        const pend = window.adminData.pendampingan;
-        
         let cCatin = 0, cBumil = 0, cBufas = 0, cBaduta = 0;
         let pCatin = 0, pBumil = 0, pBufas = 0, pBaduta = 0;
 
-        reg.forEach(r => {
+        filteredReg.forEach(r => {
             if(r.status_duplikasi && r.status_duplikasi.includes('DUPLIKAT')) return; 
             if(r.jenis_sasaran === 'CATIN') cCatin++;
             else if(r.jenis_sasaran === 'BUMIL') cBumil++;
@@ -89,7 +103,7 @@ window.renderAdminView = async (target) => {
         });
 
         const kaderKinerja = {};
-        pend.forEach(p => {
+        filteredPend.forEach(p => {
             let jenis = p.id_sasaran_ref.substring(0,3);
             if(jenis === 'CTN') pCatin++; else if(jenis === 'BML') pBumil++; else if(jenis === 'BFS') pBufas++; else if(jenis === 'BDT') pBaduta++;
             if(!kaderKinerja[p.username]) kaderKinerja[p.username] = 0;
@@ -98,19 +112,52 @@ window.renderAdminView = async (target) => {
 
         const topKader = Object.entries(kaderKinerja).sort((a,b) => b[1] - a[1]).slice(0, 5);
         
-        // 🔥 PATCH KAMUFLASE DASHBOARD
         let displayDesa = window.adminSession.desa === '-' || window.adminSession.desa === 'ALL' || window.adminSession.desa === '' ? window.adminSession.kecamatan : window.adminSession.desa;
-        if (String(displayDesa).toUpperCase() === 'ALL') {
-            displayDesa = 'KABUPATEN BULELENG';
+        if (String(displayDesa).toUpperCase() === 'ALL') displayDesa = 'KABUPATEN BULELENG';
+
+        // 🔥 MENYIAPKAN OPSI DROPDOWN FILTER
+        let optKec = `<option value="ALL">🌍 Semua Kecamatan</option>`;
+        let optDesa = `<option value="ALL">🏘️ Semua Desa</option>`;
+        
+        const isKabupaten = roleUpper.includes('KABUPATEN') || roleUpper.includes('SUPER') || roleUpper.includes('MITRA');
+        const isKecamatan = roleUpper.includes('KECAMATAN') || roleUpper === 'ADMIN';
+        const mapKecRev = { 'GRK': 'GEROKGAK', 'SRT': 'SERIRIT', 'BSB': 'BUSUNGBIU', 'BJR': 'BANJAR', 'SKS': 'SUKASADA', 'BLL': 'BULELENG', 'SWN': 'SAWAN', 'KBT': 'KUBUTAMBAHAN', 'TJK': 'TEJAKULA' };
+        
+        if (isKabupaten) {
+            const listKec = [...new Set(window.adminData.registrasi.map(r => r.sumber_kecamatan).filter(Boolean))];
+            listKec.forEach(k => { optKec += `<option value="${k}" ${window.currentFilterKec === k ? 'selected' : ''}>${mapKecRev[k] || k}</option>`; });
+            
+            const listDesa = [...new Set(window.adminData.registrasi.filter(r => window.currentFilterKec === 'ALL' || r.sumber_kecamatan === window.currentFilterKec).map(r => String(r.desa||'').toUpperCase()).filter(Boolean))];
+            listDesa.sort().forEach(d => { if(d !== '-') optDesa += `<option value="${d}" ${window.currentFilterDesa === d ? 'selected' : ''}>${d}</option>`; });
+        } 
+        else if (isKecamatan) {
+            optKec = `<option value="${window.currentFilterKec}">${window.adminSession.kecamatan}</option>`; 
+            const listDesa = [...new Set(window.adminData.registrasi.map(r => String(r.desa||'').toUpperCase()).filter(Boolean))];
+            listDesa.sort().forEach(d => { if(d !== '-') optDesa += `<option value="${d}" ${window.currentFilterDesa === d ? 'selected' : ''}>${d}</option>`; });
         }
+        else {
+            optKec = `<option value="${window.currentFilterKec}">${window.adminSession.kecamatan}</option>`;
+            const listDesa = String(window.adminSession.desa || '').toUpperCase().split(',').map(d => d.trim());
+            optDesa = listDesa.map(d => `<option value="${d}" ${window.currentFilterDesa === d ? 'selected' : ''}>${d}</option>`).join('');
+        }
+
+        const filterHTML = `
+            <div style="background: white; padding: 15px 25px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); display: flex; gap: 15px; align-items: center; border-left: 4px solid var(--th-main);">
+                <div style="font-size: 0.85rem; font-weight: bold; color: #666; white-space: nowrap;">🔍 Filter Wilayah:</div>
+                <select id="dash-flt-kec" class="admin-input" style="flex:1; font-weight:bold; color:var(--th-dark);" ${isKabupaten ? '' : 'disabled'}>${optKec}</select>
+                <select id="dash-flt-desa" class="admin-input" style="flex:1; font-weight:bold; color:var(--th-dark);" ${roleUpper.includes('DESA') && String(window.adminSession.desa).indexOf(',') === -1 ? 'disabled' : ''}>${optDesa}</select>
+            </div>
+        `;
 
         content.innerHTML = `
             <div class="animate-fade">
                 <div style="background: linear-gradient(135deg, var(--th-dark) 0%, var(--th-main) 100%); color: var(--th-text); border-radius: 12px; padding: 25px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.15); border-bottom: 5px solid var(--th-accent);">
                     <p style="margin:0; color: var(--th-accent); font-weight: 800; font-size: 0.85rem; letter-spacing:1px; text-transform:uppercase;">RADAR ${window.adminSession.role}</p>
-                    <h2 style="margin: 5px 0 10px 0; font-size: 1.6rem; word-wrap: break-word;">Wilayah: ${displayDesa}</h2>
-                    <p style="margin:0; font-size:0.9rem; opacity:0.9;">Total Data Terhimpun: <b>${reg.length} Sasaran</b> & <b>${pend.length} Kunjungan</b>.</p>
+                    <h2 style="margin: 5px 0 10px 0; font-size: 1.6rem; word-wrap: break-word;">Wilayah Tugas: ${displayDesa}</h2>
+                    <p style="margin:0; font-size:0.9rem; opacity:0.9;">Total Terhimpun (Sesuai Filter): <b>${filteredReg.length} Sasaran</b> & <b>${filteredPend.length} Kunjungan</b>.</p>
                 </div>
+                
+                ${filterHTML}
 
                 <div style="margin-bottom: 15px; font-weight: bold; color: var(--th-dark); border-left: 4px solid var(--th-accent); padding-left: 10px;">📊 Akumulasi Sasaran Terdaftar</div>
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 25px;">
@@ -141,7 +188,7 @@ window.renderAdminView = async (target) => {
                             <tr><td style="padding:10px; border-bottom:1px solid #eee;">Ibu Hamil (BUMIL)</td><td style="padding:10px; text-align:right; border-bottom:1px solid #eee; font-weight:bold;">${pBumil}</td></tr>
                             <tr><td style="padding:10px; border-bottom:1px solid #eee;">Ibu Nifas (BUFAS)</td><td style="padding:10px; text-align:right; border-bottom:1px solid #eee; font-weight:bold;">${pBufas}</td></tr>
                             <tr><td style="padding:10px; border-bottom:1px solid #eee;">Baduta (0-23 Bulan)</td><td style="padding:10px; text-align:right; border-bottom:1px solid #eee; font-weight:bold;">${pBaduta}</td></tr>
-                            <tr style="background:var(--th-light);"><td style="padding:10px; font-weight:bold; color:var(--th-dark);">TOTAL LAPORAN</td><td style="padding:10px; text-align:right; font-weight:bold; color:var(--th-main); font-size:1.1rem;">${pend.length}</td></tr>
+                            <tr style="background:var(--th-light);"><td style="padding:10px; font-weight:bold; color:var(--th-dark);">TOTAL LAPORAN</td><td style="padding:10px; text-align:right; font-weight:bold; color:var(--th-main); font-size:1.1rem;">${filteredPend.length}</td></tr>
                         </table>
                     </div>
                     <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); border: 1px solid #e1e8ed;">
@@ -159,10 +206,26 @@ window.renderAdminView = async (target) => {
                 </div>
             </div>
         `;
+
+        // 🔥 FUNGSI REFRESH FILTER
+        const btnKec = document.getElementById('dash-flt-kec');
+        if (btnKec) {
+            btnKec.addEventListener('change', () => {
+                window.currentFilterKec = btnKec.value;
+                window.currentFilterDesa = 'ALL'; 
+                window.renderAdminView('dashboard');
+            });
+        }
+        const btnDesa = document.getElementById('dash-flt-desa');
+        if (btnDesa) {
+            btnDesa.addEventListener('change', () => {
+                window.currentFilterDesa = btnDesa.value;
+                window.renderAdminView('dashboard');
+            });
+        }
     }
 
     else if (target === 'sasaran') {
-        const reg = window.adminData.registrasi;
         content.innerHTML = `
             <div class="animate-fade">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap:wrap; gap:10px;">
@@ -191,7 +254,7 @@ window.renderAdminView = async (target) => {
             const filterJenis = document.getElementById('flt-sasaran-jenis').value;
             const tbody = document.getElementById('tbody-sasaran');
             
-            const filtered = reg.filter(r => {
+            const filtered = filteredReg.filter(r => {
                 const matchNama = r.nama_sasaran.toLowerCase().includes(filterNama) || (r.id||'').toLowerCase().includes(filterNama) || (r.desa||'').toLowerCase().includes(filterNama);
                 const matchJenis = filterJenis === 'ALL' || r.jenis_sasaran === filterJenis;
                 return matchNama && matchJenis;
@@ -222,7 +285,6 @@ window.renderAdminView = async (target) => {
     }
 
     else if (target === 'pendampingan') {
-        const pend = window.adminData.pendampingan;
         content.innerHTML = `
             <div class="animate-fade">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap:wrap; gap:10px;">
@@ -247,7 +309,7 @@ window.renderAdminView = async (target) => {
             const filterNama = document.getElementById('flt-pend-nama').value.toLowerCase();
             const tbody = document.getElementById('tbody-pend');
             
-            const filtered = pend.filter(p => {
+            const filtered = filteredPend.filter(p => {
                 const matchNama = (p.id_sasaran_ref||'').toLowerCase().includes(filterNama) || (p.username||'').toLowerCase().includes(filterNama);
                 return matchNama;
             }).sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
@@ -258,7 +320,6 @@ window.renderAdminView = async (target) => {
                 let rData = {}; try { rData = JSON.parse(p.data_laporan || '{}'); } catch(e){}
                 const tgl = rData.tgl_kunjungan ? new Date(rData.tgl_kunjungan).toLocaleDateString('id-ID') : new Date(p.created_at).toLocaleDateString('id-ID');
                 const cat = rData.catatan || '-';
-                
                 let gpsStr = p.lokasi_gps && p.lokasi_gps !== '-' ? `<a href="https://maps.google.com/?q=${p.lokasi_gps}" target="_blank" style="color:var(--th-main); font-weight:bold; text-decoration:none; font-size:0.8rem;">🗺️ Cek Map</a>` : '<span style="color:#999; font-size:0.8rem;">Tidak Ada</span>';
 
                 return `<tr style="border-bottom:1px solid #eee;">
@@ -277,14 +338,29 @@ window.renderAdminView = async (target) => {
 };
 
 window.exportCSV = (jenis) => {
+    // 🔥 EKSPOR HANYA DATA SESUAI FILTER YANG SEDANG AKTIF
+    let filteredReg = window.adminData.registrasi;
+    let filteredPend = window.adminData.pendampingan;
+    
+    if (window.currentFilterKec !== 'ALL') {
+        filteredReg = filteredReg.filter(r => (r.sumber_kecamatan || '').toUpperCase() === window.currentFilterKec);
+        const allowedIds = new Set(filteredReg.map(r => r.id));
+        filteredPend = filteredPend.filter(p => allowedIds.has(p.id_sasaran_ref));
+    }
+    if (window.currentFilterDesa !== 'ALL') {
+        filteredReg = filteredReg.filter(r => (r.desa || '').toUpperCase() === window.currentFilterDesa);
+        const allowedIds = new Set(filteredReg.map(r => r.id));
+        filteredPend = filteredPend.filter(p => allowedIds.has(p.id_sasaran_ref));
+    }
+
     if(jenis === 'sasaran') {
-        const data = window.adminData.registrasi.map(r => {
+        const data = filteredReg.map(r => {
             let detail = {}; try { detail = JSON.parse(r.data_laporan || '{}'); } catch(e){}
             return { ID_Registrasi: r.id, Tanggal_Daftar: r.created_at, Kader_Pendata: r.username, No_Tim: r.id_tim, Jenis_Sasaran: r.jenis_sasaran, Nama_Sasaran: r.nama_sasaran, Desa: r.desa, Dusun: r.dusun, NIK: detail.nik || '', No_KK: detail.nomor_kk || '', Tanggal_Lahir: detail.tanggal_lahir || '', Usia_Tahun: detail.usia_saat_daftar_tahun || '', Alamat_Lengkap: detail.alamat || detail.catin_alamat || '', Status_Aktif: r.status_sasaran };
         });
         exportToCSV('Data_Sasaran_TPK.csv', data);
     } else if (jenis === 'pendampingan') {
-        const data = window.adminData.pendampingan.map(p => {
+        const data = filteredPend.map(p => {
             let detail = {}; try { detail = JSON.parse(p.data_laporan || '{}'); } catch(e){}
             return { ID_Laporan: p.id, Waktu_Input: p.created_at, Kader_Pelapor: p.username, ID_Sasaran: p.id_sasaran_ref, Tgl_Kunjungan: detail.tgl_kunjungan || '', Catatan_Hasil: detail.catatan || '', Lokasi_GPS: p.lokasi_gps || '' };
         });
@@ -299,7 +375,15 @@ export const initAdmin = async (session) => {
     window.adminSession = session;
     const th = getRoleTheme(session.role);
     
-    // 🔥 PATCH KAMUFLASE SIDEBAR
+    const roleUpper = String(session.role).toUpperCase();
+    if(roleUpper.includes('KABUPATEN') || roleUpper.includes('SUPER') || roleUpper.includes('MITRA')) {
+        window.currentFilterKec = 'ALL';
+    } else {
+        const mapKec = { 'GEROKGAK': 'GRK', 'SERIRIT': 'SRT', 'BUSUNGBIU': 'BSB', 'BANJAR': 'BJR', 'SUKASADA': 'SKS', 'BULELENG': 'BLL', 'SAWAN': 'SWN', 'KUBUTAMBAHAN': 'KBT', 'TEJAKULA': 'TJK' };
+        window.currentFilterKec = mapKec[String(session.kecamatan).toUpperCase()] || String(session.kecamatan).toUpperCase();
+    }
+    window.currentFilterDesa = 'ALL';
+
     const displayKecamatan = String(session.kecamatan || '').toUpperCase() === 'ALL' ? 'KABUPATEN BULELENG' : session.kecamatan;
 
     document.body.innerHTML = `
@@ -363,7 +447,8 @@ export const initAdmin = async (session) => {
             menuItems.forEach(m => m.classList.remove('active')); 
             item.classList.add('active'); 
             document.getElementById('admin-page-title').innerText = item.innerText.replace(/[^\w\s]/gi, '').trim(); 
-            window.renderAdminView(item.getAttribute('data-target')); 
+            const activeTarget = item.getAttribute('data-target');
+            window.renderAdminView(activeTarget); 
         }; 
     });
 
