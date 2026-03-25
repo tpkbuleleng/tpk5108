@@ -1,50 +1,70 @@
-const CACHE_NAME = 'tpk-buleleng-v2'; // Naikkan versi cache
-const urlsToCache = [
-  './',
-  './index.html',
-  './assets/js/app.js',
-  './assets/js/admin.js',
-  './assets/js/db.js',
-  './assets/js/sync.js'
-  // Tambahkan file CSS/Gambar lain jika ada
+const CACHE_NAME = 'tpk-buleleng-v50'; // Kode versi, ubah angka jika ada update besar
+const ASSETS_TO_CACHE = [
+    './',
+    './index.html',
+    './assets/css/style.css',
+    './assets/js/app.js',
+    './assets/js/db.js',
+    './assets/js/sync.js',
+    './assets/img/logo.png',
+    './manifest.json'
 ];
 
+// 1. INSTALASI: Masukkan semua senjata utama ke dalam Gudang Cache
 self.addEventListener('install', event => {
-  self.skipWaiting(); // Memaksa SW baru langsung aktif
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => {
-      return cache.addAll(urlsToCache);
-    })
-  );
+    self.skipWaiting(); // Paksa langsung aktif
+    event.waitUntil(
+        caches.open(CACHE_NAME)
+            .then(cache => cache.addAll(ASSETS_TO_CACHE))
+    );
 });
 
+// 2. AKTIVASI: Hapus gudang senjata versi lama (jika ada update)
 self.addEventListener('activate', event => {
-  event.waitUntil(
-    caches.keys().then(cacheNames => {
-      return Promise.all(
-        cacheNames.map(cacheName => {
-          if (cacheName !== CACHE_NAME) {
-            return caches.delete(cacheName); // Hapus cache versi lama
-          }
+    event.waitUntil(
+        caches.keys().then(cacheNames => {
+            return Promise.all(
+                cacheNames.map(cache => {
+                    if (cache !== CACHE_NAME) {
+                        return caches.delete(cache);
+                    }
+                })
+            );
         })
-      );
-    })
-  );
+    );
+    self.clients.claim();
 });
 
+// 3. PENGHADANGAN (INTERCEPTOR): Logika Mode Offline
 self.addEventListener('fetch', event => {
-  // 🔥 KUNCI PENYELAMAT: Jika request menuju Google Script, BIARKAN LEWAT! Jangan dicegat!
-  if (event.request.url.includes('script.google.com')) {
-    return; // Langsung return, biarkan browser yang menangani koneksi aslinya
-  }
+    // Abaikan lalu lintas radar ke Google Sheet agar tidak dicache paksa
+    if (event.request.url.includes('script.google.com')) {
+        return;
+    }
 
-  // Untuk file lainnya (HTML, JS, CSS), gunakan strategi Cache First
-  event.respondWith(
-    caches.match(event.request).then(response => {
-      return response || fetch(event.request);
-    }).catch(() => {
-      // Fallback jika offline dan tidak ada di cache
-      return new Response('Aplikasi sedang offline dan data tidak ditemukan di cache.');
-    })
-  );
+    event.respondWith(
+        caches.match(event.request).then(cachedResponse => {
+            // Jika file ada di memori lokal, langsung berikan (SUPER CEPAT & BISA OFFLINE)
+            if (cachedResponse) {
+                return cachedResponse;
+            }
+
+            // Jika tidak ada di memori, coba sedot dari internet
+            return fetch(event.request).then(networkResponse => {
+                return caches.open(CACHE_NAME).then(cache => {
+                    // Simpan file baru ke memori untuk offline selanjutnya (Dynamic Caching)
+                    if(event.request.method === 'GET') {
+                        cache.put(event.request, networkResponse.clone());
+                    }
+                    return networkResponse;
+                });
+            }).catch(() => {
+                // 🔥 DOKTRIN UTAMA: Jika offline total dan file tidak ada, 
+                // JANGAN tampilkan halaman error/offline, tapi PAKSA kembalikan ke index.html!
+                if (event.request.mode === 'navigate') {
+                    return caches.match('./index.html');
+                }
+            });
+        })
+    );
 });
