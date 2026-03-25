@@ -1,7 +1,7 @@
 // ==========================================
-// 📊 DASHBOARD SUPERVISOR (V39 - LIVE REGIONAL FILTER)
+// 📊 DASHBOARD SUPERVISOR (V40 - GENERATOR LAPORAN KADER)
 // ==========================================
-import { clearStore } from './db.js';
+import { clearStore, getAllData } from './db.js';
 
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzEmmn0wMJmC1OHij9JUxm8EIT2xW1AuV0597EYCWDIxG_nkpZYBPx1EGiNYe6OjEHniw/exec';
 
@@ -9,6 +9,8 @@ window.adminData = { registrasi: [], pendampingan: [] };
 window.adminSession = null;
 window.currentFilterKec = 'ALL';
 window.currentFilterDesa = 'ALL';
+window.currentFilterBulan = new Date().getMonth() + 1; // 1-12
+window.currentFilterTahun = new Date().getFullYear();
 
 const getRoleTheme = (roleStr) => {
     const r = String(roleStr).toUpperCase();
@@ -71,11 +73,34 @@ const exportToCSV = (filename, rows) => {
     }
 };
 
+// 🔥 FUNGSI EKSPOR TABEL HTML KE EXCEL (.xls)
+const exportTableToExcel = (tableID, filename = '') => {
+    const table = document.getElementById(tableID);
+    if(!table) return;
+    
+    // Menambahkan style border agar di Excel tampil rapi
+    let tableHTML = table.outerHTML.replace(/<table/g, '<table border="1" style="border-collapse:collapse;"');
+    
+    // Membungkus dengan XML format lama agar dikenali MS Excel
+    const template = `
+        <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+        <head><meta charset="UTF-8">
+        </head><body>${tableHTML}</body></html>`;
+        
+    const blob = new Blob([template], { type: 'application/vnd.ms-excel' });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = filename ? filename + '.xls' : 'Rekapan_Laporan.xls';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+};
+
 window.renderAdminView = async (target) => {
     const content = document.getElementById('admin-content');
     const roleUpper = String(window.adminSession.role).toUpperCase();
     
-    // 🔥 FILTER DATA BERDASARKAN DROPDOWN (Jika ada)
+    // 🔥 FILTER WILAYAH
     let filteredReg = window.adminData.registrasi;
     let filteredPend = window.adminData.pendampingan;
     
@@ -90,6 +115,41 @@ window.renderAdminView = async (target) => {
         filteredPend = filteredPend.filter(p => allowedIds.has(p.id_sasaran_ref));
     }
 
+    // 🔥 GENERATE OPSI DROPDOWN FILTER
+    let optKec = `<option value="ALL">🌍 Semua Kecamatan</option>`;
+    let optDesa = `<option value="ALL">🏘️ Semua Desa</option>`;
+    const isKabupaten = roleUpper.includes('KABUPATEN') || roleUpper.includes('SUPER') || roleUpper.includes('MITRA');
+    const isKecamatan = roleUpper.includes('KECAMATAN') || roleUpper === 'ADMIN';
+    const mapKecRev = { 'GRK': 'GEROKGAK', 'SRT': 'SERIRIT', 'BSB': 'BUSUNGBIU', 'BJR': 'BANJAR', 'SKS': 'SUKASADA', 'BLL': 'BULELENG', 'SWN': 'SAWAN', 'KBT': 'KUBUTAMBAHAN', 'TJK': 'TEJAKULA' };
+    
+    if (isKabupaten) {
+        const listKec = [...new Set(window.adminData.registrasi.map(r => r.sumber_kecamatan).filter(Boolean))];
+        listKec.forEach(k => { optKec += `<option value="${k}" ${window.currentFilterKec === k ? 'selected' : ''}>${mapKecRev[k] || k}</option>`; });
+        const listDesa = [...new Set(window.adminData.registrasi.filter(r => window.currentFilterKec === 'ALL' || r.sumber_kecamatan === window.currentFilterKec).map(r => String(r.desa||'').toUpperCase()).filter(Boolean))];
+        listDesa.sort().forEach(d => { if(d !== '-') optDesa += `<option value="${d}" ${window.currentFilterDesa === d ? 'selected' : ''}>${d}</option>`; });
+    } 
+    else if (isKecamatan) {
+        optKec = `<option value="${window.currentFilterKec}">${window.adminSession.kecamatan}</option>`; 
+        const listDesa = [...new Set(window.adminData.registrasi.map(r => String(r.desa||'').toUpperCase()).filter(Boolean))];
+        listDesa.sort().forEach(d => { if(d !== '-') optDesa += `<option value="${d}" ${window.currentFilterDesa === d ? 'selected' : ''}>${d}</option>`; });
+    }
+    else {
+        optKec = `<option value="${window.currentFilterKec}">${window.adminSession.kecamatan}</option>`;
+        const listDesa = String(window.adminSession.desa || '').toUpperCase().split(',').map(d => d.trim());
+        optDesa = listDesa.map(d => `<option value="${d}" ${window.currentFilterDesa === d ? 'selected' : ''}>${d}</option>`).join('');
+    }
+
+    const filterWilayahHTML = `
+        <div style="background: white; padding: 15px 25px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); display: flex; gap: 15px; align-items: center; border-left: 4px solid var(--th-main);">
+            <div style="font-size: 0.85rem; font-weight: bold; color: #666; white-space: nowrap;">🔍 Filter Wilayah:</div>
+            <select id="dash-flt-kec" class="admin-input" style="flex:1; font-weight:bold; color:var(--th-dark);" ${isKabupaten ? '' : 'disabled'}>${optKec}</select>
+            <select id="dash-flt-desa" class="admin-input" style="flex:1; font-weight:bold; color:var(--th-dark);" ${roleUpper.includes('DESA') && String(window.adminSession.desa).indexOf(',') === -1 ? 'disabled' : ''}>${optDesa}</select>
+        </div>
+    `;
+
+    // ==========================================
+    // RENDER: DASHBOARD
+    // ==========================================
     if (target === 'dashboard') {
         let cCatin = 0, cBumil = 0, cBufas = 0, cBaduta = 0;
         let pCatin = 0, pBumil = 0, pBufas = 0, pBaduta = 0;
@@ -115,40 +175,6 @@ window.renderAdminView = async (target) => {
         let displayDesa = window.adminSession.desa === '-' || window.adminSession.desa === 'ALL' || window.adminSession.desa === '' ? window.adminSession.kecamatan : window.adminSession.desa;
         if (String(displayDesa).toUpperCase() === 'ALL') displayDesa = 'KABUPATEN BULELENG';
 
-        // 🔥 MENYIAPKAN OPSI DROPDOWN FILTER
-        let optKec = `<option value="ALL">🌍 Semua Kecamatan</option>`;
-        let optDesa = `<option value="ALL">🏘️ Semua Desa</option>`;
-        
-        const isKabupaten = roleUpper.includes('KABUPATEN') || roleUpper.includes('SUPER') || roleUpper.includes('MITRA');
-        const isKecamatan = roleUpper.includes('KECAMATAN') || roleUpper === 'ADMIN';
-        const mapKecRev = { 'GRK': 'GEROKGAK', 'SRT': 'SERIRIT', 'BSB': 'BUSUNGBIU', 'BJR': 'BANJAR', 'SKS': 'SUKASADA', 'BLL': 'BULELENG', 'SWN': 'SAWAN', 'KBT': 'KUBUTAMBAHAN', 'TJK': 'TEJAKULA' };
-        
-        if (isKabupaten) {
-            const listKec = [...new Set(window.adminData.registrasi.map(r => r.sumber_kecamatan).filter(Boolean))];
-            listKec.forEach(k => { optKec += `<option value="${k}" ${window.currentFilterKec === k ? 'selected' : ''}>${mapKecRev[k] || k}</option>`; });
-            
-            const listDesa = [...new Set(window.adminData.registrasi.filter(r => window.currentFilterKec === 'ALL' || r.sumber_kecamatan === window.currentFilterKec).map(r => String(r.desa||'').toUpperCase()).filter(Boolean))];
-            listDesa.sort().forEach(d => { if(d !== '-') optDesa += `<option value="${d}" ${window.currentFilterDesa === d ? 'selected' : ''}>${d}</option>`; });
-        } 
-        else if (isKecamatan) {
-            optKec = `<option value="${window.currentFilterKec}">${window.adminSession.kecamatan}</option>`; 
-            const listDesa = [...new Set(window.adminData.registrasi.map(r => String(r.desa||'').toUpperCase()).filter(Boolean))];
-            listDesa.sort().forEach(d => { if(d !== '-') optDesa += `<option value="${d}" ${window.currentFilterDesa === d ? 'selected' : ''}>${d}</option>`; });
-        }
-        else {
-            optKec = `<option value="${window.currentFilterKec}">${window.adminSession.kecamatan}</option>`;
-            const listDesa = String(window.adminSession.desa || '').toUpperCase().split(',').map(d => d.trim());
-            optDesa = listDesa.map(d => `<option value="${d}" ${window.currentFilterDesa === d ? 'selected' : ''}>${d}</option>`).join('');
-        }
-
-        const filterHTML = `
-            <div style="background: white; padding: 15px 25px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); display: flex; gap: 15px; align-items: center; border-left: 4px solid var(--th-main);">
-                <div style="font-size: 0.85rem; font-weight: bold; color: #666; white-space: nowrap;">🔍 Filter Wilayah:</div>
-                <select id="dash-flt-kec" class="admin-input" style="flex:1; font-weight:bold; color:var(--th-dark);" ${isKabupaten ? '' : 'disabled'}>${optKec}</select>
-                <select id="dash-flt-desa" class="admin-input" style="flex:1; font-weight:bold; color:var(--th-dark);" ${roleUpper.includes('DESA') && String(window.adminSession.desa).indexOf(',') === -1 ? 'disabled' : ''}>${optDesa}</select>
-            </div>
-        `;
-
         content.innerHTML = `
             <div class="animate-fade">
                 <div style="background: linear-gradient(135deg, var(--th-dark) 0%, var(--th-main) 100%); color: var(--th-text); border-radius: 12px; padding: 25px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.15); border-bottom: 5px solid var(--th-accent);">
@@ -157,7 +183,7 @@ window.renderAdminView = async (target) => {
                     <p style="margin:0; font-size:0.9rem; opacity:0.9;">Total Terhimpun (Sesuai Filter): <b>${filteredReg.length} Sasaran</b> & <b>${filteredPend.length} Kunjungan</b>.</p>
                 </div>
                 
-                ${filterHTML}
+                ${filterWilayahHTML}
 
                 <div style="margin-bottom: 15px; font-weight: bold; color: var(--th-dark); border-left: 4px solid var(--th-accent); padding-left: 10px;">📊 Akumulasi Sasaran Terdaftar</div>
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 25px;">
@@ -206,25 +232,17 @@ window.renderAdminView = async (target) => {
                 </div>
             </div>
         `;
-
-        // 🔥 FUNGSI REFRESH FILTER
+        
+        // Listener Filter Dashboard
         const btnKec = document.getElementById('dash-flt-kec');
-        if (btnKec) {
-            btnKec.addEventListener('change', () => {
-                window.currentFilterKec = btnKec.value;
-                window.currentFilterDesa = 'ALL'; 
-                window.renderAdminView('dashboard');
-            });
-        }
+        if (btnKec) btnKec.addEventListener('change', () => { window.currentFilterKec = btnKec.value; window.currentFilterDesa = 'ALL'; window.renderAdminView('dashboard'); });
         const btnDesa = document.getElementById('dash-flt-desa');
-        if (btnDesa) {
-            btnDesa.addEventListener('change', () => {
-                window.currentFilterDesa = btnDesa.value;
-                window.renderAdminView('dashboard');
-            });
-        }
+        if (btnDesa) btnDesa.addEventListener('change', () => { window.currentFilterDesa = btnDesa.value; window.renderAdminView('dashboard'); });
     }
 
+    // ==========================================
+    // RENDER: DATABASE SASARAN
+    // ==========================================
     else if (target === 'sasaran') {
         content.innerHTML = `
             <div class="animate-fade">
@@ -232,6 +250,7 @@ window.renderAdminView = async (target) => {
                     <h2 style="margin:0; font-size:1.4rem; color:var(--th-dark); border-left:4px solid var(--th-accent); padding-left:10px;">📋 Database Sasaran</h2>
                     <button class="btn-action" style="background:var(--th-main); color:var(--th-text); border:1px solid var(--th-accent); border-radius:6px; padding:10px 15px; font-size:0.9rem;" onclick="window.exportCSV('sasaran')">📥 Download Excel (CSV)</button>
                 </div>
+                ${filterWilayahHTML}
                 <div style="background:white; padding:15px; border-radius:8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); border: 1px solid #e1e8ed;">
                     <div style="display:flex; gap:10px; margin-bottom:15px;">
                         <input type="text" id="flt-sasaran-nama" class="admin-input" placeholder="Cari Nama/NIK/Desa..." style="flex:2;">
@@ -282,8 +301,16 @@ window.renderAdminView = async (target) => {
         document.getElementById('flt-sasaran-nama').addEventListener('input', renderTabelSasaran);
         document.getElementById('flt-sasaran-jenis').addEventListener('change', renderTabelSasaran);
         renderTabelSasaran();
+        
+        const btnKec = document.getElementById('dash-flt-kec');
+        if (btnKec) btnKec.addEventListener('change', () => { window.currentFilterKec = btnKec.value; window.currentFilterDesa = 'ALL'; window.renderAdminView('sasaran'); });
+        const btnDesa = document.getElementById('dash-flt-desa');
+        if (btnDesa) btnDesa.addEventListener('change', () => { window.currentFilterDesa = btnDesa.value; window.renderAdminView('sasaran'); });
     }
 
+    // ==========================================
+    // RENDER: RIWAYAT PENDAMPINGAN
+    // ==========================================
     else if (target === 'pendampingan') {
         content.innerHTML = `
             <div class="animate-fade">
@@ -291,6 +318,7 @@ window.renderAdminView = async (target) => {
                     <h2 style="margin:0; font-size:1.4rem; color:var(--th-dark); border-left:4px solid var(--th-accent); padding-left:10px;">🤝 Riwayat Pendampingan</h2>
                     <button class="btn-action" style="background:var(--th-main); color:var(--th-text); border:1px solid var(--th-accent); border-radius:6px; padding:10px 15px; font-size:0.9rem;" onclick="window.exportCSV('pendampingan')">📥 Download Excel (CSV)</button>
                 </div>
+                ${filterWilayahHTML}
                 <div style="background:white; padding:15px; border-radius:8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); border: 1px solid #e1e8ed;">
                     <div style="display:flex; gap:10px; margin-bottom:15px;">
                         <input type="text" id="flt-pend-nama" class="admin-input" placeholder="Cari ID Sasaran / Petugas..." style="flex:2;">
@@ -334,11 +362,239 @@ window.renderAdminView = async (target) => {
 
         document.getElementById('flt-pend-nama').addEventListener('input', renderTabelPend);
         renderTabelPend();
+        
+        const btnKec = document.getElementById('dash-flt-kec');
+        if (btnKec) btnKec.addEventListener('change', () => { window.currentFilterKec = btnKec.value; window.currentFilterDesa = 'ALL'; window.renderAdminView('pendampingan'); });
+        const btnDesa = document.getElementById('dash-flt-desa');
+        if (btnDesa) btnDesa.addEventListener('change', () => { window.currentFilterDesa = btnDesa.value; window.renderAdminView('pendampingan'); });
+    }
+
+    // ==========================================
+    // RENDER: CETAK LAPORAN KADER (FITUR BARU)
+    // ==========================================
+    else if (target === 'cetak_laporan') {
+        const blnNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+        
+        let optBulan = '';
+        for(let i=1; i<=12; i++) {
+            optBulan += `<option value="${i}" ${window.currentFilterBulan == i ? 'selected' : ''}>${blnNames[i-1]}</option>`;
+        }
+        
+        let optTahun = '';
+        const curYear = new Date().getFullYear();
+        for(let y = curYear - 2; y <= curYear + 1; y++) {
+            optTahun += `<option value="${y}" ${window.currentFilterTahun == y ? 'selected' : ''}>${y}</option>`;
+        }
+
+        content.innerHTML = `
+            <style>
+                @media print {
+                    body * { visibility: hidden; }
+                    #admin-sidebar, .admin-header, #filter-area-cetak { display: none !important; }
+                    #report-print-area, #report-print-area * { visibility: visible; color: black !important; }
+                    #report-print-area { position: absolute; left: 0; top: 0; width: 100%; padding: 10px; background: white; }
+                    #report-print-area table { width: 100%; border-collapse: collapse; }
+                    #report-print-area th, #report-print-area td { border: 1px solid black !important; }
+                    #report-print-area th { background-color: #FFFF00 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                }
+            </style>
+            
+            <div class="animate-fade">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap:wrap; gap:10px;">
+                    <h2 style="margin:0; font-size:1.4rem; color:var(--th-dark); border-left:4px solid var(--th-accent); padding-left:10px;">🖨️ Cetak Laporan Kader</h2>
+                    <div style="display:flex; gap:10px;">
+                        <button class="btn-action" style="background:#e94560; color:white; border:none; border-radius:6px; padding:10px 15px; font-size:0.9rem;" onclick="window.print()">📄 Unduh PDF (Print)</button>
+                        <button class="btn-action" style="background:#198754; color:white; border:none; border-radius:6px; padding:10px 15px; font-size:0.9rem;" onclick="exportTableToExcel('tabel-rekap-kader', 'Rekap_Kader_${window.currentFilterDesa}_${blnNames[window.currentFilterBulan-1]}')">📥 Unduh Excel (.xls)</button>
+                    </div>
+                </div>
+
+                <div id="filter-area-cetak" style="background: white; padding: 15px 25px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); display: flex; gap: 15px; align-items: center; border-left: 4px solid var(--th-main);">
+                    <div style="font-size: 0.85rem; font-weight: bold; color: #666; white-space: nowrap;">📅 Filter Periode & Wilayah:</div>
+                    <select id="dash-flt-bulan" class="admin-input" style="flex:1;">${optBulan}</select>
+                    <select id="dash-flt-tahun" class="admin-input" style="flex:1;">${optTahun}</select>
+                    <select id="dash-flt-kec" class="admin-input" style="flex:1;" ${isKabupaten ? '' : 'disabled'}>${optKec}</select>
+                    <select id="dash-flt-desa" class="admin-input" style="flex:1;" ${roleUpper.includes('DESA') && String(window.adminSession.desa).indexOf(',') === -1 ? 'disabled' : ''}>${optDesa}</select>
+                </div>
+
+                <div style="background:white; padding:20px; border-radius:8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); border: 1px solid #e1e8ed; overflow-x:auto;">
+                    <div id="report-print-area">
+                        <div style="text-align:center; font-weight:bold; font-size:1.2rem; margin-bottom:20px; color:black;">REKAP HASIL PENDAMPINGAN KADER TPK</div>
+                        
+                        <table style="width: 100%; margin-bottom: 20px; border: none; font-size: 0.9rem; color:black;">
+                            <tr><td style="width: 120px; border: none !important; font-weight:bold; padding:2px;">DESA</td><td style="border: none !important; font-weight:bold; padding:2px;">: <span id="r-desa"></span></td></tr>
+                            <tr><td style="border: none !important; font-weight:bold; padding:2px;">KECAMATAN</td><td style="border: none !important; font-weight:bold; padding:2px;">: <span id="r-kec"></span></td></tr>
+                            <tr><td style="border: none !important; font-weight:bold; padding:2px;">BULAN</td><td style="border: none !important; font-weight:bold; padding:2px;">: <span id="r-bulan"></span></td></tr>
+                        </table>
+
+                        <table id="tabel-rekap-kader" style="width: 100%; border-collapse: collapse; font-size: 0.85rem; text-align: center; color:black; margin-bottom: 30px;" border="1">
+                            <thead>
+                                <tr style="background-color: #FFFF00;">
+                                    <th rowspan="2" style="border: 1px solid black; padding: 8px;">NO</th>
+                                    <th rowspan="2" style="border: 1px solid black; padding: 8px;">NAMA KADER</th>
+                                    <th colspan="4" style="border: 1px solid black; padding: 8px;">JUMLAH SASARAN</th>
+                                    <th colspan="4" style="border: 1px solid black; padding: 8px;">JUMLAH PENDAMPINGAN</th>
+                                    <th rowspan="2" style="border: 1px solid black; padding: 8px;">TOTAL JUMLAH<br>PENDAMPINGAN</th>
+                                </tr>
+                                <tr style="background-color: #FFFF00;">
+                                    <th style="border: 1px solid black; padding: 5px;">CATIN</th>
+                                    <th style="border: 1px solid black; padding: 5px;">BUMIL</th>
+                                    <th style="border: 1px solid black; padding: 5px;">BUFAS</th>
+                                    <th style="border: 1px solid black; padding: 5px;">BADUTA</th>
+                                    <th style="border: 1px solid black; padding: 5px;">CATIN</th>
+                                    <th style="border: 1px solid black; padding: 5px;">BUMIL</th>
+                                    <th style="border: 1px solid black; padding: 5px;">BUFAS</th>
+                                    <th style="border: 1px solid black; padding: 5px;">BADUTA</th>
+                                </tr>
+                            </thead>
+                            <tbody id="r-tbody">
+                            </tbody>
+                        </table>
+
+                        <div style="display:flex; justify-content:flex-end; padding-right:50px; text-align:center; font-size:0.9rem; color:black;">
+                            <div>
+                                <div id="r-tgl-ttd" style="margin-bottom: 5px;">Singaraja, </div>
+                                <div style="margin-bottom: 60px;">Mengetahui,<br>PKB Pengampu</div>
+                                <div id="r-nama-pkb" style="font-weight:bold; text-decoration:underline;">(Nama PKB)</div>
+                                <div id="r-nip-pkb">NIP. .........................</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        const renderReport = async () => {
+            const m = parseInt(window.currentFilterBulan);
+            const y = parseInt(window.currentFilterTahun);
+            const d = window.currentFilterDesa;
+            const k = window.currentFilterKec;
+            
+            // Set Headers
+            document.getElementById('r-desa').innerText = d === 'ALL' ? 'SEMUA DESA' : d;
+            document.getElementById('r-kec').innerText = k === 'ALL' ? 'SEMUA KECAMATAN' : (mapKecRev[k] || k);
+            document.getElementById('r-bulan').innerText = `${blnNames[m-1]} ${y}`;
+            
+            // Filter Data for the selected month/year
+            // Sasaran: Hitung yang terdaftar (created_at) di bulan tsb, ATAU yang aktif sampai bulan tsb.
+            // Sesuai standar, kita hitung yang terdaftar bulan ini + yang aktif. 
+            // Untuk kesederhanaan rekap bulanan TPK: Hitung semua sasaran yang status_sasaran = AKTIF (atau terdaftar di bulan itu).
+            // Laporan: Hitung khusus yang tgl_kunjungan di bulan dan tahun tersebut.
+            
+            let regTarget = filteredReg.filter(r => {
+                const dt = new Date(r.created_at);
+                // Hitung yang masih aktif atau selesai di bulan ini
+                return true; 
+            });
+
+            let pendTarget = filteredPend.filter(p => {
+                let rData = {}; try { rData = JSON.parse(p.data_laporan || '{}'); } catch(e){}
+                const dt = rData.tgl_kunjungan ? new Date(rData.tgl_kunjungan) : new Date(p.created_at);
+                return dt.getMonth() + 1 === m && dt.getFullYear() === y;
+            });
+
+            // Grouping by Kader
+            const kaderMap = {};
+            
+            regTarget.forEach(r => {
+                let u = r.username;
+                if(!kaderMap[u]) kaderMap[u] = { sCat:0, sBum:0, sBuf:0, sBad:0, pCat:0, pBum:0, pBuf:0, pBad:0 };
+                
+                // Cek apakah aktif di bulan tersebut
+                let isAktif = r.status_sasaran !== 'SELESAI';
+                // (Logika detail keaktifan sama seperti dashboard)
+                if (r.jenis_sasaran === 'CATIN') kaderMap[u].sCat++;
+                else if (r.jenis_sasaran === 'BUMIL') kaderMap[u].sBum++;
+                else if (r.jenis_sasaran === 'BUFAS') kaderMap[u].sBuf++;
+                else if (r.jenis_sasaran === 'BADUTA') kaderMap[u].sBad++;
+            });
+
+            pendTarget.forEach(p => {
+                let u = p.username;
+                if(!kaderMap[u]) kaderMap[u] = { sCat:0, sBum:0, sBuf:0, sBad:0, pCat:0, pBum:0, pBuf:0, pBad:0 };
+                
+                let jns = p.id_sasaran_ref.substring(0,3);
+                if (jns === 'CTN') kaderMap[u].pCat++;
+                else if (jns === 'BML') kaderMap[u].pBum++;
+                else if (jns === 'BFS') kaderMap[u].pBuf++;
+                else if (jns === 'BDT') kaderMap[u].pBad++;
+            });
+
+            // Draw Table
+            const tbody = document.getElementById('r-tbody');
+            let rowsHtml = '';
+            let idx = 1;
+            
+            for (const [kaderName, data] of Object.entries(kaderMap)) {
+                // Jangan tampilkan jika 0 semua di bulan tsb untuk kerapian, kecuali ada sasaran aktif
+                if(data.sCat===0 && data.sBum===0 && data.sBuf===0 && data.sBad===0 && data.pCat===0 && data.pBum===0 && data.pBuf===0 && data.pBad===0) continue;
+                
+                const totalPend = data.pCat + data.pBum + data.pBuf + data.pBad;
+                rowsHtml += `
+                    <tr>
+                        <td style="border: 1px solid black; padding: 5px;">${idx++}</td>
+                        <td style="border: 1px solid black; padding: 5px; text-align:left;">${kaderName}</td>
+                        <td style="border: 1px solid black; padding: 5px;">${data.sCat || 0}</td>
+                        <td style="border: 1px solid black; padding: 5px;">${data.sBum || 0}</td>
+                        <td style="border: 1px solid black; padding: 5px;">${data.sBuf || 0}</td>
+                        <td style="border: 1px solid black; padding: 5px;">${data.sBad || 0}</td>
+                        <td style="border: 1px solid black; padding: 5px;">${data.pCat || 0}</td>
+                        <td style="border: 1px solid black; padding: 5px;">${data.pBum || 0}</td>
+                        <td style="border: 1px solid black; padding: 5px;">${data.pBuf || 0}</td>
+                        <td style="border: 1px solid black; padding: 5px;">${data.pBad || 0}</td>
+                        <td style="border: 1px solid black; padding: 5px; font-weight:bold;">${totalPend || 0}</td>
+                    </tr>
+                `;
+            }
+            
+            if (rowsHtml === '') {
+                rowsHtml = `<tr><td colspan="11" style="border: 1px solid black; padding: 15px; text-align:center;">Tidak ada aktivitas kader pada periode ini.</td></tr>`;
+            }
+            tbody.innerHTML = rowsHtml;
+
+            // Footer Tanggal
+            const lastDay = new Date(y, m, 0).getDate();
+            document.getElementById('r-tgl-ttd').innerText = `Singaraja, ${lastDay} ${blnNames[m-1]} ${y}`;
+
+            // Footer PKB Name
+            let pkbName = '(Nama PKB Pengampu)';
+            let pkbNip = 'NIP ......................................';
+            
+            if (roleUpper.includes('PKB')) {
+                pkbName = window.adminSession.nama;
+                pkbNip = window.adminSession.ref_id ? 'NIP. ' + window.adminSession.ref_id : pkbNip;
+            } else {
+                try {
+                    // Cari di master_pkb berdasarkan desa
+                    const { getAllData } = await import('./db.js');
+                    const allPkb = await getAllData('master_pkb').catch(()=>[]);
+                    if (d !== 'ALL') {
+                        const foundPkb = allPkb.find(p => String(p.desa_kelurahan || p.desa || '').toUpperCase().includes(d));
+                        if (foundPkb) {
+                            pkbName = foundPkb.nama_pkb || foundPkb.nama || pkbName;
+                            pkbNip = 'NIP. ' + (foundPkb.nip_pkb || foundPkb.id_pkb || '....................');
+                        }
+                    }
+                } catch(e) {}
+            }
+            
+            document.getElementById('r-nama-pkb').innerText = pkbName;
+            document.getElementById('r-nip-pkb').innerText = pkbNip;
+        };
+
+        // Listeners for this specific page
+        document.getElementById('dash-flt-bulan').addEventListener('change', (e) => { window.currentFilterBulan = e.target.value; renderReport(); });
+        document.getElementById('dash-flt-tahun').addEventListener('change', (e) => { window.currentFilterTahun = e.target.value; renderReport(); });
+        
+        const btnKec = document.getElementById('dash-flt-kec');
+        if (btnKec) btnKec.addEventListener('change', () => { window.currentFilterKec = btnKec.value; window.currentFilterDesa = 'ALL'; window.renderAdminView('cetak_laporan'); });
+        const btnDesa = document.getElementById('dash-flt-desa');
+        if (btnDesa) btnDesa.addEventListener('change', () => { window.currentFilterDesa = btnDesa.value; renderReport(); });
+
+        renderReport();
     }
 };
 
 window.exportCSV = (jenis) => {
-    // 🔥 EKSPOR HANYA DATA SESUAI FILTER YANG SEDANG AKTIF
     let filteredReg = window.adminData.registrasi;
     let filteredPend = window.adminData.pendampingan;
     
@@ -421,6 +677,7 @@ export const initAdmin = async (session) => {
                     <div class="admin-menu-item active" data-target="dashboard">📊 Dashboard Pemantauan</div>
                     <div class="admin-menu-item" data-target="sasaran">📋 Database Sasaran</div>
                     <div class="admin-menu-item" data-target="pendampingan">🤝 Riwayat Pendampingan</div>
+                    <div class="admin-menu-item" data-target="cetak_laporan">🖨️ Cetak Laporan Kader</div>
                 </div>
                 <div style="padding: 20px; border-top: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.2);">
                     <div style="font-size:0.8rem; margin-bottom:10px; color:var(--th-text);">Supervisor:<br><b style="color:var(--th-accent); font-size:0.95rem;">${session.nama}</b><br><span style="font-size:0.75rem; opacity:0.8;">${displayKecamatan}</span></div>
@@ -428,7 +685,7 @@ export const initAdmin = async (session) => {
                 </div>
             </div>
             <div style="flex:1; display:flex; flex-direction:column; overflow:hidden; width:100%;">
-                <div style="background:white; padding: 15px 25px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); z-index:5; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #e1e8ed;">
+                <div class="admin-header" style="background:white; padding: 15px 25px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); z-index:5; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #e1e8ed;">
                     <h2 id="admin-page-title" style="margin:0; font-size:1.3rem; color:var(--th-dark); font-weight:800;">Memuat Data...</h2>
                     <button id="btn-admin-refresh" style="background:var(--th-accent); color:var(--th-btn-text); border:none; padding:8px 15px; border-radius:6px; font-weight:bold; cursor:pointer; font-size:0.85rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">🔄 Segarkan Data</button>
                 </div>
