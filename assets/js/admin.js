@@ -1,5 +1,5 @@
 // ==========================================
-// 📊 DASHBOARD SUPERVISOR (V42 - GLOBAL IDENTITY FIX & LAPORAN KADER)
+// 📊 DASHBOARD SUPERVISOR (V43 - GLOBAL IDENTITY & UPDATE SYSTEM PATCH)
 // ==========================================
 import { clearStore, getAllData } from './db.js';
 
@@ -16,7 +16,6 @@ window.currentFilterTahun = new Date().getFullYear();
 window.getKaderName = (uname) => {
     if(!uname) return '-';
     const kaders = window.adminData.master_kader || [];
-    // Mencari kecocokan dari id (hasil terjemahan Code.gs), id_kader, atau username
     const found = kaders.find(x => String(x.id) === String(uname) || String(x.id_kader) === String(uname) || String(x.username) === String(uname));
     return found ? (found.nama_kader || found.nama_lengkap || found.nama || uname) : uname;
 };
@@ -247,7 +246,6 @@ window.renderAdminView = async (target) => {
             </div>
         `;
         
-        // Listener Filter Dashboard
         const btnKec = document.getElementById('dash-flt-kec');
         if (btnKec) btnKec.addEventListener('change', () => { window.currentFilterKec = btnKec.value; window.currentFilterDesa = 'ALL'; window.renderAdminView('dashboard'); });
         const btnDesa = document.getElementById('dash-flt-desa');
@@ -683,6 +681,7 @@ export const initAdmin = async (session) => {
                     <div class="admin-menu-item" data-target="sasaran">📋 Database Sasaran</div>
                     <div class="admin-menu-item" data-target="pendampingan">🤝 Riwayat Pendampingan</div>
                     <div class="admin-menu-item" data-target="cetak_laporan">🖨️ Cetak Laporan Kader</div>
+                    <div class="admin-menu-item" data-target="reload_app" style="color:var(--th-accent); margin-top:10px; border-top: 1px solid rgba(255,255,255,0.1);">🔄 Pembaruan / Update Sistem</div>
                 </div>
                 <div style="padding: 20px; border-top: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.2);">
                     <div style="font-size:0.8rem; margin-bottom:10px; color:var(--th-text);">Supervisor:<br><b style="color:var(--th-accent); font-size:0.95rem;">${session.nama}</b><br><span style="font-size:0.75rem; opacity:0.8;">${displayKecamatan}</span></div>
@@ -701,15 +700,43 @@ export const initAdmin = async (session) => {
         </div>
     `;
 
-    document.getElementById('btn-admin-logout').onclick = async () => { if(confirm("Keluar dari Panel Supervisor?")) { await clearStore('kader_session'); location.reload(); } };
+    document.getElementById('btn-admin-logout').onclick = async () => { 
+        if(confirm("🚪 Yakin ingin Keluar Aplikasi?\n\n⚠️ PENTING: Jika ada proses penarikan data yang belum selesai, data tersebut mungkin terputus.\n\nLanjutkan?")) { 
+            await clearStore('kader_session'); 
+            location.reload(); 
+        } 
+    };
     
     const menuItems = document.querySelectorAll('.admin-menu-item');
     menuItems.forEach(item => { 
-        item.onclick = () => { 
+        item.onclick = async () => { 
+            const activeTarget = item.getAttribute('data-target');
+            
+            // 🔥 FUNGSI HARD CACHE NUKE UNTUK SUPERVISOR
+            if (activeTarget === 'reload_app') {
+                if (confirm("🔄 TARIK PEMBARUAN SISTEM?\n\nPerintah ini akan membersihkan memori sistem (Cache) dan memuat ulang aplikasi ke versi terbaru dari Server.\n\nLanjutkan?")) {
+                    try {
+                        if ('serviceWorker' in navigator) {
+                            const regs = await navigator.serviceWorker.getRegistrations();
+                            for (let r of regs) { await r.unregister(); }
+                        }
+                        if (window.caches) {
+                            const keys = await caches.keys();
+                            for (let k of keys) { await caches.delete(k); }
+                        }
+                        alert("✅ Memori sistem berhasil dibersihkan! Memuat versi terbaru...");
+                        window.location.reload(true);
+                    } catch (e) {
+                        console.error("Gagal menghapus cache:", e);
+                        window.location.reload(true);
+                    }
+                }
+                return; // Berhenti di sini agar tidak mengubah layar yang sedang aktif
+            }
+
             menuItems.forEach(m => m.classList.remove('active')); 
             item.classList.add('active'); 
             document.getElementById('admin-page-title').innerText = item.innerText.replace(/[^\w\s]/gi, '').trim(); 
-            const activeTarget = item.getAttribute('data-target');
             window.renderAdminView(activeTarget); 
         }; 
     });
