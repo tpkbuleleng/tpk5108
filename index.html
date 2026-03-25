@@ -45,7 +45,7 @@
                     <span id="network-status" class="status-badge offline">Offline</span>
                 </div>
             </div>
-            <button class="btn-logout-icon" onclick="confirm('Tutup Aplikasi dan hapus sesi login?') ? (async () => { await import('./assets/js/db.js').then(m => m.clearStore('kader_session')); location.reload(); })() : false;">🚪</button>
+            <button class="btn-logout-icon" onclick="confirm('🚪 Yakin ingin Keluar Aplikasi?\n\n⚠️ PENTING: Pastikan Anda SUDAH KLIK SINKRONISASI. Jika masih ada data yang Belum Sinkron (Lokal), data tersebut akan HILANG PERMANEN.\n\n(Data yang sudah masuk Server AMAN dan akan ditarik kembali saat Anda Login).') ? (async () => { await import('./assets/js/db.js').then(async m => { await m.clearStore('kader_session'); await m.clearStore('sync_queue'); }); location.reload(); })() : false;">🚪</button>
         </header>
 
         <div id="sidebar-overlay" class="sidebar-overlay"></div>
