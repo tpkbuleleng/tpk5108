@@ -140,7 +140,7 @@ const masukKeAplikasi = async (session) => {
 };
 
 // ==========================================
-// 3. PABRIK SUB-MENU (STANDAR KADER ONLY)
+// 3. PABRIK SUB-MENU (STANDAR KADER ONLY) & HARD RESET
 // ==========================================
 const renderMenu = async (role) => {
     const container = getEl('dynamic-menu-container'); if (!container) return; let allMenu = []; const rUpper = String(role).toUpperCase();
@@ -154,11 +154,12 @@ const renderMenu = async (role) => {
             { id_menu: 'M5', label_menu: 'Rekap Bulanan', icon: '📊', target_view: 'rekap_bulanan', role_akses: 'KADER', urutan: 5, is_active: 'Y' },
             { id_menu: 'M6', label_menu: 'Bantuan & FAQ', icon: '🆘', target_view: 'bantuan', role_akses: 'KADER', urutan: 6, is_active: 'Y' },
             { id_menu: 'M7', label_menu: 'Pengaturan Akun', icon: '⚙️', target_view: 'setting', role_akses: 'KADER', urutan: 7, is_active: 'Y' },
-            { id_menu: 'M8', label_menu: 'Muat Ulang Aplikasi', icon: '🔁', target_view: 'reload_app', role_akses: 'KADER', urutan: 8, is_active: 'Y' }
+            // 🔥 PATCH V49: Tombol Update Khusus (Tarik Pembaruan)
+            { id_menu: 'M8', label_menu: 'Tarik Pembaruan (Update)', icon: '🔄', target_view: 'reload_app', role_akses: 'KADER', urutan: 8, is_active: 'Y' }
         ];
     } else {
         allMenu = await getAllData('master_menu').catch(()=>[]);
-        if (allMenu.length === 0) { allMenu = [ { id_menu: 'M1', label_menu: 'Dashboard', icon: '🏠', target_view: 'dashboard', role_akses: role, urutan: 1, is_active: 'Y' }, { id_menu: 'M8', label_menu: 'Muat Ulang Aplikasi', icon: '🔁', target_view: 'reload_app', role_akses: role, urutan: 8, is_active: 'Y' } ]; }
+        if (allMenu.length === 0) { allMenu = [ { id_menu: 'M1', label_menu: 'Dashboard', icon: '🏠', target_view: 'dashboard', role_akses: role, urutan: 1, is_active: 'Y' }, { id_menu: 'M8', label_menu: 'Tarik Pembaruan (Update)', icon: '🔄', target_view: 'reload_app', role_akses: role, urutan: 8, is_active: 'Y' } ]; }
     }
 
     const filteredMenu = allMenu.filter(m => { const roles = String(m.role_akses || '').toUpperCase(); const isActive = String(m.is_active || 'Y').toUpperCase() === 'Y'; return isActive && roles.includes(rUpper); }).sort((a,b) => (parseInt(a.urutan)||0) - (parseInt(b.urutan)||0));
@@ -169,7 +170,8 @@ const renderMenu = async (role) => {
         if(myChildren.length > 0) {
             menuHtml += `<div style="margin-bottom: 2px;"><a class="menu-item" style="display:flex; justify-content:space-between; align-items:center;" onclick="var c = this.nextElementSibling; if(c.style.display==='none'){c.style.display='block'; this.style.background='rgba(0,0,0,0.05)';}else{c.style.display='none'; this.style.background='';}"><span><span class="icon">${p.icon || '📁'}</span> ${p.label_menu}</span><span style="font-size:0.7rem; opacity:0.6;">▼</span></a><div style="display:none; background: rgba(0,0,0,0.03); border-left: 3px solid var(--primary);">${myChildren.map(c => `<a class="menu-item" style="padding-left: 45px; font-size:0.9rem;" data-target="${c.target_view}"><span class="icon">${c.icon || '📄'}</span> ${c.label_menu}</a>`).join('')}</div></div>`;
         } else {
-            menuHtml += `<a class="menu-item" data-target="${p.target_view}"><span class="icon">${p.icon || '📌'}</span> ${p.label_menu}</a>`;
+            let textColor = p.target_view === 'reload_app' ? 'color:#0d6efd; font-weight:bold;' : '';
+            menuHtml += `<a class="menu-item" data-target="${p.target_view}" style="${textColor}"><span class="icon">${p.icon || '📌'}</span> ${p.label_menu}</a>`;
         }
     });
 
@@ -177,15 +179,49 @@ const renderMenu = async (role) => {
     container.style.overflowY = 'auto'; container.style.maxHeight = 'calc(100vh - 180px)'; container.style.paddingBottom = '20px';
 
     document.querySelectorAll('.menu-item[data-target]').forEach(item => {
-        item.onclick = () => {
+        item.onclick = async () => {
             getEl('sidebar').classList.remove('active'); getEl('sidebar-overlay').classList.remove('active');
             const target = item.getAttribute('data-target');
-            if (target === 'reload_app') { location.reload(true); } 
+            
+            // 🔥 PATCH V49: THE HARD CACHE NUKE (Rudal Pembersih Cache)
+            if (target === 'reload_app') { 
+                if (confirm("🔄 TARIK PEMBARUAN SISTEM?\n\nPerintah ini akan membersihkan memori sistem (Cache) dan memuat ulang aplikasi ke versi terbaru dari Server.\n\nJangan khawatir, data Sasaran dan Laporan Anda yang belum disinkronisasi TETAP AMAN.\n\nLanjutkan?")) {
+                    try {
+                        // 1. Matikan semua Service Worker yang mencekik aplikasi
+                        if ('serviceWorker' in navigator) {
+                            const regs = await navigator.serviceWorker.getRegistrations();
+                            for (let r of regs) { await r.unregister(); }
+                        }
+                        // 2. Hapus gudang Web Cache HTML/JS lama
+                        if (window.caches) {
+                            const keys = await caches.keys();
+                            for (let k of keys) { await caches.delete(k); }
+                        }
+                        // 3. Paksa Muat Ulang Murni
+                        alert("✅ Memori sistem berhasil dibersihkan! Memuat versi terbaru...");
+                        window.location.reload(true);
+                    } catch (e) {
+                        console.error("Gagal menghapus cache:", e);
+                        window.location.reload(true);
+                    }
+                }
+            } 
             else if (target) { window.editModeData = null; window.editModeLaporan = null; renderKonten(target); }
         };
     });
 
-    if (getEl('btnLogout')) { getEl('btnLogout').onclick = async () => { if (confirm("🔴 PERINGATAN: Ini akan MENGHAPUS SEMUA DATA BELUM SINKRON di memori HP Anda.\n\nApakah Anda yakin ingin Keluar?")) { await clearStore('kader_session'); await clearStore('sync_queue'); location.reload(true); } }; }
+    // 🔥 PATCH V49: Hapus juga Cache saat Keluar agar benar-benar Reset
+    if (getEl('btnLogout')) { 
+        getEl('btnLogout').onclick = async () => { 
+            if (confirm("🔴 PERINGATAN: Ini akan MENGHAPUS SEMUA DATA BELUM SINKRON di memori HP Anda.\n\nApakah Anda yakin ingin Keluar?")) { 
+                await clearStore('kader_session'); 
+                await clearStore('sync_queue'); 
+                if ('serviceWorker' in navigator) { const regs = await navigator.serviceWorker.getRegistrations(); for (let r of regs) { await r.unregister(); } }
+                if (window.caches) { const keys = await caches.keys(); for (let k of keys) { await caches.delete(k); } }
+                location.reload(true); 
+            } 
+        }; 
+    }
 };
 
 window.mulaiSinkronisasiDashboard = async () => {
@@ -263,16 +299,7 @@ window.renderKonten = async (target) => {
                     <h3 style="margin:0; color:var(--primary); font-size:1.3rem;">📝 ${eLabel}</h3>
                     ${isEdit ? `<div style="background:#fff3cd; padding:10px; border-radius:5px; margin-bottom:15px; font-size:0.85rem; color:#856404;"><b>Info:</b> ID Sasaran dan Jenis Sasaran tidak dapat diubah.</div>` : ''}
                     <form id="form-registrasi" style="background:#fff; padding:15px; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.1);">
-                        <div class="form-group">
-                            <label style="font-weight:bold;">Jenis Sasaran <span style="color:red">*</span></label>
-                            <select name="jenis_sasaran" id="reg-jenis" class="form-control" required ${isEdit ? 'disabled' : ''}>
-                                <option value="">-- Pilih Jenis Sasaran --</option>
-                                <option value="CATIN">Calon Pengantin (CATIN)</option>
-                                <option value="BUMIL">Ibu Hamil (BUMIL)</option>
-                                <option value="BUFAS">Ibu Nifas (BUFAS)</option>
-                                <option value="BADUTA">Anak Baduta (0-23 Bulan)</option>
-                            </select>
-                        </div>
+                        <div class="form-group"><label style="font-weight:bold;">Jenis Sasaran <span style="color:red">*</span></label><select name="jenis_sasaran" id="reg-jenis" class="form-control" required ${isEdit ? 'disabled' : ''}><option value="">-- Pilih Jenis Sasaran --</option><option value="CATIN">Calon Pengantin (CATIN)</option><option value="BUMIL">Ibu Hamil (BUMIL)</option><option value="BUFAS">Ibu Nifas (BUFAS)</option><option value="BADUTA">Anak Baduta (0-23 Bulan)</option></select></div>
                         <div id="form-core" style="display:none; margin-top:15px;">
                             
                             <div id="box-sasaran-inti" style="background:#e8f4fd; padding:15px; border-radius:8px; border-left:4px solid var(--primary); margin-bottom:15px;">
@@ -510,7 +537,6 @@ const initFormRegistrasi = async () => {
             selJenis.onchange = () => {
                 const jenis = selJenis.value; const core = getEl('form-core'); if(!jenis) { core.style.display = 'none'; return; } core.style.display = 'block';
                 
-                // 🔥 Sembunyikan Jenis Kelamin untuk BUMIL & BUFAS
                 if (boxJk && selJk) { 
                     if (jenis === 'BUMIL' || jenis === 'BUFAS') { 
                         selJk.value = 'Perempuan'; boxJk.style.display = 'none'; 
@@ -519,7 +545,6 @@ const initFormRegistrasi = async () => {
                     } 
                 }
                 
-                // 🔥 TOGGLE BLOCK SPESIFIK & ATUR REQUIRED
                 const boxCatinPasangan = getEl('box-catin-pasangan'); const boxBumilStatus = getEl('box-bumil-status'); const boxBufasStatus = getEl('box-bufas-status'); const boxBadutaStatus = getEl('box-baduta-status');
                 const boxCatinWilayah = getEl('wilayah-catin'); const boxDomisili = getEl('wilayah-domisili');
                 
