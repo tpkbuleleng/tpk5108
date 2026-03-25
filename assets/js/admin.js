@@ -1,11 +1,11 @@
 // ==========================================
-// 📊 DASHBOARD SUPERVISOR (V40 - GENERATOR LAPORAN KADER)
+// 📊 DASHBOARD SUPERVISOR (V41 - LAPORAN KADER ADVANCED & LIVE FILTER)
 // ==========================================
 import { clearStore, getAllData } from './db.js';
 
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzEmmn0wMJmC1OHij9JUxm8EIT2xW1AuV0597EYCWDIxG_nkpZYBPx1EGiNYe6OjEHniw/exec';
 
-window.adminData = { registrasi: [], pendampingan: [] };
+window.adminData = { registrasi: [], pendampingan: [], master_kader: [], master_pkb: [] };
 window.adminSession = null;
 window.currentFilterKec = 'ALL';
 window.currentFilterDesa = 'ALL';
@@ -25,8 +25,14 @@ const getRoleTheme = (roleStr) => {
 const fetchAdminData = async () => {
     try {
         const url = `${SCRIPT_URL}?action=getAdminData&role=${window.adminSession.role}&kecamatan=${window.adminSession.kecamatan}`;
-        const response = await fetch(url);
+        // 🔥 Menyedot data Admin sekaligus Master Data (Kader & PKB) secara bersamaan agar cepat
+        const [response, masterRes] = await Promise.all([
+            fetch(url),
+            fetch(SCRIPT_URL)
+        ]);
+        
         const res = await response.json();
+        const masterData = await masterRes.json();
         
         if (res.status === 'success') {
             let rawReg = res.data.registrasi || [];
@@ -44,6 +50,8 @@ const fetchAdminData = async () => {
             }
             window.adminData.registrasi = rawReg;
             window.adminData.pendampingan = rawPend;
+            window.adminData.master_kader = masterData.data ? masterData.data.master_kader || [] : [];
+            window.adminData.master_pkb = masterData.data ? masterData.data.master_pkb || [] : [];
             return true;
         }
         return false;
@@ -73,15 +81,10 @@ const exportToCSV = (filename, rows) => {
     }
 };
 
-// 🔥 FUNGSI EKSPOR TABEL HTML KE EXCEL (.xls)
 const exportTableToExcel = (tableID, filename = '') => {
     const table = document.getElementById(tableID);
     if(!table) return;
-    
-    // Menambahkan style border agar di Excel tampil rapi
     let tableHTML = table.outerHTML.replace(/<table/g, '<table border="1" style="border-collapse:collapse;"');
-    
-    // Membungkus dengan XML format lama agar dikenali MS Excel
     const template = `
         <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
         <head><meta charset="UTF-8">
@@ -100,7 +103,7 @@ window.renderAdminView = async (target) => {
     const content = document.getElementById('admin-content');
     const roleUpper = String(window.adminSession.role).toUpperCase();
     
-    // 🔥 FILTER WILAYAH
+    // 🔥 FILTER DATA BERDASARKAN DROPDOWN
     let filteredReg = window.adminData.registrasi;
     let filteredPend = window.adminData.pendampingan;
     
@@ -116,8 +119,8 @@ window.renderAdminView = async (target) => {
     }
 
     // 🔥 GENERATE OPSI DROPDOWN FILTER
-    let optKec = `<option value="ALL">🌍 Semua Kecamatan</option>`;
-    let optDesa = `<option value="ALL">🏘️ Semua Desa</option>`;
+    let optKec = `<option value="ALL">🌍 SEMUA KECAMATAN</option>`;
+    let optDesa = `<option value="ALL">🏘️ SEMUA DESA</option>`;
     const isKabupaten = roleUpper.includes('KABUPATEN') || roleUpper.includes('SUPER') || roleUpper.includes('MITRA');
     const isKecamatan = roleUpper.includes('KECAMATAN') || roleUpper === 'ADMIN';
     const mapKecRev = { 'GRK': 'GEROKGAK', 'SRT': 'SERIRIT', 'BSB': 'BUSUNGBIU', 'BJR': 'BANJAR', 'SKS': 'SUKASADA', 'BLL': 'BULELENG', 'SWN': 'SAWAN', 'KBT': 'KUBUTAMBAHAN', 'TJK': 'TEJAKULA' };
@@ -136,7 +139,7 @@ window.renderAdminView = async (target) => {
     else {
         optKec = `<option value="${window.currentFilterKec}">${window.adminSession.kecamatan}</option>`;
         const listDesa = String(window.adminSession.desa || '').toUpperCase().split(',').map(d => d.trim());
-        optDesa = listDesa.map(d => `<option value="${d}" ${window.currentFilterDesa === d ? 'selected' : ''}>${d}</option>`).join('');
+        optDesa = `<option value="ALL">🏘️ SEMUA DESA</option>` + listDesa.map(d => `<option value="${d}" ${window.currentFilterDesa === d ? 'selected' : ''}>${d}</option>`).join('');
     }
 
     const filterWilayahHTML = `
@@ -233,7 +236,6 @@ window.renderAdminView = async (target) => {
             </div>
         `;
         
-        // Listener Filter Dashboard
         const btnKec = document.getElementById('dash-flt-kec');
         if (btnKec) btnKec.addEventListener('change', () => { window.currentFilterKec = btnKec.value; window.currentFilterDesa = 'ALL'; window.renderAdminView('dashboard'); });
         const btnDesa = document.getElementById('dash-flt-desa');
@@ -374,17 +376,21 @@ window.renderAdminView = async (target) => {
     // ==========================================
     else if (target === 'cetak_laporan') {
         const blnNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+        const curDate = new Date();
+        const curRealMonth = curDate.getMonth() + 1;
+        const curRealYear = curDate.getFullYear();
         
+        // 🔥 FILTER BULAN & TAHUN SESUAI PERMINTAAN
+        let maxMonth = parseInt(window.currentFilterTahun) === curRealYear ? curRealMonth : 12;
+        if(parseInt(window.currentFilterTahun) > curRealYear) maxMonth = 12; 
+
         let optBulan = '';
-        for(let i=1; i<=12; i++) {
+        for(let i=1; i<=maxMonth; i++) {
             optBulan += `<option value="${i}" ${window.currentFilterBulan == i ? 'selected' : ''}>${blnNames[i-1]}</option>`;
         }
         
-        let optTahun = '';
-        const curYear = new Date().getFullYear();
-        for(let y = curYear - 2; y <= curYear + 1; y++) {
-            optTahun += `<option value="${y}" ${window.currentFilterTahun == y ? 'selected' : ''}>${y}</option>`;
-        }
+        const years = [2026, 2027, 2028, 2029, 2030];
+        let optTahun = years.map(y => `<option value="${y}" ${window.currentFilterTahun == y ? 'selected' : ''}>${y}</option>`).join('');
 
         content.innerHTML = `
             <style>
@@ -395,7 +401,6 @@ window.renderAdminView = async (target) => {
                     #report-print-area { position: absolute; left: 0; top: 0; width: 100%; padding: 10px; background: white; }
                     #report-print-area table { width: 100%; border-collapse: collapse; }
                     #report-print-area th, #report-print-area td { border: 1px solid black !important; }
-                    #report-print-area th { background-color: #FFFF00 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
                 }
             </style>
             
@@ -428,14 +433,14 @@ window.renderAdminView = async (target) => {
 
                         <table id="tabel-rekap-kader" style="width: 100%; border-collapse: collapse; font-size: 0.85rem; text-align: center; color:black; margin-bottom: 30px;" border="1">
                             <thead>
-                                <tr style="background-color: #FFFF00;">
+                                <tr>
                                     <th rowspan="2" style="border: 1px solid black; padding: 8px;">NO</th>
                                     <th rowspan="2" style="border: 1px solid black; padding: 8px;">NAMA KADER</th>
                                     <th colspan="4" style="border: 1px solid black; padding: 8px;">JUMLAH SASARAN</th>
                                     <th colspan="4" style="border: 1px solid black; padding: 8px;">JUMLAH PENDAMPINGAN</th>
                                     <th rowspan="2" style="border: 1px solid black; padding: 8px;">TOTAL JUMLAH<br>PENDAMPINGAN</th>
                                 </tr>
-                                <tr style="background-color: #FFFF00;">
+                                <tr>
                                     <th style="border: 1px solid black; padding: 5px;">CATIN</th>
                                     <th style="border: 1px solid black; padding: 5px;">BUMIL</th>
                                     <th style="border: 1px solid black; padding: 5px;">BUFAS</th>
@@ -450,12 +455,12 @@ window.renderAdminView = async (target) => {
                             </tbody>
                         </table>
 
-                        <div style="display:flex; justify-content:flex-end; padding-right:50px; text-align:center; font-size:0.9rem; color:black;">
-                            <div>
+                        <div style="display:flex; justify-content:flex-end; padding-right:30px; text-align:center; font-size:0.9rem; color:black;">
+                            <div style="width: 250px;">
                                 <div id="r-tgl-ttd" style="margin-bottom: 5px;">Singaraja, </div>
                                 <div style="margin-bottom: 60px;">Mengetahui,<br>PKB Pengampu</div>
-                                <div id="r-nama-pkb" style="font-weight:bold; text-decoration:underline;">(Nama PKB)</div>
-                                <div id="r-nip-pkb">NIP. .........................</div>
+                                <div id="r-nama-pkb" style="font-weight:bold; text-decoration:underline; white-space: nowrap; overflow: visible;">(Nama PKB)</div>
+                                <div id="r-nip-pkb" style="white-space: nowrap;">NIP. .........................</div>
                             </div>
                         </div>
                     </div>
@@ -469,22 +474,11 @@ window.renderAdminView = async (target) => {
             const d = window.currentFilterDesa;
             const k = window.currentFilterKec;
             
-            // Set Headers
             document.getElementById('r-desa').innerText = d === 'ALL' ? 'SEMUA DESA' : d;
             document.getElementById('r-kec').innerText = k === 'ALL' ? 'SEMUA KECAMATAN' : (mapKecRev[k] || k);
             document.getElementById('r-bulan').innerText = `${blnNames[m-1]} ${y}`;
             
-            // Filter Data for the selected month/year
-            // Sasaran: Hitung yang terdaftar (created_at) di bulan tsb, ATAU yang aktif sampai bulan tsb.
-            // Sesuai standar, kita hitung yang terdaftar bulan ini + yang aktif. 
-            // Untuk kesederhanaan rekap bulanan TPK: Hitung semua sasaran yang status_sasaran = AKTIF (atau terdaftar di bulan itu).
-            // Laporan: Hitung khusus yang tgl_kunjungan di bulan dan tahun tersebut.
-            
-            let regTarget = filteredReg.filter(r => {
-                const dt = new Date(r.created_at);
-                // Hitung yang masih aktif atau selesai di bulan ini
-                return true; 
-            });
+            let regTarget = filteredReg.filter(r => { return true; });
 
             let pendTarget = filteredPend.filter(p => {
                 let rData = {}; try { rData = JSON.parse(p.data_laporan || '{}'); } catch(e){}
@@ -492,26 +486,22 @@ window.renderAdminView = async (target) => {
                 return dt.getMonth() + 1 === m && dt.getFullYear() === y;
             });
 
-            // Grouping by Kader
             const kaderMap = {};
             
             regTarget.forEach(r => {
                 let u = r.username;
                 if(!kaderMap[u]) kaderMap[u] = { sCat:0, sBum:0, sBuf:0, sBad:0, pCat:0, pBum:0, pBuf:0, pBad:0 };
-                
-                // Cek apakah aktif di bulan tersebut
-                let isAktif = r.status_sasaran !== 'SELESAI';
-                // (Logika detail keaktifan sama seperti dashboard)
-                if (r.jenis_sasaran === 'CATIN') kaderMap[u].sCat++;
-                else if (r.jenis_sasaran === 'BUMIL') kaderMap[u].sBum++;
-                else if (r.jenis_sasaran === 'BUFAS') kaderMap[u].sBuf++;
-                else if (r.jenis_sasaran === 'BADUTA') kaderMap[u].sBad++;
+                if (r.status_sasaran !== 'SELESAI') {
+                    if (r.jenis_sasaran === 'CATIN') kaderMap[u].sCat++;
+                    else if (r.jenis_sasaran === 'BUMIL') kaderMap[u].sBum++;
+                    else if (r.jenis_sasaran === 'BUFAS') kaderMap[u].sBuf++;
+                    else if (r.jenis_sasaran === 'BADUTA') kaderMap[u].sBad++;
+                }
             });
 
             pendTarget.forEach(p => {
                 let u = p.username;
                 if(!kaderMap[u]) kaderMap[u] = { sCat:0, sBum:0, sBuf:0, sBad:0, pCat:0, pBum:0, pBuf:0, pBad:0 };
-                
                 let jns = p.id_sasaran_ref.substring(0,3);
                 if (jns === 'CTN') kaderMap[u].pCat++;
                 else if (jns === 'BML') kaderMap[u].pBum++;
@@ -519,15 +509,20 @@ window.renderAdminView = async (target) => {
                 else if (jns === 'BDT') kaderMap[u].pBad++;
             });
 
-            // Draw Table
             const tbody = document.getElementById('r-tbody');
             let rowsHtml = '';
             let idx = 1;
             
-            for (const [kaderName, data] of Object.entries(kaderMap)) {
-                // Jangan tampilkan jika 0 semua di bulan tsb untuk kerapian, kecuali ada sasaran aktif
+            // 🔥 PENARIKAN DATA NAMA ASLI DARI MASTER_KADER
+            const allKader = window.adminData.master_kader || [];
+            
+            for (const [username, data] of Object.entries(kaderMap)) {
                 if(data.sCat===0 && data.sBum===0 && data.sBuf===0 && data.sBad===0 && data.pCat===0 && data.pBum===0 && data.pBuf===0 && data.pBad===0) continue;
                 
+                let kaderName = username;
+                const foundK = allKader.find(k => k.username === username || k.id_kader === username);
+                if (foundK) kaderName = foundK.nama_kader || foundK.nama_lengkap || foundK.nama || username;
+
                 const totalPend = data.pCat + data.pBum + data.pBuf + data.pBad;
                 rowsHtml += `
                     <tr>
@@ -551,39 +546,43 @@ window.renderAdminView = async (target) => {
             }
             tbody.innerHTML = rowsHtml;
 
-            // Footer Tanggal
             const lastDay = new Date(y, m, 0).getDate();
             document.getElementById('r-tgl-ttd').innerText = `Singaraja, ${lastDay} ${blnNames[m-1]} ${y}`;
 
-            // Footer PKB Name
+            // 🔥 PENARIKAN DATA PKB OTOMATIS DARI MASTER_PKB
+            const allPkb = window.adminData.master_pkb || [];
             let pkbName = '(Nama PKB Pengampu)';
             let pkbNip = 'NIP ......................................';
             
             if (roleUpper.includes('PKB')) {
-                pkbName = window.adminSession.nama;
-                pkbNip = window.adminSession.ref_id ? 'NIP. ' + window.adminSession.ref_id : pkbNip;
+                const myPkb = allPkb.find(p => p.username === window.adminSession.username || p.id_pkb === window.adminSession.username);
+                if(myPkb) {
+                    pkbName = myPkb.nama_pkb || myPkb.nama || window.adminSession.nama;
+                    pkbNip = 'NIP. ' + (myPkb.nip_pkb || myPkb.nip || '....................');
+                } else {
+                    pkbName = window.adminSession.nama;
+                    pkbNip = 'NIP. ' + (window.adminSession.ref_id || '....................');
+                }
             } else {
-                try {
-                    // Cari di master_pkb berdasarkan desa
-                    const { getAllData } = await import('./db.js');
-                    const allPkb = await getAllData('master_pkb').catch(()=>[]);
-                    if (d !== 'ALL') {
-                        const foundPkb = allPkb.find(p => String(p.desa_kelurahan || p.desa || '').toUpperCase().includes(d));
-                        if (foundPkb) {
-                            pkbName = foundPkb.nama_pkb || foundPkb.nama || pkbName;
-                            pkbNip = 'NIP. ' + (foundPkb.nip_pkb || foundPkb.id_pkb || '....................');
-                        }
+                if (d !== 'ALL') {
+                    const foundPkb = allPkb.find(p => String(p.desa_kelurahan || p.desa || '').toUpperCase().includes(d));
+                    if (foundPkb) {
+                        pkbName = foundPkb.nama_pkb || foundPkb.nama || pkbName;
+                        pkbNip = 'NIP. ' + (foundPkb.nip_pkb || foundPkb.nip || '....................');
                     }
-                } catch(e) {}
+                }
             }
             
             document.getElementById('r-nama-pkb').innerText = pkbName;
             document.getElementById('r-nip-pkb').innerText = pkbNip;
         };
 
-        // Listeners for this specific page
+        // Listeners Filter Bulan & Wilayah
         document.getElementById('dash-flt-bulan').addEventListener('change', (e) => { window.currentFilterBulan = e.target.value; renderReport(); });
-        document.getElementById('dash-flt-tahun').addEventListener('change', (e) => { window.currentFilterTahun = e.target.value; renderReport(); });
+        document.getElementById('dash-flt-tahun').addEventListener('change', (e) => { 
+            window.currentFilterTahun = e.target.value; 
+            window.renderAdminView('cetak_laporan'); // Refresh view to update month options
+        });
         
         const btnKec = document.getElementById('dash-flt-kec');
         if (btnKec) btnKec.addEventListener('change', () => { window.currentFilterKec = btnKec.value; window.currentFilterDesa = 'ALL'; window.renderAdminView('cetak_laporan'); });
