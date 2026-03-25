@@ -206,7 +206,6 @@ const renderMenu = async (role) => {
         };
     });
 
-    // 🔥 PATCH V49: Penyesuaian Pesan Log Out agar Kader tidak panik
     if (getEl('btnLogout')) { 
         getEl('btnLogout').onclick = async () => { 
             if (confirm("🚪 Yakin ingin Keluar Aplikasi?\n\n⚠️ PENTING: Pastikan indikator Sinkronisasi sudah 0/0. Jika masih ada data yang BELUM SINKRON, data tersebut akan HILANG PERMANEN!\n\n(Catatan: Data yang sudah masuk Server dijamin AMAN dan akan ditarik kembali saat Anda Login lagi).")) { 
@@ -759,9 +758,48 @@ const initFormPendampingan = async () => {
                         if(idInputBB) getEl(idInputBB).addEventListener('input', calcAntro); if(idInputTB) getEl(idInputTB).addEventListener('input', calcAntro);
                     } 
                     else if (sasaran.jenis_sasaran === 'BUMIL') {
-                        const widgetLahir = `<div style="background: #fcf1f6; padding: 15px; border-radius: 8px; border-left: 4px solid #d63384; margin-top: 15px;"><div class="form-group"><label style="color:#d63384; font-weight:bold;">Apakah BUMIL sudah melahirkan?</label><select id="is_melahirkan" name="is_melahirkan" class="form-control"><option value="TIDAK">Belum / Tidak</option><option value="YA">Ya, Sudah Melahirkan</option></select></div><div class="form-group hidden" id="box-tgl-lahir" style="margin-bottom:0;"><label style="font-weight:bold;">Tanggal Persalinan</label><input type="date" name="tgl_persalinan" class="form-control"></div></div>`;
+                        // 🔥 PATCH V51: WIDGET KELAHIRAN OTOMATIS BUMIL -> BUFAS & BADUTA
+                        const widgetLahir = `
+                            <div style="background: #fcf1f6; padding: 15px; border-radius: 8px; border-left: 4px solid #d63384; margin-top: 15px;">
+                                <div class="form-group">
+                                    <label style="color:#d63384; font-weight:bold;">Apakah BUMIL sudah melahirkan?</label>
+                                    <select id="is_melahirkan" name="is_melahirkan" class="form-control">
+                                        <option value="TIDAK">Belum / Tidak</option>
+                                        <option value="YA">Ya, Sudah Melahirkan</option>
+                                    </select>
+                                </div>
+                                <div id="box-tgl-lahir" style="display:none;">
+                                    <div class="form-group">
+                                        <label style="font-weight:bold;">Tanggal Persalinan</label>
+                                        <input type="date" id="input-tgl-salin" name="tgl_persalinan" class="form-control">
+                                    </div>
+                                    <div class="form-group">
+                                        <label style="font-weight:bold;">Kondisi Bayi Saat Lahir</label>
+                                        <select id="kondisi_bayi" name="kondisi_bayi" class="form-control">
+                                            <option value="Hidup">Lahir Hidup</option>
+                                            <option value="Meninggal">Lahir Meninggal</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group" id="box-jml-bayi">
+                                        <label style="font-weight:bold;">Jumlah Bayi Lahir Hidup</label>
+                                        <input type="number" id="jumlah_bayi" name="jumlah_bayi" class="form-control" value="1" min="1" max="5">
+                                    </div>
+                                </div>
+                            </div>
+                        `;
                         containerQ.insertAdjacentHTML('beforeend', widgetLahir);
-                        if(getEl('is_melahirkan')) { getEl('is_melahirkan').onchange = (e) => { if(e.target.value === 'YA') getEl('box-tgl-lahir').classList.remove('hidden'); else getEl('box-tgl-lahir').classList.add('hidden'); }; }
+                        
+                        if(getEl('is_melahirkan')) { 
+                            getEl('is_melahirkan').onchange = (e) => { 
+                                getEl('box-tgl-lahir').style.display = e.target.value === 'YA' ? 'block' : 'none'; 
+                                getEl('input-tgl-salin').required = e.target.value === 'YA';
+                            }; 
+                        }
+                        if(getEl('kondisi_bayi')) {
+                            getEl('kondisi_bayi').onchange = (e) => {
+                                getEl('box-jml-bayi').style.display = e.target.value === 'Hidup' ? 'block' : 'none';
+                            };
+                        }
                     }
 
                     if(window.editModeLaporan) {
@@ -787,13 +825,65 @@ const initFormPendampingan = async () => {
                 try {
                     const formData = new FormData(e.target); const jawaban = {}; formData.forEach((val, key) => jawaban[key] = val);
                     
+                    // 🔥 PATCH V51: LOGIKA AUTO-GENERATE BUMIL -> BUFAS & BADUTA
                     if(jawaban.is_melahirkan === 'YA' && jawaban.tgl_persalinan && !window.editModeLaporan) {
                         const oR = await getDataById('sync_queue', selSasaran.value);
                         if(oR) {
+                            // 1. Matikan BUMIL
                             oR.status_sasaran = 'SELESAI'; oR.is_synced = false; await putData('sync_queue', oR);
-                            const nId = `BFS-${oR.id.split('-')[1]||'XXX'}-${Math.floor(Math.random()*1000000).toString().padStart(6,'0')}`;
-                            const nB = JSON.parse(JSON.stringify(oR)); nB.id = nId; nB.jenis_sasaran = 'BUFAS'; nB.status_sasaran = 'AKTIF'; nB.is_synced = false; nB.created_at = new Date().toISOString();
-                            await putData('sync_queue', nB); alert("🎉 BUMIL telah melahirkan. Kartu BUFAS baru diterbitkan!");
+                            
+                            // 2. Lahirkan BUFAS
+                            const nIdBufas = `BFS-${oR.id.split('-')[1]||'XXX'}-${Math.floor(Math.random()*1000000).toString().padStart(6,'0')}`;
+                            const nBufas = JSON.parse(JSON.stringify(oR)); 
+                            nBufas.id = nIdBufas; nBufas.jenis_sasaran = 'BUFAS'; nBufas.status_sasaran = 'AKTIF'; nBufas.is_synced = false; nBufas.created_at = new Date().toISOString();
+                            if(!nBufas.data_laporan) nBufas.data_laporan = {}; 
+                            nBufas.data_laporan.tgl_persalinan = jawaban.tgl_persalinan;
+                            await putData('sync_queue', nBufas); 
+
+                            // 3. Lahirkan BADUTA (Jika Bayi Hidup)
+                            let countBayi = 0;
+                            if (jawaban.kondisi_bayi === 'Hidup') {
+                                const jml = parseInt(jawaban.jumlah_bayi) || 1;
+                                for (let i = 1; i <= jml; i++) {
+                                    const idBaduta = `BDT-${oR.id.split('-')[1]||'XXX'}-${Math.floor(Math.random()*1000000).toString().padStart(6,'0')}`;
+                                    
+                                    // 🔥 STANDAR PENAMAAN: "Bayi [Nama Ibu]"
+                                    const namaAnak = jml > 1 ? `Bayi ${i} ${oR.nama_sasaran}` : `Bayi ${oR.nama_sasaran}`;
+                                    
+                                    const badutaData = {
+                                        id: idBaduta, 
+                                        tipe_laporan: 'REGISTRASI', 
+                                        username: session.username, 
+                                        id_tim: session.id_tim, 
+                                        nomor_tim: session.nomor_tim, 
+                                        kecamatan: oR.kecamatan || session.kecamatan, 
+                                        jenis_sasaran: 'BADUTA', 
+                                        nama_sasaran: namaAnak, 
+                                        desa: oR.desa, 
+                                        dusun: oR.dusun, 
+                                        status_sasaran: 'AKTIF', 
+                                        is_synced: false, 
+                                        created_at: new Date().toISOString(), 
+                                        lokasi_gps: gpsLocation,
+                                        data_laporan: { 
+                                            nama_sasaran: namaAnak, 
+                                            nama_ibu_kandung: oR.nama_sasaran, 
+                                            nama_kk: oR.data_laporan?.nama_kk || '', 
+                                            nomor_kk: oR.data_laporan?.nomor_kk || '', 
+                                            tanggal_lahir: jawaban.tgl_persalinan, 
+                                            sumber_air: oR.data_laporan?.sumber_air || '', 
+                                            fasilitas_bab: oR.data_laporan?.fasilitas_bab || '', 
+                                            usia_saat_daftar_tahun: 0, 
+                                            usia_saat_daftar_bulan: 0, 
+                                            jenis_kelamin: '', // Sengaja kosong agar kader Edit
+                                            nik: '' // Sengaja kosong agar kader Edit (wajib 16 digit nanti)
+                                        }
+                                    };
+                                    await putData('sync_queue', badutaData);
+                                    countBayi++;
+                                }
+                            }
+                            alert(`🎉 SELAMAT! BUMIL telah melahirkan.\n\nSistem telah mematikan kartu BUMIL dan otomatis menerbitkan:\n- 1 Kartu BUFAS (Ibu Nifas)\n- ${countBayi} Kartu BADUTA (${countBayi > 0 ? 'Nama: Bayi '+oR.nama_sasaran : ''})\n\nSilakan lengkapi NIK dan Data Bayi di menu Database Sasaran nanti.`);
                         }
                     }
                     
