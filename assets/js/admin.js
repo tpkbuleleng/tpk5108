@@ -1,5 +1,5 @@
 // ==========================================
-// 📊 DASHBOARD SUPERVISOR (V41 - LAPORAN KADER ADVANCED & LIVE FILTER)
+// 📊 DASHBOARD SUPERVISOR (V42 - GLOBAL IDENTITY FIX & LAPORAN KADER)
 // ==========================================
 import { clearStore, getAllData } from './db.js';
 
@@ -11,6 +11,15 @@ window.currentFilterKec = 'ALL';
 window.currentFilterDesa = 'ALL';
 window.currentFilterBulan = new Date().getMonth() + 1; // 1-12
 window.currentFilterTahun = new Date().getFullYear();
+
+// 🔥 FUNGSI PELACAK NAMA KADER (GLOBAL)
+window.getKaderName = (uname) => {
+    if(!uname) return '-';
+    const kaders = window.adminData.master_kader || [];
+    // Mencari kecocokan dari id (hasil terjemahan Code.gs), id_kader, atau username
+    const found = kaders.find(x => String(x.id) === String(uname) || String(x.id_kader) === String(uname) || String(x.username) === String(uname));
+    return found ? (found.nama_kader || found.nama_lengkap || found.nama || uname) : uname;
+};
 
 const getRoleTheme = (roleStr) => {
     const r = String(roleStr).toUpperCase();
@@ -25,7 +34,6 @@ const getRoleTheme = (roleStr) => {
 const fetchAdminData = async () => {
     try {
         const url = `${SCRIPT_URL}?action=getAdminData&role=${window.adminSession.role}&kecamatan=${window.adminSession.kecamatan}`;
-        // 🔥 Menyedot data Admin sekaligus Master Data (Kader & PKB) secara bersamaan agar cepat
         const [response, masterRes] = await Promise.all([
             fetch(url),
             fetch(SCRIPT_URL)
@@ -224,18 +232,22 @@ window.renderAdminView = async (target) => {
                         <h3 style="margin:0 0 15px 0; font-size:1.1rem; color:var(--th-dark); border-bottom:2px solid var(--th-accent); padding-bottom:10px; display:inline-block;">🏆 Top 5 Kader Teraktif</h3>
                         <div style="margin-top:10px;">
                         ${topKader.length === 0 ? '<div style="color:#555; text-align:center; padding:20px 0; font-weight:500;">Belum ada laporan masuk.</div>' : ''}
-                        ${topKader.map((k, idx) => `
-                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; border-bottom:1px dashed #eee; padding-bottom:8px;">
-                                <div style="font-size:0.85rem;"><span style="color:var(--th-accent); font-weight:bold; margin-right:5px;">#${idx+1}</span> <b style="color:var(--th-dark);">${k[0]}</b></div>
-                                <div style="font-size:0.8rem; background:var(--th-light); color:var(--th-main); padding:2px 8px; border-radius:10px; font-weight:bold; border:1px solid var(--th-main);">${k[1]} Lapor</div>
-                            </div>
-                        `).join('')}
+                        ${topKader.map((k, idx) => {
+                            const namaAsli = window.getKaderName(k[0]);
+                            return `
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; border-bottom:1px dashed #eee; padding-bottom:8px;">
+                                    <div style="font-size:0.85rem;"><span style="color:var(--th-accent); font-weight:bold; margin-right:5px;">#${idx+1}</span> <b style="color:var(--th-dark);">${namaAsli}</b></div>
+                                    <div style="font-size:0.8rem; background:var(--th-light); color:var(--th-main); padding:2px 8px; border-radius:10px; font-weight:bold; border:1px solid var(--th-main);">${k[1]} Lapor</div>
+                                </div>
+                            `
+                        }).join('')}
                         </div>
                     </div>
                 </div>
             </div>
         `;
         
+        // Listener Filter Dashboard
         const btnKec = document.getElementById('dash-flt-kec');
         if (btnKec) btnKec.addEventListener('change', () => { window.currentFilterKec = btnKec.value; window.currentFilterDesa = 'ALL'; window.renderAdminView('dashboard'); });
         const btnDesa = document.getElementById('dash-flt-desa');
@@ -285,6 +297,7 @@ window.renderAdminView = async (target) => {
 
             tbody.innerHTML = filtered.map(r => {
                 const tgl = new Date(r.created_at).toLocaleDateString('id-ID');
+                const namaKaderAsli = window.getKaderName(r.username);
                 let statBadge = r.status_sasaran === 'SELESAI' ? `<span style="background:#f8f9fa; color:#6c757d; padding:3px 6px; border-radius:4px; font-size:0.7rem; font-weight:bold; border:1px solid #ddd;">SELESAI</span>` : `<span style="background:var(--th-light); color:var(--th-main); padding:3px 6px; border-radius:4px; font-size:0.7rem; font-weight:bold; border:1px solid var(--th-main);">AKTIF</span>`;
                 if(r.status_duplikasi && r.status_duplikasi.includes('DUPLIKAT')) statBadge = `<span style="background:#fff3cd; color:#B8860B; padding:3px 6px; border-radius:4px; font-size:0.7rem; font-weight:bold; border:1px solid #ffeeba;">⚠️ DUPLIKAT</span>`;
                 
@@ -294,7 +307,7 @@ window.renderAdminView = async (target) => {
                     <td><b style="color:#B8860B;">${r.jenis_sasaran}</b></td>
                     <td style="color:var(--th-main); font-weight:bold;">${r.nama_sasaran}</td>
                     <td>${r.desa}<br><span style="font-size:0.75rem; color:#888;">${r.dusun}</span></td>
-                    <td>${r.username}</td>
+                    <td>${namaKaderAsli}</td>
                     <td>${statBadge}</td>
                 </tr>`;
             }).join('');
@@ -350,12 +363,13 @@ window.renderAdminView = async (target) => {
                 let rData = {}; try { rData = JSON.parse(p.data_laporan || '{}'); } catch(e){}
                 const tgl = rData.tgl_kunjungan ? new Date(rData.tgl_kunjungan).toLocaleDateString('id-ID') : new Date(p.created_at).toLocaleDateString('id-ID');
                 const cat = rData.catatan || '-';
+                const namaKaderAsli = window.getKaderName(p.username);
                 let gpsStr = p.lokasi_gps && p.lokasi_gps !== '-' ? `<a href="https://maps.google.com/?q=${p.lokasi_gps}" target="_blank" style="color:var(--th-main); font-weight:bold; text-decoration:none; font-size:0.8rem;">🗺️ Cek Map</a>` : '<span style="color:#999; font-size:0.8rem;">Tidak Ada</span>';
 
                 return `<tr style="border-bottom:1px solid #eee;">
                     <td><b style="color:#B8860B;">${tgl}</b></td>
                     <td><code style="color:var(--th-dark); font-weight:bold;">${p.id_sasaran_ref}</code></td>
-                    <td>${p.username}</td>
+                    <td>${namaKaderAsli}</td>
                     <td style="font-size:0.85rem; color:#444;">${cat}</td>
                     <td>${gpsStr}</td>
                 </tr>`;
@@ -372,7 +386,7 @@ window.renderAdminView = async (target) => {
     }
 
     // ==========================================
-    // RENDER: CETAK LAPORAN KADER (FITUR BARU)
+    // RENDER: CETAK LAPORAN KADER
     // ==========================================
     else if (target === 'cetak_laporan') {
         const blnNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
@@ -380,7 +394,6 @@ window.renderAdminView = async (target) => {
         const curRealMonth = curDate.getMonth() + 1;
         const curRealYear = curDate.getFullYear();
         
-        // 🔥 FILTER BULAN & TAHUN SESUAI PERMINTAAN
         let maxMonth = parseInt(window.currentFilterTahun) === curRealYear ? curRealMonth : 12;
         if(parseInt(window.currentFilterTahun) > curRealYear) maxMonth = 12; 
 
@@ -513,15 +526,10 @@ window.renderAdminView = async (target) => {
             let rowsHtml = '';
             let idx = 1;
             
-            // 🔥 PENARIKAN DATA NAMA ASLI DARI MASTER_KADER
-            const allKader = window.adminData.master_kader || [];
-            
             for (const [username, data] of Object.entries(kaderMap)) {
                 if(data.sCat===0 && data.sBum===0 && data.sBuf===0 && data.sBad===0 && data.pCat===0 && data.pBum===0 && data.pBuf===0 && data.pBad===0) continue;
                 
-                let kaderName = username;
-                const foundK = allKader.find(k => k.username === username || k.id_kader === username);
-                if (foundK) kaderName = foundK.nama_kader || foundK.nama_lengkap || foundK.nama || username;
+                let kaderName = window.getKaderName(username);
 
                 const totalPend = data.pCat + data.pBum + data.pBuf + data.pBad;
                 rowsHtml += `
@@ -549,13 +557,12 @@ window.renderAdminView = async (target) => {
             const lastDay = new Date(y, m, 0).getDate();
             document.getElementById('r-tgl-ttd').innerText = `Singaraja, ${lastDay} ${blnNames[m-1]} ${y}`;
 
-            // 🔥 PENARIKAN DATA PKB OTOMATIS DARI MASTER_PKB
             const allPkb = window.adminData.master_pkb || [];
             let pkbName = '(Nama PKB Pengampu)';
             let pkbNip = 'NIP ......................................';
             
             if (roleUpper.includes('PKB')) {
-                const myPkb = allPkb.find(p => p.username === window.adminSession.username || p.id_pkb === window.adminSession.username);
+                const myPkb = allPkb.find(p => String(p.id) === String(window.adminSession.username) || String(p.id_pkb) === String(window.adminSession.username) || String(p.username) === String(window.adminSession.username));
                 if(myPkb) {
                     pkbName = myPkb.nama_pkb || myPkb.nama || window.adminSession.nama;
                     pkbNip = 'NIP. ' + (myPkb.nip_pkb || myPkb.nip || '....................');
@@ -577,11 +584,10 @@ window.renderAdminView = async (target) => {
             document.getElementById('r-nip-pkb').innerText = pkbNip;
         };
 
-        // Listeners Filter Bulan & Wilayah
         document.getElementById('dash-flt-bulan').addEventListener('change', (e) => { window.currentFilterBulan = e.target.value; renderReport(); });
         document.getElementById('dash-flt-tahun').addEventListener('change', (e) => { 
             window.currentFilterTahun = e.target.value; 
-            window.renderAdminView('cetak_laporan'); // Refresh view to update month options
+            window.renderAdminView('cetak_laporan'); 
         });
         
         const btnKec = document.getElementById('dash-flt-kec');
@@ -611,13 +617,13 @@ window.exportCSV = (jenis) => {
     if(jenis === 'sasaran') {
         const data = filteredReg.map(r => {
             let detail = {}; try { detail = JSON.parse(r.data_laporan || '{}'); } catch(e){}
-            return { ID_Registrasi: r.id, Tanggal_Daftar: r.created_at, Kader_Pendata: r.username, No_Tim: r.id_tim, Jenis_Sasaran: r.jenis_sasaran, Nama_Sasaran: r.nama_sasaran, Desa: r.desa, Dusun: r.dusun, NIK: detail.nik || '', No_KK: detail.nomor_kk || '', Tanggal_Lahir: detail.tanggal_lahir || '', Usia_Tahun: detail.usia_saat_daftar_tahun || '', Alamat_Lengkap: detail.alamat || detail.catin_alamat || '', Status_Aktif: r.status_sasaran };
+            return { ID_Registrasi: r.id, Tanggal_Daftar: r.created_at, Kader_Pendata: window.getKaderName(r.username), No_Tim: r.id_tim, Jenis_Sasaran: r.jenis_sasaran, Nama_Sasaran: r.nama_sasaran, Desa: r.desa, Dusun: r.dusun, NIK: detail.nik || '', No_KK: detail.nomor_kk || '', Tanggal_Lahir: detail.tanggal_lahir || '', Usia_Tahun: detail.usia_saat_daftar_tahun || '', Alamat_Lengkap: detail.alamat || detail.catin_alamat || '', Status_Aktif: r.status_sasaran };
         });
         exportToCSV('Data_Sasaran_TPK.csv', data);
     } else if (jenis === 'pendampingan') {
         const data = filteredPend.map(p => {
             let detail = {}; try { detail = JSON.parse(p.data_laporan || '{}'); } catch(e){}
-            return { ID_Laporan: p.id, Waktu_Input: p.created_at, Kader_Pelapor: p.username, ID_Sasaran: p.id_sasaran_ref, Tgl_Kunjungan: detail.tgl_kunjungan || '', Catatan_Hasil: detail.catatan || '', Lokasi_GPS: p.lokasi_gps || '' };
+            return { ID_Laporan: p.id, Waktu_Input: p.created_at, Kader_Pelapor: window.getKaderName(p.username), ID_Sasaran: p.id_sasaran_ref, Tgl_Kunjungan: detail.tgl_kunjungan || '', Catatan_Hasil: detail.catatan || '', Lokasi_GPS: p.lokasi_gps || '' };
         });
         exportToCSV('Data_Pendampingan_TPK.csv', data);
     }
