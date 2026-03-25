@@ -154,12 +154,12 @@ const renderMenu = async (role) => {
             { id_menu: 'M5', label_menu: 'Rekap Bulanan', icon: '📊', target_view: 'rekap_bulanan', role_akses: 'KADER', urutan: 5, is_active: 'Y' },
             { id_menu: 'M6', label_menu: 'Bantuan & FAQ', icon: '🆘', target_view: 'bantuan', role_akses: 'KADER', urutan: 6, is_active: 'Y' },
             { id_menu: 'M7', label_menu: 'Pengaturan Akun', icon: '⚙️', target_view: 'setting', role_akses: 'KADER', urutan: 7, is_active: 'Y' },
-            // 🔥 PATCH V49: Tombol Update Khusus (Tarik Pembaruan)
-            { id_menu: 'M8', label_menu: 'Tarik Pembaruan (Update)', icon: '🔄', target_view: 'reload_app', role_akses: 'KADER', urutan: 8, is_active: 'Y' }
+            // 🔥 PERUBAHAN TEKS: Menjadi Pembaruan / Update Sistem
+            { id_menu: 'M8', label_menu: 'Pembaruan / Update Sistem', icon: '🔄', target_view: 'reload_app', role_akses: 'KADER', urutan: 8, is_active: 'Y' }
         ];
     } else {
         allMenu = await getAllData('master_menu').catch(()=>[]);
-        if (allMenu.length === 0) { allMenu = [ { id_menu: 'M1', label_menu: 'Dashboard', icon: '🏠', target_view: 'dashboard', role_akses: role, urutan: 1, is_active: 'Y' }, { id_menu: 'M8', label_menu: 'Tarik Pembaruan (Update)', icon: '🔄', target_view: 'reload_app', role_akses: role, urutan: 8, is_active: 'Y' } ]; }
+        if (allMenu.length === 0) { allMenu = [ { id_menu: 'M1', label_menu: 'Dashboard', icon: '🏠', target_view: 'dashboard', role_akses: role, urutan: 1, is_active: 'Y' }, { id_menu: 'M8', label_menu: 'Pembaruan / Update Sistem', icon: '🔄', target_view: 'reload_app', role_akses: role, urutan: 8, is_active: 'Y' } ]; }
     }
 
     const filteredMenu = allMenu.filter(m => { const roles = String(m.role_akses || '').toUpperCase(); const isActive = String(m.is_active || 'Y').toUpperCase() === 'Y'; return isActive && roles.includes(rUpper); }).sort((a,b) => (parseInt(a.urutan)||0) - (parseInt(b.urutan)||0));
@@ -187,17 +187,14 @@ const renderMenu = async (role) => {
             if (target === 'reload_app') { 
                 if (confirm("🔄 TARIK PEMBARUAN SISTEM?\n\nPerintah ini akan membersihkan memori sistem (Cache) dan memuat ulang aplikasi ke versi terbaru dari Server.\n\nJangan khawatir, data Sasaran dan Laporan Anda yang belum disinkronisasi TETAP AMAN.\n\nLanjutkan?")) {
                     try {
-                        // 1. Matikan semua Service Worker yang mencekik aplikasi
                         if ('serviceWorker' in navigator) {
                             const regs = await navigator.serviceWorker.getRegistrations();
                             for (let r of regs) { await r.unregister(); }
                         }
-                        // 2. Hapus gudang Web Cache HTML/JS lama
                         if (window.caches) {
                             const keys = await caches.keys();
                             for (let k of keys) { await caches.delete(k); }
                         }
-                        // 3. Paksa Muat Ulang Murni
                         alert("✅ Memori sistem berhasil dibersihkan! Memuat versi terbaru...");
                         window.location.reload(true);
                     } catch (e) {
@@ -210,7 +207,6 @@ const renderMenu = async (role) => {
         };
     });
 
-    // 🔥 PATCH V49: Hapus juga Cache saat Keluar agar benar-benar Reset
     if (getEl('btnLogout')) { 
         getEl('btnLogout').onclick = async () => { 
             if (confirm("🔴 PERINGATAN: Ini akan MENGHAPUS SEMUA DATA BELUM SINKRON di memori HP Anda.\n\nApakah Anda yakin ingin Keluar?")) { 
