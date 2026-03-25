@@ -1,5 +1,5 @@
 // ==========================================
-// 📊 DASHBOARD SUPERVISOR (V43 - GLOBAL IDENTITY & UPDATE SYSTEM PATCH)
+// 📊 DASHBOARD SUPERVISOR (V44 - MOBILE RESPONSIVE SIDEBAR PATCH)
 // ==========================================
 import { clearStore, getAllData } from './db.js';
 
@@ -150,10 +150,10 @@ window.renderAdminView = async (target) => {
     }
 
     const filterWilayahHTML = `
-        <div style="background: white; padding: 15px 25px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); display: flex; gap: 15px; align-items: center; border-left: 4px solid var(--th-main);">
+        <div style="background: white; padding: 15px 25px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); display: flex; gap: 15px; align-items: center; border-left: 4px solid var(--th-main); flex-wrap: wrap;">
             <div style="font-size: 0.85rem; font-weight: bold; color: #666; white-space: nowrap;">🔍 Filter Wilayah:</div>
-            <select id="dash-flt-kec" class="admin-input" style="flex:1; font-weight:bold; color:var(--th-dark);" ${isKabupaten ? '' : 'disabled'}>${optKec}</select>
-            <select id="dash-flt-desa" class="admin-input" style="flex:1; font-weight:bold; color:var(--th-dark);" ${roleUpper.includes('DESA') && String(window.adminSession.desa).indexOf(',') === -1 ? 'disabled' : ''}>${optDesa}</select>
+            <select id="dash-flt-kec" class="admin-input" style="flex:1; min-width: 150px; font-weight:bold; color:var(--th-dark);" ${isKabupaten ? '' : 'disabled'}>${optKec}</select>
+            <select id="dash-flt-desa" class="admin-input" style="flex:1; min-width: 150px; font-weight:bold; color:var(--th-dark);" ${roleUpper.includes('DESA') && String(window.adminSession.desa).indexOf(',') === -1 ? 'disabled' : ''}>${optDesa}</select>
         </div>
     `;
 
@@ -215,17 +215,19 @@ window.renderAdminView = async (target) => {
                     </div>
                 </div>
 
-                <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 15px;">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px;">
                     <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); border: 1px solid #e1e8ed;">
                         <h3 style="margin:0 0 15px 0; font-size:1.1rem; color:var(--th-dark); border-bottom:2px solid var(--th-accent); padding-bottom:10px; display:inline-block;">📈 Statistik Laporan Kunjungan</h3>
-                        <table style="width:100%; border-collapse: collapse; font-size:0.9rem; margin-top:10px;">
-                            <tr style="background:#f8f9fa;"><th style="padding:10px; text-align:left; border-bottom:1px solid #ddd; color:var(--th-dark);">Kategori</th><th style="padding:10px; text-align:right; border-bottom:1px solid #ddd; color:var(--th-dark);">Jml Laporan Masuk</th></tr>
-                            <tr><td style="padding:10px; border-bottom:1px solid #eee;">Calon Pengantin (CATIN)</td><td style="padding:10px; text-align:right; border-bottom:1px solid #eee; font-weight:bold;">${pCatin}</td></tr>
-                            <tr><td style="padding:10px; border-bottom:1px solid #eee;">Ibu Hamil (BUMIL)</td><td style="padding:10px; text-align:right; border-bottom:1px solid #eee; font-weight:bold;">${pBumil}</td></tr>
-                            <tr><td style="padding:10px; border-bottom:1px solid #eee;">Ibu Nifas (BUFAS)</td><td style="padding:10px; text-align:right; border-bottom:1px solid #eee; font-weight:bold;">${pBufas}</td></tr>
-                            <tr><td style="padding:10px; border-bottom:1px solid #eee;">Baduta (0-23 Bulan)</td><td style="padding:10px; text-align:right; border-bottom:1px solid #eee; font-weight:bold;">${pBaduta}</td></tr>
-                            <tr style="background:var(--th-light);"><td style="padding:10px; font-weight:bold; color:var(--th-dark);">TOTAL LAPORAN</td><td style="padding:10px; text-align:right; font-weight:bold; color:var(--th-main); font-size:1.1rem;">${filteredPend.length}</td></tr>
-                        </table>
+                        <div style="overflow-x:auto;">
+                            <table style="width:100%; border-collapse: collapse; font-size:0.9rem; margin-top:10px; min-width: 250px;">
+                                <tr style="background:#f8f9fa;"><th style="padding:10px; text-align:left; border-bottom:1px solid #ddd; color:var(--th-dark);">Kategori</th><th style="padding:10px; text-align:right; border-bottom:1px solid #ddd; color:var(--th-dark);">Jml Laporan Masuk</th></tr>
+                                <tr><td style="padding:10px; border-bottom:1px solid #eee;">Calon Pengantin (CATIN)</td><td style="padding:10px; text-align:right; border-bottom:1px solid #eee; font-weight:bold;">${pCatin}</td></tr>
+                                <tr><td style="padding:10px; border-bottom:1px solid #eee;">Ibu Hamil (BUMIL)</td><td style="padding:10px; text-align:right; border-bottom:1px solid #eee; font-weight:bold;">${pBumil}</td></tr>
+                                <tr><td style="padding:10px; border-bottom:1px solid #eee;">Ibu Nifas (BUFAS)</td><td style="padding:10px; text-align:right; border-bottom:1px solid #eee; font-weight:bold;">${pBufas}</td></tr>
+                                <tr><td style="padding:10px; border-bottom:1px solid #eee;">Baduta (0-23 Bulan)</td><td style="padding:10px; text-align:right; border-bottom:1px solid #eee; font-weight:bold;">${pBaduta}</td></tr>
+                                <tr style="background:var(--th-light);"><td style="padding:10px; font-weight:bold; color:var(--th-dark);">TOTAL LAPORAN</td><td style="padding:10px; text-align:right; font-weight:bold; color:var(--th-main); font-size:1.1rem;">${filteredPend.length}</td></tr>
+                            </table>
+                        </div>
                     </div>
                     <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); border: 1px solid #e1e8ed;">
                         <h3 style="margin:0 0 15px 0; font-size:1.1rem; color:var(--th-dark); border-bottom:2px solid var(--th-accent); padding-bottom:10px; display:inline-block;">🏆 Top 5 Kader Teraktif</h3>
@@ -246,6 +248,7 @@ window.renderAdminView = async (target) => {
             </div>
         `;
         
+        // Listener Filter Dashboard
         const btnKec = document.getElementById('dash-flt-kec');
         if (btnKec) btnKec.addEventListener('change', () => { window.currentFilterKec = btnKec.value; window.currentFilterDesa = 'ALL'; window.renderAdminView('dashboard'); });
         const btnDesa = document.getElementById('dash-flt-desa');
@@ -264,9 +267,9 @@ window.renderAdminView = async (target) => {
                 </div>
                 ${filterWilayahHTML}
                 <div style="background:white; padding:15px; border-radius:8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); border: 1px solid #e1e8ed;">
-                    <div style="display:flex; gap:10px; margin-bottom:15px;">
-                        <input type="text" id="flt-sasaran-nama" class="admin-input" placeholder="Cari Nama/NIK/Desa..." style="flex:2;">
-                        <select id="flt-sasaran-jenis" class="admin-input" style="flex:1;">
+                    <div style="display:flex; gap:10px; margin-bottom:15px; flex-wrap: wrap;">
+                        <input type="text" id="flt-sasaran-nama" class="admin-input" placeholder="Cari Nama/NIK/Desa..." style="flex:2; min-width: 200px;">
+                        <select id="flt-sasaran-jenis" class="admin-input" style="flex:1; min-width: 150px;">
                             <option value="ALL">Semua Jenis</option><option value="CATIN">CATIN</option><option value="BUMIL">BUMIL</option><option value="BUFAS">BUFAS</option><option value="BADUTA">BADUTA</option>
                         </select>
                     </div>
@@ -333,8 +336,8 @@ window.renderAdminView = async (target) => {
                 </div>
                 ${filterWilayahHTML}
                 <div style="background:white; padding:15px; border-radius:8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); border: 1px solid #e1e8ed;">
-                    <div style="display:flex; gap:10px; margin-bottom:15px;">
-                        <input type="text" id="flt-pend-nama" class="admin-input" placeholder="Cari ID Sasaran / Petugas..." style="flex:2;">
+                    <div style="display:flex; gap:10px; margin-bottom:15px; flex-wrap: wrap;">
+                        <input type="text" id="flt-pend-nama" class="admin-input" placeholder="Cari ID Sasaran / Petugas..." style="flex:2; min-width: 200px;">
                     </div>
                     <div style="overflow-x:auto;">
                         <table class="admin-table">
@@ -418,22 +421,22 @@ window.renderAdminView = async (target) => {
             <div class="animate-fade">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap:wrap; gap:10px;">
                     <h2 style="margin:0; font-size:1.4rem; color:var(--th-dark); border-left:4px solid var(--th-accent); padding-left:10px;">🖨️ Cetak Laporan Kader</h2>
-                    <div style="display:flex; gap:10px;">
-                        <button class="btn-action" style="background:#e94560; color:white; border:none; border-radius:6px; padding:10px 15px; font-size:0.9rem;" onclick="window.print()">📄 Unduh PDF (Print)</button>
-                        <button class="btn-action" style="background:#198754; color:white; border:none; border-radius:6px; padding:10px 15px; font-size:0.9rem;" onclick="exportTableToExcel('tabel-rekap-kader', 'Rekap_Kader_${window.currentFilterDesa}_${blnNames[window.currentFilterBulan-1]}')">📥 Unduh Excel (.xls)</button>
+                    <div style="display:flex; gap:10px; flex-wrap: wrap;">
+                        <button class="btn-action" style="background:#e94560; color:white; border:none; border-radius:6px; padding:10px 15px; font-size:0.9rem; flex: 1; min-width: 150px;" onclick="window.print()">📄 Unduh PDF (Print)</button>
+                        <button class="btn-action" style="background:#198754; color:white; border:none; border-radius:6px; padding:10px 15px; font-size:0.9rem; flex: 1; min-width: 150px;" onclick="exportTableToExcel('tabel-rekap-kader', 'Rekap_Kader_${window.currentFilterDesa}_${blnNames[window.currentFilterBulan-1]}')">📥 Unduh Excel (.xls)</button>
                     </div>
                 </div>
 
-                <div id="filter-area-cetak" style="background: white; padding: 15px 25px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); display: flex; gap: 15px; align-items: center; border-left: 4px solid var(--th-main);">
+                <div id="filter-area-cetak" style="background: white; padding: 15px 25px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); display: flex; gap: 15px; align-items: center; border-left: 4px solid var(--th-main); flex-wrap: wrap;">
                     <div style="font-size: 0.85rem; font-weight: bold; color: #666; white-space: nowrap;">📅 Filter Periode & Wilayah:</div>
-                    <select id="dash-flt-bulan" class="admin-input" style="flex:1;">${optBulan}</select>
-                    <select id="dash-flt-tahun" class="admin-input" style="flex:1;">${optTahun}</select>
-                    <select id="dash-flt-kec" class="admin-input" style="flex:1;" ${isKabupaten ? '' : 'disabled'}>${optKec}</select>
-                    <select id="dash-flt-desa" class="admin-input" style="flex:1;" ${roleUpper.includes('DESA') && String(window.adminSession.desa).indexOf(',') === -1 ? 'disabled' : ''}>${optDesa}</select>
+                    <select id="dash-flt-bulan" class="admin-input" style="flex:1; min-width: 100px;">${optBulan}</select>
+                    <select id="dash-flt-tahun" class="admin-input" style="flex:1; min-width: 80px;">${optTahun}</select>
+                    <select id="dash-flt-kec" class="admin-input" style="flex:1; min-width: 120px;" ${isKabupaten ? '' : 'disabled'}>${optKec}</select>
+                    <select id="dash-flt-desa" class="admin-input" style="flex:1; min-width: 120px;" ${roleUpper.includes('DESA') && String(window.adminSession.desa).indexOf(',') === -1 ? 'disabled' : ''}>${optDesa}</select>
                 </div>
 
                 <div style="background:white; padding:20px; border-radius:8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); border: 1px solid #e1e8ed; overflow-x:auto;">
-                    <div id="report-print-area">
+                    <div id="report-print-area" style="min-width: 800px;">
                         <div style="text-align:center; font-weight:bold; font-size:1.2rem; margin-bottom:20px; color:black;">REKAP HASIL PENDAMPINGAN KADER TPK</div>
                         
                         <table style="width: 100%; margin-bottom: 20px; border: none; font-size: 0.9rem; color:black;">
@@ -657,6 +660,19 @@ export const initAdmin = async (session) => {
                     --th-icon: ${th.icon};
                     --th-btn-text: ${th.btnText};
                 }
+                
+                /* 🔥 PATCH: MOBILE RESPONSIVE SIDEBAR */
+                #admin-sidebar { transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index: 1000; position: relative; }
+                .sidebar-backdrop { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.5); z-index: 999; opacity: 0; transition: opacity 0.3s; }
+                #btn-mobile-menu { display: none; background: transparent; border: none; color: var(--th-dark); font-size: 1.8rem; cursor: pointer; padding: 0 15px 0 0; }
+                
+                @media (max-width: 768px) {
+                    #admin-sidebar { position: fixed; height: 100%; transform: translateX(-100%); }
+                    #admin-sidebar.active { transform: translateX(0); }
+                    .sidebar-backdrop.active { display: block; opacity: 1; }
+                    #btn-mobile-menu { display: block; }
+                }
+
                 .admin-menu-item { padding: 14px 25px; color: var(--th-light); font-weight: 600; cursor: pointer; transition: all 0.2s; border-left: 4px solid transparent; font-size: 0.95rem; } 
                 .admin-menu-item:hover { background: rgba(255,255,255, 0.1); color: var(--th-icon); } 
                 .admin-menu-item.active { background: rgba(255,255,255, 0.2); color: var(--th-icon); border-left: 4px solid var(--th-accent); } 
@@ -669,8 +685,10 @@ export const initAdmin = async (session) => {
                 .admin-table td { padding: 12px; vertical-align: middle; } 
                 .admin-table tr:hover td { background: #fcf8ff; }
             </style>
+            
+            <div id="sidebar-backdrop" class="sidebar-backdrop"></div>
 
-            <div id="admin-sidebar" style="width:260px; background: linear-gradient(180deg, var(--th-dark) 0%, var(--th-main) 100%); color:var(--th-text); display:flex; flex-direction:column; box-shadow: 2px 0 10px rgba(0,0,0,0.15); z-index:100; flex-shrink: 0;">
+            <div id="admin-sidebar" style="width:260px; background: linear-gradient(180deg, var(--th-dark) 0%, var(--th-main) 100%); color:var(--th-text); display:flex; flex-direction:column; box-shadow: 2px 0 10px rgba(0,0,0,0.15); flex-shrink: 0;">
                 <div style="padding: 25px 20px; border-bottom: 1px solid rgba(255,255,255,0.1); text-align:center;">
                     <div style="font-size: 2.5rem; margin-bottom: 5px;">📡</div>
                     <h3 style="margin:0; font-weight:900; line-height:1.2; color:var(--th-accent); letter-spacing:1px;">RADAR TPK</h3>
@@ -690,7 +708,10 @@ export const initAdmin = async (session) => {
             </div>
             <div style="flex:1; display:flex; flex-direction:column; overflow:hidden; width:100%;">
                 <div class="admin-header" style="background:white; padding: 15px 25px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); z-index:5; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #e1e8ed;">
-                    <h2 id="admin-page-title" style="margin:0; font-size:1.3rem; color:var(--th-dark); font-weight:800;">Memuat Data...</h2>
+                    <div style="display:flex; align-items:center;">
+                        <button id="btn-mobile-menu">☰</button>
+                        <h2 id="admin-page-title" style="margin:0; font-size:1.3rem; color:var(--th-dark); font-weight:800;">Memuat Data...</h2>
+                    </div>
                     <button id="btn-admin-refresh" style="background:var(--th-accent); color:var(--th-btn-text); border:none; padding:8px 15px; border-radius:6px; font-weight:bold; cursor:pointer; font-size:0.85rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">🔄 Segarkan Data</button>
                 </div>
                 <div id="admin-content" style="flex:1; padding: 25px; overflow-y:auto; background:#eef2f5;">
@@ -699,6 +720,19 @@ export const initAdmin = async (session) => {
             </div>
         </div>
     `;
+
+    // 🔥 LOGIKA TOGGLE MENU MOBILE
+    const sidebar = document.getElementById('admin-sidebar');
+    const backdrop = document.getElementById('sidebar-backdrop');
+    const btnMenu = document.getElementById('btn-mobile-menu');
+
+    const toggleMenu = () => {
+        sidebar.classList.toggle('active');
+        backdrop.classList.toggle('active');
+    };
+
+    btnMenu.addEventListener('click', toggleMenu);
+    backdrop.addEventListener('click', toggleMenu);
 
     document.getElementById('btn-admin-logout').onclick = async () => { 
         if(confirm("🚪 Yakin ingin Keluar Aplikasi?\n\n⚠️ PENTING: Jika ada proses penarikan data yang belum selesai, data tersebut mungkin terputus.\n\nLanjutkan?")) { 
@@ -712,7 +746,6 @@ export const initAdmin = async (session) => {
         item.onclick = async () => { 
             const activeTarget = item.getAttribute('data-target');
             
-            // 🔥 FUNGSI HARD CACHE NUKE UNTUK SUPERVISOR
             if (activeTarget === 'reload_app') {
                 if (confirm("🔄 TARIK PEMBARUAN SISTEM?\n\nPerintah ini akan membersihkan memori sistem (Cache) dan memuat ulang aplikasi ke versi terbaru dari Server.\n\nLanjutkan?")) {
                     try {
@@ -731,13 +764,19 @@ export const initAdmin = async (session) => {
                         window.location.reload(true);
                     }
                 }
-                return; // Berhenti di sini agar tidak mengubah layar yang sedang aktif
+                return; 
             }
 
             menuItems.forEach(m => m.classList.remove('active')); 
             item.classList.add('active'); 
             document.getElementById('admin-page-title').innerText = item.innerText.replace(/[^\w\s]/gi, '').trim(); 
             window.renderAdminView(activeTarget); 
+            
+            // Auto close sidebar on mobile after clicking menu
+            if(window.innerWidth <= 768) {
+                sidebar.classList.remove('active');
+                backdrop.classList.remove('active');
+            }
         }; 
     });
 
