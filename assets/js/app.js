@@ -154,7 +154,6 @@ const renderMenu = async (role) => {
             { id_menu: 'M5', label_menu: 'Rekap Bulanan', icon: '📊', target_view: 'rekap_bulanan', role_akses: 'KADER', urutan: 5, is_active: 'Y' },
             { id_menu: 'M6', label_menu: 'Bantuan & FAQ', icon: '🆘', target_view: 'bantuan', role_akses: 'KADER', urutan: 6, is_active: 'Y' },
             { id_menu: 'M7', label_menu: 'Pengaturan Akun', icon: '⚙️', target_view: 'setting', role_akses: 'KADER', urutan: 7, is_active: 'Y' },
-            // 🔥 PERUBAHAN TEKS: Menjadi Pembaruan / Update Sistem
             { id_menu: 'M8', label_menu: 'Pembaruan / Update Sistem', icon: '🔄', target_view: 'reload_app', role_akses: 'KADER', urutan: 8, is_active: 'Y' }
         ];
     } else {
@@ -175,7 +174,8 @@ const renderMenu = async (role) => {
         }
     });
 
-    container.innerHTML = menuHtml + `<hr><a class="menu-item text-danger" id="btnLogout">🚪 Keluar (Hapus Sesi Lokal)</a>`;
+    menuHtml += `<hr><a class="menu-item text-danger" id="btnLogout">🚪 Keluar (Hapus Sesi Lokal)</a>`;
+    container.innerHTML = menuHtml;
     container.style.overflowY = 'auto'; container.style.maxHeight = 'calc(100vh - 180px)'; container.style.paddingBottom = '20px';
 
     document.querySelectorAll('.menu-item[data-target]').forEach(item => {
@@ -183,7 +183,6 @@ const renderMenu = async (role) => {
             getEl('sidebar').classList.remove('active'); getEl('sidebar-overlay').classList.remove('active');
             const target = item.getAttribute('data-target');
             
-            // 🔥 PATCH V49: THE HARD CACHE NUKE (Rudal Pembersih Cache)
             if (target === 'reload_app') { 
                 if (confirm("🔄 TARIK PEMBARUAN SISTEM?\n\nPerintah ini akan membersihkan memori sistem (Cache) dan memuat ulang aplikasi ke versi terbaru dari Server.\n\nJangan khawatir, data Sasaran dan Laporan Anda yang belum disinkronisasi TETAP AMAN.\n\nLanjutkan?")) {
                     try {
@@ -207,9 +206,10 @@ const renderMenu = async (role) => {
         };
     });
 
+    // 🔥 PATCH V49: Penyesuaian Pesan Log Out agar Kader tidak panik
     if (getEl('btnLogout')) { 
         getEl('btnLogout').onclick = async () => { 
-            if (confirm("🔴 PERINGATAN: Ini akan MENGHAPUS SEMUA DATA BELUM SINKRON di memori HP Anda.\n\nApakah Anda yakin ingin Keluar?")) { 
+            if (confirm("🚪 Yakin ingin Keluar Aplikasi?\n\n⚠️ PENTING: Pastikan indikator Sinkronisasi sudah 0/0. Jika masih ada data yang BELUM SINKRON, data tersebut akan HILANG PERMANEN!\n\n(Catatan: Data yang sudah masuk Server dijamin AMAN dan akan ditarik kembali saat Anda Login lagi).")) { 
                 await clearStore('kader_session'); 
                 await clearStore('sync_queue'); 
                 if ('serviceWorker' in navigator) { const regs = await navigator.serviceWorker.getRegistrations(); for (let r of regs) { await r.unregister(); } }
