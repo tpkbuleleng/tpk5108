@@ -1,531 +1,802 @@
 // ==========================================
-// 🏢 ADMIN & PKB DASHBOARD (V54 - FULL RESTORE + AUTO FILTER PATCH)
+// 📊 DASHBOARD SUPERVISOR (V44 - MOBILE RESPONSIVE SIDEBAR PATCH + AUTO FILTER)
 // ==========================================
-import { getAllData, putData, clearStore } from './db.js';
+import { clearStore, getAllData } from './db.js';
 
-// Pastikan SCRIPT_URL ini sama persis dengan yang ada di app.js dan super.js
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx0_deS9S3tfxkhCW1zzg8lxZGnQZzpxfw3btNAuTCsSBsBsgaN4kqJ1TpbHnBNZrOrfA/exec';
 
-window.adminData = { registrasi: [], pendampingan: [] };
-window.masterKader = [];
-window.masterTim = [];
-window.masterPkb = [];
-window.currentUser = null;
-
-// Variabel memori agar pilihan filter tidak hilang saat layar dirender ulang
-window.currentFilterBulan = new Date().getMonth() + 1;
-window.currentFilterTahun = new Date().getFullYear();
+window.adminData = { registrasi: [], pendampingan: [], master_kader: [], master_pkb: [] };
+window.adminSession = null;
+window.currentFilterKec = 'ALL';
 window.currentFilterDesa = 'ALL';
+window.currentFilterBulan = new Date().getMonth() + 1; // 1-12
+window.currentFilterTahun = new Date().getFullYear();
 
-const catatErrorSistem = (lokasi, error) => { 
-    if(window.logErrorToServer) window.logErrorToServer(`Admin: ${lokasi}`, error); 
-    else console.error(`[${lokasi}]`, error); 
+// 🔥 FUNGSI PELACAK NAMA KADER (GLOBAL)
+window.getKaderName = (uname) => {
+    if(!uname) return '-';
+    const kaders = window.adminData.master_kader || [];
+    const found = kaders.find(x => String(x.id) === String(uname) || String(x.id_kader) === String(uname) || String(x.username) === String(uname));
+    return found ? (found.nama_kader || found.nama_lengkap || found.nama || uname) : uname;
 };
 
-// ==========================================
-// 1. FUNGSI PENARIKAN DATA (SINKRONISASI SERVER)
-// ==========================================
-window.fetchAdminData = async (forceRefresh = false) => {
-    const btnRefresh = document.getElementById('btn-refresh-admin');
-    if (btnRefresh) { btnRefresh.innerHTML = `<span class="icon spin">🔄</span> Menyegarkan...`; btnRefresh.disabled = true; }
-    
+const getRoleTheme = (roleStr) => {
+    const r = String(roleStr).toUpperCase();
+    if(r.includes('KABUPATEN')) return { main: '#0043A8', dark: '#0A2342', light: '#E8F4FD', accent: '#F1C40F', text: '#FFFFFF', icon: '#F1C40F', btnText: '#0A2342' }; 
+    if(r.includes('KECAMATAN') || r === 'ADMIN') return { main: '#2980B9', dark: '#1A5276', light: '#E8F4FD', accent: '#F1C40F', text: '#FFFFFF', icon: '#FFFFFF', btnText: '#0A2342' }; 
+    if(r === 'ADMIN_DESA') return { main: '#B8860B', dark: '#8B6508', light: '#FDF8E7', accent: '#0A2342', text: '#FFFFFF', icon: '#FFFFFF', btnText: '#F1C40F' }; 
+    if(r.includes('PKB')) return { main: '#8CA8D1', dark: '#5C7A9E', light: '#F0F4F8', accent: '#0A2342', text: '#0A2342', icon: '#0A2342', btnText: '#F1C40F' }; 
+    if(r.includes('MITRA')) return { main: '#F1C40F', dark: '#D4AF37', light: '#FFF8E7', accent: '#0A2342', text: '#0A2342', icon: '#0A2342', btnText: '#F1C40F' }; 
+    return { main: '#0A2342', dark: '#051221', light: '#E8F4FD', accent: '#F1C40F', text: '#FFFFFF', icon: '#F1C40F', btnText: '#0A2342' }; 
+};
+
+const fetchAdminData = async () => {
     try {
-        const session = window.currentUser;
-        const role = String(session.role || session.role_akses || '').toUpperCase();
-        const kec = String(session.kecamatan || session.scope_kecamatan || '').toUpperCase();
-        
-        if (!forceRefresh) {
-            const cachedReg = await getAllData('admin_registrasi').catch(()=>[]);
-            const cachedPend = await getAllData('admin_pendampingan').catch(()=>[]);
-            const mKader = await getAllData('master_kader').catch(()=>[]);
-            const mTim = await getAllData('master_tim').catch(()=>[]);
-            const mPkb = await getAllData('master_pkb').catch(()=>[]);
-            
-            if (cachedReg.length > 0 || cachedPend.length > 0) {
-                window.adminData.registrasi = cachedReg;
-                window.adminData.pendampingan = cachedPend;
-                window.masterKader = mKader;
-                window.masterTim = mTim;
-                window.masterPkb = mPkb;
-                if (btnRefresh) { btnRefresh.innerHTML = `<span class="icon">🔄</span> Segarkan Data`; btnRefresh.disabled = false; }
-                return true;
-            }
-        }
-
-        const url = `${SCRIPT_URL}?action=getAdminData&role=${role}&kecamatan=${kec}`;
-        const [resAdmin, resKader, resTim, resPkb] = await Promise.all([
-            fetch(url).then(r => r.json()).catch(() => ({status:'error'})),
-            fetch(SCRIPT_URL, { method:'POST', body: JSON.stringify({action:'SECURE_GET_ALL', sheetName:'MASTER_KADER'}) }).then(r=>r.json()).catch(()=>({status:'error'})),
-            fetch(SCRIPT_URL, { method:'POST', body: JSON.stringify({action:'SECURE_GET_ALL', sheetName:'MASTER_TIM'}) }).then(r=>r.json()).catch(()=>({status:'error'})),
-            fetch(SCRIPT_URL, { method:'POST', body: JSON.stringify({action:'SECURE_GET_ALL', sheetName:'MASTER_PKB'}) }).then(r=>r.json()).catch(()=>({status:'error'}))
+        const url = `${SCRIPT_URL}?action=getAdminData&role=${window.adminSession.role}&kecamatan=${window.adminSession.kecamatan}`;
+        const [response, masterRes] = await Promise.all([
+            fetch(url),
+            fetch(SCRIPT_URL)
         ]);
-
-        if (resAdmin.status === 'success') {
-            window.adminData.registrasi = resAdmin.data.registrasi || [];
-            window.adminData.pendampingan = resAdmin.data.pendampingan || [];
-            await clearStore('admin_registrasi'); await clearStore('admin_pendampingan');
-            for(let r of window.adminData.registrasi) await putData('admin_registrasi', r);
-            for(let p of window.adminData.pendampingan) await putData('admin_pendampingan', p);
-        }
-        if (resKader.status === 'success') { window.masterKader = resKader.data || []; await clearStore('master_kader'); for(let k of window.masterKader) await putData('master_kader', k); }
-        if (resTim.status === 'success') { window.masterTim = resTim.data || []; await clearStore('master_tim'); for(let t of window.masterTim) await putData('master_tim', t); }
-        if (resPkb.status === 'success') { window.masterPkb = resPkb.data || []; await clearStore('master_pkb'); for(let p of window.masterPkb) await putData('master_pkb', p); }
         
-        if (btnRefresh) { btnRefresh.innerHTML = `<span class="icon">🔄</span> Segarkan Data`; btnRefresh.disabled = false; }
-        return true;
-    } catch (e) {
-        catatErrorSistem('fetchAdminData', e);
-        if (btnRefresh) { btnRefresh.innerHTML = `❌ Gagal`; setTimeout(()=> {btnRefresh.innerHTML=`<span class="icon">🔄</span> Segarkan Data`; btnRefresh.disabled=false;}, 3000); }
-        return false;
-    }
-};
-
-// ==========================================
-// 2. FILTER DATA (CLIENT-SIDE RAM)
-// ==========================================
-const getFilteredData = () => {
-    const session = window.currentUser;
-    const role = String(session.role).toUpperCase();
-    const scopeDesa = String(session.desa || '').toUpperCase();
-    let rData = window.adminData.registrasi;
-    let pData = window.adminData.pendampingan;
-
-    if (role.includes('DESA') || role.includes('PKB')) {
-        const arrDesa = scopeDesa.split(',').map(d => d.trim()).filter(Boolean);
-        if (arrDesa.length > 0 && scopeDesa !== 'ALL' && scopeDesa !== '-') {
-            rData = rData.filter(r => arrDesa.includes(String(r.desa || '').toUpperCase()));
-            pData = pData.filter(p => rData.find(rx => rx.id === p.id_sasaran_ref));
+        const res = await response.json();
+        const masterData = await masterRes.json();
+        
+        if (res.status === 'success') {
+            let rawReg = res.data.registrasi || [];
+            let rawPend = res.data.pendampingan || [];
+            const roleUpper = String(window.adminSession.role).toUpperCase();
+            
+            const isRestrictedByDesa = roleUpper.includes('PKB') || roleUpper === 'ADMIN_DESA';
+            if (isRestrictedByDesa) {
+                const allowedDesa = String(window.adminSession.desa || '').toUpperCase().split(',').map(d => d.trim());
+                if (!allowedDesa.includes('ALL') && !allowedDesa.includes('-') && allowedDesa.length > 0 && allowedDesa[0] !== "") {
+                    rawReg = rawReg.filter(r => allowedDesa.includes(String(r.desa || '').toUpperCase()));
+                    const allowedIds = new Set(rawReg.map(r => r.id));
+                    rawPend = rawPend.filter(p => allowedIds.has(p.id_sasaran_ref));
+                }
+            }
+            window.adminData.registrasi = rawReg;
+            window.adminData.pendampingan = rawPend;
+            window.adminData.master_kader = masterData.data ? masterData.data.master_kader || [] : [];
+            window.adminData.master_pkb = masterData.data ? masterData.data.master_pkb || [] : [];
+            return true;
         }
-    }
-    
-    if (window.currentFilterDesa !== 'ALL') {
-        rData = rData.filter(r => String(r.desa || '').toUpperCase() === window.currentFilterDesa);
-        pData = pData.filter(p => rData.find(rx => rx.id === p.id_sasaran_ref));
-    }
-
-    return { registrasi: rData, pendampingan: pData };
+        return false;
+    } catch (e) { console.error("Gagal menarik data:", e); return false; }
 };
 
-// ==========================================
-// 3. ROUTER TAMPILAN ADMIN (RENDER VIEW)
-// ==========================================
+const exportToCSV = (filename, rows) => {
+    if(!rows || !rows.length) return;
+    const separator = ',';
+    const keys = Object.keys(rows[0]);
+    const csvContent = keys.join(separator) + '\n' + rows.map(row => {
+            return keys.map(k => {
+                let cell = row[k] === null || row[k] === undefined ? '' : row[k];
+                cell = cell instanceof Date ? cell.toLocaleString() : cell.toString().replace(/"/g, '""');
+                if (cell.search(/("|,|\n)/g) >= 0) cell = `"${cell}"`;
+                return cell;
+            }).join(separator);
+        }).join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    if (link.download !== undefined) {
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url); link.setAttribute('download', filename);
+        link.style.visibility = 'hidden'; document.body.appendChild(link);
+        link.click(); document.body.removeChild(link);
+    }
+};
+
+const exportTableToExcel = (tableID, filename = '') => {
+    const table = document.getElementById(tableID);
+    if(!table) return;
+    let tableHTML = table.outerHTML.replace(/<table/g, '<table border="1" style="border-collapse:collapse;"');
+    const template = `
+        <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+        <head><meta charset="UTF-8">
+        </head><body>${tableHTML}</body></html>`;
+        
+    const blob = new Blob([template], { type: 'application/vnd.ms-excel' });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = filename ? filename + '.xls' : 'Rekapan_Laporan.xls';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+};
+
 window.renderAdminView = async (target) => {
     const content = document.getElementById('admin-content');
-    if(!content) return;
+    const roleUpper = String(window.adminSession.role).toUpperCase();
     
-    try {
-        const data = getFilteredData();
-        const regData = data.registrasi;
-        const pendData = data.pendampingan;
-        const session = window.currentUser;
+    // 🔥 FILTER DATA BERDASARKAN DROPDOWN
+    let filteredReg = window.adminData.registrasi;
+    let filteredPend = window.adminData.pendampingan;
+    
+    if (window.currentFilterKec !== 'ALL') {
+        filteredReg = filteredReg.filter(r => (r.sumber_kecamatan || '').toUpperCase() === window.currentFilterKec);
+        const allowedIds = new Set(filteredReg.map(r => r.id));
+        filteredPend = filteredPend.filter(p => allowedIds.has(p.id_sasaran_ref));
+    }
+    if (window.currentFilterDesa !== 'ALL') {
+        filteredReg = filteredReg.filter(r => (r.desa || '').toUpperCase() === window.currentFilterDesa);
+        const allowedIds = new Set(filteredReg.map(r => r.id));
+        filteredPend = filteredPend.filter(p => allowedIds.has(p.id_sasaran_ref));
+    }
+
+    // 🔥 GENERATE OPSI DROPDOWN FILTER
+    let optKec = `<option value="ALL">🌍 SEMUA KECAMATAN</option>`;
+    let optDesa = `<option value="ALL">🏘️ SEMUA DESA</option>`;
+    const isKabupaten = roleUpper.includes('KABUPATEN') || roleUpper.includes('SUPER') || roleUpper.includes('MITRA');
+    const isKecamatan = roleUpper.includes('KECAMATAN') || roleUpper === 'ADMIN';
+    const mapKecRev = { 'GRK': 'GEROKGAK', 'SRT': 'SERIRIT', 'BSB': 'BUSUNGBIU', 'BJR': 'BANJAR', 'SKS': 'SUKASADA', 'BLL': 'BULELENG', 'SWN': 'SAWAN', 'KBT': 'KUBUTAMBAHAN', 'TJK': 'TEJAKULA' };
+    
+    if (isKabupaten) {
+        const listKec = [...new Set(window.adminData.registrasi.map(r => r.sumber_kecamatan).filter(Boolean))];
+        listKec.forEach(k => { optKec += `<option value="${k}" ${window.currentFilterKec === k ? 'selected' : ''}>${mapKecRev[k] || k}</option>`; });
+        const listDesa = [...new Set(window.adminData.registrasi.filter(r => window.currentFilterKec === 'ALL' || r.sumber_kecamatan === window.currentFilterKec).map(r => String(r.desa||'').toUpperCase()).filter(Boolean))];
+        listDesa.sort().forEach(d => { if(d !== '-') optDesa += `<option value="${d}" ${window.currentFilterDesa === d ? 'selected' : ''}>${d}</option>`; });
+    } 
+    else if (isKecamatan) {
+        optKec = `<option value="${window.currentFilterKec}">${window.adminSession.kecamatan}</option>`; 
+        const listDesa = [...new Set(window.adminData.registrasi.map(r => String(r.desa||'').toUpperCase()).filter(Boolean))];
+        listDesa.sort().forEach(d => { if(d !== '-') optDesa += `<option value="${d}" ${window.currentFilterDesa === d ? 'selected' : ''}>${d}</option>`; });
+    }
+    else {
+        optKec = `<option value="${window.currentFilterKec}">${window.adminSession.kecamatan}</option>`;
+        const listDesa = String(window.adminSession.desa || '').toUpperCase().split(',').map(d => d.trim());
+        optDesa = `<option value="ALL">🏘️ SEMUA DESA</option>` + listDesa.map(d => `<option value="${d}" ${window.currentFilterDesa === d ? 'selected' : ''}>${d}</option>`).join('');
+    }
+
+    const filterWilayahHTML = `
+        <div style="background: white; padding: 15px 25px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); display: flex; gap: 15px; align-items: center; border-left: 4px solid var(--th-main); flex-wrap: wrap;">
+            <div style="font-size: 0.85rem; font-weight: bold; color: #666; white-space: nowrap;">🔍 Filter Wilayah:</div>
+            <select id="dash-flt-kec" class="admin-input" style="flex:1; min-width: 150px; font-weight:bold; color:var(--th-dark);" ${isKabupaten ? '' : 'disabled'}>${optKec}</select>
+            <select id="dash-flt-desa" class="admin-input" style="flex:1; min-width: 150px; font-weight:bold; color:var(--th-dark);" ${roleUpper.includes('DESA') && String(window.adminSession.desa).indexOf(',') === -1 ? 'disabled' : ''}>${optDesa}</select>
+        </div>
+    `;
+
+    // ==========================================
+    // RENDER: DASHBOARD
+    // ==========================================
+    if (target === 'dashboard') {
+        let cCatin = 0, cBumil = 0, cBufas = 0, cBaduta = 0;
+        let pCatin = 0, pBumil = 0, pBufas = 0, pBaduta = 0;
+
+        filteredReg.forEach(r => {
+            if(r.status_duplikasi && r.status_duplikasi.includes('DUPLIKAT')) return; 
+            if(r.jenis_sasaran === 'CATIN') cCatin++;
+            else if(r.jenis_sasaran === 'BUMIL') cBumil++;
+            else if(r.jenis_sasaran === 'BUFAS') cBufas++;
+            else if(r.jenis_sasaran === 'BADUTA') cBaduta++;
+        });
+
+        const kaderKinerja = {};
+        filteredPend.forEach(p => {
+            let jenis = p.id_sasaran_ref.substring(0,3);
+            if(jenis === 'CTN') pCatin++; else if(jenis === 'BML') pBumil++; else if(jenis === 'BFS') pBufas++; else if(jenis === 'BDT') pBaduta++;
+            if(!kaderKinerja[p.username]) kaderKinerja[p.username] = 0;
+            kaderKinerja[p.username]++;
+        });
+
+        const topKader = Object.entries(kaderKinerja).sort((a,b) => b[1] - a[1]).slice(0, 5);
         
-        if (target === 'dashboard') {
-            content.innerHTML = `
-                <div class="animate-fade">
-                    <div class="card" style="background: var(--primary-color); color: white; margin-bottom: 20px; border-left: 5px solid var(--warning-color);">
-                        <h2 style="margin:0 0 5px 0; font-size:1.5rem;">Selamat Datang, ${session.nama}!</h2>
-                        <p style="margin:0; opacity:0.9; font-size:0.9rem;">Anda masuk sebagai <b>${session.role}</b> Wilayah ${session.desa !== '-' ? session.desa : session.kecamatan}.</p>
-                    </div>
+        let displayDesa = window.adminSession.desa === '-' || window.adminSession.desa === 'ALL' || window.adminSession.desa === '' ? window.adminSession.kecamatan : window.adminSession.desa;
+        if (String(displayDesa).toUpperCase() === 'ALL') displayDesa = 'KABUPATEN BULELENG';
 
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-bottom: 20px;">
-                        <div class="card" style="border-left: 5px solid var(--warning-color); text-align:center;">
-                            <div style="font-size:0.85rem; color:#666; font-weight:bold; margin-bottom:5px;">TOTAL SASARAN TERDAFTAR</div>
-                            <div style="font-size:2.5rem; font-weight:900; color:var(--primary-color);">${regData.length}</div>
-                        </div>
-                        <div class="card" style="border-left: 5px solid var(--success-color); text-align:center;">
-                            <div style="font-size:0.85rem; color:#666; font-weight:bold; margin-bottom:5px;">TOTAL LAPORAN PENDAMPINGAN</div>
-                            <div style="font-size:2.5rem; font-weight:900; color:var(--success-color);">${pendData.length}</div>
+        content.innerHTML = `
+            <div class="animate-fade">
+                <div style="background: linear-gradient(135deg, var(--th-dark) 0%, var(--th-main) 100%); color: var(--th-text); border-radius: 12px; padding: 25px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.15); border-bottom: 5px solid var(--th-accent);">
+                    <p style="margin:0; color: var(--th-accent); font-weight: 800; font-size: 0.85rem; letter-spacing:1px; text-transform:uppercase;">RADAR ${window.adminSession.role}</p>
+                    <h2 style="margin: 5px 0 10px 0; font-size: 1.6rem; word-wrap: break-word;">Wilayah Tugas: ${displayDesa}</h2>
+                    <p style="margin:0; font-size:0.9rem; opacity:0.9;">Total Terhimpun (Sesuai Filter): <b>${filteredReg.length} Sasaran</b> & <b>${filteredPend.length} Kunjungan</b>.</p>
+                </div>
+                
+                ${filterWilayahHTML}
+
+                <div style="margin-bottom: 15px; font-weight: bold; color: var(--th-dark); border-left: 4px solid var(--th-accent); padding-left: 10px;">📊 Akumulasi Sasaran Terdaftar</div>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 25px;">
+                    <div style="background: white; padding: 20px; border-radius: 8px; border-bottom: 4px solid var(--th-main); box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+                        <div style="font-size:0.8rem; color:#666; font-weight:bold;">👰 CATIN</div>
+                        <div style="font-size:2rem; font-weight:900; color:var(--th-main);">${cCatin}</div>
+                    </div>
+                    <div style="background: white; padding: 20px; border-radius: 8px; border-bottom: 4px solid #e84393; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+                        <div style="font-size:0.8rem; color:#666; font-weight:bold;">🤰 IBU HAMIL</div>
+                        <div style="font-size:2rem; font-weight:900; color:#e84393;">${cBumil}</div>
+                    </div>
+                    <div style="background: white; padding: 20px; border-radius: 8px; border-bottom: 4px solid #00b894; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+                        <div style="font-size:0.8rem; color:#666; font-weight:bold;">🤱 IBU NIFAS</div>
+                        <div style="font-size:2rem; font-weight:900; color:#00b894;">${cBufas}</div>
+                    </div>
+                    <div style="background: white; padding: 20px; border-radius: 8px; border-bottom: 4px solid var(--th-accent); box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+                        <div style="font-size:0.8rem; color:#666; font-weight:bold;">👶 BADUTA</div>
+                        <div style="font-size:2rem; font-weight:900; color:var(--th-dark);">${cBaduta}</div>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px;">
+                    <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); border: 1px solid #e1e8ed;">
+                        <h3 style="margin:0 0 15px 0; font-size:1.1rem; color:var(--th-dark); border-bottom:2px solid var(--th-accent); padding-bottom:10px; display:inline-block;">📈 Statistik Laporan Kunjungan</h3>
+                        <div style="overflow-x:auto;">
+                            <table style="width:100%; border-collapse: collapse; font-size:0.9rem; margin-top:10px; min-width: 250px;">
+                                <tr style="background:#f8f9fa;"><th style="padding:10px; text-align:left; border-bottom:1px solid #ddd; color:var(--th-dark);">Kategori</th><th style="padding:10px; text-align:right; border-bottom:1px solid #ddd; color:var(--th-dark);">Jml Laporan Masuk</th></tr>
+                                <tr><td style="padding:10px; border-bottom:1px solid #eee;">Calon Pengantin (CATIN)</td><td style="padding:10px; text-align:right; border-bottom:1px solid #eee; font-weight:bold;">${pCatin}</td></tr>
+                                <tr><td style="padding:10px; border-bottom:1px solid #eee;">Ibu Hamil (BUMIL)</td><td style="padding:10px; text-align:right; border-bottom:1px solid #eee; font-weight:bold;">${pBumil}</td></tr>
+                                <tr><td style="padding:10px; border-bottom:1px solid #eee;">Ibu Nifas (BUFAS)</td><td style="padding:10px; text-align:right; border-bottom:1px solid #eee; font-weight:bold;">${pBufas}</td></tr>
+                                <tr><td style="padding:10px; border-bottom:1px solid #eee;">Baduta (0-23 Bulan)</td><td style="padding:10px; text-align:right; border-bottom:1px solid #eee; font-weight:bold;">${pBaduta}</td></tr>
+                                <tr style="background:var(--th-light);"><td style="padding:10px; font-weight:bold; color:var(--th-dark);">TOTAL LAPORAN</td><td style="padding:10px; text-align:right; font-weight:bold; color:var(--th-main); font-size:1.1rem;">${filteredPend.length}</td></tr>
+                            </table>
                         </div>
                     </div>
-
-                    <div class="card">
-                        <h3 style="margin-top:0; color:var(--primary-color); border-bottom:2px solid #eee; padding-bottom:10px;"><span class="icon">📊</span> Rincian Sasaran</h3>
-                        <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:10px; text-align:center;">
-                            <div style="background:#f8f9fa; padding:15px; border-radius:8px; border:1px solid #ddd;">
-                                <div style="font-size:1.8rem; margin-bottom:5px;">👰</div>
-                                <div style="font-weight:bold; color:var(--primary-color); font-size:1.4rem;">${regData.filter(r=>String(r.jenis_sasaran).includes('CATIN')).length}</div>
-                                <div style="font-size:0.75rem; color:#666;">CATIN</div>
-                            </div>
-                            <div style="background:#f8f9fa; padding:15px; border-radius:8px; border:1px solid #ddd;">
-                                <div style="font-size:1.8rem; margin-bottom:5px;">🤰</div>
-                                <div style="font-weight:bold; color:var(--primary-color); font-size:1.4rem;">${regData.filter(r=>String(r.jenis_sasaran).includes('BUMIL')).length}</div>
-                                <div style="font-size:0.75rem; color:#666;">IBU HAMIL</div>
-                            </div>
-                            <div style="background:#f8f9fa; padding:15px; border-radius:8px; border:1px solid #ddd;">
-                                <div style="font-size:1.8rem; margin-bottom:5px;">🤱</div>
-                                <div style="font-weight:bold; color:var(--primary-color); font-size:1.4rem;">${regData.filter(r=>String(r.jenis_sasaran).includes('BUFAS')).length}</div>
-                                <div style="font-size:0.75rem; color:#666;">IBU NIFAS</div>
-                            </div>
-                            <div style="background:#f8f9fa; padding:15px; border-radius:8px; border:1px solid #ddd;">
-                                <div style="font-size:1.8rem; margin-bottom:5px;">👶</div>
-                                <div style="font-weight:bold; color:var(--primary-color); font-size:1.4rem;">${regData.filter(r=>String(r.jenis_sasaran).includes('BADUTA')).length}</div>
-                                <div style="font-size:0.75rem; color:#666;">BADUTA</div>
-                            </div>
+                    <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); border: 1px solid #e1e8ed;">
+                        <h3 style="margin:0 0 15px 0; font-size:1.1rem; color:var(--th-dark); border-bottom:2px solid var(--th-accent); padding-bottom:10px; display:inline-block;">🏆 Top 5 Kader Teraktif</h3>
+                        <div style="margin-top:10px;">
+                        ${topKader.length === 0 ? '<div style="color:#555; text-align:center; padding:20px 0; font-weight:500;">Belum ada laporan masuk.</div>' : ''}
+                        ${topKader.map((k, idx) => {
+                            const namaAsli = window.getKaderName(k[0]);
+                            return `
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; border-bottom:1px dashed #eee; padding-bottom:8px;">
+                                    <div style="font-size:0.85rem;"><span style="color:var(--th-accent); font-weight:bold; margin-right:5px;">#${idx+1}</span> <b style="color:var(--th-dark);">${namaAsli}</b></div>
+                                    <div style="font-size:0.8rem; background:var(--th-light); color:var(--th-main); padding:2px 8px; border-radius:10px; font-weight:bold; border:1px solid var(--th-main);">${k[1]} Lapor</div>
+                                </div>
+                            `
+                        }).join('')}
                         </div>
                     </div>
                 </div>
-            `;
-        }
+            </div>
+        `;
         
-        else if (target === 'daftar_sasaran') {
-            content.innerHTML = `
-                <div class="card animate-fade">
-                    <h3 style="margin:0 0 15px 0; color:var(--primary-color);"><span class="icon">📋</span> Daftar Sasaran TPK</h3>
-                    <div style="display:flex; gap:10px; margin-bottom:15px; flex-wrap:wrap;">
-                        <div style="flex:1; min-width:200px;">
-                            <input type="text" id="flt-cari" class="form-control" placeholder="🔍 Cari Nama / NIK..." style="width:100%;">
-                        </div>
-                        <select id="flt-jenis" class="form-control" style="width:auto; min-width:150px;">
-                            <option value="ALL">Semua Jenis Sasaran</option>
-                            <option value="CATIN">CATIN</option>
-                            <option value="BUMIL">BUMIL</option>
-                            <option value="BUFAS">BUFAS</option>
-                            <option value="BADUTA">BADUTA</option>
+        // Listener Filter Dashboard
+        const btnKec = document.getElementById('dash-flt-kec');
+        if (btnKec) btnKec.addEventListener('change', () => { window.currentFilterKec = btnKec.value; window.currentFilterDesa = 'ALL'; window.renderAdminView('dashboard'); });
+        const btnDesa = document.getElementById('dash-flt-desa');
+        if (btnDesa) btnDesa.addEventListener('change', () => { window.currentFilterDesa = btnDesa.value; window.renderAdminView('dashboard'); });
+    }
+
+    // ==========================================
+    // RENDER: DATABASE SASARAN
+    // ==========================================
+    else if (target === 'sasaran') {
+        content.innerHTML = `
+            <div class="animate-fade">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap:wrap; gap:10px;">
+                    <h2 style="margin:0; font-size:1.4rem; color:var(--th-dark); border-left:4px solid var(--th-accent); padding-left:10px;">📋 Database Sasaran</h2>
+                    <button class="btn-action" style="background:var(--th-main); color:var(--th-text); border:1px solid var(--th-accent); border-radius:6px; padding:10px 15px; font-size:0.9rem;" onclick="window.exportCSV('sasaran')">📥 Download Excel (CSV)</button>
+                </div>
+                ${filterWilayahHTML}
+                <div style="background:white; padding:15px; border-radius:8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); border: 1px solid #e1e8ed;">
+                    <div style="display:flex; gap:10px; margin-bottom:15px; flex-wrap: wrap;">
+                        <input type="text" id="flt-sasaran-nama" class="admin-input" placeholder="Cari Nama/NIK/Desa..." style="flex:2; min-width: 200px;">
+                        <select id="flt-sasaran-jenis" class="admin-input" style="flex:1; min-width: 150px;">
+                            <option value="ALL">Semua Jenis</option><option value="CATIN">CATIN</option><option value="BUMIL">BUMIL</option><option value="BUFAS">BUFAS</option><option value="BADUTA">BADUTA</option>
                         </select>
                     </div>
-                    <div style="overflow-x:auto; border-radius:8px; border:1px solid #dee2e6;">
-                        <table style="width:100%; border-collapse:collapse; background:white; font-size:0.9rem;" id="tbl-sasaran">
-                            <thead style="background:var(--primary-color); color:white;">
-                                <tr>
-                                    <th style="padding:12px; text-align:left;">Tgl Daftar</th>
-                                    <th style="padding:12px; text-align:left;">ID Sasaran</th>
-                                    <th style="padding:12px; text-align:left;">Nama Sasaran</th>
-                                    <th style="padding:12px; text-align:left;">Jenis</th>
-                                    <th style="padding:12px; text-align:left;">Desa</th>
-                                    <th style="padding:12px; text-align:left;">Tim TPK</th>
-                                </tr>
-                            </thead>
-                            <tbody></tbody>
-                        </table>
-                    </div>
-                </div>
-            `;
-            
-            const renderTbl = () => {
-                const cari = document.getElementById('flt-cari').value.toLowerCase();
-                const jenis = document.getElementById('flt-jenis').value;
-                const tbody = document.querySelector('#tbl-sasaran tbody');
-                let html = ''; let count = 0;
-                
-                const sortedReg = [...regData].sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
-                
-                sortedReg.forEach((r, idx) => {
-                    const jns = String(r.jenis_sasaran || '').toUpperCase();
-                    const nm = String(r.nama_sasaran || '').toLowerCase();
-                    const id = String(r.id || '').toLowerCase();
-                    if ((jenis === 'ALL' || jns.includes(jenis)) && (nm.includes(cari) || id.includes(cari))) {
-                        count++;
-                        const tgl = new Date(r.created_at).toLocaleDateString('id-ID');
-                        let tData = window.masterTim.find(t => t.id_tim === r.id_tim) || {};
-                        let nTim = tData.nama_tim || tData.nomor_tim || r.id_tim || '-';
-                        const bg = idx % 2 === 0 ? '#f8f9fa' : 'white';
-                        html += `<tr style="background:${bg}; border-bottom:1px solid #dee2e6;">
-                            <td style="padding:10px 12px; color:#666;">${tgl}</td>
-                            <td style="padding:10px 12px;"><code>${r.id}</code></td>
-                            <td style="padding:10px 12px;"><b>${r.nama_sasaran}</b></td>
-                            <td style="padding:10px 12px;"><span class="badge" style="background:#e8f4fd; color:var(--primary-color);">${r.jenis_sasaran}</span></td>
-                            <td style="padding:10px 12px;">${r.desa || '-'}</td>
-                            <td style="padding:10px 12px;">${nTim}</td>
-                        </tr>`;
-                    }
-                });
-                if(count === 0) html = `<tr><td colspan="6" style="text-align:center; padding:30px; color:#999;">Tidak ada data ditemukan.</td></tr>`;
-                tbody.innerHTML = html;
-            };
-            
-            renderTbl();
-            document.getElementById('flt-cari').addEventListener('input', renderTbl);
-            document.getElementById('flt-jenis').addEventListener('change', renderTbl);
-        }
-
-        else if (target === 'cetak_laporan') {
-            let optDesa = '';
-            if (session.role.includes('PKB') || session.role.includes('DESA')) {
-                const arrDesa = session.desa.split(',').map(d=>d.trim()).filter(Boolean);
-                if (arrDesa.length > 1) {
-                    optDesa = `<select id="dash-flt-desa" class="form-control" style="width:auto;"><option value="ALL">Semua Desa Binaan</option>${arrDesa.map(d => `<option value="${d}">${d}</option>`).join('')}</select>`;
-                } else if (arrDesa.length === 1) {
-                    optDesa = `<select id="dash-flt-desa" class="form-control" style="width:auto;" disabled><option value="${arrDesa[0]}">${arrDesa[0]}</option></select>`;
-                    window.currentFilterDesa = arrDesa[0];
-                }
-            } else {
-                const desaSet = new Set(window.adminData.registrasi.map(r => String(r.desa || '').toUpperCase()));
-                const dList = Array.from(desaSet).filter(d => d !== '' && d !== '-' && d !== 'UNDEFINED').sort();
-                optDesa = `<select id="dash-flt-desa" class="form-control" style="width:auto;"><option value="ALL">Seluruh Desa (Kecamatan)</option>${dList.map(d => `<option value="${d}">${d}</option>`).join('')}</select>`;
-            }
-
-            content.innerHTML = `
-                <div class="no-print card" style="margin-bottom:15px; display:flex; gap:10px; align-items:center; background:#e8f4fd; border-left:4px solid var(--primary-color); flex-wrap:wrap;">
-                    <strong style="color:var(--primary-color);">Filter Wilayah & Periode:</strong>
-                    <select id="dash-flt-bulan" class="form-control" style="width:auto;">
-                        ${[1,2,3,4,5,6,7,8,9,10,11,12].map(m => `<option value="${m}" ${m == window.currentFilterBulan ? 'selected' : ''}>Bulan ${m}</option>`).join('')}
-                    </select>
-                    <select id="dash-flt-tahun" class="form-control" style="width:auto;">
-                        ${[2024,2025,2026,2027].map(y => `<option value="${y}" ${y == window.currentFilterTahun ? 'selected' : ''}>${y}</option>`).join('')}
-                    </select>
-                    ${optDesa}
-                    <button style="background:var(--success-color); color:white; border:none; padding:10px 20px; border-radius:5px; font-weight:bold; cursor:pointer; margin-left:auto; display:flex; align-items:center; gap:5px;" onclick="window.print()"><span class="icon">🖨️</span> Cetak PDF / Kertas</button>
-                </div>
-
-                <div id="print-area" class="card" style="background:white;">
-                    <div style="text-align:center; margin-bottom:20px; border-bottom:2px solid #333; padding-bottom:10px;">
-                        <h2 style="margin:0; font-size:1.3rem;">REKAPITULASI HASIL PENDAMPINGAN TIM PENDAMPING KELUARGA (TPK)</h2>
-                        <h3 style="margin:5px 0 0 0; font-size:1.1rem;">KECAMATAN ${session.kecamatan}</h3>
-                        <p style="margin:5px 0 0 0; font-size:0.9rem;" id="lbl-periode-cetak">Bulan: -</p>
-                    </div>
-                    
                     <div style="overflow-x:auto;">
-                        <table class="print-table" style="width:100%; border-collapse:collapse; font-size:0.8rem; border:1px solid #000;" border="1">
-                            <thead>
-                                <tr style="background:#eee; text-align:center;">
-                                    <th rowspan="2" style="padding:8px;">No</th>
-                                    <th rowspan="2" style="padding:8px;">Desa</th>
-                                    <th rowspan="2" style="padding:8px;">Tim</th>
-                                    <th colspan="2" style="padding:8px;">Catin</th>
-                                    <th colspan="2" style="padding:8px;">Bumil</th>
-                                    <th colspan="2" style="padding:8px;">Bufas</th>
-                                    <th colspan="2" style="padding:8px;">Baduta</th>
-                                </tr>
-                                <tr style="background:#eee; text-align:center;">
-                                    <th style="padding:5px;">Terdaftar</th><th style="padding:5px;">Didampingi</th>
-                                    <th style="padding:5px;">Terdaftar</th><th style="padding:5px;">Didampingi</th>
-                                    <th style="padding:5px;">Terdaftar</th><th style="padding:5px;">Didampingi</th>
-                                    <th style="padding:5px;">Terdaftar</th><th style="padding:5px;">Didampingi</th>
-                                </tr>
-                            </thead>
-                            <tbody id="tbody-cetak"></tbody>
+                        <table class="admin-table">
+                            <thead><tr><th>ID Registrasi</th><th>Tgl Daftar</th><th>Jenis</th><th>Nama Sasaran</th><th>Desa / Dusun</th><th>Kader Pendata</th><th>Status</th></tr></thead>
+                            <tbody id="tbody-sasaran"></tbody>
                         </table>
                     </div>
+                </div>
+            </div>
+        `;
 
-                    <div style="margin-top:40px; display:flex; justify-content:flex-end;">
-                        <div style="text-align:center; width:250px;">
-                            <p style="margin:0 0 60px 0;">Mengetahui,<br>Penyuluh KB / Pembina Wilayah</p>
-                            <b id="ttd-nama-pkb" style="text-decoration:underline; font-size:1.05rem;">NAMA PKB</b>
-                            <p style="margin:0; font-size:0.9rem;">NIP. <span id="ttd-nip-pkb">-</span></p>
+        const renderTabelSasaran = () => {
+            const filterNama = document.getElementById('flt-sasaran-nama').value.toLowerCase();
+            const filterJenis = document.getElementById('flt-sasaran-jenis').value;
+            const tbody = document.getElementById('tbody-sasaran');
+            
+            const filtered = filteredReg.filter(r => {
+                const matchNama = r.nama_sasaran.toLowerCase().includes(filterNama) || (r.id||'').toLowerCase().includes(filterNama) || (r.desa||'').toLowerCase().includes(filterNama);
+                const matchJenis = filterJenis === 'ALL' || r.jenis_sasaran === filterJenis;
+                return matchNama && matchJenis;
+            }).sort((a,b) => new Date(b.created_at) - new Date(a.created_at)); 
+
+            if(filtered.length === 0) { tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:20px; color:#999;">Tidak ada data yang cocok.</td></tr>`; return; }
+
+            tbody.innerHTML = filtered.map(r => {
+                const tgl = new Date(r.created_at).toLocaleDateString('id-ID');
+                const namaKaderAsli = window.getKaderName(r.username);
+                let statBadge = r.status_sasaran === 'SELESAI' ? `<span style="background:#f8f9fa; color:#6c757d; padding:3px 6px; border-radius:4px; font-size:0.7rem; font-weight:bold; border:1px solid #ddd;">SELESAI</span>` : `<span style="background:var(--th-light); color:var(--th-main); padding:3px 6px; border-radius:4px; font-size:0.7rem; font-weight:bold; border:1px solid var(--th-main);">AKTIF</span>`;
+                if(r.status_duplikasi && r.status_duplikasi.includes('DUPLIKAT')) statBadge = `<span style="background:#fff3cd; color:#B8860B; padding:3px 6px; border-radius:4px; font-size:0.7rem; font-weight:bold; border:1px solid #ffeeba;">⚠️ DUPLIKAT</span>`;
+                
+                return `<tr style="border-bottom:1px solid #eee;">
+                    <td><code style="color:var(--th-dark); font-weight:bold;">${r.id}</code></td>
+                    <td>${tgl}</td>
+                    <td><b style="color:#B8860B;">${r.jenis_sasaran}</b></td>
+                    <td style="color:var(--th-main); font-weight:bold;">${r.nama_sasaran}</td>
+                    <td>${r.desa}<br><span style="font-size:0.75rem; color:#888;">${r.dusun}</span></td>
+                    <td>${namaKaderAsli}</td>
+                    <td>${statBadge}</td>
+                </tr>`;
+            }).join('');
+        };
+
+        document.getElementById('flt-sasaran-nama').addEventListener('input', renderTabelSasaran);
+        document.getElementById('flt-sasaran-jenis').addEventListener('change', renderTabelSasaran);
+        renderTabelSasaran();
+        
+        const btnKec = document.getElementById('dash-flt-kec');
+        if (btnKec) btnKec.addEventListener('change', () => { window.currentFilterKec = btnKec.value; window.currentFilterDesa = 'ALL'; window.renderAdminView('sasaran'); });
+        const btnDesa = document.getElementById('dash-flt-desa');
+        if (btnDesa) btnDesa.addEventListener('change', () => { window.currentFilterDesa = btnDesa.value; window.renderAdminView('sasaran'); });
+    }
+
+    // ==========================================
+    // RENDER: RIWAYAT PENDAMPINGAN
+    // ==========================================
+    else if (target === 'pendampingan') {
+        content.innerHTML = `
+            <div class="animate-fade">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap:wrap; gap:10px;">
+                    <h2 style="margin:0; font-size:1.4rem; color:var(--th-dark); border-left:4px solid var(--th-accent); padding-left:10px;">🤝 Riwayat Pendampingan</h2>
+                    <button class="btn-action" style="background:var(--th-main); color:var(--th-text); border:1px solid var(--th-accent); border-radius:6px; padding:10px 15px; font-size:0.9rem;" onclick="window.exportCSV('pendampingan')">📥 Download Excel (CSV)</button>
+                </div>
+                ${filterWilayahHTML}
+                <div style="background:white; padding:15px; border-radius:8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); border: 1px solid #e1e8ed;">
+                    <div style="display:flex; gap:10px; margin-bottom:15px; flex-wrap: wrap;">
+                        <input type="text" id="flt-pend-nama" class="admin-input" placeholder="Cari ID Sasaran / Petugas..." style="flex:2; min-width: 200px;">
+                    </div>
+                    <div style="overflow-x:auto;">
+                        <table class="admin-table">
+                            <thead><tr><th>Tgl Kunjungan</th><th>ID Sasaran (Target)</th><th>Kader Pelapor</th><th>Catatan Lapangan</th><th>Lokasi GPS</th></tr></thead>
+                            <tbody id="tbody-pend"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        const renderTabelPend = () => {
+            const filterNama = document.getElementById('flt-pend-nama').value.toLowerCase();
+            const tbody = document.getElementById('tbody-pend');
+            
+            const filtered = filteredPend.filter(p => {
+                const matchNama = (p.id_sasaran_ref||'').toLowerCase().includes(filterNama) || (p.username||'').toLowerCase().includes(filterNama);
+                return matchNama;
+            }).sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+
+            if(filtered.length === 0) { tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:20px; color:#999;">Tidak ada data laporan.</td></tr>`; return; }
+
+            tbody.innerHTML = filtered.map(p => {
+                let rData = {}; try { rData = JSON.parse(p.data_laporan || '{}'); } catch(e){}
+                const tgl = rData.tgl_kunjungan ? new Date(rData.tgl_kunjungan).toLocaleDateString('id-ID') : new Date(p.created_at).toLocaleDateString('id-ID');
+                const cat = rData.catatan || '-';
+                const namaKaderAsli = window.getKaderName(p.username);
+                let gpsStr = p.lokasi_gps && p.lokasi_gps !== '-' ? `<a href="https://maps.google.com/?q=${p.lokasi_gps}" target="_blank" style="color:var(--th-main); font-weight:bold; text-decoration:none; font-size:0.8rem;">🗺️ Cek Map</a>` : '<span style="color:#999; font-size:0.8rem;">Tidak Ada</span>';
+
+                return `<tr style="border-bottom:1px solid #eee;">
+                    <td><b style="color:#B8860B;">${tgl}</b></td>
+                    <td><code style="color:var(--th-dark); font-weight:bold;">${p.id_sasaran_ref}</code></td>
+                    <td>${namaKaderAsli}</td>
+                    <td style="font-size:0.85rem; color:#444;">${cat}</td>
+                    <td>${gpsStr}</td>
+                </tr>`;
+            }).join('');
+        };
+
+        document.getElementById('flt-pend-nama').addEventListener('input', renderTabelPend);
+        renderTabelPend();
+        
+        const btnKec = document.getElementById('dash-flt-kec');
+        if (btnKec) btnKec.addEventListener('change', () => { window.currentFilterKec = btnKec.value; window.currentFilterDesa = 'ALL'; window.renderAdminView('pendampingan'); });
+        const btnDesa = document.getElementById('dash-flt-desa');
+        if (btnDesa) btnDesa.addEventListener('change', () => { window.currentFilterDesa = btnDesa.value; window.renderAdminView('pendampingan'); });
+    }
+
+    // ==========================================
+    // RENDER: CETAK LAPORAN KADER
+    // ==========================================
+    else if (target === 'cetak_laporan') {
+        const blnNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+        const curDate = new Date();
+        const curRealMonth = curDate.getMonth() + 1;
+        const curRealYear = curDate.getFullYear();
+        
+        let maxMonth = parseInt(window.currentFilterTahun) === curRealYear ? curRealMonth : 12;
+        if(parseInt(window.currentFilterTahun) > curRealYear) maxMonth = 12; 
+
+        let optBulan = '';
+        for(let i=1; i<=maxMonth; i++) {
+            optBulan += `<option value="${i}" ${window.currentFilterBulan == i ? 'selected' : ''}>${blnNames[i-1]}</option>`;
+        }
+        
+        const years = [2026, 2027, 2028, 2029, 2030];
+        let optTahun = years.map(y => `<option value="${y}" ${window.currentFilterTahun == y ? 'selected' : ''}>${y}</option>`).join('');
+
+        content.innerHTML = `
+            <style>
+                @media print {
+                    body * { visibility: hidden; }
+                    #admin-sidebar, .admin-header, #filter-area-cetak { display: none !important; }
+                    #report-print-area, #report-print-area * { visibility: visible; color: black !important; }
+                    #report-print-area { position: absolute; left: 0; top: 0; width: 100%; padding: 10px; background: white; }
+                    #report-print-area table { width: 100%; border-collapse: collapse; }
+                    #report-print-area th, #report-print-area td { border: 1px solid black !important; }
+                }
+            </style>
+            
+            <div class="animate-fade">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap:wrap; gap:10px;">
+                    <h2 style="margin:0; font-size:1.4rem; color:var(--th-dark); border-left:4px solid var(--th-accent); padding-left:10px;">🖨️ Cetak Laporan Kader</h2>
+                    <div style="display:flex; gap:10px; flex-wrap: wrap;">
+                        <button class="btn-action" style="background:#e94560; color:white; border:none; border-radius:6px; padding:10px 15px; font-size:0.9rem; flex: 1; min-width: 150px;" onclick="window.print()">📄 Unduh PDF (Print)</button>
+                        <button class="btn-action" style="background:#198754; color:white; border:none; border-radius:6px; padding:10px 15px; font-size:0.9rem; flex: 1; min-width: 150px;" onclick="exportTableToExcel('tabel-rekap-kader', 'Rekap_Kader_${window.currentFilterDesa}_${blnNames[window.currentFilterBulan-1]}')">📥 Unduh Excel (.xls)</button>
+                    </div>
+                </div>
+
+                <div id="filter-area-cetak" style="background: white; padding: 15px 25px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); display: flex; gap: 15px; align-items: center; border-left: 4px solid var(--th-main); flex-wrap: wrap;">
+                    <div style="font-size: 0.85rem; font-weight: bold; color: #666; white-space: nowrap;">📅 Filter Periode & Wilayah:</div>
+                    <select id="dash-flt-bulan" class="admin-input" style="flex:1; min-width: 100px;">${optBulan}</select>
+                    <select id="dash-flt-tahun" class="admin-input" style="flex:1; min-width: 80px;">${optTahun}</select>
+                    <select id="dash-flt-kec" class="admin-input" style="flex:1; min-width: 120px;" ${isKabupaten ? '' : 'disabled'}>${optKec}</select>
+                    <select id="dash-flt-desa" class="admin-input" style="flex:1; min-width: 120px;" ${roleUpper.includes('DESA') && String(window.adminSession.desa).indexOf(',') === -1 ? 'disabled' : ''}>${optDesa}</select>
+                </div>
+
+                <div style="background:white; padding:20px; border-radius:8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); border: 1px solid #e1e8ed; overflow-x:auto;">
+                    <div id="report-print-area" style="min-width: 800px;">
+                        <div style="text-align:center; font-weight:bold; font-size:1.2rem; margin-bottom:20px; color:black;">REKAP HASIL PENDAMPINGAN KADER TPK</div>
+                        
+                        <table style="width: 100%; margin-bottom: 20px; border: none; font-size: 0.9rem; color:black;">
+                            <tr><td style="width: 120px; border: none !important; font-weight:bold; padding:2px;">DESA</td><td style="border: none !important; font-weight:bold; padding:2px;">: <span id="r-desa"></span></td></tr>
+                            <tr><td style="border: none !important; font-weight:bold; padding:2px;">KECAMATAN</td><td style="border: none !important; font-weight:bold; padding:2px;">: <span id="r-kec"></span></td></tr>
+                            <tr><td style="border: none !important; font-weight:bold; padding:2px;">BULAN</td><td style="border: none !important; font-weight:bold; padding:2px;">: <span id="r-bulan"></span></td></tr>
+                        </table>
+
+                        <table id="tabel-rekap-kader" style="width: 100%; border-collapse: collapse; font-size: 0.85rem; text-align: center; color:black; margin-bottom: 30px;" border="1">
+                            <thead>
+                                <tr>
+                                    <th rowspan="2" style="border: 1px solid black; padding: 8px;">NO</th>
+                                    <th rowspan="2" style="border: 1px solid black; padding: 8px;">NAMA KADER</th>
+                                    <th colspan="4" style="border: 1px solid black; padding: 8px;">JUMLAH SASARAN</th>
+                                    <th colspan="4" style="border: 1px solid black; padding: 8px;">JUMLAH PENDAMPINGAN</th>
+                                    <th rowspan="2" style="border: 1px solid black; padding: 8px;">TOTAL JUMLAH<br>PENDAMPINGAN</th>
+                                </tr>
+                                <tr>
+                                    <th style="border: 1px solid black; padding: 5px;">CATIN</th>
+                                    <th style="border: 1px solid black; padding: 5px;">BUMIL</th>
+                                    <th style="border: 1px solid black; padding: 5px;">BUFAS</th>
+                                    <th style="border: 1px solid black; padding: 5px;">BADUTA</th>
+                                    <th style="border: 1px solid black; padding: 5px;">CATIN</th>
+                                    <th style="border: 1px solid black; padding: 5px;">BUMIL</th>
+                                    <th style="border: 1px solid black; padding: 5px;">BUFAS</th>
+                                    <th style="border: 1px solid black; padding: 5px;">BADUTA</th>
+                                </tr>
+                            </thead>
+                            <tbody id="r-tbody">
+                            </tbody>
+                        </table>
+
+                        <div style="display:flex; justify-content:flex-end; padding-right:30px; text-align:center; font-size:0.9rem; color:black;">
+                            <div style="width: 250px;">
+                                <div id="r-tgl-ttd" style="margin-bottom: 5px;">Singaraja, </div>
+                                <div style="margin-bottom: 60px;">Mengetahui,<br>PKB Pengampu</div>
+                                <div id="r-nama-pkb" style="font-weight:bold; text-decoration:underline; white-space: nowrap; overflow: visible;">(Nama PKB)</div>
+                                <div id="r-nip-pkb" style="white-space: nowrap;">NIP. .........................</div>
+                            </div>
                         </div>
                     </div>
                 </div>
-            `;
+            </div>
+        `;
 
-            const fltDesaEl = document.getElementById('dash-flt-desa');
-            if (fltDesaEl && window.currentFilterDesa) { fltDesaEl.value = window.currentFilterDesa; }
-
-            // 🔥 PATCH V54: AUTO FILTER FIX
-            const triggerRerender = () => {
-                window.currentFilterBulan = parseInt(document.getElementById('dash-flt-bulan').value);
-                window.currentFilterTahun = parseInt(document.getElementById('dash-flt-tahun').value);
-                if (document.getElementById('dash-flt-desa')) {
-                    window.currentFilterDesa = document.getElementById('dash-flt-desa').value;
-                }
-                window.renderAdminView('cetak_laporan'); // Panggil ulang render untuk filter RAM seketika
-            };
-
-            document.getElementById('dash-flt-bulan').addEventListener('change', triggerRerender);
-            document.getElementById('dash-flt-tahun').addEventListener('change', triggerRerender);
-            if (fltDesaEl) fltDesaEl.addEventListener('change', triggerRerender);
-
-            const fBulan = window.currentFilterBulan;
-            const fTahun = window.currentFilterTahun;
+        const renderReport = async () => {
+            const m = parseInt(window.currentFilterBulan);
+            const y = parseInt(window.currentFilterTahun);
+            const d = window.currentFilterDesa;
+            const k = window.currentFilterKec;
             
-            document.getElementById('lbl-periode-cetak').innerText = `Bulan: ${fBulan} Tahun: ${fTahun} ${window.currentFilterDesa !== 'ALL' ? ' | Desa: '+window.currentFilterDesa : ''}`;
+            document.getElementById('r-desa').innerText = d === 'ALL' ? 'SEMUA DESA' : d;
+            document.getElementById('r-kec').innerText = k === 'ALL' ? 'SEMUA KECAMATAN' : (mapKecRev[k] || k);
+            document.getElementById('r-bulan').innerText = `${blnNames[m-1]} ${y}`;
+            
+            let regTarget = filteredReg.filter(r => { return true; });
 
-            // 🔥 TTD LOGIC REPAIRED
-            let ttdNama = ".....................................";
-            let ttdNIP = ".....................................";
-            if (session.role.includes('PKB')) {
-                ttdNama = session.nama;
-                const p = window.masterPkb.find(pk => pk.id_pkb === session.username || pk.nip_pkb === session.username);
-                if(p) ttdNIP = p.nip_pkb || '-';
-            } else if (window.currentFilterDesa !== 'ALL') {
-                const targetPkb = window.masterPkb.find(p => String(p.desa_kelurahan||'').toUpperCase().includes(window.currentFilterDesa));
-                if(targetPkb) { ttdNama = targetPkb.nama_pkb || targetPkb.nama || '-'; ttdNIP = targetPkb.nip_pkb || targetPkb.nip || '-'; }
+            let pendTarget = filteredPend.filter(p => {
+                let rData = {}; try { rData = JSON.parse(p.data_laporan || '{}'); } catch(e){}
+                const dt = rData.tgl_kunjungan ? new Date(rData.tgl_kunjungan) : new Date(p.created_at);
+                return dt.getMonth() + 1 === m && dt.getFullYear() === y;
+            });
+
+            const kaderMap = {};
+            
+            regTarget.forEach(r => {
+                let u = r.username;
+                if(!kaderMap[u]) kaderMap[u] = { sCat:0, sBum:0, sBuf:0, sBad:0, pCat:0, pBum:0, pBuf:0, pBad:0 };
+                if (r.status_sasaran !== 'SELESAI') {
+                    if (r.jenis_sasaran === 'CATIN') kaderMap[u].sCat++;
+                    else if (r.jenis_sasaran === 'BUMIL') kaderMap[u].sBum++;
+                    else if (r.jenis_sasaran === 'BUFAS') kaderMap[u].sBuf++;
+                    else if (r.jenis_sasaran === 'BADUTA') kaderMap[u].sBad++;
+                }
+            });
+
+            pendTarget.forEach(p => {
+                let u = p.username;
+                if(!kaderMap[u]) kaderMap[u] = { sCat:0, sBum:0, sBuf:0, sBad:0, pCat:0, pBum:0, pBuf:0, pBad:0 };
+                let jns = p.id_sasaran_ref.substring(0,3);
+                if (jns === 'CTN') kaderMap[u].pCat++;
+                else if (jns === 'BML') kaderMap[u].pBum++;
+                else if (jns === 'BFS') kaderMap[u].pBuf++;
+                else if (jns === 'BDT') kaderMap[u].pBad++;
+            });
+
+            const tbody = document.getElementById('r-tbody');
+            let rowsHtml = '';
+            let idx = 1;
+            
+            for (const [username, data] of Object.entries(kaderMap)) {
+                if(data.sCat===0 && data.sBum===0 && data.sBuf===0 && data.sBad===0 && data.pCat===0 && data.pBum===0 && data.pBuf===0 && data.pBad===0) continue;
+                
+                let kaderName = window.getKaderName(username);
+
+                const totalPend = data.pCat + data.pBum + data.pBuf + data.pBad;
+                rowsHtml += `
+                    <tr>
+                        <td style="border: 1px solid black; padding: 5px;">${idx++}</td>
+                        <td style="border: 1px solid black; padding: 5px; text-align:left;">${kaderName}</td>
+                        <td style="border: 1px solid black; padding: 5px;">${data.sCat || 0}</td>
+                        <td style="border: 1px solid black; padding: 5px;">${data.sBum || 0}</td>
+                        <td style="border: 1px solid black; padding: 5px;">${data.sBuf || 0}</td>
+                        <td style="border: 1px solid black; padding: 5px;">${data.sBad || 0}</td>
+                        <td style="border: 1px solid black; padding: 5px;">${data.pCat || 0}</td>
+                        <td style="border: 1px solid black; padding: 5px;">${data.pBum || 0}</td>
+                        <td style="border: 1px solid black; padding: 5px;">${data.pBuf || 0}</td>
+                        <td style="border: 1px solid black; padding: 5px;">${data.pBad || 0}</td>
+                        <td style="border: 1px solid black; padding: 5px; font-weight:bold;">${totalPend || 0}</td>
+                    </tr>
+                `;
             }
-            document.getElementById('ttd-nama-pkb').innerText = ttdNama.toUpperCase();
-            document.getElementById('ttd-nip-pkb').innerText = ttdNIP;
-
-            const tbody = document.getElementById('tbody-cetak');
-            let html = '';
-            let mapTim = {};
             
-            regData.forEach(r => {
-                const dt = new Date(r.created_at);
-                if (dt.getFullYear() > fTahun || (dt.getFullYear() === fTahun && (dt.getMonth()+1) > fBulan)) return;
-                
-                let tData = window.masterTim.find(t => t.id_tim === r.id_tim) || {};
-                let tKey = r.id_tim || 'UNKNOWN';
-                let tName = tData.nama_tim || tData.nomor_tim || tKey;
-                let dName = r.desa || tData.desa_kelurahan || '-';
+            if (rowsHtml === '') {
+                rowsHtml = `<tr><td colspan="11" style="border: 1px solid black; padding: 15px; text-align:center;">Tidak ada aktivitas kader pada periode ini.</td></tr>`;
+            }
+            tbody.innerHTML = rowsHtml;
 
-                if(!mapTim[tKey]) mapTim[tKey] = { desa: dName, nama: tName, c_reg:0, c_pend:0, m_reg:0, m_pend:0, f_reg:0, f_pend:0, b_reg:0, b_pend:0 };
-                
-                const jns = String(r.jenis_sasaran).toUpperCase();
-                if(jns.includes('CATIN')) mapTim[tKey].c_reg++;
-                else if(jns.includes('BUMIL')) mapTim[tKey].m_reg++;
-                else if(jns.includes('BUFAS')) mapTim[tKey].f_reg++;
-                else if(jns.includes('BADUTA')) mapTim[tKey].b_reg++;
-            });
+            const lastDay = new Date(y, m, 0).getDate();
+            document.getElementById('r-tgl-ttd').innerText = `Singaraja, ${lastDay} ${blnNames[m-1]} ${y}`;
 
-            pendData.forEach(p => {
-                let pData = {}; try{ pData = JSON.parse(p.data_laporan || '{}'); }catch(e){}
-                const dt = pData.tgl_kunjungan ? new Date(pData.tgl_kunjungan) : new Date(p.created_at);
-                
-                if(dt.getFullYear() !== fTahun || (dt.getMonth()+1) !== fBulan) return;
-
-                let tKey = p.id_tim || 'UNKNOWN';
-                let ref = regData.find(r => r.id === p.id_sasaran_ref);
-                if(!ref) return;
-
-                if(!mapTim[tKey]) {
-                    let tData = window.masterTim.find(t => t.id_tim === tKey) || {};
-                    mapTim[tKey] = { desa: ref.desa || tData.desa_kelurahan || '-', nama: tData.nama_tim||tKey, c_reg:0, c_pend:0, m_reg:0, m_pend:0, f_reg:0, f_pend:0, b_reg:0, b_pend:0 };
+            const allPkb = window.adminData.master_pkb || [];
+            let pkbName = '(Nama PKB Pengampu)';
+            let pkbNip = 'NIP ......................................';
+            
+            if (roleUpper.includes('PKB')) {
+                const myPkb = allPkb.find(p => String(p.id) === String(window.adminSession.username) || String(p.id_pkb) === String(window.adminSession.username) || String(p.username) === String(window.adminSession.username));
+                if(myPkb) {
+                    pkbName = myPkb.nama_pkb || myPkb.nama || window.adminSession.nama;
+                    pkbNip = 'NIP. ' + (myPkb.nip_pkb || myPkb.nip || '....................');
+                } else {
+                    pkbName = window.adminSession.nama;
+                    pkbNip = 'NIP. ' + (window.adminSession.ref_id || '....................');
                 }
-
-                const jns = String(ref.jenis_sasaran).toUpperCase();
-                if(jns.includes('CATIN')) mapTim[tKey].c_pend++;
-                else if(jns.includes('BUMIL')) mapTim[tKey].m_pend++;
-                else if(jns.includes('BUFAS')) mapTim[tKey].f_pend++;
-                else if(jns.includes('BADUTA')) mapTim[tKey].b_pend++;
-            });
-
-            const keys = Object.keys(mapTim).sort((a,b) => mapTim[a].desa.localeCompare(mapTim[b].desa));
-            let no = 1;
-            let sum = { cr:0, cp:0, mr:0, mp:0, fr:0, fp:0, br:0, bp:0 };
-
-            if(keys.length === 0) {
-                html = `<tr><td colspan="11" style="text-align:center; padding:20px; color:#999;">Data kosong pada bulan dan wilayah ini.</td></tr>`;
             } else {
-                keys.forEach(k => {
-                    const row = mapTim[k];
-                    sum.cr += row.c_reg; sum.cp += row.c_pend;
-                    sum.mr += row.m_reg; sum.mp += row.m_pend;
-                    sum.fr += row.f_reg; sum.fp += row.f_pend;
-                    sum.br += row.b_reg; sum.bp += row.b_pend;
-                    
-                    html += `<tr style="text-align:center;">
-                        <td style="padding:8px;">${no++}</td><td style="text-align:left; padding:8px;">${row.desa}</td><td style="text-align:left; padding:8px;">${row.nama}</td>
-                        <td style="padding:8px;">${row.c_reg}</td><td style="padding:8px;">${row.c_pend}</td>
-                        <td style="padding:8px;">${row.m_reg}</td><td style="padding:8px;">${row.m_pend}</td>
-                        <td style="padding:8px;">${row.f_reg}</td><td style="padding:8px;">${row.f_pend}</td>
-                        <td style="padding:8px;">${row.b_reg}</td><td style="padding:8px;">${row.b_pend}</td>
-                    </tr>`;
-                });
-                html += `<tr style="font-weight:bold; background:#e8f4fd; text-align:center;">
-                    <td colspan="3" style="padding:10px;">JUMLAH TOTAL</td>
-                    <td>${sum.cr}</td><td>${sum.cp}</td>
-                    <td>${sum.mr}</td><td>${sum.mp}</td>
-                    <td>${sum.fr}</td><td>${sum.fp}</td>
-                    <td>${sum.br}</td><td>${sum.bp}</td>
-                </tr>`;
-            }
-            tbody.innerHTML = html;
-        }
-        
-        else if (target === 'reload_app') {
-            if(confirm("Anda akan memuat ulang (refresh) aplikasi. Lanjutkan?")) {
-                if ('serviceWorker' in navigator) {
-                    navigator.serviceWorker.getRegistrations().then(function(registrations) {
-                        for(let registration of registrations) { registration.update(); }
-                    });
+                if (d !== 'ALL') {
+                    const foundPkb = allPkb.find(p => String(p.desa_kelurahan || p.desa || '').toUpperCase().includes(d));
+                    if (foundPkb) {
+                        pkbName = foundPkb.nama_pkb || foundPkb.nama || pkbName;
+                        pkbNip = 'NIP. ' + (foundPkb.nip_pkb || foundPkb.nip || '....................');
+                    }
                 }
-                setTimeout(() => window.location.reload(true), 500);
             }
-        }
+            
+            document.getElementById('r-nama-pkb').innerText = pkbName;
+            document.getElementById('r-nip-pkb').innerText = pkbNip;
+        };
 
-    } catch(e) { catatErrorSistem('renderAdminView', e); }
+        // 🔥 FIX V44 AUTO FILTER RAM (MENGUBAH RENDER KE DIRECT RE-RENDER)
+        document.getElementById('dash-flt-bulan').addEventListener('change', (e) => { window.currentFilterBulan = e.target.value; window.renderAdminView('cetak_laporan'); });
+        document.getElementById('dash-flt-tahun').addEventListener('change', (e) => { window.currentFilterTahun = e.target.value; window.renderAdminView('cetak_laporan'); });
+        
+        const btnKec = document.getElementById('dash-flt-kec');
+        if (btnKec) btnKec.addEventListener('change', () => { window.currentFilterKec = btnKec.value; window.currentFilterDesa = 'ALL'; window.renderAdminView('cetak_laporan'); });
+        const btnDesa = document.getElementById('dash-flt-desa');
+        if (btnDesa) btnDesa.addEventListener('change', () => { window.currentFilterDesa = btnDesa.value; window.renderAdminView('cetak_laporan'); }); // Mengubah panggil renderReport() menjadi re-render layar utuh
+
+        renderReport();
+    }
+};
+
+window.exportCSV = (jenis) => {
+    let filteredReg = window.adminData.registrasi;
+    let filteredPend = window.adminData.pendampingan;
+    
+    if (window.currentFilterKec !== 'ALL') {
+        filteredReg = filteredReg.filter(r => (r.sumber_kecamatan || '').toUpperCase() === window.currentFilterKec);
+        const allowedIds = new Set(filteredReg.map(r => r.id));
+        filteredPend = filteredPend.filter(p => allowedIds.has(p.id_sasaran_ref));
+    }
+    if (window.currentFilterDesa !== 'ALL') {
+        filteredReg = filteredReg.filter(r => (r.desa || '').toUpperCase() === window.currentFilterDesa);
+        const allowedIds = new Set(filteredReg.map(r => r.id));
+        filteredPend = filteredPend.filter(p => allowedIds.has(p.id_sasaran_ref));
+    }
+
+    if(jenis === 'sasaran') {
+        const data = filteredReg.map(r => {
+            let detail = {}; try { detail = JSON.parse(r.data_laporan || '{}'); } catch(e){}
+            return { ID_Registrasi: r.id, Tanggal_Daftar: r.created_at, Kader_Pendata: window.getKaderName(r.username), No_Tim: r.id_tim, Jenis_Sasaran: r.jenis_sasaran, Nama_Sasaran: r.nama_sasaran, Desa: r.desa, Dusun: r.dusun, NIK: detail.nik || '', No_KK: detail.nomor_kk || '', Tanggal_Lahir: detail.tanggal_lahir || '', Usia_Tahun: detail.usia_saat_daftar_tahun || '', Alamat_Lengkap: detail.alamat || detail.catin_alamat || '', Status_Aktif: r.status_sasaran };
+        });
+        exportToCSV('Data_Sasaran_TPK.csv', data);
+    } else if (jenis === 'pendampingan') {
+        const data = filteredPend.map(p => {
+            let detail = {}; try { detail = JSON.parse(p.data_laporan || '{}'); } catch(e){}
+            return { ID_Laporan: p.id, Waktu_Input: p.created_at, Kader_Pelapor: window.getKaderName(p.username), ID_Sasaran: p.id_sasaran_ref, Tgl_Kunjungan: detail.tgl_kunjungan || '', Catatan_Hasil: detail.catatan || '', Lokasi_GPS: p.lokasi_gps || '' };
+        });
+        exportToCSV('Data_Pendampingan_TPK.csv', data);
+    }
 };
 
 // ==========================================
-// 4. INISIALISASI (BOOTSTRAP) ADMIN APP
+// 4. INISIALISASI KERANGKA (SKELETON)
 // ==========================================
 export const initAdmin = async (session) => {
-    window.currentUser = session;
+    window.adminSession = session;
+    const th = getRoleTheme(session.role);
     
-    document.getElementById('view-splash').style.display = 'none';
-    document.getElementById('view-login').classList.add('hidden');
-    document.getElementById('view-app').classList.add('hidden');
+    const roleUpper = String(session.role).toUpperCase();
+    if(roleUpper.includes('KABUPATEN') || roleUpper.includes('SUPER') || roleUpper.includes('MITRA')) {
+        window.currentFilterKec = 'ALL';
+    } else {
+        const mapKec = { 'GEROKGAK': 'GRK', 'SERIRIT': 'SRT', 'BUSUNGBIU': 'BSB', 'BANJAR': 'BJR', 'SUKASADA': 'SKS', 'BULELENG': 'BLL', 'SAWAN': 'SWN', 'KUBUTAMBAHAN': 'KBT', 'TEJAKULA': 'TJK' };
+        window.currentFilterKec = mapKec[String(session.kecamatan).toUpperCase()] || String(session.kecamatan).toUpperCase();
+    }
+    window.currentFilterDesa = 'ALL';
 
-    const style = document.createElement('style');
-    style.innerHTML = `
-        .admin-sidebar { width:260px; background:var(--primary-color); color:white; display:flex; flex-direction:column; height:100vh; position:fixed; left:0; top:0; z-index:100; transition: transform 0.3s; box-shadow: 2px 0 10px rgba(0,0,0,0.1); }
-        .admin-main { margin-left:260px; display:flex; flex-direction:column; min-height:100vh; background:#eef2f5; transition: margin-left 0.3s; }
-        .admin-menu-item { padding:15px 20px; cursor:pointer; font-weight:bold; color:#E8F4FD; border-left:4px solid transparent; transition:all 0.2s; display:flex; align-items:center; gap:10px; }
-        .admin-menu-item:hover, .admin-menu-item.active { background:rgba(255,255,255,0.1); color:var(--warning-color); border-left:4px solid var(--warning-color); }
-        .admin-card { background:white; padding:20px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.05); }
-        
-        @media print { 
-            .admin-sidebar { display:none !important; } 
-            .admin-main { margin-left:0 !important; padding:0 !important; background:white !important; }
-            .no-print { display:none !important; }
-            .print-table th, .print-table td { border: 1px solid #000 !important; padding: 6px !important; color: #000 !important;}
-            #print-area { box-shadow:none !important; padding:0 !important; }
-        }
-        @media (max-width: 768px) {
-            .admin-sidebar { transform: translateX(-100%); }
-            .admin-sidebar.show { transform: translateX(0); }
-            .admin-main { margin-left: 0; }
-        }
-    `;
-    document.head.appendChild(style);
+    const displayKecamatan = String(session.kecamatan || '').toUpperCase() === 'ALL' ? 'KABUPATEN BULELENG' : session.kecamatan;
 
-    const isPKB = session.role.includes('PKB');
-    const headerTitle = isPKB ? 'DASHBOARD PKB' : 'DASHBOARD ADMIN';
+    document.body.innerHTML = `
+        <div id="admin-root" style="position:absolute; top:0; left:0; right:0; bottom:0; display:flex; background:#eef2f5; font-family: 'Segoe UI', sans-serif; overflow: hidden;">
+            <style>
+                :root {
+                    --th-main: ${th.main};
+                    --th-dark: ${th.dark};
+                    --th-light: ${th.light};
+                    --th-accent: ${th.accent};
+                    --th-text: ${th.text};
+                    --th-icon: ${th.icon};
+                    --th-btn-text: ${th.btnText};
+                }
+                
+                /* 🔥 PATCH: MOBILE RESPONSIVE SIDEBAR */
+                #admin-sidebar { transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index: 1000; position: relative; }
+                .sidebar-backdrop { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.5); z-index: 999; opacity: 0; transition: opacity 0.3s; }
+                #btn-mobile-menu { display: none; background: transparent; border: none; color: var(--th-dark); font-size: 1.8rem; cursor: pointer; padding: 0 15px 0 0; }
+                
+                @media (max-width: 768px) {
+                    #admin-sidebar { position: fixed; height: 100%; transform: translateX(-100%); }
+                    #admin-sidebar.active { transform: translateX(0); }
+                    .sidebar-backdrop.active { display: block; opacity: 1; }
+                    #btn-mobile-menu { display: block; }
+                }
 
-    document.body.innerHTML += `
-        <div class="admin-sidebar" id="admin-sidebar">
-            <div style="padding:20px; text-align:center; border-bottom:1px solid rgba(255,255,255,0.1);">
-                <div style="font-size:2.5rem; margin-bottom:5px;">🏢</div>
-                <h3 style="margin:0; color:var(--warning-color); font-size:1.2rem;">${headerTitle}</h3>
-            </div>
-            <div style="flex:1; overflow-y:auto; padding:15px 0;">
-                <div class="admin-menu-item active" data-target="dashboard"><span class="icon">🏠</span> Beranda Ringkasan</div>
-                <div class="admin-menu-item" data-target="daftar_sasaran"><span class="icon">📋</span> Daftar Sasaran TPK</div>
-                <div class="admin-menu-item" data-target="cetak_laporan"><span class="icon">🖨️</span> Cetak Laporan</div>
-                <div class="admin-menu-item" data-target="reload_app" style="color:#adb5bd; margin-top:20px; border-top:1px solid rgba(255,255,255,0.1); padding-top:20px;"><span class="icon">🔄</span> Pembaruan Sistem</div>
-            </div>
-            <div style="padding:20px; text-align:center; border-top:1px solid rgba(255,255,255,0.1);">
-                <button id="btn-admin-logout" style="width:100%; padding:10px; background:transparent; border:1px solid var(--warning-color); color:var(--warning-color); border-radius:5px; cursor:pointer; font-weight:bold; transition:all 0.2s;">🚪 Keluar (Logout)</button>
-            </div>
-        </div>
-        <div class="admin-main">
-            <div class="no-print" style="background:white; padding:15px 20px; box-shadow:0 2px 5px rgba(0,0,0,0.05); display:flex; justify-content:space-between; align-items:center; z-index:10; position:sticky; top:0;">
-                <div style="display:flex; align-items:center; gap:15px;">
-                    <button id="btn-admin-toggle" style="background:none; border:none; font-size:1.5rem; cursor:pointer; padding:0; color:var(--primary-color);">☰</button>
-                    <h2 id="admin-title" style="margin:0; font-size:1.2rem; color:var(--primary-color);">Beranda Ringkasan</h2>
+                .admin-menu-item { padding: 14px 25px; color: var(--th-light); font-weight: 600; cursor: pointer; transition: all 0.2s; border-left: 4px solid transparent; font-size: 0.95rem; } 
+                .admin-menu-item:hover { background: rgba(255,255,255, 0.1); color: var(--th-icon); } 
+                .admin-menu-item.active { background: rgba(255,255,255, 0.2); color: var(--th-icon); border-left: 4px solid var(--th-accent); } 
+                #btn-admin-logout:hover { background: var(--th-accent); color: var(--th-btn-text); }
+                .admin-input { padding:10px 12px; border:1px solid #ced4da; border-radius:6px; outline:none; font-family:inherit; } 
+                .admin-input:focus { border-color:var(--th-main); box-shadow: 0 0 0 2px rgba(0,0,0, 0.1); }
+                .btn-action:hover { opacity: 0.8; transform:translateY(-1px); }
+                .admin-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; min-width: 800px; } 
+                .admin-table th { position: sticky; top: 0; background: var(--th-dark); color: white; padding: 12px; text-align: left; font-weight:600; border-bottom: 3px solid var(--th-accent); } 
+                .admin-table td { padding: 12px; vertical-align: middle; } 
+                .admin-table tr:hover td { background: #fcf8ff; }
+            </style>
+            
+            <div id="sidebar-backdrop" class="sidebar-backdrop"></div>
+
+            <div id="admin-sidebar" style="width:260px; background: linear-gradient(180deg, var(--th-dark) 0%, var(--th-main) 100%); color:var(--th-text); display:flex; flex-direction:column; box-shadow: 2px 0 10px rgba(0,0,0,0.15); flex-shrink: 0;">
+                <div style="padding: 25px 20px; border-bottom: 1px solid rgba(255,255,255,0.1); text-align:center;">
+                    <div style="font-size: 2.5rem; margin-bottom: 5px;">📡</div>
+                    <h3 style="margin:0; font-weight:900; line-height:1.2; color:var(--th-accent); letter-spacing:1px;">RADAR TPK</h3>
+                    <div style="font-size:0.75rem; color:var(--th-text); font-weight:bold; margin-top:5px; opacity:0.9;">PANEL SUPERVISOR</div>
                 </div>
-                <button id="btn-refresh-admin" class="btn btn-primary" style="padding:8px 15px; font-size:0.9rem;"><span class="icon">🔄</span> Segarkan Data</button>
+                <div style="flex:1; padding: 20px 0; overflow-y:auto;">
+                    <div class="admin-menu-item active" data-target="dashboard">📊 Dashboard Pemantauan</div>
+                    <div class="admin-menu-item" data-target="sasaran">📋 Database Sasaran</div>
+                    <div class="admin-menu-item" data-target="pendampingan">🤝 Riwayat Pendampingan</div>
+                    <div class="admin-menu-item" data-target="cetak_laporan">🖨️ Cetak Laporan Kader</div>
+                    <div class="admin-menu-item" data-target="reload_app" style="color:var(--th-accent); margin-top:10px; border-top: 1px solid rgba(255,255,255,0.1);">🔄 Pembaruan / Update Sistem</div>
+                </div>
+                <div style="padding: 20px; border-top: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.2);">
+                    <div style="font-size:0.8rem; margin-bottom:10px; color:var(--th-text);">Supervisor:<br><b style="color:var(--th-accent); font-size:0.95rem;">${session.nama}</b><br><span style="font-size:0.75rem; opacity:0.8;">${displayKecamatan}</span></div>
+                    <button id="btn-admin-logout" style="width:100%; background:transparent; color:var(--th-accent); border:1px solid var(--th-accent); padding:10px; border-radius:6px; cursor:pointer; font-weight:bold; transition: all 0.3s;">🔒 Keluar Sistem</button>
+                </div>
             </div>
-            <div id="admin-content" style="padding:20px; flex:1; overflow-y:auto;"></div>
+            <div style="flex:1; display:flex; flex-direction:column; overflow:hidden; width:100%;">
+                <div class="admin-header" style="background:white; padding: 15px 25px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); z-index:5; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #e1e8ed;">
+                    <div style="display:flex; align-items:center;">
+                        <button id="btn-mobile-menu">☰</button>
+                        <h2 id="admin-page-title" style="margin:0; font-size:1.3rem; color:var(--th-dark); font-weight:800;">Memuat Data...</h2>
+                    </div>
+                    <button id="btn-admin-refresh" style="background:var(--th-accent); color:var(--th-btn-text); border:none; padding:8px 15px; border-radius:6px; font-weight:bold; cursor:pointer; font-size:0.85rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">🔄 Segarkan Data</button>
+                </div>
+                <div id="admin-content" style="flex:1; padding: 25px; overflow-y:auto; background:#eef2f5;">
+                    <div style="padding:50px; text-align:center; color:var(--th-main);"><h3>⏳ Menyedot Data dari Satelit Pusat...</h3><p>Tunggu sebentar ya, Bapak/Ibu.</p></div>
+                </div>
+            </div>
         </div>
     `;
 
-    document.getElementById('btn-admin-toggle').onclick = () => document.getElementById('admin-sidebar').classList.toggle('show');
-    document.getElementById('btn-admin-logout').onclick = async () => { if(confirm("Keluar dari sistem?")) { await clearStore('kader_session'); location.reload(); } };
-    
-    let currentActiveMenu = 'dashboard';
-    const menuItems = document.querySelectorAll('.admin-menu-item');
-    menuItems.forEach(item => {
-        item.onclick = () => {
-            menuItems.forEach(m => m.classList.remove('active'));
-            item.classList.add('active');
-            const target = item.getAttribute('data-target');
-            if (target !== 'reload_app') {
-                currentActiveMenu = target;
-                document.getElementById('admin-title').innerText = item.innerText.replace(/[^\w\s]/gi, '').trim();
-                if(window.innerWidth <= 768) document.getElementById('admin-sidebar').classList.remove('show');
-                window.renderAdminView(currentActiveMenu);
-            } else {
-                window.renderAdminView(target);
-            }
-        };
-    });
+    // 🔥 LOGIKA TOGGLE MENU MOBILE
+    const sidebar = document.getElementById('admin-sidebar');
+    const backdrop = document.getElementById('sidebar-backdrop');
+    const btnMenu = document.getElementById('btn-mobile-menu');
 
-    document.getElementById('btn-refresh-admin').onclick = async () => {
-        const success = await window.fetchAdminData(true);
-        if (success) window.renderAdminView(currentActiveMenu);
+    const toggleMenu = () => {
+        sidebar.classList.toggle('active');
+        backdrop.classList.toggle('active');
     };
 
-    await window.fetchAdminData(false);
-    window.renderAdminView('dashboard');
+    btnMenu.addEventListener('click', toggleMenu);
+    backdrop.addEventListener('click', toggleMenu);
+
+    document.getElementById('btn-admin-logout').onclick = async () => { 
+        if(confirm("🚪 Yakin ingin Keluar Aplikasi?\n\n⚠️ PENTING: Jika ada proses penarikan data yang belum selesai, data tersebut mungkin terputus.\n\nLanjutkan?")) { 
+            await clearStore('kader_session'); 
+            location.reload(); 
+        } 
+    };
     
-    setTimeout(() => { window.fetchAdminData(true).then(()=> window.renderAdminView(currentActiveMenu)); }, 1500);
+    const menuItems = document.querySelectorAll('.admin-menu-item');
+    menuItems.forEach(item => { 
+        item.onclick = async () => { 
+            const activeTarget = item.getAttribute('data-target');
+            
+            if (activeTarget === 'reload_app') {
+                if (confirm("🔄 TARIK PEMBARUAN SISTEM?\n\nPerintah ini akan membersihkan memori sistem (Cache) dan memuat ulang aplikasi ke versi terbaru dari Server.\n\nLanjutkan?")) {
+                    try {
+                        if ('serviceWorker' in navigator) {
+                            const regs = await navigator.serviceWorker.getRegistrations();
+                            for (let r of regs) { await r.unregister(); }
+                        }
+                        if (window.caches) {
+                            const keys = await caches.keys();
+                            for (let k of keys) { await caches.delete(k); }
+                        }
+                        alert("✅ Memori sistem berhasil dibersihkan! Memuat versi terbaru...");
+                        window.location.reload(true);
+                    } catch (e) {
+                        console.error("Gagal menghapus cache:", e);
+                        window.location.reload(true);
+                    }
+                }
+                return; 
+            }
+
+            menuItems.forEach(m => m.classList.remove('active')); 
+            item.classList.add('active'); 
+            document.getElementById('admin-page-title').innerText = item.innerText.replace(/[^\w\s]/gi, '').trim(); 
+            window.renderAdminView(activeTarget); 
+            
+            // Auto close sidebar on mobile after clicking menu
+            if(window.innerWidth <= 768) {
+                sidebar.classList.remove('active');
+                backdrop.classList.remove('active');
+            }
+        }; 
+    });
+
+    document.getElementById('btn-admin-refresh').onclick = async () => {
+        const btn = document.getElementById('btn-admin-refresh');
+        btn.innerText = "⏳ Menyedot..."; btn.disabled = true;
+        const success = await fetchAdminData();
+        if(success) {
+            const activeMenu = document.querySelector('.admin-menu-item.active').getAttribute('data-target');
+            window.renderAdminView(activeMenu);
+        } else {
+            alert("Gagal menyegarkan data. Periksa koneksi internet.");
+        }
+        btn.innerText = "🔄 Segarkan Data"; btn.disabled = false;
+    };
+
+    const success = await fetchAdminData();
+    if(success) {
+        document.getElementById('admin-page-title').innerText = 'Dashboard Pemantauan';
+        window.renderAdminView('dashboard');
+    } else {
+        document.getElementById('admin-content').innerHTML = `<div style="padding:50px; text-align:center; color:#e94560;"><h3>❌ Gagal Terhubung ke Satelit</h3><p>Pastikan Anda memiliki koneksi internet yang stabil, lalu klik 'Segarkan Data'.</p></div>`;
+        document.getElementById('admin-page-title').innerText = 'Koneksi Terputus';
+    }
 };
