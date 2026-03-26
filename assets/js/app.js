@@ -410,9 +410,130 @@ window.renderKonten = async (target) => {
         } else if (target === 'cetak_pdf') { const tpl = getEl('template-cetak-pdf'); if(tpl) area.appendChild(tpl.content.cloneNode(true));
         } else if (target === 'setting') { const tpl = getEl('template-setting'); if(tpl) { area.appendChild(tpl.content.cloneNode(true)); initSetting(); }
         } else if (target === 'bantuan') { 
-            area.innerHTML = `<div class="animate-fade"><div style="background: linear-gradient(135deg, #00b894, #059b7b); padding: 25px 20px; border-radius: 12px; color: white; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center;"><div style="font-size: 3rem; margin-bottom: 10px;">🆘</div><h2 style="margin: 0 0 5px 0; font-size: 1.5rem; font-weight: 800;">Pusat Bantuan Kader</h2><p style="margin: 0; opacity: 0.9; font-size: 0.9rem;">Jangan bingung, Ibu/Bapak Kader! Temukan semua jawaban dari kendala aplikasi di sini.</p></div><div style="margin-bottom:20px;"><button id="btn-buka-kalkulator" style="width: 100%; background: #fff; border: 2px solid #0984e3; color: #0984e3; padding: 15px; border-radius: 8px; font-weight: bold; font-size: 1.05rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; box-shadow: 0 2px 4px rgba(9, 132, 227, 0.1);">🧮 BUKA KALKULATOR GIZI & HPL</button></div><h3 style="color:#2c3e50; font-size:1.1rem; margin-bottom:15px; padding-bottom:5px; border-bottom:2px solid #eee;">❓ Pertanyaan Sering Ditanya (FAQ)</h3><div class="faq-container"><button class="faq-question">🔄 Apa fungsi tombol "SINKRONISASI"?</button><div class="faq-answer"><p>Tombol <b>SINKRONISASI</b> itu ibarat "Tukang Pos".</p><p>Aplikasi ini dirancang bisa bekerja tanpa sinyal (Offline). Jadi, data yang Ibu masukkan akan disimpan dulu di dalam HP.</p><p><b>Cara pakainya:</b><br>1. Saat ada sinyal (di balai desa/rumah), tekan SINKRONISASI untuk mengirim data Ibu ke dinas.<br>2. Jika angka di tombol sudah berubah menjadi <b>0/0</b>, artinya semua data sudah aman terkirim!</p></div><button class="faq-question">📡 Bagaimana jika saat mendata warga sinyal saya hilang?</button><div class="faq-answer"><p><b>Lanjut saja mendata, Bu! Tidak perlu panik.</b> 😊</p><p>Aplikasi ini kebal terhadap sinyal hilang. Isi form seperti biasa lalu klik "Simpan". Data akan aman tertidur di HP Ibu. Nanti pas sudah sampai di tempat yang ada sinyal / WiFi, tinggal klik SINKRONISASI.</p></div><button class="faq-question">📍 Kenapa saya disuruh menyalakan Lokasi (GPS)?</button><div class="faq-answer"><p>Sistem akan meminta izin lokasi Ibu tepat saat tombol "Simpan" ditekan.</p><p>Ini digunakan sebagai <b>Bukti Digital (CCTV Lapangan)</b> bahwa Ibu benar-benar turun ke rumah warga saat melakukan pendampingan, bukan mengisi data dari rumah. Cukup klik "Izinkan" atau "Allow" jika HP meminta izin ya!</p></div><button class="faq-question">🤰 BUMIL yang saya dampingi sudah melahirkan, bagaimana cara lapornya?</button><div class="faq-answer"><p>Wah, selamat! Caranya sangat mudah:</p><ol style="padding-left:20px; margin-top:5px;"><li>Buka menu <b>Lapor Pendampingan</b>.</li><li>Pilih nama BUMIL tersebut.</li><li>Akan muncul pertanyaan: <i>"Apakah BUMIL sudah melahirkan?"</i></li><li>Pilih <b>YA</b>, lalu masukkan tanggal lahir si bayi.</li></ol><p>Selesai! Sistem akan otomatis mematikan kartu BUMIL-nya, dan membuatkan kartu <b>BUFAS (Ibu Nifas)</b> baru secara otomatis untuk Ibu dampingi selanjutnya.</p></div><button class="faq-question">📉 Jika hasil ukur Baduta berwarna Merah, apa artinya?</button><div class="faq-answer"><p>Aplikasi ini sudah ditanami otak pintar buatan Kemenkes RI.</p><p>Jika saat Ibu memasukkan Berat dan Tinggi anak lalu muncul warna <b>Merah (Kekurangan Gizi / Pendek)</b>, itu adalah alarm peringatan (Warning)! 🚨</p><p>Segera sarankan orang tua bayi untuk membawa anaknya ke Posyandu atau Bidan Desa terdekat hari itu juga untuk mendapat pemeriksaan medis.</p></div><button class="faq-question">✏️ Saya salah ketik nama/data, apakah bisa diperbaiki?</button><div class="faq-answer"><p>Sangat bisa! Kesalahan adalah hal yang wajar.</p><p>Buka menu <b>Data Sasaran & Riwayat</b>, cari nama warga yang salah, klik namanya, lalu klik tulisan biru <b>✏️ (edit)</b> di pojok kanan atas nama mereka.</p><p style="color:#d63384; font-size:0.85rem;"><b>Catatan:</b> Jika data sudah terlanjur di-Sinkronisasi ke pusat, Ibu tetap bisa mengeditnya. Nanti sistem akan otomatis menimpa data yang lama di Dinas.</p></div></div><div style="margin-top:30px; text-align:center; padding:15px; background:#f8f9fa; border-radius:8px; border: 1px dashed #ccc;"><p style="margin:0; font-size:0.85rem; color:#666;">Masih kebingungan?<br>Silakan hubungi <b>Admin Kecamatan</b> atau <b>PKB (Penyuluh KB)</b> di wilayah Ibu.</p></div></div><style>.faq-question { background-color: #fff; color: #333; cursor: pointer; padding: 18px; width: 100%; text-align: left; border: 1px solid #ddd; border-radius: 8px; outline: none; transition: 0.3s; font-weight: bold; font-size: 0.95rem; margin-bottom: 8px; display: flex; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05); } .faq-question:hover { background-color: #f1f7fd; border-color: #0984e3; } .faq-question.active { background-color: #0984e3; color: white; border-color: #0984e3; } .faq-answer { padding: 0 18px; display: none; background-color: #fdfdfd; overflow: hidden; border-left: 3px solid #0984e3; border-bottom: 1px solid #eee; border-right: 1px solid #eee; border-radius: 0 0 8px 8px; margin-top: -8px; margin-bottom: 15px; font-size: 0.9rem; line-height: 1.6; color: #444; padding-top: 15px; padding-bottom: 15px; box-shadow: 0 2px 3px rgba(0,0,0,0.05); } .faq-answer p { margin-top: 0; margin-bottom: 10px; }</style>`;
-            document.querySelectorAll('.faq-question').forEach(btn => { btn.onclick = () => { btn.classList.toggle('active'); const panel = btn.nextElementSibling; if (panel.style.display === "block") { panel.style.display = "none"; } else { panel.style.display = "block"; } } });
-            const btnCalc = getEl('btn-buka-kalkulator'); if(btnCalc) btnCalc.onclick = () => renderKonten('kalkulator');
+            area.innerHTML = `
+            <div class="animate-fade">
+                <div style="background: linear-gradient(135deg, #00b894, #059b7b); padding: 25px 20px; border-radius: 12px; color: white; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center;">
+                    <div style="font-size: 3rem; margin-bottom: 10px;">🆘</div>
+                    <h2 style="margin: 0 0 5px 0; font-size: 1.5rem; font-weight: 800;">Pusat Bantuan Kader</h2>
+                    <p style="margin: 0; opacity: 0.9; font-size: 0.9rem;">Jangan bingung, Ibu/Bapak Kader! Temukan panduan langkah demi langkah dan jawaban dari kendala aplikasi di sini.</p>
+                </div>
+                
+                <div style="margin-bottom:25px;">
+                    <button id="btn-buka-kalkulator" style="width: 100%; background: #fff; border: 2px solid #0984e3; color: #0984e3; padding: 15px; border-radius: 8px; font-weight: bold; font-size: 1.05rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; box-shadow: 0 2px 4px rgba(9, 132, 227, 0.1); transition: all 0.2s;">🧮 BUKA KALKULATOR GIZI & HPL</button>
+                </div>
+
+                <h3 style="color:#2c3e50; font-size:1.1rem; margin-bottom:15px; padding-bottom:5px; border-bottom:2px solid #eee;">🚀 Tutorial Penggunaan Aplikasi</h3>
+                <div style="display:grid; grid-template-columns: 1fr; gap:12px; margin-bottom:30px;">
+                    
+                    <div style="background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 15px; display: flex; gap: 15px; align-items: flex-start; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+                        <div style="background: #e8f4fd; color: #0d6efd; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 1.2rem; flex-shrink: 0;">1</div>
+                        <div>
+                            <h4 style="margin: 0 0 5px 0; color: #0A2342; font-size: 1rem;">Persiapan Awal (Tarik Data)</h4>
+                            <p style="margin: 0; font-size: 0.85rem; color: #555; line-height: 1.4;">Sebelum keliling, pastikan HP ada sinyal internet. Buka Dashboard, lalu klik tombol <b>SINKRON</b> yang berputar. Tunggu sampai angkanya menjadi <b>0/0</b> agar semua data warga terbaru masuk ke HP Ibu.</p>
+                        </div>
+                    </div>
+
+                    <div style="background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 15px; display: flex; gap: 15px; align-items: flex-start; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+                        <div style="background: #fff3cd; color: #d35400; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 1.2rem; flex-shrink: 0;">2</div>
+                        <div>
+                            <h4 style="margin: 0 0 5px 0; color: #0A2342; font-size: 1rem;">Mendata Warga Baru</h4>
+                            <p style="margin: 0; font-size: 0.85rem; color: #555; line-height: 1.4;">Jika ada warga baru, buka menu <b>Registrasi Sasaran</b>. Isi datanya seperti biasa.<br><span style="background:#fdf3e8; color:#d35400; padding:2px 5px; border-radius:3px; font-weight:bold; font-size:0.75rem;">💡 TIPS:</span> Ketik pakai huruf kecil saja tidak apa-apa, sistem akan otomatis mengubahnya menjadi HURUF KAPITAL setelah disimpan!</p>
+                        </div>
+                    </div>
+
+                    <div style="background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 15px; display: flex; gap: 15px; align-items: flex-start; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+                        <div style="background: #e2f0cb; color: #198754; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 1.2rem; flex-shrink: 0;">3</div>
+                        <div>
+                            <h4 style="margin: 0 0 5px 0; color: #0A2342; font-size: 1rem;">Lapor Kunjungan Pendampingan</h4>
+                            <p style="margin: 0; font-size: 0.85rem; color: #555; line-height: 1.4;">Buka menu <b>Lapor Pendampingan</b>, pilih nama warga, lalu isi form. Jika BUMIL yang Ibu dampingi sudah melahirkan, cukup pilih "Ya, Sudah Melahirkan". Sistem akan otomatis mematikan status Bumil dan membuatkan kartu Ibu Nifas (BUFAS) & Bayi (BADUTA) yang baru untuk Ibu!</p>
+                        </div>
+                    </div>
+
+                    <div style="background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 15px; display: flex; gap: 15px; align-items: flex-start; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+                        <div style="background: #fcf1f6; color: #d63384; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 1.2rem; flex-shrink: 0;">4</div>
+                        <div>
+                            <h4 style="margin: 0 0 5px 0; color: #0A2342; font-size: 1rem;">Kirim Data (Selesai Keliling)</h4>
+                            <p style="margin: 0; font-size: 0.85rem; color: #555; line-height: 1.4;">Setelah selesai berkeliling desa, cari tempat yang ada sinyal / WiFi. Buka halaman Dashboard, lalu klik tombol <b>SINKRON</b>. Tunggu sampai warna berubah hijau dan angka kembali menjadi <b>0/0</b>. Data Ibu sudah aman di Dinas!</p>
+                        </div>
+                    </div>
+
+                </div>
+
+                <h3 style="color:#2c3e50; font-size:1.1rem; margin-bottom:15px; padding-bottom:5px; border-bottom:2px solid #eee;">❓ Pertanyaan Sering Ditanya (FAQ)</h3>
+                <div class="faq-container">
+                    <button class="faq-question">📡 Bagaimana jika saat mendata warga, sinyal HP saya hilang?</button>
+                    <div class="faq-answer">
+                        <p><b>Lanjut saja mendata, Bu! Tidak perlu panik.</b> 😊</p>
+                        <p>Aplikasi ini kebal terhadap sinyal hilang (Bisa Offline). Isi form seperti biasa lalu klik "Simpan". Data akan tertampung aman di HP Ibu. Nanti pas sudah sampai di balai desa/rumah yang ada sinyal, tinggal klik <b>SINKRONISASI</b>.</p>
+                    </div>
+
+                    <button class="faq-question">🤰 BUMIL yang didampingi sudah melahirkan, bagaimana lapornya?</button>
+                    <div class="faq-answer">
+                        <p>Wah, selamat! Aplikasi kita sekarang sudah pintar, Bu. Caranya:</p>
+                        <ol style="padding-left:20px; margin-top:5px;">
+                            <li>Buka menu <b>Lapor Pendampingan</b>.</li>
+                            <li>Pilih nama BUMIL tersebut.</li>
+                            <li>Pada pertanyaan pertama: <i>"Apakah BUMIL sudah melahirkan?"</i>, pilih <b>YA</b>.</li>
+                            <li>Masukkan tanggal lahir si bayi dan klik Simpan.</li>
+                        </ol>
+                        <p>Selesai! Sistem akan otomatis mematikan kartu BUMIL, dan ajaibnya... langsung menciptakan kartu <b>BUFAS (Ibu Nifas)</b> dan kartu <b>BADUTA</b> secara otomatis untuk Ibu dampingi bulan depan!</p>
+                    </div>
+
+                    <button class="faq-question">🥗 Bagaimana cara melapor jika saya mengantar Makanan Bergizi Gratis (MBG)?</button>
+                    <div class="faq-answer">
+                        <p>Pastikan Profil Ibu sudah diatur terlebih dahulu:</p>
+                        <ol style="padding-left:20px; margin-top:5px;">
+                            <li>Buka menu <b>Pengaturan Akun</b> di garis tiga kiri atas.</li>
+                            <li>Pada pilihan <b>Mengantar MBG 3B</b>, ubah menjadi "Ya".</li>
+                            <li>Isi juga apakah Ibu menerima insentif dan berapa nominalnya. Lalu klik <b>Simpan Profil Terkini</b>.</li>
+                        </ol>
+                        <p>Setelah itu, setiap Ibu melakukan Lapor Pendampingan, otomatis akan muncul pertanyaan khusus tentang pemberian Makanan Bergizi Gratis (MBG) di bagian bawah form.</p>
+                    </div>
+
+                    <button class="faq-question">📉 Kenapa saat input BB/TB Baduta muncul peringatan Gizi Merah & Panduan KKA?</button>
+                    <div class="faq-answer">
+                        <p>Aplikasi ini sudah ditanami otak cerdas Kalkulator Stunting & Buku KIA dari Kemenkes RI.</p>
+                        <p>Saat Ibu mengetik Berat Badan (BB) dan Tinggi (TB), aplikasi akan otomatis mengeceknya. Jika muncul warna <b>Merah (Kekurangan Gizi / Pendek)</b>, itu adalah alarm peringatan! 🚨 Segera sarankan orang tua membawa anaknya ke Posyandu/Bidan.</p>
+                        <p>Selain itu, aplikasi juga otomatis memunculkan <b>Target Panduan Stimulasi KKA</b> sesuai umur bulan anak tersebut untuk membantu Ibu memberi penyuluhan yang tepat.</p>
+                    </div>
+
+                    <button class="faq-question">⌨️ Apakah saya harus selalu mengetik memakai Huruf Besar (Capslock)?</button>
+                    <div class="faq-answer">
+                        <p><b>TIDAK PERLU SAMA SEKALI, BU!</b> 😄</p>
+                        <p>Ketik saja biasa senyaman Ibu (huruf kecil semua juga boleh). Biarkan mesin aplikasi ini yang bekerja merapikannya. Saat Ibu menekan tombol "Simpan", nama, NIK, dan Alamat akan otomatis diubah menjadi HURUF KAPITAL dan spasi yang bocor akan dibersihkan.</p>
+                    </div>
+
+                    <button class="faq-question">✏️ Saya salah ketik nama/data warga, apakah bisa diperbaiki?</button>
+                    <div class="faq-answer">
+                        <p>Sangat bisa! Kesalahan adalah hal yang wajar.</p>
+                        <p>Buka menu <b>Data Sasaran & Riwayat</b>, cari nama warga yang salah, klik namanya agar terbuka. Di pojok kanan atas nama, ada tombol tulisan biru <b>✏️ (edit)</b>. Klik itu untuk memperbaiki data.</p>
+                        <p style="color:#d63384; font-size:0.85rem;"><b>Catatan:</b> Jika data sudah terlanjur masuk ke server, hasil editan Ibu tetap akan otomatis menimpa data yang salah di kantor Dinas!</p>
+                    </div>
+                </div>
+
+                <div style="margin-top:30px; text-align:center; padding:15px; background:#f8f9fa; border-radius:8px; border: 1px dashed #ccc;">
+                    <p style="margin:0; font-size:0.85rem; color:#666;">Masih kebingungan?<br>Silakan hubungi <b>Admin Kecamatan</b> atau <b>PKB (Penyuluh KB)</b> di wilayah Ibu.</p>
+                </div>
+            </div>
+
+            <style>
+                .faq-question { background-color: #fff; color: #333; cursor: pointer; padding: 18px; width: 100%; text-align: left; border: 1px solid #ddd; border-radius: 8px; outline: none; transition: 0.3s; font-weight: bold; font-size: 0.95rem; margin-bottom: 8px; display: flex; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05); } 
+                .faq-question:hover { background-color: #f1f7fd; border-color: #0984e3; } 
+                .faq-question.active { background-color: #0984e3; color: white; border-color: #0984e3; } 
+                .faq-answer { padding: 0 18px; display: none; background-color: #fdfdfd; overflow: hidden; border-left: 3px solid #0984e3; border-bottom: 1px solid #eee; border-right: 1px solid #eee; border-radius: 0 0 8px 8px; margin-top: -8px; margin-bottom: 15px; font-size: 0.9rem; line-height: 1.6; color: #444; padding-top: 15px; padding-bottom: 15px; box-shadow: 0 2px 3px rgba(0,0,0,0.05); } 
+                .faq-answer p { margin-top: 0; margin-bottom: 10px; }
+            </style>`;
+            
+            document.querySelectorAll('.faq-question').forEach(btn => { 
+                btn.onclick = () => { 
+                    btn.classList.toggle('active'); 
+                    const panel = btn.nextElementSibling; 
+                    if (panel.style.display === "block") { panel.style.display = "none"; } 
+                    else { panel.style.display = "block"; } 
+                } 
+            });
+            const btnCalc = getEl('btn-buka-kalkulator'); 
+            if(btnCalc) btnCalc.onclick = () => renderKonten('kalkulator');
         }
 
         try {
