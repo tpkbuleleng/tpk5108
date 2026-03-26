@@ -1,5 +1,5 @@
 // ==========================================
-// 📱 APLIKASI KADER TPK (V56 - AUTO UPPERCASE & TRIM PATCH)
+// 📱 APLIKASI KADER TPK (V58 - RADAR PRIORITAS & AUTO FILTER PATCH)
 // ==========================================
 import { initDB, putData, getDataById, deleteData, getAllData, clearStore } from './db.js';
 import { downloadMasterData, uploadData } from './sync.js';
@@ -258,7 +258,6 @@ window.renderKonten = async (target) => {
                 </div>`;
 
             try {
-                // Menarik Standar Antropometri juga ke Dashboard untuk menghitung alarm Gizi
                 const [allWil, allTim, antrean, stdAntro] = await Promise.all([ getAllData('master_tim_wilayah').catch(()=>[]), getAllData('master_tim').catch(()=>[]), getAllData('sync_queue').catch(()=>[]), getAllData('standar_antropometri').catch(()=>[]) ]);
                 
                 let namaDesa = session.desa && session.desa !== '-' && String(session.desa).toLowerCase() !== 'undefined' ? session.desa : '-'; 
@@ -377,6 +376,271 @@ window.renderKonten = async (target) => {
             } catch (e) { window.logErrorToServer('renderKonten - dashboard', e); }
 
         } else if (target === 'registrasi') {
+            const isEdit = window.editModeData != null; const eLabel = isEdit ? `Mengedit Data Sasaran` : `Registrasi Sasaran Baru`;
+            area.innerHTML = `
+                <div class="animate-fade">
+                    <h3 style="margin:0; color:var(--primary); font-size:1.3rem;">📝 ${eLabel}</h3>
+                    ${isEdit ? `<div style="background:#fff3cd; padding:10px; border-radius:5px; margin-bottom:15px; font-size:0.85rem; color:#856404;"><b>Info:</b> ID Sasaran dan Jenis Sasaran tidak dapat diubah.</div>` : ''}
+                    <form id="form-registrasi" style="background:#fff; padding:15px; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+                        <div class="form-group"><label style="font-weight:bold;">Jenis Sasaran <span style="color:red">*</span></label><select name="jenis_sasaran" id="reg-jenis" class="form-control" required ${isEdit ? 'disabled' : ''}><option value="">-- Pilih Jenis Sasaran --</option><option value="CATIN">Calon Pengantin (CATIN)</option><option value="BUMIL">Ibu Hamil (BUMIL)</option><option value="BUFAS">Ibu Nifas (BUFAS)</option><option value="BADUTA">Anak Baduta (0-23 Bulan)</option></select></div>
+                        <div id="form-core" style="display:none; margin-top:15px;">
+                            
+                            <div id="box-sasaran-inti" style="background:#e8f4fd; padding:15px; border-radius:8px; border-left:4px solid var(--primary); margin-bottom:15px;">
+                                <h4 style="margin:0 0 15px 0; color:var(--primary); font-size:1rem;">Identitas Pokok Sasaran</h4>
+                                <div class="form-group"><label>Nama Sasaran <span style="color:red">*</span></label><input type="text" name="nama_sasaran" id="f_nama" class="form-control" required></div>
+                                <div class="form-group"><label>NIK Sasaran <span style="color:red">*</span></label><input type="text" name="nik" id="f_nik" class="form-control" pattern="[0-9]{16}" title="NIK harus 16 digit angka" maxlength="16" minlength="16" oninput="this.value=this.value.replace(/[^0-9]/g,'')" placeholder="16 digit angka" required></div>
+                                <div class="form-group"><label>Nama Kepala Keluarga <span style="color:red">*</span></label><input type="text" name="nama_kk" id="f_kk_nama" class="form-control" required></div>
+                                <div class="form-group"><label>Nomor KK <span style="color:red">*</span></label><input type="text" name="nomor_kk" id="f_kk_no" class="form-control" pattern="[0-9]{16}" title="Nomor KK harus 16 digit angka" maxlength="16" minlength="16" oninput="this.value=this.value.replace(/[^0-9]/g,'')" placeholder="16 digit angka" required></div>
+                                <div class="form-group"><label>Tanggal Lahir Sasaran <span style="color:red">*</span></label><input type="date" name="tanggal_lahir" id="f_tgl" class="form-control" required></div>
+                                <div class="form-group" id="box-jk"><label>Jenis Kelamin <span style="color:red">*</span></label><select name="jenis_kelamin" id="reg-jk" class="form-control" required><option value="">-- Pilih --</option><option value="Laki-laki">Laki-laki</option><option value="Perempuan">Perempuan</option></select></div>
+                            </div>
+                            
+                            <div id="box-indikator-krs" style="background:#fdf3e8; padding:15px; border-radius:8px; border-left:4px solid #e67e22; margin-bottom:15px;">
+                                <h4 style="margin:0 0 15px 0; color:#d35400; font-size:1rem;">Indikator KRS</h4>
+                                <div class="form-group">
+                                    <label>Sumber Air Minum Utama <span style="color:red">*</span></label>
+                                    <select name="sumber_air" id="f_sumber_air" class="form-control" required>
+                                        <option value="">-- Pilih --</option>
+                                        <option value="Air Kemasan / Isi Ulang">Air Kemasan / Isi Ulang</option>
+                                        <option value="Ledeng / Pam">Ledeng / Pam</option>
+                                        <option value="Sumur Bor / Pompa">Sumur Bor / Pompa</option>
+                                        <option value="Sumur Terlindung">Sumur Terlindung</option>
+                                        <option value="Sumur Tak Terlindung">Sumur Tak Terlindung</option>
+                                        <option value="Mata Air Terlindung">Mata Air Terlindung</option>
+                                        <option value="Mata Air Tak Terlindung">Mata Air Tak Terlindung</option>
+                                        <option value="Air Permukaan (Sungai/Danau/Waduk/Kolam/Irigasi)">Air Permukaan (Sungai/Danau/Waduk/Kolam/Irigasi)</option>
+                                        <option value="Air Hujan">Air Hujan</option>
+                                        <option value="Lainnya">Lainnya</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Fasilitas Buang Air Besar (BAB) <span style="color:red">*</span></label>
+                                    <select name="fasilitas_bab" id="f_fasilitas_bab" class="form-control" required>
+                                        <option value="">-- Pilih --</option>
+                                        <option value="Jamban Milik Sendiri Dengan Leher Angsa Dan Tangki Septik / Ipal">Jamban Milik Sendiri Dengan Leher Angsa Dan Tangki Septik / Ipal</option>
+                                        <option value="Jamban Pada Mck Komunal Dengan Leher Angsa Dan Tangki Septik / Ipal">Jamban Pada Mck Komunal Dengan Leher Angsa Dan Tangki Septik / Ipal</option>
+                                        <option value="Ya Lainnya">Ya Lainnya</option>
+                                        <option value="Tidak Ada">Tidak Ada</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div id="box-catin-pasangan" style="display:none; background:#f4f6f8; padding:15px; border-radius:8px; border-left:4px solid #6c757d; margin-bottom:15px;">
+                                <h4 style="margin:0 0 15px 0; color:#495057; font-size:1rem;">Data Pasangan</h4>
+                                <div class="form-group"><label>Tanggal Pernikahan <span style="color:red">*</span></label><input type="date" id="input-tgl-nikah" name="tanggal_pernikahan" class="form-control"></div>
+                                <div class="form-group"><label>Nama Calon Suami/Istri <span style="color:red">*</span></label><input type="text" name="nama_pasangan" id="f_nama_pasangan" class="form-control" placeholder="Nama Lengkap Pasangan"></div>
+                                <div class="form-group"><label>NIK Calon Suami/Istri <span style="color:red">*</span></label><input type="text" name="nik_pasangan" id="f_nik_pasangan" class="form-control" maxlength="16" minlength="16" pattern="[0-9]{16}" oninput="this.value=this.value.replace(/[^0-9]/g,'')" placeholder="16 digit angka"></div>
+                            </div>
+
+                            <div id="box-bumil-status" style="display:none; background:#fcf1f6; padding:15px; border-radius:8px; border-left:4px solid #d63384; margin-bottom:15px;">
+                                <h4 style="margin:0 0 15px 0; color:#d63384; font-size:1rem;">Status Kehamilan</h4>
+                                <div class="form-group"><label>Kehamilan ke <span style="color:red">*</span></label><input type="text" name="kehamilan_ke" id="f_kehamilan_ke" class="form-control" maxlength="1" pattern="[1-9]" oninput="this.value=this.value.replace(/[^1-9]/g,'')" placeholder="Cth: 1"></div>
+                                <div class="form-group">
+                                    <label>Keinginan Hamil <span style="color:red">*</span></label>
+                                    <select name="keinginan_hamil" id="f_keinginan_hamil" class="form-control">
+                                        <option value="">-- Pilih --</option>
+                                        <option value="Ingin Hamil Saat ini">Ingin Hamil Saat ini</option>
+                                        <option value="Ingin Hamil setelah >2 th">Ingin Hamil setelah >2 th</option>
+                                        <option value="Tidak Ingin Hamil Lagi">Tidak Ingin Hamil Lagi</option>
+                                    </select>
+                                </div>
+                                <div class="form-group"><label>Berat Badan Sebelum Hamil (Kg)</label><input type="number" step="any" name="bb_sebelum_hamil" id="f_bb_sebelum_hamil" class="form-control" placeholder="Cth: 50.5"></div>
+                            </div>
+
+                            <div id="box-bufas-status" style="display:none; background:#e2f0cb; padding:15px; border-radius:8px; border-left:4px solid #27ae60; margin-bottom:15px;">
+                                <h4 style="margin:0 0 15px 0; color:#27ae60; font-size:1rem;">Data Persalinan</h4>
+                                <div class="form-group"><label>Tanggal Persalinan / Melahirkan <span style="color:red">*</span></label><input type="date" id="input-tgl-salin-reg" name="tgl_persalinan" class="form-control"></div>
+                                <div class="form-group"><label>Jumlah Anak Kandung <span style="color:red">*</span></label><input type="number" name="jumlah_anak_kandung" id="f_jumlah_anak" class="form-control" placeholder="Cth: 2" min="1"></div>
+                            </div>
+
+                            <div id="box-baduta-status" style="display:none; background:#fff3cd; padding:15px; border-radius:8px; border-left:4px solid #ffc107; margin-bottom:15px;">
+                                <h4 style="margin:0 0 15px 0; color:#856404; font-size:1rem;">Data Kelahiran Anak</h4>
+                                <div class="form-group"><label>Anak ke <span style="color:red">*</span></label><input type="number" name="anak_ke" id="f_anak_ke" class="form-control" placeholder="Cth: 1" min="1"></div>
+                                <div class="form-group"><label>Berat Badan Lahir (Kg) <span style="color:red">*</span></label><input type="number" step="0.01" name="bb_lahir" id="f_bb_lahir" class="form-control" placeholder="Cth: 3.20"></div>
+                                <div class="form-group"><label>Tinggi / Panjang Badan Lahir (Cm) <span style="color:red">*</span></label><input type="number" step="0.01" name="tb_lahir" id="f_tb_lahir" class="form-control" placeholder="Cth: 48.50"></div>
+                            </div>
+
+                            <div id="pertanyaan-dinamis"></div>
+
+                            <div id="wilayah-domisili" style="margin-top:15px; border-top: 1px dashed #ccc; padding-top:15px;">
+                                <h4 style="margin-bottom: 15px; color: var(--primary);">Alamat</h4>
+                                <div class="form-group"><label>Desa / Kelurahan <span style="color:red">*</span></label><select name="desa" id="reg-desa" class="form-control"></select></div>
+                                <div class="form-group"><label>Dusun / RW <span style="color:red">*</span></label><select name="dusun" id="reg-dusun" class="form-control"></select></div>
+                                <div class="form-group"><label>Alamat Lengkap <span style="color:red">*</span></label><textarea name="alamat" id="reg-alamat" class="form-control" rows="2"></textarea></div>
+                            </div>
+
+                            <div id="wilayah-catin" style="display:none; padding:15px; background:#eef2f5; border-radius:8px; border:1px solid #ced4da; margin-top:15px;">
+                                <h4 style="margin-bottom: 15px; color: var(--primary);">Alamat Domisili Setelah Menikah</h4>
+                                <div class="form-group"><label>Kabupaten/Kota <span style="color:red">*</span></label><select name="catin_kab" id="catin-kab" class="form-control"></select></div>
+                                <div class="form-group"><label>Kecamatan <span style="color:red">*</span></label><select name="catin_kec" id="catin-kec" class="form-control"></select></div>
+                                <div class="form-group"><label>Desa/Kelurahan <span style="color:red">*</span></label><select name="catin_desa" id="catin-desa" class="form-control"></select></div>
+                                <div class="form-group"><label>Dusun / RW <span style="color:red">*</span></label>
+                                    <select id="catin-dusun-sel" class="form-control" style="display:none;"></select>
+                                    <input type="text" id="catin-dusun-txt" class="form-control" placeholder="Ketik nama Dusun/RW...">
+                                </div>
+                                <div class="form-group"><label>Alamat Lengkap <span style="color:red">*</span></label><textarea name="catin_alamat" id="catin-alamat" class="form-control" rows="2"></textarea></div>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary" style="width:100%; margin-top:15px; font-size:1.1rem; padding:12px;">💾 ${isEdit ? 'Update Data Sasaran' : 'Simpan Sasaran'}</button>
+                            ${isEdit ? `<button type="button" class="btn btn-danger" style="width:100%; margin-top:10px; font-size:1rem; padding:10px;" onclick="window.editModeData=null; renderKonten('daftar_sasaran')">❌ Batal Edit</button>` : ''}
+                        </div>
+                    </form>
+                </div>`;
+            initFormRegistrasi();
+
+        } else if (target === 'daftar_sasaran') { const tpl = getEl('template-daftar-sasaran'); if(tpl) { area.appendChild(tpl.content.cloneNode(true)); initDaftarSasaran(); }
+        } else if (target === 'pendampingan') { const tpl = getEl('template-pendampingan'); if(tpl) { area.appendChild(tpl.content.cloneNode(true)); initFormPendampingan(); }
+        } else if (target === 'rekap_bulanan') { const tpl = getEl('template-rekap'); if(tpl) { area.appendChild(tpl.content.cloneNode(true)); initRekap(); }
+        } else if (target === 'kalkulator') { const tpl = getEl('template-kalkulator'); if(tpl) { area.appendChild(tpl.content.cloneNode(true)); initKalkulator(); }
+        } else if (target === 'cetak_pdf') { const tpl = getEl('template-cetak-pdf'); if(tpl) area.appendChild(tpl.content.cloneNode(true));
+        } else if (target === 'setting') { const tpl = getEl('template-setting'); if(tpl) { area.appendChild(tpl.content.cloneNode(true)); initSetting(); }
+        } else if (target === 'bantuan') { 
+            area.innerHTML = `
+            <div class="animate-fade">
+                <div style="background: linear-gradient(135deg, #00b894, #059b7b); padding: 25px 20px; border-radius: 12px; color: white; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center;">
+                    <div style="font-size: 3rem; margin-bottom: 10px;">🆘</div>
+                    <h2 style="margin: 0 0 5px 0; font-size: 1.5rem; font-weight: 800;">Pusat Bantuan Kader</h2>
+                    <p style="margin: 0; opacity: 0.9; font-size: 0.9rem;">Jangan bingung, Ibu/Bapak Kader! Temukan panduan langkah demi langkah dan jawaban dari kendala aplikasi di sini.</p>
+                </div>
+                
+                <div style="margin-bottom:25px;">
+                    <button id="btn-buka-kalkulator" style="width: 100%; background: #fff; border: 2px solid #0984e3; color: #0984e3; padding: 15px; border-radius: 8px; font-weight: bold; font-size: 1.05rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; box-shadow: 0 2px 4px rgba(9, 132, 227, 0.1); transition: all 0.2s;">🧮 BUKA KALKULATOR GIZI & HPL</button>
+                </div>
+
+                <h3 style="color:#2c3e50; font-size:1.1rem; margin-bottom:15px; padding-bottom:5px; border-bottom:2px solid #eee;">🚀 Tutorial Penggunaan Aplikasi</h3>
+                <div style="display:grid; grid-template-columns: 1fr; gap:12px; margin-bottom:30px;">
+                    
+                    <div style="background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 15px; display: flex; gap: 15px; align-items: flex-start; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+                        <div style="background: #e8f4fd; color: #0d6efd; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 1.2rem; flex-shrink: 0;">1</div>
+                        <div>
+                            <h4 style="margin: 0 0 5px 0; color: #0A2342; font-size: 1rem;">Persiapan Awal (Tarik Data)</h4>
+                            <p style="margin: 0; font-size: 0.85rem; color: #555; line-height: 1.4;">Sebelum keliling, pastikan HP ada sinyal internet. Buka Dashboard, lalu klik tombol <b>SINKRON</b> yang berputar. Tunggu sampai angkanya menjadi <b>0/0</b> agar semua data warga terbaru masuk ke HP Ibu.</p>
+                        </div>
+                    </div>
+
+                    <div style="background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 15px; display: flex; gap: 15px; align-items: flex-start; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+                        <div style="background: #fff3cd; color: #d35400; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 1.2rem; flex-shrink: 0;">2</div>
+                        <div>
+                            <h4 style="margin: 0 0 5px 0; color: #0A2342; font-size: 1rem;">Mendata Warga Baru</h4>
+                            <p style="margin: 0; font-size: 0.85rem; color: #555; line-height: 1.4;">Jika ada warga baru, buka menu <b>Registrasi Sasaran</b>. Isi datanya seperti biasa.<br><span style="background:#fdf3e8; color:#d35400; padding:2px 5px; border-radius:3px; font-weight:bold; font-size:0.75rem;">💡 TIPS:</span> Ketik pakai huruf kecil saja tidak apa-apa, sistem akan otomatis mengubahnya menjadi HURUF KAPITAL setelah disimpan!</p>
+                        </div>
+                    </div>
+
+                    <div style="background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 15px; display: flex; gap: 15px; align-items: flex-start; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+                        <div style="background: #e2f0cb; color: #198754; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 1.2rem; flex-shrink: 0;">3</div>
+                        <div>
+                            <h4 style="margin: 0 0 5px 0; color: #0A2342; font-size: 1rem;">Lapor Kunjungan Pendampingan</h4>
+                            <p style="margin: 0; font-size: 0.85rem; color: #555; line-height: 1.4;">Buka menu <b>Lapor Pendampingan</b>, pilih nama warga, lalu isi form. Jika BUMIL yang Ibu dampingi sudah melahirkan, cukup pilih "Ya, Sudah Melahirkan". Sistem akan otomatis mematikan status Bumil dan membuatkan kartu Ibu Nifas (BUFAS) & Bayi (BADUTA) yang baru untuk Ibu!</p>
+                        </div>
+                    </div>
+
+                    <div style="background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 15px; display: flex; gap: 15px; align-items: flex-start; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+                        <div style="background: #fcf1f6; color: #d63384; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 1.2rem; flex-shrink: 0;">4</div>
+                        <div>
+                            <h4 style="margin: 0 0 5px 0; color: #0A2342; font-size: 1rem;">Kirim Data (Selesai Keliling)</h4>
+                            <p style="margin: 0; font-size: 0.85rem; color: #555; line-height: 1.4;">Setelah selesai berkeliling desa, cari tempat yang ada sinyal / WiFi. Buka halaman Dashboard, lalu klik tombol <b>SINKRON</b>. Tunggu sampai warna berubah hijau dan angka kembali menjadi <b>0/0</b>. Data Ibu sudah aman di Dinas!</p>
+                        </div>
+                    </div>
+
+                </div>
+
+                <h3 style="color:#2c3e50; font-size:1.1rem; margin-bottom:15px; padding-bottom:5px; border-bottom:2px solid #eee;">❓ Pertanyaan Sering Ditanya (FAQ)</h3>
+                <div class="faq-container">
+                    <button class="faq-question">📡 Bagaimana jika saat mendata warga, sinyal HP saya hilang?</button>
+                    <div class="faq-answer">
+                        <p><b>Lanjut saja mendata, Bu! Tidak perlu panik.</b> 😊</p>
+                        <p>Aplikasi ini kebal terhadap sinyal hilang (Bisa Offline). Isi form seperti biasa lalu klik "Simpan". Data akan tertampung aman di HP Ibu. Nanti pas sudah sampai di balai desa/rumah yang ada sinyal, tinggal klik <b>SINKRONISASI</b>.</p>
+                    </div>
+
+                    <button class="faq-question">🤰 BUMIL yang didampingi sudah melahirkan, bagaimana lapornya?</button>
+                    <div class="faq-answer">
+                        <p>Wah, selamat! Aplikasi kita sekarang sudah pintar, Bu. Caranya:</p>
+                        <ol style="padding-left:20px; margin-top:5px;">
+                            <li>Buka menu <b>Lapor Pendampingan</b>.</li>
+                            <li>Pilih nama BUMIL tersebut.</li>
+                            <li>Pada pertanyaan pertama: <i>"Apakah BUMIL sudah melahirkan?"</i>, pilih <b>YA</b>.</li>
+                            <li>Masukkan tanggal lahir si bayi dan klik Simpan.</li>
+                        </ol>
+                        <p>Selesai! Sistem akan otomatis mematikan kartu BUMIL, dan ajaibnya... langsung menciptakan kartu <b>BUFAS (Ibu Nifas)</b> dan kartu <b>BADUTA</b> secara otomatis untuk Ibu dampingi bulan depan!</p>
+                    </div>
+
+                    <button class="faq-question">🥗 Bagaimana cara melapor jika saya mengantar Makanan Bergizi Gratis (MBG)?</button>
+                    <div class="faq-answer">
+                        <p>Pastikan Profil Ibu sudah diatur terlebih dahulu:</p>
+                        <ol style="padding-left:20px; margin-top:5px;">
+                            <li>Buka menu <b>Pengaturan Akun</b> di garis tiga kiri atas.</li>
+                            <li>Pada pilihan <b>Mengantar MBG 3B</b>, ubah menjadi "Ya".</li>
+                            <li>Isi juga apakah Ibu menerima insentif dan berapa nominalnya. Lalu klik <b>Simpan Profil Terkini</b>.</li>
+                        </ol>
+                        <p>Setelah itu, setiap Ibu melakukan Lapor Pendampingan, otomatis akan muncul pertanyaan khusus tentang pemberian Makanan Bergizi Gratis (MBG) di bagian bawah form.</p>
+                    </div>
+
+                    <button class="faq-question">📉 Kenapa saat input BB/TB Baduta muncul peringatan Gizi Merah & Panduan KKA?</button>
+                    <div class="faq-answer">
+                        <p>Aplikasi ini sudah ditanami otak cerdas Kalkulator Stunting & Buku KIA dari Kemenkes RI.</p>
+                        <p>Saat Ibu mengetik Berat Badan (BB) dan Tinggi (TB), aplikasi akan otomatis mengeceknya. Jika muncul warna <b>Merah (Kekurangan Gizi / Pendek)</b>, itu adalah alarm peringatan! 🚨 Segera sarankan orang tua membawa anaknya ke Posyandu/Bidan.</p>
+                        <p>Selain itu, aplikasi juga otomatis memunculkan <b>Target Panduan Stimulasi KKA</b> sesuai umur bulan anak tersebut untuk membantu Ibu memberi penyuluhan yang tepat.</p>
+                    </div>
+
+                    <button class="faq-question">⌨️ Apakah saya harus selalu mengetik memakai Huruf Besar (Capslock)?</button>
+                    <div class="faq-answer">
+                        <p><b>TIDAK PERLU SAMA SEKALI, BU!</b> 😄</p>
+                        <p>Ketik saja biasa senyaman Ibu (huruf kecil semua juga boleh). Biarkan mesin aplikasi ini yang bekerja merapikannya. Saat Ibu menekan tombol "Simpan", nama, NIK, dan Alamat akan otomatis diubah menjadi HURUF KAPITAL dan spasi yang bocor akan dibersihkan.</p>
+                    </div>
+
+                    <button class="faq-question">✏️ Saya salah ketik nama/data warga, apakah bisa diperbaiki?</button>
+                    <div class="faq-answer">
+                        <p>Sangat bisa! Kesalahan adalah hal yang wajar.</p>
+                        <p>Buka menu <b>Data Sasaran & Riwayat</b>, cari nama warga yang salah, klik namanya agar terbuka. Di pojok kanan atas nama, ada tombol tulisan biru <b>✏️ (edit)</b>. Klik itu untuk memperbaiki data.</p>
+                        <p style="color:#d63384; font-size:0.85rem;"><b>Catatan:</b> Jika data sudah terlanjur masuk ke server, hasil editan Ibu tetap akan otomatis menimpa data yang salah di kantor Dinas!</p>
+                    </div>
+                </div>
+
+                <div style="margin-top:30px; text-align:center; padding:15px; background:#f8f9fa; border-radius:8px; border: 1px dashed #ccc;">
+                    <p style="margin:0; font-size:0.85rem; color:#666;">Masih kebingungan?<br>Silakan hubungi <b>Admin Kecamatan</b> atau <b>PKB (Penyuluh KB)</b> di wilayah Ibu.</p>
+                </div>
+            </div>
+
+            <style>
+                .faq-question { background-color: #fff; color: #333; cursor: pointer; padding: 18px; width: 100%; text-align: left; border: 1px solid #ddd; border-radius: 8px; outline: none; transition: 0.3s; font-weight: bold; font-size: 0.95rem; margin-bottom: 8px; display: flex; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05); } 
+                .faq-question:hover { background-color: #f1f7fd; border-color: #0984e3; } 
+                .faq-question.active { background-color: #0984e3; color: white; border-color: #0984e3; } 
+                .faq-answer { padding: 0 18px; display: none; background-color: #fdfdfd; overflow: hidden; border-left: 3px solid #0984e3; border-bottom: 1px solid #eee; border-right: 1px solid #eee; border-radius: 0 0 8px 8px; margin-top: -8px; margin-bottom: 15px; font-size: 0.9rem; line-height: 1.6; color: #444; padding-top: 15px; padding-bottom: 15px; box-shadow: 0 2px 3px rgba(0,0,0,0.05); } 
+                .faq-answer p { margin-top: 0; margin-bottom: 10px; }
+            </style>`;
+            
+            document.querySelectorAll('.faq-question').forEach(btn => { 
+                btn.onclick = () => { 
+                    btn.classList.toggle('active'); 
+                    const panel = btn.nextElementSibling; 
+                    if (panel.style.display === "block") { panel.style.display = "none"; } 
+                    else { panel.style.display = "block"; } 
+                } 
+            });
+            const btnCalc = getEl('btn-buka-kalkulator'); 
+            if(btnCalc) btnCalc.onclick = () => renderKonten('kalkulator');
+        }
+
+        try {
+            const allWidgets = await getAllData('master_widget').catch(()=>[]);
+            const activeWidgets = allWidgets.filter(w => String(w.is_active || 'Y').toUpperCase() === 'Y' && String(w.target_halaman).toLowerCase() === target.toLowerCase());
+            if (activeWidgets.length > 0) {
+                let htmlAtas = ''; let htmlBawah = '';
+                activeWidgets.forEach(w => {
+                    const content = w.tipe === 'html' ? w.isi_konten : `<div style="background:#fff3cd; padding:12px; border-radius:6px; border-left:4px solid #ffc107; font-size:0.9rem; color:#856404; margin-bottom:15px; line-height:1.4;">${w.isi_konten}</div>`;
+                    if(w.posisi === 'bawah') htmlBawah += `<div style="margin-top:15px; width:100%;">${content}</div>`; else htmlAtas += `<div style="margin-bottom:15px; width:100%;">${content}</div>`;
+                });
+                const injectAndExecute = (htmlString, position) => {
+                    const tempDiv = document.createElement('div'); tempDiv.innerHTML = htmlString; const scripts = tempDiv.querySelectorAll('script');
+                    scripts.forEach(s => { const newScript = document.createElement('script'); newScript.text = s.innerHTML; s.parentNode.removeChild(s); document.body.appendChild(newScript); });
+                    if(position === 'atas') { while(tempDiv.firstChild) area.insertBefore(tempDiv.firstChild, area.firstChild); } else { while(tempDiv.firstChild) area.appendChild(tempDiv.firstChild); }
+                };
+                if(htmlAtas) injectAndExecute(htmlAtas, 'atas');
+                if(htmlBawah) injectAndExecute(htmlBawah, 'bawah');
+            }
+        } catch(e) { window.logErrorToServer('renderKonten - Widget Inject', e); }
+    } catch (e) { window.logErrorToServer('renderKonten - Main', e); }
+};
 
 // ==========================================
 // 4. LOGIKA KUESIONER DINAMIS
@@ -649,7 +913,6 @@ const initDaftarSasaran = async () => {
 
             let syncStatusHtml = r.is_synced ? '<span style="color:#198754;">✅ Tersinkron (Server)</span>' : '<span style="color:#fd7e14;">⏳ Belum Sinkron (Lokal)</span>';
             if (kontenDetail) {
-                // 🔥 PATCH V55: DETAIL PROFIL LENGKAP (Point 3)
                 const nikSasaran = r.data_laporan?.nik || '-';
                 const namaKkIbu = r.data_laporan?.nama_kk || r.data_laporan?.nama_ibu_kandung || '-';
                 kontenDetail.innerHTML = `<div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #ddd; line-height: 1.4;"><div style="font-size: 0.8rem; color: #666; margin-bottom: 4px;">Nama Sasaran</div><div style="font-size: 1.15rem; font-weight: bold; color: #0043a8; margin-bottom: 15px; text-transform: uppercase; background: #ffffff; padding: 10px 12px; border-radius: 6px; border: 1px solid #c6c6c6; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 2px rgba(0,0,0,0.05);"><span>${r.nama_sasaran || '-'}</span><span style="font-size: 0.85rem; color: #0d6efd; cursor: pointer; text-transform: none; font-weight: normal; background: #e8f4fd; padding: 4px 8px; border-radius: 4px;" onclick="window.bukaEditSasaran('${r.id}')">✏️ (edit)</span></div><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;"><div><div style="font-size: 0.8rem; color: #666;">ID Sasaran</div><div style="font-size: 0.95rem; color: #222; font-weight: 500;">${r.id}</div></div><div><div style="font-size: 0.8rem; color: #666;">Kategori</div><div style="font-size: 0.95rem; color: #222; font-weight: bold;">${r.textBaris2}</div></div><div><div style="font-size: 0.8rem; color: #666;">NIK Sasaran</div><div style="font-size: 0.95rem; color: #222; font-weight: bold;">${nikSasaran}</div></div><div><div style="font-size: 0.8rem; color: #666;">Nama KK / Ibu</div><div style="font-size: 0.95rem; color: #222; font-weight: bold;">${namaKkIbu}</div></div></div><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;"><div><div style="font-size: 0.8rem; color: #666;">Status Pendampingan</div><div style="font-size: 0.95rem;">${r.labelSelesai}</div></div><div><div style="font-size: 0.8rem; color: #666;">Status Sinkronisasi</div><div style="font-size: 0.95rem; font-weight: bold;">${syncStatusHtml}</div></div></div><div style="font-size: 0.8rem; color: #666;">Alamat Lengkap</div><div style="font-size: 0.95rem; color: #222;">${r.data_laporan?.alamat || '-'}</div></div><h4 style="margin-bottom: 15px; color: #0043a8; background: #ffffff; padding: 12px; border-radius: 6px; border: 1px solid #c6c6c6; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05); font-weight: 700;">${r.jenis_sasaran === 'BADUTA' ? '📈 Buku KIA/KKA Digital' : 'Riwayat Kunjungan'} (${riwayat.length})</h4><div style="max-height: 400px; overflow-y: auto; padding-right: 5px;">${htmlRiwayat}</div>`;
@@ -696,7 +959,6 @@ const initFormPendampingan = async () => {
             selSasaran.onchange = () => {
                 const sasaran = regList.find(r => r.id === selSasaran.value); if (!sasaran) { containerQ.innerHTML = ''; return; }
                 if (infoBox) { 
-                    // 🔥 PATCH V55: PROFIL SASARAN LENGKAP DI FORM PENDAMPINGAN (Point 3)
                     const nikSasaran = sasaran.data_laporan?.nik || '-';
                     const namaKkIbu = sasaran.data_laporan?.nama_kk || sasaran.data_laporan?.nama_ibu_kandung || '-';
                     infoBox.style.display = 'block'; 
@@ -705,7 +967,6 @@ const initFormPendampingan = async () => {
                 renderPertanyaanDinamis(sasaran.jenis_sasaran, 'PENDAMPINGAN', containerQ, questions);
 
                 setTimeout(() => {
-                    // 🔥 PATCH V55: CEK KUNJUNGAN PERTAMA (Point 2)
                     const visitCount = pendList.filter(p => p.id_sasaran_ref === sasaran.id).length;
                     if (visitCount > 0 && !window.editModeLaporan) {
                         ['wrap_m_jml_anak', 'wrap_m_tgl_anak_akhir'].forEach(id => {
@@ -740,7 +1001,6 @@ const initFormPendampingan = async () => {
                         };
                         if(idInputBB) getEl(idInputBB).addEventListener('input', calcAntro); if(idInputTB) getEl(idInputTB).addEventListener('input', calcAntro);
                         
-                        // 🔥 PATCH V55: FILTER IMUNISASI BERDASARKAN UMUR BADUTA (Point 5)
                         const imuWrappers = containerQ.querySelectorAll('.conditional-wrapper');
                         imuWrappers.forEach(w => {
                             const lblEl = w.querySelector('label');
@@ -758,7 +1018,6 @@ const initFormPendampingan = async () => {
                         });
                     } 
                     else if (sasaran.jenis_sasaran === 'BUMIL') {
-                        // 🔥 PATCH V55: WIDGET KELAHIRAN OTOMATIS BUMIL -> BUFAS & BADUTA DIPINDAH KE ATAS (Point 1)
                         const widgetLahir = `
                             <div id="widget-melahirkan" style="background: #fcf1f6; padding: 15px; border-radius: 8px; border-left: 4px solid #d63384; margin-bottom: 15px;">
                                 <div class="form-group">
@@ -794,7 +1053,6 @@ const initFormPendampingan = async () => {
                                 getEl('box-tgl-lahir').style.display = e.target.value === 'YA' ? 'block' : 'none'; 
                                 getEl('input-tgl-salin').required = e.target.value === 'YA';
                                 
-                                // Sembunyikan grup lainnya jika YA, dan hapus 'required' agar bisa disave
                                 const groups = containerQ.querySelectorAll(':scope > div:not(#widget-melahirkan)');
                                 groups.forEach(g => {
                                     g.style.display = e.target.value === 'YA' ? 'none' : 'block';
@@ -847,10 +1105,8 @@ const initFormPendampingan = async () => {
                     if(jawaban.is_melahirkan === 'YA' && jawaban.tgl_persalinan && !window.editModeLaporan) {
                         const oR = await getDataById('sync_queue', selSasaran.value);
                         if(oR) {
-                            // 1. Matikan BUMIL
                             oR.status_sasaran = 'SELESAI'; oR.is_synced = false; await putData('sync_queue', oR);
                             
-                            // 2. Lahirkan BUFAS
                             const nIdBufas = `BFS-${oR.id.split('-')[1]||'XXX'}-${Math.floor(Math.random()*1000000).toString().padStart(6,'0')}`;
                             const nBufas = JSON.parse(JSON.stringify(oR)); 
                             nBufas.id = nIdBufas; nBufas.jenis_sasaran = 'BUFAS'; nBufas.status_sasaran = 'AKTIF'; nBufas.is_synced = false; nBufas.created_at = new Date().toISOString();
@@ -858,7 +1114,6 @@ const initFormPendampingan = async () => {
                             nBufas.data_laporan.tgl_persalinan = jawaban.tgl_persalinan;
                             await putData('sync_queue', nBufas); 
 
-                            // 3. Lahirkan BADUTA (Jika Bayi Hidup)
                             let countBayi = 0;
                             if (jawaban.kondisi_bayi === 'Hidup') {
                                 const jml = parseInt(jawaban.jumlah_bayi) || 1;
@@ -928,7 +1183,7 @@ const initFormPendampingan = async () => {
 };
 
 // ==========================================
-// 7. FUNGSI REKAP BULANAN (UPDATE V57 - AUTO FILTER BULAN)
+// 7. FUNGSI REKAP BULANAN
 // ==========================================
 const initRekap = async () => {
     try {
@@ -957,7 +1212,6 @@ const initRekap = async () => {
             
             regList.forEach(r => {
                 const dt = new Date(r.created_at);
-                // Hitung jika didaftarkan di bulan filter ATAU bulan-bulan sebelumnya
                 if (dt.getFullYear() > filterTahun || (dt.getFullYear() === filterTahun && (dt.getMonth()+1) > filterBulan)) return;
 
                 let isAktif = r.status_sasaran !== 'SELESAI';
@@ -983,7 +1237,6 @@ const initRekap = async () => {
                 let rData = {}; try { rData = JSON.parse(p.data_laporan || '{}'); } catch(e){}
                 const dtKunjungan = rData.tgl_kunjungan ? new Date(rData.tgl_kunjungan) : new Date(p.created_at);
                 
-                // Hitung kunjungan hanya pada bulan dan tahun filter
                 if (dtKunjungan.getFullYear() === filterTahun && (dtKunjungan.getMonth()+1) === filterBulan) {
                     let jenis = p.jenis_sasaran_saat_kunjungan;
                     if (!jenis) { 
@@ -1017,7 +1270,6 @@ const initRekap = async () => {
         if (selBulan) selBulan.addEventListener('change', updateRekapTampilan);
         if (selTahun) selTahun.addEventListener('change', updateRekapTampilan);
 
-        // Render otomatis bulan ini saat menu dibuka
         updateRekapTampilan();
 
     } catch(e) { window.logErrorToServer('initRekap', e); }
