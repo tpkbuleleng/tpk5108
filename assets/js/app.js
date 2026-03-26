@@ -982,6 +982,9 @@ const initKalkulator = () => {
 // ==========================================
 // 9. PENGATURAN
 // ==========================================
+// ==========================================
+// 9. PENGATURAN (UPDATE V52 - LOGIKA PROFIL MBG INSENTIF)
+// ==========================================
 const initSetting = () => {
     try {
         const session = window.currentUser; 
@@ -991,17 +994,53 @@ const initSetting = () => {
         if(getEl('set-status-kader')) getEl('set-status-kader').value = session.status_kader || '';
         if(getEl('set-bpjs')) getEl('set-bpjs').value = session.bpjs || '';
         if(getEl('set-mbg')) getEl('set-mbg').value = session.mbg || '';
+        if(getEl('set-mbg-insentif')) getEl('set-mbg-insentif').value = session.mbg_insentif || '';
+        if(getEl('set-mbg-nominal')) getEl('set-mbg-nominal').value = session.mbg_nominal || '';
+
+        // 🔥 LOGIKA SENSOR TAMPIL/SEMBUNYI DINAMIS MBG
+        const elMbg = getEl('set-mbg');
+        const boxInsentif = getEl('box-mbg-insentif');
+        const elInsentif = getEl('set-mbg-insentif');
+        const boxNominal = getEl('box-mbg-nominal');
+        const elNominal = getEl('set-mbg-nominal');
+
+        const toggleMbgForm = () => {
+            if (elMbg && boxInsentif) {
+                // Munculkan opsi Insentif jika Mengantar MBG = Ya
+                boxInsentif.style.display = elMbg.value === 'Ya' ? 'block' : 'none';
+                if (elMbg.value !== 'Ya') {
+                    if(elInsentif) elInsentif.value = '';
+                    if(elNominal) elNominal.value = '';
+                }
+            }
+            if (elInsentif && boxNominal) {
+                // Munculkan isian Nominal jika Menerima Insentif = Menerima
+                boxNominal.style.display = (elMbg.value === 'Ya' && elInsentif.value === 'Menerima') ? 'block' : 'none';
+                if (elInsentif.value !== 'Menerima') {
+                    if(elNominal) elNominal.value = '';
+                }
+            }
+        };
+
+        // Pasang pendengar sensor
+        if (elMbg) elMbg.addEventListener('change', toggleMbgForm);
+        if (elInsentif) elInsentif.addEventListener('change', toggleMbgForm);
+        toggleMbgForm(); // Pancing saat layar pertama kali dibuka
         
         const btnSaveProfil = getEl('btn-save-profil');
         if (btnSaveProfil) {
             btnSaveProfil.onclick = async () => {
+                // Tarik semua data yang diinput kader
                 session.status_kader = getEl('set-status-kader').value;
                 session.bpjs = getEl('set-bpjs').value;
                 session.mbg = getEl('set-mbg').value;
+                session.mbg_insentif = getEl('set-mbg-insentif') ? getEl('set-mbg-insentif').value : '';
+                session.mbg_nominal = getEl('set-mbg-nominal') ? getEl('set-mbg-nominal').value : '';
                 
+                // Simpan ke memori HP (IndexedDB)
                 await window.AppDB.putData('kader_session', session);
                 window.currentUser = session;
-                alert("✅ Data Profil Tambahan berhasil disimpan di perangkat Anda!");
+                alert("✅ Data Profil Terkini berhasil disimpan di perangkat Anda!");
             };
         }
 
