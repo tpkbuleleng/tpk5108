@@ -5,7 +5,7 @@ import { initAdmin } from './admin.js';
 // 🔥 EKSPOS DATABASE KE GLOBAL
 window.AppDB = { getAllData, getDataById, putData };
 const getEl = (id) => document.getElementById(id);
-const SCRIPT_URL_GLOBAL = 'https://script.google.com/macros/s/AKfycby-nJkkQqSW3PZivNO0C0gfuoptfZhZ4uiGh1mslxpctrQqf7C1c9KPRbxRazL09RJugA/exec';
+const SCRIPT_URL_GLOBAL = 'https://script.google.com/macros/s/AKfycbx0_deS9S3tfxkhCW1zzg8lxZGnQZzpxfw3btNAuTCsSBsBsgaN4kqJ1TpbHnBNZrOrfA/exec';
 
 // ==========================================
 // 🔥 V30: SISTEM SARAF PERASA (SILENT ERROR TRACKER)
