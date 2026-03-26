@@ -3,7 +3,7 @@
 // ==========================================
 import { clearStore, getAllData } from './db.js';
 
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw6Tvi3NL4CETGS22IZjYS79bCJFVuoN28ovTcc_7kRzK-aTmYgcfEyn2Eo3kc7O3xvsw/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby-nJkkQqSW3PZivNO0C0gfuoptfZhZ4uiGh1mslxpctrQqf7C1c9KPRbxRazL09RJugA/exec';
 
 window.adminData = { registrasi: [], pendampingan: [], master_kader: [], master_pkb: [] };
 window.adminSession = null;
