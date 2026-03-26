@@ -1033,5 +1033,3 @@ window.renderSuperView = async (target) => {
 
     } catch(e) { catatErrorSistem(`Global Routing [${target}]`, e); }
 };
-
-}
