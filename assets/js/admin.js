@@ -585,7 +585,7 @@ window.renderAdminView = async (target) => {
             document.getElementById('r-nip-pkb').innerText = pkbNip;
         };
 
-        document.getElementById('dash-flt-bulan').addEventListener('change', (e) => { window.currentFilterBulan = e.target.value; renderReport(); });
+        document.getElementById('dash-flt-bulan').addEventListener('change', (e) => { window.currentFilterBulan = e.target.value; window.renderAdminView('cetak_laporan'); });
         document.getElementById('dash-flt-tahun').addEventListener('change', (e) => { 
             window.currentFilterTahun = e.target.value; 
             window.renderAdminView('cetak_laporan'); 
@@ -594,9 +594,9 @@ window.renderAdminView = async (target) => {
         const btnKec = document.getElementById('dash-flt-kec');
         if (btnKec) btnKec.addEventListener('change', () => { window.currentFilterKec = btnKec.value; window.currentFilterDesa = 'ALL'; window.renderAdminView('cetak_laporan'); });
         const btnDesa = document.getElementById('dash-flt-desa');
-        if (btnDesa) btnDesa.addEventListener('change', () => { window.currentFilterDesa = btnDesa.value; renderReport(); });
+        if (btnDesa) btnDesa.addEventListener('change', () => { window.currentFilterDesa = btnDesa.value; window.renderAdminView('cetak_laporan'); });
 
-        renderReport();
+        window.renderAdminView('cetak_laporan');
     }
 };
 
