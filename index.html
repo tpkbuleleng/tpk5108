@@ -247,38 +247,62 @@
         <div class="card animate-fade">
             <h3 style="margin-bottom: 20px; color: var(--primary);">⚙️ Pengaturan</h3>
             
-            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #ddd;">
-                <h4 style="margin-bottom: 10px; color: #333; font-size: 1rem;">👤 Profil Kader</h4>
-                <div class="form-group"><label>Nama Kader</label><input type="text" id="set-nama" class="form-control" readonly></div>
-                <div class="form-group"><label>ID / Username</label><input type="text" id="set-id" class="form-control" readonly></div>
-                
-                <div class="form-group">
-                    <label>Status Kader TPK</label>
-                    <select id="set-status-kader" class="form-control">
-                        <option value="">-- Pilih Status --</option>
-                        <option value="Baru">Baru</option>
-                        <option value="Lama">Lama</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Memiliki BPJS Ketenagakerjaan</label>
-                    <select id="set-bpjs" class="form-control">
-                        <option value="">-- Pilih --</option>
-                        <option value="Memiliki">Memiliki</option>
-                        <option value="Tidak Memiliki">Tidak Memiliki</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Mengantar MBG 3B</label>
-                    <select id="set-mbg" class="form-control">
-                        <option value="">-- Pilih --</option>
-                        <option value="Ya">Ya</option>
-                        <option value="Tidak">Tidak</option>
-                    </select>
-                </div>
-                <button id="btn-save-profil" class="btn-primary" style="margin-top: 10px; width:100%; background:#198754;">💾 Simpan Profil Tambahan</button>
-                <p style="font-size: 0.75rem; color: #888; margin-top: 10px; line-height: 1.3;">*Perubahan pada profil utama (Nama/ID) harus dilakukan melalui Admin Kecamatan di Server Master Database.</p>
+            <div style="background:#fff; padding:15px; border-radius:8px; border:1px solid #ced4da; margin-bottom:15px;">
+        <h4 style="margin-top:0; color:#444;"><span class="icon">👤</span> Profil Kader</h4>
+        <div class="form-group">
+            <label>Nama Kader</label>
+            <input type="text" id="set-nama" class="form-control" readonly style="background:#f8f9fa;">
+        </div>
+        <div class="form-group">
+            <label>ID / Username</label>
+            <input type="text" id="set-id" class="form-control" readonly style="background:#f8f9fa;">
+        </div>
+        <div class="form-group">
+            <label>Status Kader TPK</label>
+            <select id="set-status-kader" class="form-control">
+                <option value="">-- Pilih Status --</option>
+                <option value="Bidan">Bidan</option>
+                <option value="Kader KB">Kader KB</option>
+                <option value="PKK">PKK</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label>Memiliki BPJS Ketenagakerjaan <br><i style="font-size:0.8rem; color:#666; font-weight:normal;">(Data di Update Setiap Saat Jika Ada Perubahan)</i></label>
+            <select id="set-bpjs" class="form-control">
+                <option value="">-- Pilih --</option>
+                <option value="Ya">Ya</option>
+                <option value="Tidak">Tidak</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Mengantar MBG 3B <br><i style="font-size:0.8rem; color:#666; font-weight:normal;">(Data di Update Setiap Saat Jika Ada Perubahan)</i></label>
+            <select id="set-mbg" class="form-control">
+                <option value="">-- Pilih --</option>
+                <option value="Ya">Ya</option>
+                <option value="Tidak">Tidak</option>
+            </select>
+        </div>
+        
+        <div class="form-group" id="box-mbg-insentif" style="display:none;">
+            <label>Menerima Insentif Mengantar MBG 3B <br><i style="font-size:0.8rem; color:#666; font-weight:normal;">(Data di Update Setiap Saat Jika Ada Perubahan)</i></label>
+            <select id="set-mbg-insentif" class="form-control">
+                <option value="">-- Pilih --</option>
+                <option value="Menerima">Menerima</option>
+                <option value="Tidak">Tidak</option>
+            </select>
+        </div>
+        <div class="form-group" id="box-mbg-nominal" style="display:none;">
+            <label>Nominal Insentif Yang Diterima <br><i style="font-size:0.8rem; color:#666; font-weight:normal;">(Data di Update Setiap Saat Jika Ada Perubahan)</i></label>
+            <div style="display: flex; align-items: center;">
+                <span style="background: #eee; padding: 10px; border: 1px solid #ced4da; border-right: none; border-radius: 6px 0 0 6px; font-weight: bold;">Rp.</span>
+                <input type="text" id="set-mbg-nominal" class="form-control" style="border-radius: 0 6px 6px 0;" placeholder="Contoh: 50.000" oninput="this.value = this.value.replace(/[^0-9]/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, '.')">
             </div>
+        </div>
+
+        <button type="button" id="btn-save-profil" class="btn btn-primary" style="width:100%; margin-top:10px; font-size:1.1rem; padding:12px;">💾 Simpan Profil Terkini</button>
+        <p style="font-size:0.75rem; color:#888; margin-top:10px;">*Perubahan pada profil utama (Nama/ID) harus dilakukan melalui Admin Kecamatan di Server Master Database.</p>
+    </div>
 
             <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #ddd;">
                 <h4 style="margin-bottom: 10px; color: #333; font-size: 1rem;">📱 Tampilan Layar</h4>
