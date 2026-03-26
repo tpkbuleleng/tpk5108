@@ -3,7 +3,7 @@
 // ==========================================
 import { getAllData, clearStore } from './db.js';
 
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw6Tvi3NL4CETGS22IZjYS79bCJFVuoN28ovTcc_7kRzK-aTmYgcfEyn2Eo3kc7O3xvsw/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby-nJkkQqSW3PZivNO0C0gfuoptfZhZ4uiGh1mslxpctrQqf7C1c9KPRbxRazL09RJugA/exec';
 const SUPER_TOKEN = 'MasterKeyKubuSecure!001';
 
 window.superUsersData = []; window.superTimData = []; window.currentFilteredIds = [];
