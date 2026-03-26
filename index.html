@@ -292,8 +292,16 @@
                 <option value="Tidak">Tidak</option>
             </select>
         </div>
+        <div class="form-group" id="box-mbg-insentif" style="display:none;">
+            <label>Menerima Insentif Mengantar MBG 3B <br><i style="font-size:0.8rem; color:#666; font-weight:normal;">(Data di Update Setiap Saat Jika Ada Perubahan)</i></label>
+            <select id="set-mbg-insentif" class="form-control">
+                <option value="">-- Pilih --</option>
+                <option value="Menerima">Menerima</option>
+                <option value="Tidak">Tidak</option>
+            </select>
+        </div>
         <div class="form-group" id="box-mbg-nominal" style="display:none;">
-            <label>Nominal Insentif Yang Diterima <br><i style="font-size:0.8rem; color:#666; font-weight:normal;">(Data di Update Setiap Saat Jika Ada Perubahan)</i></label>
+            <label>Nominal Insentif Yang Diterima Setiap Pengantaran Kepada 1 Sasaran <br><i style="font-size:0.8rem; color:#666; font-weight:normal;">(Data di Update Setiap Saat Jika Ada Perubahan)</i></label>
             <div style="display: flex; align-items: center;">
                 <span style="background: #eee; padding: 10px; border: 1px solid #ced4da; border-right: none; border-radius: 6px 0 0 6px; font-weight: bold;">Rp.</span>
                 <input type="text" id="set-mbg-nominal" class="form-control" style="border-radius: 0 6px 6px 0;" placeholder="Contoh: 50.000" oninput="this.value = this.value.replace(/[^0-9]/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, '.')">
