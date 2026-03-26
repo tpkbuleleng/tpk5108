@@ -679,7 +679,7 @@ const initDaftarSasaran = async () => {
                 htmlRiwayat = riwayat.map(p => {
                     let dynamicHtml = '';
                     for (const [key, value] of Object.entries(p.data_laporan || {})) {
-                        if (['id_sasaran', 'tgl_kunjungan', 'catatan', 'is_melahirkan', 'tgl_persalinan', 'nama_sasaran', 'nama_kk', 'nik', 'jenis_kelamin'].includes(key) || !value) continue;
+                        if (['id_sasaran', 'tgl_kunjungan', 'catatan', 'is_melahirkan', 'tgl_persalinan', 'nama_sasaran', 'nama_kk', 'nik', 'jenis_kelamin', 'kondisi_bayi', 'jumlah_bayi'].includes(key) || !value) continue;
                         let foundQ = masterPertanyaan.find(mq => String(mq.id_pertanyaan) === String(key)); let label = foundQ ? foundQ.label_pertanyaan : key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
                         dynamicHtml += `<div style="margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #eee;"><div style="font-size: 0.75rem; color: #666; font-weight: normal;">${label}</div><div style="font-size: 0.9rem; color: #222; font-weight: 500;">${value}</div></div>`;
                     }
@@ -689,7 +689,10 @@ const initDaftarSasaran = async () => {
 
             let syncStatusHtml = r.is_synced ? '<span style="color:#198754;">✅ Tersinkron (Server)</span>' : '<span style="color:#fd7e14;">⏳ Belum Sinkron (Lokal)</span>';
             if (kontenDetail) {
-                kontenDetail.innerHTML = `<div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #ddd; line-height: 1.4;"><div style="font-size: 0.8rem; color: #666; margin-bottom: 4px;">Nama Sasaran</div><div style="font-size: 1.15rem; font-weight: bold; color: #0043a8; margin-bottom: 15px; text-transform: uppercase; background: #ffffff; padding: 10px 12px; border-radius: 6px; border: 1px solid #c6c6c6; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 2px rgba(0,0,0,0.05);"><span>${r.nama_sasaran || '-'}</span><span style="font-size: 0.85rem; color: #0d6efd; cursor: pointer; text-transform: none; font-weight: normal; background: #e8f4fd; padding: 4px 8px; border-radius: 4px;" onclick="window.bukaEditSasaran('${r.id}')">✏️ (edit)</span></div><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;"><div><div style="font-size: 0.8rem; color: #666;">ID / No NIK</div><div style="font-size: 0.95rem; color: #222; font-weight: 500;">${r.id} <br> ${r.data_laporan?.nik || '-'}</div></div><div><div style="font-size: 0.8rem; color: #666;">Kategori</div><div style="font-size: 0.95rem; color: #222; font-weight: bold;">${r.textBaris2}</div></div></div><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;"><div><div style="font-size: 0.8rem; color: #666;">Status Pendampingan</div><div style="font-size: 0.95rem;">${r.labelSelesai}</div></div><div><div style="font-size: 0.8rem; color: #666;">Status Sinkronisasi</div><div style="font-size: 0.95rem; font-weight: bold;">${syncStatusHtml}</div></div></div><div style="font-size: 0.8rem; color: #666;">Alamat Lengkap</div><div style="font-size: 0.95rem; color: #222;">${r.data_laporan?.alamat || '-'}</div></div><h4 style="margin-bottom: 15px; color: #0043a8; background: #ffffff; padding: 12px; border-radius: 6px; border: 1px solid #c6c6c6; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05); font-weight: 700;">${r.jenis_sasaran === 'BADUTA' ? '📈 Buku KIA/KKA Digital' : 'Riwayat Kunjungan'} (${riwayat.length})</h4><div style="max-height: 400px; overflow-y: auto; padding-right: 5px;">${htmlRiwayat}</div>`;
+                // 🔥 PATCH V55: DETAIL PROFIL LENGKAP (Point 3)
+                const nikSasaran = r.data_laporan?.nik || '-';
+                const namaKkIbu = r.data_laporan?.nama_kk || r.data_laporan?.nama_ibu_kandung || '-';
+                kontenDetail.innerHTML = `<div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #ddd; line-height: 1.4;"><div style="font-size: 0.8rem; color: #666; margin-bottom: 4px;">Nama Sasaran</div><div style="font-size: 1.15rem; font-weight: bold; color: #0043a8; margin-bottom: 15px; text-transform: uppercase; background: #ffffff; padding: 10px 12px; border-radius: 6px; border: 1px solid #c6c6c6; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 2px rgba(0,0,0,0.05);"><span>${r.nama_sasaran || '-'}</span><span style="font-size: 0.85rem; color: #0d6efd; cursor: pointer; text-transform: none; font-weight: normal; background: #e8f4fd; padding: 4px 8px; border-radius: 4px;" onclick="window.bukaEditSasaran('${r.id}')">✏️ (edit)</span></div><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;"><div><div style="font-size: 0.8rem; color: #666;">ID Sasaran</div><div style="font-size: 0.95rem; color: #222; font-weight: 500;">${r.id}</div></div><div><div style="font-size: 0.8rem; color: #666;">Kategori</div><div style="font-size: 0.95rem; color: #222; font-weight: bold;">${r.textBaris2}</div></div><div><div style="font-size: 0.8rem; color: #666;">NIK Sasaran</div><div style="font-size: 0.95rem; color: #222; font-weight: bold;">${nikSasaran}</div></div><div><div style="font-size: 0.8rem; color: #666;">Nama KK / Ibu</div><div style="font-size: 0.95rem; color: #222; font-weight: bold;">${namaKkIbu}</div></div></div><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;"><div><div style="font-size: 0.8rem; color: #666;">Status Pendampingan</div><div style="font-size: 0.95rem;">${r.labelSelesai}</div></div><div><div style="font-size: 0.8rem; color: #666;">Status Sinkronisasi</div><div style="font-size: 0.95rem; font-weight: bold;">${syncStatusHtml}</div></div></div><div style="font-size: 0.8rem; color: #666;">Alamat Lengkap</div><div style="font-size: 0.95rem; color: #222;">${r.data_laporan?.alamat || '-'}</div></div><h4 style="margin-bottom: 15px; color: #0043a8; background: #ffffff; padding: 12px; border-radius: 6px; border: 1px solid #c6c6c6; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05); font-weight: 700;">${r.jenis_sasaran === 'BADUTA' ? '📈 Buku KIA/KKA Digital' : 'Riwayat Kunjungan'} (${riwayat.length})</h4><div style="max-height: 400px; overflow-y: auto; padding-right: 5px;">${htmlRiwayat}</div>`;
             }
             if(modal) modal.style.display = 'block';
         };
@@ -717,6 +720,7 @@ const initFormPendampingan = async () => {
 
         const [questions, antrean, stdAntro, masterKembang] = await Promise.all([ getAllData('master_pertanyaan').catch(()=>[]), getAllData('sync_queue').catch(()=>[]), getAllData('standar_antropometri').catch(()=>[]), getAllData('master_kembang').catch(()=>[]) ]);
         const regList = antrean.filter(a => a.tipe_laporan === 'REGISTRASI' && String(a.id_tim) === String(session.id_tim) && a.status_sasaran !== 'SELESAI');
+        const pendList = antrean.filter(a => a.tipe_laporan === 'PENDAMPINGAN' && String(a.id_tim) === String(session.id_tim));
 
         const getKkaData = (umurAnak) => { const ages = [...new Set(masterKembang.map(d => parseInt(d.umur_bulan)))].filter(a => !isNaN(a)).sort((a,b)=>a-b); let targetUmur = ages.filter(a => a <= umurAnak).pop() || ages[0]; return masterKembang.filter(k => parseInt(k.umur_bulan) === targetUmur); };
 
@@ -731,10 +735,29 @@ const initFormPendampingan = async () => {
 
             selSasaran.onchange = () => {
                 const sasaran = regList.find(r => r.id === selSasaran.value); if (!sasaran) { containerQ.innerHTML = ''; return; }
-                if (infoBox) { infoBox.style.display = 'block'; infoBox.innerHTML = `<div style="font-weight:bold; color:#0043a8; margin-bottom: 8px; background: #fff; padding: 6px 12px; border-radius: 6px; border: 1px solid #c6c6c6; text-align:center; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">📌 Profil Sasaran Terpilih</div><table style="width:100%; font-size: 0.85rem; background: #fff; padding: 12px; border-radius: 6px; border: 1px solid #ddd; line-height:1.5;"><tr><td style="width:35%; color:#555;">Nama</td><td>: <b>${sasaran.nama_sasaran}</b></td></tr><tr><td style="color:#555;">No. KK</td><td>: ${sasaran.data_laporan?.nomor_kk||'-'}</td></tr><tr><td style="color:#555;">Umur Daftar</td><td>: ${sasaran.data_laporan?.usia_saat_daftar_tahun||'-'} Tahun</td></tr></table>`; }
+                if (infoBox) { 
+                    // 🔥 PATCH V55: PROFIL SASARAN LENGKAP DI FORM PENDAMPINGAN (Point 3)
+                    const nikSasaran = sasaran.data_laporan?.nik || '-';
+                    const namaKkIbu = sasaran.data_laporan?.nama_kk || sasaran.data_laporan?.nama_ibu_kandung || '-';
+                    infoBox.style.display = 'block'; 
+                    infoBox.innerHTML = `<div style="font-weight:bold; color:#0043a8; margin-bottom: 8px; background: #fff; padding: 6px 12px; border-radius: 6px; border: 1px solid #c6c6c6; text-align:center; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">📌 Profil Sasaran Terpilih</div><table style="width:100%; font-size: 0.85rem; background: #fff; padding: 12px; border-radius: 6px; border: 1px solid #ddd; line-height:1.5;"><tr><td style="width:35%; color:#555;">Nama</td><td>: <b>${sasaran.nama_sasaran}</b></td></tr><tr><td style="color:#555;">NIK</td><td>: ${nikSasaran}</td></tr><tr><td style="color:#555;">Nama KK/Ibu</td><td>: ${namaKkIbu}</td></tr><tr><td style="color:#555;">Umur Daftar</td><td>: ${sasaran.data_laporan?.usia_saat_daftar_tahun||'-'} Tahun</td></tr></table>`; 
+                }
                 renderPertanyaanDinamis(sasaran.jenis_sasaran, 'PENDAMPINGAN', containerQ, questions);
 
                 setTimeout(() => {
+                    // 🔥 PATCH V55: CEK KUNJUNGAN PERTAMA (Point 2)
+                    const visitCount = pendList.filter(p => p.id_sasaran_ref === sasaran.id).length;
+                    if (visitCount > 0 && !window.editModeLaporan) {
+                        ['wrap_m_jml_anak', 'wrap_m_tgl_anak_akhir'].forEach(id => {
+                            const el = getEl(id);
+                            if (el) {
+                                el.style.display = 'none';
+                                const inp = el.querySelector('input, select');
+                                if(inp) inp.removeAttribute('required');
+                            }
+                        });
+                    }
+
                     if (sasaran.jenis_sasaran === 'BADUTA' && sasaran.data_laporan.tanggal_lahir) {
                         const tL = new Date(sasaran.data_laporan.tanggal_lahir); const tH = new Date(); let uBln = (tH.getFullYear() - tL.getFullYear()) * 12; uBln -= tL.getMonth(); uBln += tH.getMonth(); if (tH.getDate() < tL.getDate()) uBln--; if (uBln < 0) uBln = 0;
                         let jk = sasaran.data_laporan.jenis_kelamin === 'Laki-laki' ? 'L' : 'P';
@@ -756,11 +779,28 @@ const initFormPendampingan = async () => {
                             getEl('antro_result').style.display = 'block'; getEl('antro_result').innerHTML = `<h5 style="margin:0 0 10px 0; color:#333; text-align:center;">📊 Deteksi Dini Status Gizi</h5><div style="font-size:0.85rem;"><div style="display:flex; justify-content:space-between; border-bottom:1px solid #eee; padding-bottom:5px;"><span>Berat (BB/U):</span><b style="color:${cB};">${sB}</b></div><div style="display:flex; justify-content:space-between; border-bottom:1px solid #eee; padding:5px 0;"><span>Tinggi (PB/U):</span><b style="color:${cT};">${sT}</b></div><div style="display:flex; justify-content:space-between; padding-top:5px;"><span>Proporsi (BB/PB):</span><b style="color:${cP};">${sP}</b></div></div>`;
                         };
                         if(idInputBB) getEl(idInputBB).addEventListener('input', calcAntro); if(idInputTB) getEl(idInputTB).addEventListener('input', calcAntro);
+                        
+                        // 🔥 PATCH V55: FILTER IMUNISASI BERDASARKAN UMUR BADUTA (Point 5)
+                        const imuWrappers = containerQ.querySelectorAll('.conditional-wrapper');
+                        imuWrappers.forEach(w => {
+                            const lblEl = w.querySelector('label');
+                            if (lblEl && lblEl.innerText.toLowerCase().includes('imunisasi') && lblEl.innerText.toLowerCase().includes('usia')) {
+                                const match = lblEl.innerText.match(/Usia (\d+) Bulan/i);
+                                if (match) {
+                                    const reqAge = parseInt(match[1]);
+                                    if (uBln < reqAge) {
+                                        w.style.display = 'none'; 
+                                        const inp = w.querySelector('input, select');
+                                        if(inp) inp.removeAttribute('required');
+                                    }
+                                }
+                            }
+                        });
                     } 
                     else if (sasaran.jenis_sasaran === 'BUMIL') {
-                        // 🔥 PATCH V51: WIDGET KELAHIRAN OTOMATIS BUMIL -> BUFAS & BADUTA
+                        // 🔥 PATCH V55: WIDGET KELAHIRAN OTOMATIS BUMIL -> BUFAS & BADUTA DIPINDAH KE ATAS (Point 1)
                         const widgetLahir = `
-                            <div style="background: #fcf1f6; padding: 15px; border-radius: 8px; border-left: 4px solid #d63384; margin-top: 15px;">
+                            <div id="widget-melahirkan" style="background: #fcf1f6; padding: 15px; border-radius: 8px; border-left: 4px solid #d63384; margin-bottom: 15px;">
                                 <div class="form-group">
                                     <label style="color:#d63384; font-weight:bold;">Apakah BUMIL sudah melahirkan?</label>
                                     <select id="is_melahirkan" name="is_melahirkan" class="form-control">
@@ -787,12 +827,31 @@ const initFormPendampingan = async () => {
                                 </div>
                             </div>
                         `;
-                        containerQ.insertAdjacentHTML('beforeend', widgetLahir);
+                        containerQ.insertAdjacentHTML('afterbegin', widgetLahir);
                         
                         if(getEl('is_melahirkan')) { 
                             getEl('is_melahirkan').onchange = (e) => { 
                                 getEl('box-tgl-lahir').style.display = e.target.value === 'YA' ? 'block' : 'none'; 
                                 getEl('input-tgl-salin').required = e.target.value === 'YA';
+                                
+                                // Sembunyikan grup lainnya jika YA, dan hapus 'required' agar bisa disave
+                                const groups = containerQ.querySelectorAll(':scope > div:not(#widget-melahirkan)');
+                                groups.forEach(g => {
+                                    g.style.display = e.target.value === 'YA' ? 'none' : 'block';
+                                    const reqInputs = g.querySelectorAll('[required], [data-was-required]');
+                                    reqInputs.forEach(inp => {
+                                        if(e.target.value === 'YA') {
+                                            if(inp.hasAttribute('required')) {
+                                                inp.setAttribute('data-was-required', 'true');
+                                                inp.removeAttribute('required');
+                                            }
+                                        } else {
+                                            if(inp.getAttribute('data-was-required') === 'true') {
+                                                inp.setAttribute('required', 'true');
+                                            }
+                                        }
+                                    });
+                                });
                             }; 
                         }
                         if(getEl('kondisi_bayi')) {
@@ -825,7 +884,6 @@ const initFormPendampingan = async () => {
                 try {
                     const formData = new FormData(e.target); const jawaban = {}; formData.forEach((val, key) => jawaban[key] = val);
                     
-                    // 🔥 PATCH V51: LOGIKA AUTO-GENERATE BUMIL -> BUFAS & BADUTA
                     if(jawaban.is_melahirkan === 'YA' && jawaban.tgl_persalinan && !window.editModeLaporan) {
                         const oR = await getDataById('sync_queue', selSasaran.value);
                         if(oR) {
@@ -846,8 +904,6 @@ const initFormPendampingan = async () => {
                                 const jml = parseInt(jawaban.jumlah_bayi) || 1;
                                 for (let i = 1; i <= jml; i++) {
                                     const idBaduta = `BDT-${oR.id.split('-')[1]||'XXX'}-${Math.floor(Math.random()*1000000).toString().padStart(6,'0')}`;
-                                    
-                                    // 🔥 STANDAR PENAMAAN: "Bayi [Nama Ibu]"
                                     const namaAnak = jml > 1 ? `Bayi ${i} ${oR.nama_sasaran}` : `Bayi ${oR.nama_sasaran}`;
                                     
                                     const badutaData = {
@@ -875,8 +931,8 @@ const initFormPendampingan = async () => {
                                             fasilitas_bab: oR.data_laporan?.fasilitas_bab || '', 
                                             usia_saat_daftar_tahun: 0, 
                                             usia_saat_daftar_bulan: 0, 
-                                            jenis_kelamin: '', // Sengaja kosong agar kader Edit
-                                            nik: '' // Sengaja kosong agar kader Edit (wajib 16 digit nanti)
+                                            jenis_kelamin: '', 
+                                            nik: '' 
                                         }
                                     };
                                     await putData('sync_queue', badutaData);
@@ -982,9 +1038,6 @@ const initKalkulator = () => {
 // ==========================================
 // 9. PENGATURAN
 // ==========================================
-// ==========================================
-// 9. PENGATURAN (UPDATE V52 - LOGIKA PROFIL MBG INSENTIF)
-// ==========================================
 const initSetting = () => {
     try {
         const session = window.currentUser; 
@@ -997,7 +1050,6 @@ const initSetting = () => {
         if(getEl('set-mbg-insentif')) getEl('set-mbg-insentif').value = session.mbg_insentif || '';
         if(getEl('set-mbg-nominal')) getEl('set-mbg-nominal').value = session.mbg_nominal || '';
 
-        // 🔥 LOGIKA SENSOR TAMPIL/SEMBUNYI DINAMIS MBG
         const elMbg = getEl('set-mbg');
         const boxInsentif = getEl('box-mbg-insentif');
         const elInsentif = getEl('set-mbg-insentif');
@@ -1006,38 +1058,27 @@ const initSetting = () => {
 
         const toggleMbgForm = () => {
             if (elMbg && boxInsentif) {
-                // Munculkan opsi Insentif jika Mengantar MBG = Ya
                 boxInsentif.style.display = elMbg.value === 'Ya' ? 'block' : 'none';
-                if (elMbg.value !== 'Ya') {
-                    if(elInsentif) elInsentif.value = '';
-                    if(elNominal) elNominal.value = '';
-                }
+                if (elMbg.value !== 'Ya') { if(elInsentif) elInsentif.value = ''; if(elNominal) elNominal.value = ''; }
             }
             if (elInsentif && boxNominal) {
-                // Munculkan isian Nominal jika Menerima Insentif = Menerima
                 boxNominal.style.display = (elMbg.value === 'Ya' && elInsentif.value === 'Menerima') ? 'block' : 'none';
-                if (elInsentif.value !== 'Menerima') {
-                    if(elNominal) elNominal.value = '';
-                }
+                if (elInsentif.value !== 'Menerima') { if(elNominal) elNominal.value = ''; }
             }
         };
 
-        // Pasang pendengar sensor
         if (elMbg) elMbg.addEventListener('change', toggleMbgForm);
         if (elInsentif) elInsentif.addEventListener('change', toggleMbgForm);
-        toggleMbgForm(); // Pancing saat layar pertama kali dibuka
+        toggleMbgForm(); 
         
         const btnSaveProfil = getEl('btn-save-profil');
         if (btnSaveProfil) {
             btnSaveProfil.onclick = async () => {
-                // Tarik semua data yang diinput kader
                 session.status_kader = getEl('set-status-kader').value;
                 session.bpjs = getEl('set-bpjs').value;
                 session.mbg = getEl('set-mbg').value;
                 session.mbg_insentif = getEl('set-mbg-insentif') ? getEl('set-mbg-insentif').value : '';
                 session.mbg_nominal = getEl('set-mbg-nominal') ? getEl('set-mbg-nominal').value : '';
-                
-                // Simpan ke memori HP (IndexedDB)
                 await window.AppDB.putData('kader_session', session);
                 window.currentUser = session;
                 alert("✅ Data Profil Terkini berhasil disimpan di perangkat Anda!");
@@ -1047,39 +1088,18 @@ const initSetting = () => {
         const toggleDark = getEl('toggle-dark-mode'); 
         if (toggleDark) { 
             toggleDark.checked = localStorage.getItem('theme') === 'dark'; 
-            toggleDark.onchange = () => { 
-                localStorage.setItem('theme', toggleDark.checked ? 'dark' : 'light'); 
-                applySettings(); 
-            }; 
+            toggleDark.onchange = () => { localStorage.setItem('theme', toggleDark.checked ? 'dark' : 'light'); applySettings(); }; 
         }
         
-        const btnMin = getEl('btn-text-min'); 
-        const btnNormal = getEl('btn-text-normal'); 
-        const btnPlus = getEl('btn-text-plus');
-        
+        const btnMin = getEl('btn-text-min'); const btnNormal = getEl('btn-text-normal'); const btnPlus = getEl('btn-text-plus');
         if (btnMin && btnPlus && btnNormal) { 
-            btnMin.onclick = () => { 
-                let size = parseInt(localStorage.getItem('fontSize') || '16'); 
-                if (size > 12) { size -= 2; localStorage.setItem('fontSize', size); applySettings(); } 
-            }; 
-            btnNormal.onclick = () => { 
-                localStorage.setItem('fontSize', 16); applySettings(); 
-            }; 
-            btnPlus.onclick = () => { 
-                let size = parseInt(localStorage.getItem('fontSize') || '16'); 
-                if (size < 24) { size += 2; localStorage.setItem('fontSize', size); applySettings(); } 
-            }; 
+            btnMin.onclick = () => { let size = parseInt(localStorage.getItem('fontSize') || '16'); if (size > 12) { size -= 2; localStorage.setItem('fontSize', size); applySettings(); } }; 
+            btnNormal.onclick = () => { localStorage.setItem('fontSize', 16); applySettings(); }; 
+            btnPlus.onclick = () => { let size = parseInt(localStorage.getItem('fontSize') || '16'); if (size < 24) { size += 2; localStorage.setItem('fontSize', size); applySettings(); } }; 
         }
         
         const formP = getEl('form-ganti-pass'); 
-        if(formP) {
-            formP.onsubmit = (e) => { 
-                e.preventDefault(); 
-                alert("Permintaan ganti password disimpan."); 
-                e.target.reset(); 
-                renderKonten('dashboard'); 
-            };
-        }
+        if(formP) { formP.onsubmit = (e) => { e.preventDefault(); alert("Permintaan ganti password disimpan."); e.target.reset(); renderKonten('dashboard'); }; }
     } catch(e) { window.logErrorToServer('initSetting', e); }
 };
 
