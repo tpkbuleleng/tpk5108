@@ -986,49 +986,98 @@ const initFormPendampingan = async () => {
 };
 
 // ==========================================
-// 7. FUNGSI REKAP BULANAN
+// 7. FUNGSI REKAP BULANAN (UPDATE V57 - AUTO FILTER BULAN)
 // ==========================================
 const initRekap = async () => {
     try {
-        const session = window.currentUser; const antrean = await getAllData('sync_queue').catch(()=>[]);
-        const dataTim = antrean.filter(a => String(a.id_tim) === String(session.id_tim)); const dataKader = dataTim.filter(a => a.username === session.username);
+        const session = window.currentUser; 
+        const antrean = await getAllData('sync_queue').catch(()=>[]);
+        const dataTim = antrean.filter(a => String(a.id_tim) === String(session.id_tim)); 
+        const dataKader = dataTim.filter(a => a.username === session.username);
         
-        const calculateStats = (data) => {
-            const regList = data.filter(a => a.tipe_laporan === 'REGISTRASI'); const pendList = data.filter(a => a.tipe_laporan === 'PENDAMPINGAN');
+        const curDate = new Date();
+        const curMonth = curDate.getMonth() + 1;
+        const curYear = curDate.getFullYear();
+
+        const selBulan = getEl('flt-rekap-bulan');
+        const selTahun = getEl('flt-rekap-tahun');
+        
+        if (selBulan && selTahun) {
+            const blnNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+            selBulan.innerHTML = blnNames.map((b, i) => `<option value="${i+1}" ${i+1 === curMonth ? 'selected' : ''}>${b}</option>`).join('');
+            selTahun.innerHTML = [2024, 2025, 2026, 2027].map(y => `<option value="${y}" ${y === curYear ? 'selected' : ''}>${y}</option>`).join('');
+        }
+
+        const calculateStats = (data, filterBulan, filterTahun) => {
+            const regList = data.filter(a => a.tipe_laporan === 'REGISTRASI'); 
+            const pendList = data.filter(a => a.tipe_laporan === 'PENDAMPINGAN');
             const stats = { CATIN: { aktif: 0, pend: 0 }, BUMIL: { aktif: 0, pend: 0 }, BUFAS: { aktif: 0, pend: 0 }, BADUTA: { aktif: 0, pend: 0 }, TOTAL: { aktif: 0, pend: 0 } };
-            const hariIni = new Date(); hariIni.setHours(0,0,0,0);
             
             regList.forEach(r => {
+                const dt = new Date(r.created_at);
+                // Hitung jika didaftarkan di bulan filter ATAU bulan-bulan sebelumnya
+                if (dt.getFullYear() > filterTahun || (dt.getFullYear() === filterTahun && (dt.getMonth()+1) > filterBulan)) return;
+
                 let isAktif = r.status_sasaran !== 'SELESAI';
-                if (r.jenis_sasaran === 'CATIN' && r.data_laporan?.tanggal_pernikahan) { const tglNikah = new Date(r.data_laporan.tanggal_pernikahan); if (tglNikah < hariIni) isAktif = false; }
-                if (r.jenis_sasaran === 'BUFAS' && r.data_laporan?.tgl_persalinan) { const tglBatas = new Date(r.data_laporan.tgl_persalinan); tglBatas.setDate(tglBatas.getDate() + 42); if (hariIni > tglBatas) isAktif = false; }
+                
+                if (r.jenis_sasaran === 'CATIN' && r.data_laporan?.tanggal_pernikahan) { 
+                    const tglNikah = new Date(r.data_laporan.tanggal_pernikahan); 
+                    if (tglNikah.getFullYear() < filterTahun || (tglNikah.getFullYear() === filterTahun && (tglNikah.getMonth()+1) < filterBulan)) {
+                        isAktif = false; 
+                    }
+                }
+                if (r.jenis_sasaran === 'BUFAS' && r.data_laporan?.tgl_persalinan) { 
+                    const tglBatas = new Date(r.data_laporan.tgl_persalinan); 
+                    tglBatas.setDate(tglBatas.getDate() + 42); 
+                    if (tglBatas.getFullYear() < filterTahun || (tglBatas.getFullYear() === filterTahun && (tglBatas.getMonth()+1) < filterBulan)) {
+                        isAktif = false;
+                    }
+                }
+                
                 if (isAktif && stats[r.jenis_sasaran]) { stats[r.jenis_sasaran].aktif++; stats.TOTAL.aktif++; }
             });
             
             pendList.forEach(p => {
-                let jenis = p.jenis_sasaran_saat_kunjungan;
-                if (!jenis) { 
-                    const ref = String(p.id_sasaran_ref || '');
-                    if (ref.indexOf('CTN') > -1) jenis = 'CATIN'; 
-                    else if (ref.indexOf('BML') > -1) jenis = 'BUMIL'; 
-                    else if (ref.indexOf('BFS') > -1) jenis = 'BUFAS'; 
-                    else if (ref.indexOf('BDT') > -1) jenis = 'BADUTA'; 
+                let rData = {}; try { rData = JSON.parse(p.data_laporan || '{}'); } catch(e){}
+                const dtKunjungan = rData.tgl_kunjungan ? new Date(rData.tgl_kunjungan) : new Date(p.created_at);
+                
+                // Hitung kunjungan hanya pada bulan dan tahun filter
+                if (dtKunjungan.getFullYear() === filterTahun && (dtKunjungan.getMonth()+1) === filterBulan) {
+                    let jenis = p.jenis_sasaran_saat_kunjungan;
+                    if (!jenis) { 
+                        const ref = String(p.id_sasaran_ref || '');
+                        if (ref.indexOf('CTN') > -1) jenis = 'CATIN'; 
+                        else if (ref.indexOf('BML') > -1) jenis = 'BUMIL'; 
+                        else if (ref.indexOf('BFS') > -1) jenis = 'BUFAS'; 
+                        else if (ref.indexOf('BDT') > -1) jenis = 'BADUTA'; 
+                    }
+                    if (jenis && stats[jenis]) { stats[jenis].pend++; stats.TOTAL.pend++; }
                 }
-                if (jenis && stats[jenis]) { stats[jenis].pend++; stats.TOTAL.pend++; }
             });
             return stats;
         };
-        
-        const statsKader = calculateStats(dataKader); const statsTim = calculateStats(dataTim);
         
         const renderTableRows = (stats) => {
             const rows = ['CATIN', 'BUMIL', 'BUFAS', 'BADUTA'].map(j => `<tr style="border-bottom: 1px solid #eee;"><td style="padding: 10px 8px; text-align:left; font-weight:600; color: #444;">${j}</td><td style="padding: 10px 8px;">${stats[j].aktif}</td><td style="padding: 10px 8px;">${stats[j].pend}</td></tr>`).join('');
             const totalRow = `<tr style="background: #e9ecef; font-weight: bold;"><td style="padding: 12px 8px; text-align:left; color: #222;">TOTAL</td><td style="padding: 12px 8px; color: var(--primary); font-size: 1.1rem;">${stats.TOTAL.aktif}</td><td style="padding: 12px 8px; color: #198754; font-size: 1.1rem;">${stats.TOTAL.pend}</td></tr>`;
             return rows + totalRow;
         };
-        
-        if (getEl('tbody-rekap-kader')) getEl('tbody-rekap-kader').innerHTML = renderTableRows(statsKader);
-        if (getEl('tbody-rekap-tim')) getEl('tbody-rekap-tim').innerHTML = renderTableRows(statsTim);
+
+        const updateRekapTampilan = () => {
+            const m = parseInt(selBulan.value);
+            const y = parseInt(selTahun.value);
+            const statsKader = calculateStats(dataKader, m, y); 
+            const statsTim = calculateStats(dataTim, m, y);
+            if (getEl('tbody-rekap-kader')) getEl('tbody-rekap-kader').innerHTML = renderTableRows(statsKader);
+            if (getEl('tbody-rekap-tim')) getEl('tbody-rekap-tim').innerHTML = renderTableRows(statsTim);
+        };
+
+        if (selBulan) selBulan.addEventListener('change', updateRekapTampilan);
+        if (selTahun) selTahun.addEventListener('change', updateRekapTampilan);
+
+        // Render otomatis bulan ini saat menu dibuka
+        updateRekapTampilan();
+
     } catch(e) { window.logErrorToServer('initRekap', e); }
 };
 
