@@ -1,3 +1,6 @@
+// ==========================================
+// 📱 APLIKASI KADER TPK (V56 - AUTO UPPERCASE & TRIM PATCH)
+// ==========================================
 import { initDB, putData, getDataById, deleteData, getAllData, clearStore } from './db.js';
 import { downloadMasterData, uploadData } from './sync.js';
 import { initAdmin } from './admin.js';
@@ -592,9 +595,24 @@ const initFormRegistrasi = async () => {
 
                 try {
                     const formData = new FormData(e.target); const jawaban = {}; formData.forEach((val, key) => { jawaban[key] = val; });
+                    
+                    // 🔥 PATCH V56: MESIN PEMBERSIH TEKS (Auto Uppercase & Trim)
+                    const fieldsToUppercase = ['nama_sasaran', 'nama_kk', 'nama_ibu_kandung', 'nama_pasangan', 'alamat', 'catin_alamat', 'catin_dusun'];
+                    for (let key in jawaban) {
+                        if (typeof jawaban[key] === 'string') {
+                            jawaban[key] = jawaban[key].trim(); // Hapus spasi liar di awal/akhir
+                            if (fieldsToUppercase.includes(key)) {
+                                jawaban[key] = jawaban[key].toUpperCase(); // Jadikan KAPITAL
+                            }
+                        }
+                    }
+
                     const kecamatan = session.kecamatan || 'BULELENG'; const jenisSasaran = selJenis.value;
                     let idSasaran = window.editModeData ? window.editModeData.id : `${{"CATIN":"CTN","BUMIL":"BML","BUFAS":"BFS","BADUTA":"BDT"}[jenisSasaran]}-${window.getKodeKecamatan(kecamatan)}-${Math.floor(Math.random() * 1000000).toString().padStart(6, '0')}`;
-                    const desaFinal = jenisSasaran === 'CATIN' ? '-' : selDesa.value; const dusunFinal = jenisSasaran === 'CATIN' ? '-' : selDusun.value;
+                    
+                    const desaFinal = jenisSasaran === 'CATIN' ? '-' : selDesa.value; 
+                    let dusunFinal = jenisSasaran === 'CATIN' ? '-' : selDusun.value;
+                    if (dusunFinal !== '-') dusunFinal = dusunFinal.trim().toUpperCase(); // Pastikan Dusun Kapital
 
                     if (jawaban.tanggal_lahir) {
                         const tglLahir = new Date(jawaban.tanggal_lahir); const tglDaftar = new Date(); let umurTahun = tglDaftar.getFullYear() - tglLahir.getFullYear(); let umurBulan = tglDaftar.getMonth() - tglLahir.getMonth();
@@ -914,7 +932,7 @@ const initFormPendampingan = async () => {
                                         nomor_tim: session.nomor_tim, 
                                         kecamatan: oR.kecamatan || session.kecamatan, 
                                         jenis_sasaran: 'BADUTA', 
-                                        nama_sasaran: namaAnak, 
+                                        nama_sasaran: namaAnak.toUpperCase(), 
                                         desa: oR.desa, 
                                         dusun: oR.dusun, 
                                         status_sasaran: 'AKTIF', 
@@ -922,8 +940,8 @@ const initFormPendampingan = async () => {
                                         created_at: new Date().toISOString(), 
                                         lokasi_gps: gpsLocation,
                                         data_laporan: { 
-                                            nama_sasaran: namaAnak, 
-                                            nama_ibu_kandung: oR.nama_sasaran, 
+                                            nama_sasaran: namaAnak.toUpperCase(), 
+                                            nama_ibu_kandung: oR.nama_sasaran.toUpperCase(), 
                                             nama_kk: oR.data_laporan?.nama_kk || '', 
                                             nomor_kk: oR.data_laporan?.nomor_kk || '', 
                                             tanggal_lahir: jawaban.tgl_persalinan, 
