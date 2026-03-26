@@ -198,39 +198,33 @@
     </template>
 
     <template id="template-rekap">
-        <div class="card animate-fade">
-            <h3 style="margin-bottom: 20px; color: var(--primary); text-align: center;">📊 Rekapitulasi Bulanan</h3>
+        <div class="animate-fade">
+            <h3 style="margin:0 0 15px 0; color:var(--primary); font-size:1.3rem;">📊 Rekapitulasi Bulanan</h3>
             
-            <div style="background: #f8f9fa; border-radius: 8px; padding: 15px; margin-bottom: 20px; border: 1px solid #dee2e6;">
-                <h4 style="color: #0d6efd; margin-bottom: 10px; font-size: 1rem;">👤 Rekap Kader (Anda)</h4>
-                <table style="width: 100%; border-collapse: collapse; text-align: center; font-size: 0.9rem;">
-                    <thead>
-                        <tr style="background: #0d6efd; color: white;">
-                            <th style="padding: 8px; border: 1px solid #c6c6c6; text-align: left;">Jenis Sasaran</th>
-                            <th style="padding: 8px; border: 1px solid #c6c6c6;">Sasaran Aktif</th>
-                            <th style="padding: 8px; border: 1px solid #c6c6c6;">Pendampingan</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tbody-rekap-kader">
-                        <tr><td colspan="3" style="padding: 10px;">Memuat data...</td></tr>
-                    </tbody>
-                </table>
+            <div style="background:white; padding:15px; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.1); margin-bottom:15px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; border-left: 4px solid var(--primary);">
+                <strong style="color:#444;">📅 Filter Periode:</strong>
+                <select id="flt-rekap-bulan" class="form-control" style="width:auto; min-width:120px; font-weight:bold;"></select>
+                <select id="flt-rekap-tahun" class="form-control" style="width:auto; min-width:100px; font-weight:bold;"></select>
             </div>
 
-            <div style="background: #f8f9fa; border-radius: 8px; padding: 15px; border: 1px solid #dee2e6;">
-                <h4 style="color: #198754; margin-bottom: 10px; font-size: 1rem;">👥 Rekap Tim</h4>
-                <table style="width: 100%; border-collapse: collapse; text-align: center; font-size: 0.9rem;">
-                    <thead>
-                        <tr style="background: #198754; color: white;">
-                            <th style="padding: 8px; border: 1px solid #c6c6c6; text-align: left;">Jenis Sasaran</th>
-                            <th style="padding: 8px; border: 1px solid #c6c6c6;">Sasaran Aktif</th>
-                            <th style="padding: 8px; border: 1px solid #c6c6c6;">Pendampingan</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tbody-rekap-tim">
-                        <tr><td colspan="3" style="padding: 10px;">Memuat data...</td></tr>
-                    </tbody>
-                </table>
+            <div style="background:#fff; padding:15px; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.1); margin-bottom:15px;">
+                <h4 style="margin-top:0; color:#0A2342; border-bottom:2px solid #eee; padding-bottom:10px;"><span class="icon">👤</span> Rekap Kader (Anda)</h4>
+                <div style="overflow-x:auto;">
+                    <table style="width:100%; border-collapse:collapse; font-size:0.9rem; text-align:center;">
+                        <thead><tr style="background:#0d6efd; color:white;"><th style="padding:10px; text-align:left;">Jenis Sasaran</th><th style="padding:10px;">Sasaran Aktif</th><th style="padding:10px;">Pendampingan</th></tr></thead>
+                        <tbody id="tbody-rekap-kader"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div style="background:#fff; padding:15px; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+                <h4 style="margin-top:0; color:#0A2342; border-bottom:2px solid #eee; padding-bottom:10px;"><span class="icon">👥</span> Rekap Tim</h4>
+                <div style="overflow-x:auto;">
+                    <table style="width:100%; border-collapse:collapse; font-size:0.9rem; text-align:center;">
+                        <thead><tr style="background:#198754; color:white;"><th style="padding:10px; text-align:left;">Jenis Sasaran</th><th style="padding:10px;">Sasaran Aktif</th><th style="padding:10px;">Pendampingan</th></tr></thead>
+                        <tbody id="tbody-rekap-tim"></tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </template>
