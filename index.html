@@ -368,6 +368,55 @@
         </div>
     </template>
 
+    <template id="template-database-tpk">
+    <div class="animate-fade">
+        <div style="background: linear-gradient(135deg, #0A2342 0%, #0043A8 100%); padding: 20px; border-radius: 12px; color: white; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
+            <h2 style="margin: 0 0 5px 0; font-size: 1.4rem; font-weight: 800;">👥 Database Tim Pendamping Keluarga</h2>
+            <p style="margin: 0; opacity: 0.85; font-size: 0.85rem;">Pusat kendali dan monitoring kapilaritas SDM Kader TPK di wilayah tugas Anda.</p>
+        </div>
+
+        <div id="tpk-stats-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 20px;">
+            </div>
+
+        <div style="background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; border: 1px solid #eee;">
+            <h4 style="margin: 0 0 10px 0; color: #555; font-size: 0.9rem;">Penyaringan Data (Filter)</h4>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px;">
+                <select id="flt-tpk-kec" class="form-control" style="font-size:0.85rem;"><option value="ALL">Semua Kecamatan</option></select>
+                <select id="flt-tpk-desa" class="form-control" style="font-size:0.85rem;"><option value="ALL">Semua Desa/Kelurahan</option></select>
+                <select id="flt-tpk-unsur" class="form-control" style="font-size:0.85rem;">
+                    <option value="ALL">Semua Unsur Kader</option>
+                    <option value="BIDAN">Bidan / Tenaga Kesehatan</option>
+                    <option value="PKK">Kader PKK</option>
+                    <option value="KB">Kader KB</option>
+                </select>
+                <select id="flt-tpk-bpjs" class="form-control" style="font-size:0.85rem;">
+                    <option value="ALL">Status BPJSTK (Semua)</option>
+                    <option value="YA">Memiliki BPJSTK</option>
+                    <option value="TIDAK">Belum Memiliki</option>
+                </select>
+            </div>
+        </div>
+
+        <div style="background: #fff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); overflow-x: auto; border: 1px solid #eee;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem; min-width: 800px;">
+                <thead>
+                    <tr style="background: var(--primary); color: white; text-align: left;">
+                        <th style="padding: 12px; border-bottom: 2px solid #003380;">No.</th>
+                        <th style="padding: 12px; border-bottom: 2px solid #003380;">Nama Kader & Info</th>
+                        <th style="padding: 12px; border-bottom: 2px solid #003380;">Wilayah Tugas</th>
+                        <th style="padding: 12px; border-bottom: 2px solid #003380; text-align:center;">Unsur</th>
+                        <th style="padding: 12px; border-bottom: 2px solid #003380; text-align:center;">BPJSTK</th>
+                        <th style="padding: 12px; border-bottom: 2px solid #003380; text-align:center;">Penyalur MBG</th>
+                    </tr>
+                </thead>
+                <tbody id="tbody-database-tpk">
+                    <tr><td colspan="6" style="padding: 20px; text-align: center; color: #888;">⏳ Memuat data kader...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</template>
+    
     <script src="assets/js/app.js" type="module"></script>
     
     <script>
