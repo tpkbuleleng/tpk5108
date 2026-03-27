@@ -1,11 +1,10 @@
 // ==========================================
-// 📱 APLIKASI KADER TPK (V58 - RADAR PRIORITAS & AUTO FILTER PATCH)
+// 📱 APLIKASI KADER TPK (V59 - BULLETPROOF ANTI-CRASH PATCH)
 // ==========================================
 import { initDB, putData, getDataById, deleteData, getAllData, clearStore } from './db.js';
 import { downloadMasterData, uploadData } from './sync.js';
 import { initAdmin } from './admin.js';
 
-// 🔥 EKSPOS DATABASE KE GLOBAL
 window.AppDB = { getAllData, getDataById, putData };
 const getEl = (id) => document.getElementById(id);
 const SCRIPT_URL_GLOBAL = 'https://script.google.com/macros/s/AKfycbx0_deS9S3tfxkhCW1zzg8lxZGnQZzpxfw3btNAuTCsSBsBsgaN4kqJ1TpbHnBNZrOrfA/exec';
@@ -91,16 +90,13 @@ const updateNetworkStatus = () => {
     if (status) { const isOnline = navigator.onLine; status.innerText = isOnline ? 'Online' : 'Offline'; status.style.backgroundColor = isOnline ? '#198754' : '#6c757d'; }
 };
 
-// ==========================================
-// 🔥 V42: ANTENA PENERIMA PENGUMUMAN (BROADCAST)
-// ==========================================
 const tampilkanPopUpPengumuman = (p, id_p) => {
     const overlay = document.createElement('div');
     overlay.style.cssText = 'position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(10, 35, 66, 0.85); z-index:99999; display:flex; align-items:center; justify-content:center; padding:20px; backdrop-filter: blur(5px);';
     const tgl = p.tanggal ? new Date(p.tanggal).toLocaleDateString('id-ID', {day:'numeric', month:'long', year:'numeric'}) : 'Info Terbaru';
     overlay.innerHTML = `<div style="background:white; border-radius:16px; width:100%; max-width:400px; box-shadow:0 15px 35px rgba(0,0,0,0.4); overflow:hidden; animation: slideDownAlert 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);"><div style="background:linear-gradient(135deg, #0A2342 0%, #0043A8 100%); color:#F1C40F; padding:20px; text-align:center; border-bottom: 4px solid #F1C40F;"><div style="font-size:3rem; margin-bottom:5px; animation: ringBell 2s infinite;">📢</div><h3 style="margin:0; font-size:1.3rem; font-weight:900; letter-spacing:1px;">PENGUMUMAN</h3></div><div style="padding:25px 20px;"><div style="font-size:0.8rem; color:#888; text-align:center; margin-bottom:10px; font-weight:bold;">🕒 ${tgl}</div><h4 style="margin:0 0 15px 0; color:#0A2342; text-align:center; font-size:1.2rem; font-weight:800;">${p.judul}</h4><div style="font-size:1rem; color:#444; line-height:1.6; margin-bottom:25px; text-align:center; white-space:pre-wrap; background:#f8f9fa; padding:15px; border-radius:8px; border:1px dashed #ccc;">${p.isi_pesan}</div><button id="btn-mengerti-${id_p}" style="width:100%; background:#F1C40F; color:#0A2342; border:none; padding:15px; border-radius:8px; font-weight:900; font-size:1.1rem; cursor:pointer; box-shadow:0 4px 6px rgba(0,0,0,0.1); transition: transform 0.1s;">✅ SAYA MENGERTI</button></div></div><style>@keyframes slideDownAlert { from { transform:translateY(-50px) scale(0.9); opacity:0; } to { transform:translateY(0) scale(1); opacity:1; } } @keyframes ringBell { 0% { transform: rotate(0); } 10% { transform: rotate(15deg); } 20% { transform: rotate(-10deg); } 30% { transform: rotate(5deg); } 40% { transform: rotate(-5deg); } 50% { transform: rotate(0); } 100% { transform: rotate(0); } }</style>`;
     document.body.appendChild(overlay);
-    document.getElementById(`btn-mengerti-${id_p}`).onclick = () => { localStorage.setItem(`read_info_${id_p}`, 'true'); document.body.removeChild(overlay); cekPengumuman(window.currentUser.role); };
+    document.getElementById(`btn-mengerti-${id_p}`).onclick = () => { localStorage.setItem(`read_info_${id_p}`, 'true'); document.body.removeChild(overlay); cekPengumuman(window.currentUser?.role || 'KADER'); };
 };
 
 const cekPengumuman = async (userRole) => {
@@ -238,11 +234,13 @@ window.renderKonten = async (target) => {
     try {
         if (target === 'dashboard') {
             const session = window.currentUser;
+            if(!session) return; // Pelindung jika session terhapus
+            
             area.innerHTML = `
                 <div class="animate-fade">
                     <div class="card" style="background: linear-gradient(135deg, #0d6efd, #0043a8); color: white; border:none; margin-bottom: 15px; padding: 20px;">
                         <p style="margin:0; opacity: 0.9; font-weight: 800; font-size: 0.85rem;">SELAMAT DATANG,</p>
-                        <h2 style="margin: 3px 0 10px 0; font-size: 1.4rem; font-weight: 700; line-height: 1.2; text-transform:uppercase;">${session.nama}</h2>
+                        <h2 style="margin: 3px 0 10px 0; font-size: 1.4rem; font-weight: 700; line-height: 1.2; text-transform:uppercase;">${session.nama || 'PENGGUNA'}</h2>
                         <hr style="margin-bottom: 12px; border: 0; border-top: 1px solid rgba(255,255,255,0.2);">
                         <div id="dash-detail-wilayah">Memuat detail...</div>
                     </div>
@@ -267,7 +265,7 @@ window.renderKonten = async (target) => {
                 if (namaDesa === '-' || !namaDesa) { const wilayahKerja = allWil.filter(w => String(w.id_tim) === String(session.id_tim)); if (wilayahKerja.length > 0) { namaDesa = wilayahKerja[0]?.desa_kelurahan || wilayahKerja[0]?.desa || '-'; } else { const timData = allTim.find(t => String(t.id_tim) === String(session.id_tim) || String(t.id) === String(session.id_tim)); if (timData) namaDesa = timData.desa_kelurahan || timData.desa || '-'; } }
 
                 if (getEl('dash-detail-wilayah')) { 
-                    getEl('dash-detail-wilayah').innerHTML = `<div style="background: rgba(255,255,255,0.2); display: inline-block; padding: 4px 10px; border-radius: 6px; font-weight: bold; font-size: 0.85rem; margin-bottom: 12px;">NO. TIM: ${session.nomor_tim || session.id_tim}</div><div style="line-height: 1.25;"><div style="margin-bottom: 6px;"><span style="opacity:0.8; font-size: 0.8rem;">📍 Wilayah Tugas (Dusun/RW):</span><br><span style="font-weight: 600; font-size: 0.9rem;">${daftarDusun}</span></div><div style="margin-bottom: 6px;"><span style="opacity:0.8; font-size: 0.8rem;">🏘️ Desa/Kelurahan:</span><br><span style="font-weight: 600; font-size: 0.9rem;">${namaDesa}</span></div><div><span style="opacity:0.8; font-size: 0.8rem;">🏛️ Kecamatan:</span><br><span style="font-weight: 600; font-size: 0.9rem;">${session.kecamatan || '-'}</span></div></div>`; 
+                    getEl('dash-detail-wilayah').innerHTML = `<div style="background: rgba(255,255,255,0.2); display: inline-block; padding: 4px 10px; border-radius: 6px; font-weight: bold; font-size: 0.85rem; margin-bottom: 12px;">NO. TIM: ${session.nomor_tim || session.id_tim || '-'}</div><div style="line-height: 1.25;"><div style="margin-bottom: 6px;"><span style="opacity:0.8; font-size: 0.8rem;">📍 Wilayah Tugas (Dusun/RW):</span><br><span style="font-weight: 600; font-size: 0.9rem;">${daftarDusun}</span></div><div style="margin-bottom: 6px;"><span style="opacity:0.8; font-size: 0.8rem;">🏘️ Desa/Kelurahan:</span><br><span style="font-weight: 600; font-size: 0.9rem;">${namaDesa}</span></div><div><span style="opacity:0.8; font-size: 0.8rem;">🏛️ Kecamatan:</span><br><span style="font-weight: 600; font-size: 0.9rem;">${session.kecamatan || '-'}</span></div></div>`; 
                 }
                 
                 const queueTim = antrean.filter(a => String(a.id_tim) === String(session.id_tim));
@@ -289,27 +287,22 @@ window.renderKonten = async (target) => {
                     if (r.jenis_sasaran === 'BUFAS' && r.data_laporan?.tgl_persalinan) { const tB = new Date(r.data_laporan.tgl_persalinan); tB.setDate(tB.getDate() + 42); if (hariIni > tB) isAktif = false; } 
                     if(cReg[r.jenis_sasaran] !== undefined && isAktif) cReg[r.jenis_sasaran]++; 
 
-                    // JIKA SASARAN AKTIF, CEK APAKAH DIA BERISIKO (PRIORITAS)
                     if (isAktif) {
                         let reasons = [];
-                        let rD = r.data_laporan || {};
+                        let rD = r.data_laporan || {}; // Safe object
 
-                        // 1. Cek KRS (Sanitasi & Air)
                         if (badAir.includes(rD.sumber_air)) reasons.push('💧 Air Minum Berisiko');
                         if (rD.fasilitas_bab === 'Tidak Ada') reasons.push('🚽 Tidak Punya Jamban');
 
-                        // 2. Cek Kunjungan Medis Terakhir
                         const myPend = pendList.filter(p => p.id_sasaran_ref === r.id).sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
                         if (myPend.length > 0) {
                             let pD = myPend[0].data_laporan || {};
 
-                            // BUMIL KEK
                             if (r.jenis_sasaran === 'BUMIL') {
                                 let lila = parseFloat(pD.m_lila || pD.lila); 
                                 if (lila && lila < 23.5) reasons.push('🤰 KEK (LiLA < 23.5cm)');
                             }
 
-                            // BADUTA Gizi & KKA
                             if (r.jenis_sasaran === 'BADUTA') {
                                 if (pD.evaluasi_kka === 'Terlambat') reasons.push('📉 Perkembangan Meragukan (KKA)');
 
@@ -319,7 +312,7 @@ window.renderKonten = async (target) => {
                                     if (key.toLowerCase().includes('tinggi') || key.toLowerCase().includes('panjang') || key === 'b_tb' || key === 'tb') tbVal = parseFloat(pD[key]);
                                 }
 
-                                if (bbVal && tbVal && stdAntro.length > 0) {
+                                if (bbVal && tbVal && stdAntro.length > 0 && rD.tanggal_lahir) {
                                     let tL = new Date(rD.tanggal_lahir); let tH = new Date(pD.tgl_kunjungan || myPend[0].created_at);
                                     let uBln = (tH.getFullYear() - tL.getFullYear()) * 12 - tL.getMonth() + tH.getMonth();
                                     if (tH.getDate() < tL.getDate()) uBln--; if(uBln < 0) uBln = 0;
@@ -341,7 +334,6 @@ window.renderKonten = async (target) => {
                     }
                 });
 
-                // Cetak UI Alarm Prioritas di Dashboard
                 if (getEl('dash-alarm')) {
                     if (prioritasList.length > 0) {
                         let htmlAlarm = `<div style="background: #fff3cd; border: 1px solid #ffeeba; border-left: 5px solid #dc3545; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
@@ -647,7 +639,7 @@ window.renderKonten = async (target) => {
 // ==========================================
 const renderPertanyaanDinamis = (jenis, modul, container, questions) => {
     try {
-        if (!jenis) { container.innerHTML = ''; return; }
+        if (!jenis || !container) { if(container) container.innerHTML = ''; return; }
         const filteredQ = questions.filter(q => { let status = String(q.is_active || q.status || 'Y').toUpperCase(); let sasaran = String(q.jenis_sasaran || '').toUpperCase(); let mdl = String(q.modul || '').toUpperCase(); return (status === 'Y' || status === 'AKTIF') && mdl === modul.toUpperCase() && (sasaran === 'UMUM' || sasaran === jenis); }).sort((a,b)=> (parseInt(a.urutan)||0) - (parseInt(b.urutan)||0));
 
         if (filteredQ.length > 0) {
@@ -702,6 +694,7 @@ const renderPertanyaanDinamis = (jenis, modul, container, questions) => {
 const initFormRegistrasi = async () => {
     try {
         const session = window.currentUser;
+        if(!session) return;
         const allWil = await getAllData('master_tim_wilayah').catch(()=>[]); const allWilBali = await getAllData('master_wilayah_bali').catch(()=>[]); const masterWilayah = await getAllData('master_wilayah').catch(()=>[]); 
         const tugas = allWil.filter(w => String(w.id_tim) === String(session.id_tim));
         
@@ -716,7 +709,7 @@ const initFormRegistrasi = async () => {
         if (selDesa && tugas.length > 0) {
             const dDesa = [...new Set(tugas.map(w => w.desa_kelurahan))].filter(Boolean);
             selDesa.innerHTML = '<option value="">-- Pilih Desa --</option>' + dDesa.map(d => `<option value="${d}">${d}</option>`).join('');
-            selDesa.onchange = () => { const dDusun = tugas.filter(w => w.desa_kelurahan === selDesa.value); selDusun.innerHTML = '<option value="">-- Pilih Dusun --</option>' + dDusun.map(d => `<option value="${d.dusun_rw}">${d.dusun_rw}</option>`).join(''); };
+            selDesa.onchange = () => { if(selDusun){const dDusun = tugas.filter(w => w.desa_kelurahan === selDesa.value); selDusun.innerHTML = '<option value="">-- Pilih Dusun --</option>' + dDusun.map(d => `<option value="${d.dusun_rw}">${d.dusun_rw}</option>`).join('');} };
         }
 
         const catinKab = getEl('catin-kab'); const catinKec = getEl('catin-kec'); const catinDesa = getEl('catin-desa'); const catinDusunSel = getEl('catin-dusun-sel'); const catinDusunTxt = getEl('catin-dusun-txt'); const catinAlamat = getEl('catin-alamat');
@@ -724,14 +717,14 @@ const initFormRegistrasi = async () => {
         if (catinKab && allWilBali.length > 0) {
             const dKab = [...new Set(allWilBali.map(w => w.kabupaten))].filter(Boolean);
             catinKab.innerHTML = '<option value="">-- Pilih Kabupaten --</option>' + dKab.map(d => `<option value="${d}">${d}</option>`).join('');
-            catinKab.onchange = () => { const fKec = allWilBali.filter(w => w.kabupaten === catinKab.value); const dKec = [...new Set(fKec.map(w => w.kecamatan))].filter(Boolean); catinKec.innerHTML = '<option value="">-- Pilih Kecamatan --</option>' + dKec.map(d => `<option value="${d}">${d}</option>`).join(''); catinDesa.innerHTML = '<option value="">-- Pilih Desa --</option>'; catinDusunTxt.style.display = 'block'; catinDusunTxt.setAttribute('name', 'catin_dusun'); catinDusunSel.style.display = 'none'; catinDusunSel.removeAttribute('name'); };
-            catinKec.onchange = () => { const fDesa = allWilBali.filter(w => w.kabupaten === catinKab.value && w.kecamatan === catinKec.value); const dDesa = [...new Set(fDesa.map(w => w.desa_kelurahan))].filter(Boolean); catinDesa.innerHTML = '<option value="">-- Pilih Desa --</option>' + dDesa.map(d => `<option value="${d}">${d}</option>`).join(''); };
-            catinDesa.onchange = () => {
-                if (catinKab.value.toUpperCase().includes('BULELENG')) {
+            catinKab.onchange = () => { if(catinKec){const fKec = allWilBali.filter(w => w.kabupaten === catinKab.value); const dKec = [...new Set(fKec.map(w => w.kecamatan))].filter(Boolean); catinKec.innerHTML = '<option value="">-- Pilih Kecamatan --</option>' + dKec.map(d => `<option value="${d}">${d}</option>`).join(''); if(catinDesa)catinDesa.innerHTML = '<option value="">-- Pilih Desa --</option>'; if(catinDusunTxt){catinDusunTxt.style.display = 'block'; catinDusunTxt.setAttribute('name', 'catin_dusun');} if(catinDusunSel){catinDusunSel.style.display = 'none'; catinDusunSel.removeAttribute('name');}} };
+            if(catinKec) catinKec.onchange = () => { if(catinDesa){const fDesa = allWilBali.filter(w => w.kabupaten === catinKab.value && w.kecamatan === catinKec.value); const dDesa = [...new Set(fDesa.map(w => w.desa_kelurahan))].filter(Boolean); catinDesa.innerHTML = '<option value="">-- Pilih Desa --</option>' + dDesa.map(d => `<option value="${d}">${d}</option>`).join('');} };
+            if(catinDesa) catinDesa.onchange = () => {
+                if (catinKab && catinKab.value.toUpperCase().includes('BULELENG')) {
                     const dDusun = masterWilayah.filter(w => String(w.desa_kelurahan).toUpperCase() === String(catinDesa.value).toUpperCase());
-                    if(dDusun.length > 0) { const uniqueDusun = [...new Set(dDusun.map(w => w.dusun_rw))].filter(Boolean); catinDusunSel.innerHTML = '<option value="">-- Pilih Dusun --</option>' + uniqueDusun.map(d => `<option value="${d}">${d}</option>`).join(''); catinDusunSel.style.display = 'block'; catinDusunSel.setAttribute('name', 'catin_dusun'); catinDusunSel.setAttribute('required', 'true'); catinDusunTxt.style.display = 'none'; catinDusunTxt.removeAttribute('name'); catinDusunTxt.removeAttribute('required'); return; }
+                    if(dDusun.length > 0 && catinDusunSel && catinDusunTxt) { const uniqueDusun = [...new Set(dDusun.map(w => w.dusun_rw))].filter(Boolean); catinDusunSel.innerHTML = '<option value="">-- Pilih Dusun --</option>' + uniqueDusun.map(d => `<option value="${d}">${d}</option>`).join(''); catinDusunSel.style.display = 'block'; catinDusunSel.setAttribute('name', 'catin_dusun'); catinDusunSel.setAttribute('required', 'true'); catinDusunTxt.style.display = 'none'; catinDusunTxt.removeAttribute('name'); catinDusunTxt.removeAttribute('required'); return; }
                 }
-                catinDusunTxt.style.display = 'block'; catinDusunTxt.setAttribute('name', 'catin_dusun'); catinDusunTxt.setAttribute('required', 'true'); catinDusunSel.style.display = 'none'; catinDusunSel.removeAttribute('name'); catinDusunSel.removeAttribute('required');
+                if(catinDusunTxt && catinDusunSel){catinDusunTxt.style.display = 'block'; catinDusunTxt.setAttribute('name', 'catin_dusun'); catinDusunTxt.setAttribute('required', 'true'); catinDusunSel.style.display = 'none'; catinDusunSel.removeAttribute('name'); catinDusunSel.removeAttribute('required');}
             };
         }
 
@@ -739,7 +732,7 @@ const initFormRegistrasi = async () => {
         
         if (selJenis) {
             selJenis.onchange = () => {
-                const jenis = selJenis.value; const core = getEl('form-core'); if(!jenis) { core.style.display = 'none'; return; } core.style.display = 'block';
+                const jenis = selJenis.value; const core = getEl('form-core'); if(!core) return; if(!jenis) { core.style.display = 'none'; return; } core.style.display = 'block';
                 
                 if (boxJk && selJk) { 
                     if (jenis === 'BUMIL' || jenis === 'BUFAS') { 
@@ -752,10 +745,10 @@ const initFormRegistrasi = async () => {
                 const boxCatinPasangan = getEl('box-catin-pasangan'); const boxBumilStatus = getEl('box-bumil-status'); const boxBufasStatus = getEl('box-bufas-status'); const boxBadutaStatus = getEl('box-baduta-status');
                 const boxCatinWilayah = getEl('wilayah-catin'); const boxDomisili = getEl('wilayah-domisili');
                 
-                if (boxCatinPasangan) { boxCatinPasangan.style.display = jenis === 'CATIN' ? 'block' : 'none'; getEl('input-tgl-nikah').required = jenis === 'CATIN'; getEl('f_nik_pasangan').required = jenis === 'CATIN'; getEl('f_nama_pasangan').required = jenis === 'CATIN'; }
-                if (boxBumilStatus) { boxBumilStatus.style.display = jenis === 'BUMIL' ? 'block' : 'none'; getEl('f_kehamilan_ke').required = jenis === 'BUMIL'; getEl('f_keinginan_hamil').required = jenis === 'BUMIL'; }
-                if (boxBufasStatus) { boxBufasStatus.style.display = jenis === 'BUFAS' ? 'block' : 'none'; getEl('input-tgl-salin-reg').required = jenis === 'BUFAS'; getEl('f_jumlah_anak').required = jenis === 'BUFAS'; }
-                if (boxBadutaStatus) { boxBadutaStatus.style.display = jenis === 'BADUTA' ? 'block' : 'none'; getEl('f_anak_ke').required = jenis === 'BADUTA'; getEl('f_bb_lahir').required = jenis === 'BADUTA'; getEl('f_tb_lahir').required = jenis === 'BADUTA'; }
+                if (boxCatinPasangan) { boxCatinPasangan.style.display = jenis === 'CATIN' ? 'block' : 'none'; if(getEl('input-tgl-nikah')) getEl('input-tgl-nikah').required = jenis === 'CATIN'; if(getEl('f_nik_pasangan')) getEl('f_nik_pasangan').required = jenis === 'CATIN'; if(getEl('f_nama_pasangan')) getEl('f_nama_pasangan').required = jenis === 'CATIN'; }
+                if (boxBumilStatus) { boxBumilStatus.style.display = jenis === 'BUMIL' ? 'block' : 'none'; if(getEl('f_kehamilan_ke')) getEl('f_kehamilan_ke').required = jenis === 'BUMIL'; if(getEl('f_keinginan_hamil')) getEl('f_keinginan_hamil').required = jenis === 'BUMIL'; }
+                if (boxBufasStatus) { boxBufasStatus.style.display = jenis === 'BUFAS' ? 'block' : 'none'; if(getEl('input-tgl-salin-reg')) getEl('input-tgl-salin-reg').required = jenis === 'BUFAS'; if(getEl('f_jumlah_anak')) getEl('f_jumlah_anak').required = jenis === 'BUFAS'; }
+                if (boxBadutaStatus) { boxBadutaStatus.style.display = jenis === 'BADUTA' ? 'block' : 'none'; if(getEl('f_anak_ke')) getEl('f_anak_ke').required = jenis === 'BADUTA'; if(getEl('f_bb_lahir')) getEl('f_bb_lahir').required = jenis === 'BADUTA'; if(getEl('f_tb_lahir')) getEl('f_tb_lahir').required = jenis === 'BADUTA'; }
                 
                 if(boxCatinWilayah && boxDomisili) {
                     if (jenis === 'CATIN') { 
@@ -772,19 +765,21 @@ const initFormRegistrasi = async () => {
                     }
                 }
                 
-                renderPertanyaanDinamis(jenis, 'REGISTRASI', containerQ, questions);
+                if(containerQ) renderPertanyaanDinamis(jenis, 'REGISTRASI', containerQ, questions);
 
                 if(window.editModeData) {
                     setTimeout(() => {
                         const eD = window.editModeData;
-                        if(getEl('f_nama')) getEl('f_nama').value = eD.nama_sasaran || ''; if(getEl('f_nik')) getEl('f_nik').value = eD.data_laporan?.nik || ''; if(getEl('f_kk_nama')) getEl('f_kk_nama').value = eD.data_laporan?.nama_kk || ''; if(getEl('f_kk_no')) getEl('f_kk_no').value = eD.data_laporan?.nomor_kk || ''; if(getEl('f_tgl')) getEl('f_tgl').value = eD.data_laporan?.tanggal_lahir || ''; if(getEl('reg-jk') && eD.data_laporan?.jenis_kelamin) getEl('reg-jk').value = eD.data_laporan.jenis_kelamin; 
+                        if(getEl('f_nama')) getEl('f_nama').value = eD.nama_sasaran || ''; if(getEl('f_nik')) getEl('f_nik').value = eD.data_laporan?.nik || ''; if(getEl('f_kk_nama')) getEl('f_kk_nama').value = eD.data_laporan?.nama_kk || ''; if(getEl('f_kk_no')) getEl('f_kk_no').value = eD.data_laporan?.nomor_kk || ''; if(getEl('f_tgl')) getEl('f_tgl').value = eD.data_laporan?.tanggal_lahir || ''; if(getEl('reg-jk') && eD.data_laporan?.jenis_kelamin) getEl('reg-jk').value = eD.data_laporan?.jenis_kelamin || ''; 
                         if(getEl('f_sumber_air')) getEl('f_sumber_air').value = eD.data_laporan?.sumber_air || ''; if(getEl('f_fasilitas_bab')) getEl('f_fasilitas_bab').value = eD.data_laporan?.fasilitas_bab || '';
                         if(getEl('input-tgl-nikah')) getEl('input-tgl-nikah').value = eD.data_laporan?.tanggal_pernikahan || ''; if(getEl('f_nama_pasangan')) getEl('f_nama_pasangan').value = eD.data_laporan?.nama_pasangan || ''; if(getEl('f_nik_pasangan')) getEl('f_nik_pasangan').value = eD.data_laporan?.nik_pasangan || '';
                         if(getEl('f_kehamilan_ke')) getEl('f_kehamilan_ke').value = eD.data_laporan?.kehamilan_ke || ''; if(getEl('f_keinginan_hamil')) getEl('f_keinginan_hamil').value = eD.data_laporan?.keinginan_hamil || ''; if(getEl('f_bb_sebelum_hamil')) getEl('f_bb_sebelum_hamil').value = eD.data_laporan?.bb_sebelum_hamil || '';
                         if(getEl('input-tgl-salin-reg')) getEl('input-tgl-salin-reg').value = eD.data_laporan?.tgl_persalinan || ''; if(getEl('f_jumlah_anak')) getEl('f_jumlah_anak').value = eD.data_laporan?.jumlah_anak_kandung || '';
                         if(getEl('f_anak_ke')) getEl('f_anak_ke').value = eD.data_laporan?.anak_ke || ''; if(getEl('f_bb_lahir')) getEl('f_bb_lahir').value = eD.data_laporan?.bb_lahir || ''; if(getEl('f_tb_lahir')) getEl('f_tb_lahir').value = eD.data_laporan?.tb_lahir || '';
                         
-                        if(getEl('reg-desa')) getEl('reg-desa').value = eD.desa || ''; if(getEl('reg-desa')) getEl('reg-desa').dispatchEvent(new Event('change')); if(getEl('reg-dusun')) setTimeout(()=> { getEl('reg-dusun').value = eD.dusun || ''; }, 100); if(getEl('reg-alamat')) getEl('reg-alamat').value = eD.data_laporan?.alamat || '';
+                        if(getEl('reg-desa')) { getEl('reg-desa').value = eD.desa || ''; getEl('reg-desa').dispatchEvent(new Event('change')); }
+                        if(getEl('reg-dusun')) setTimeout(()=> { getEl('reg-dusun').value = eD.dusun || ''; }, 100); 
+                        if(getEl('reg-alamat')) getEl('reg-alamat').value = eD.data_laporan?.alamat || '';
 
                         for (const [key, value] of Object.entries(eD.data_laporan || {})) { let field = document.querySelector(`[name="${key}"]`); if(field) { field.value = value; field.dispatchEvent(new Event('change')); } }
                     }, 300);
@@ -802,23 +797,20 @@ const initFormRegistrasi = async () => {
                 try {
                     const formData = new FormData(e.target); const jawaban = {}; formData.forEach((val, key) => { jawaban[key] = val; });
                     
-                    // 🔥 PATCH V56: MESIN PEMBERSIH TEKS (Auto Uppercase & Trim)
                     const fieldsToUppercase = ['nama_sasaran', 'nama_kk', 'nama_ibu_kandung', 'nama_pasangan', 'alamat', 'catin_alamat', 'catin_dusun'];
                     for (let key in jawaban) {
                         if (typeof jawaban[key] === 'string') {
-                            jawaban[key] = jawaban[key].trim(); // Hapus spasi liar di awal/akhir
-                            if (fieldsToUppercase.includes(key)) {
-                                jawaban[key] = jawaban[key].toUpperCase(); // Jadikan KAPITAL
-                            }
+                            jawaban[key] = jawaban[key].trim();
+                            if (fieldsToUppercase.includes(key)) { jawaban[key] = jawaban[key].toUpperCase(); }
                         }
                     }
 
                     const kecamatan = session.kecamatan || 'BULELENG'; const jenisSasaran = selJenis.value;
                     let idSasaran = window.editModeData ? window.editModeData.id : `${{"CATIN":"CTN","BUMIL":"BML","BUFAS":"BFS","BADUTA":"BDT"}[jenisSasaran]}-${window.getKodeKecamatan(kecamatan)}-${Math.floor(Math.random() * 1000000).toString().padStart(6, '0')}`;
                     
-                    const desaFinal = jenisSasaran === 'CATIN' ? '-' : selDesa.value; 
-                    let dusunFinal = jenisSasaran === 'CATIN' ? '-' : selDusun.value;
-                    if (dusunFinal !== '-') dusunFinal = dusunFinal.trim().toUpperCase(); // Pastikan Dusun Kapital
+                    const desaFinal = jenisSasaran === 'CATIN' ? '-' : (selDesa ? selDesa.value : '-'); 
+                    let dusunFinal = jenisSasaran === 'CATIN' ? '-' : (selDusun ? selDusun.value : '-');
+                    if (dusunFinal !== '-') dusunFinal = dusunFinal.trim().toUpperCase();
 
                     if (jawaban.tanggal_lahir) {
                         const tglLahir = new Date(jawaban.tanggal_lahir); const tglDaftar = new Date(); let umurTahun = tglDaftar.getFullYear() - tglLahir.getFullYear(); let umurBulan = tglDaftar.getMonth() - tglLahir.getMonth();
@@ -854,10 +846,10 @@ const initDaftarSasaran = async () => {
             let isExpired = r.status_sasaran === 'SELESAI'; let statusRaw = r.status_sasaran || 'AKTIF'; let labelSelesai = '<span style="color: var(--primary); font-weight:bold;">Aktif</span>'; let alasanExpired = 'Selesai';
             const hariIni = new Date(); hariIni.setHours(0,0,0,0);
             
-            let tglNikahRaw = r.data_laporan?.tanggal_pernikahan; for (const key in r.data_laporan) { if(key.toLowerCase().includes('nikah')) tglNikahRaw = r.data_laporan[key]; }
+            let tglNikahRaw = r.data_laporan?.tanggal_pernikahan; for (const key in (r.data_laporan || {})) { if(key.toLowerCase().includes('nikah')) tglNikahRaw = r.data_laporan[key]; }
             if (r.jenis_sasaran === 'CATIN' && tglNikahRaw) { const tglNikah = new Date(tglNikahRaw); if (tglNikah < hariIni) { isExpired = true; statusRaw = 'SELESAI'; alasanExpired = 'Sudah Menikah'; } }
             
-            let tglSalinRaw = r.data_laporan?.tgl_persalinan; for (const key in r.data_laporan) { if(key.toLowerCase().includes('salin') || key.toLowerCase().includes('lahir')) tglSalinRaw = r.data_laporan[key]; }
+            let tglSalinRaw = r.data_laporan?.tgl_persalinan; for (const key in (r.data_laporan || {})) { if(key.toLowerCase().includes('salin') || key.toLowerCase().includes('lahir')) tglSalinRaw = r.data_laporan[key]; }
             if (r.jenis_sasaran === 'BUFAS' && tglSalinRaw) { const tglBatas = new Date(tglSalinRaw); tglBatas.setDate(tglBatas.getDate() + 42); if (hariIni > tglBatas) { isExpired = true; statusRaw = 'SELESAI'; alasanExpired = 'Masa Nifas > 42 Hari'; } }
             
             if (isExpired || statusRaw === 'SELESAI') { isExpired = true; statusRaw = 'SELESAI'; if(alasanExpired === 'Selesai') { alasanExpired = r.jenis_sasaran === 'CATIN' ? 'Sudah Menikah' : (r.jenis_sasaran === 'BUMIL' ? 'Sudah Melahirkan' : 'Selesai'); } labelSelesai = `<span style="color: #dc3545; font-weight:bold;">SELESAI (${alasanExpired})</span>`; }
@@ -935,9 +927,10 @@ const initFormPendampingan = async () => {
         const session = window.currentUser; const selJenis = getEl('pend-jenis'); const selSasaran = getEl('pend-sasaran'); const infoBox = getEl('pend-info-sasaran'); const containerQ = getEl('form-pendampingan-dinamis');
         const isEditLaporan = window.editModeLaporan != null; const eLaporan = isEditLaporan ? window.editModeLaporan : null;
 
-        if(isEditLaporan) {
-            getEl('header-pendampingan').innerHTML = `📝 Mengedit Laporan Pendampingan`;
-            getEl('header-pendampingan').insertAdjacentHTML('afterend', `<div style="background:#fff3cd; padding:10px; border-radius:5px; margin-bottom:15px; font-size:0.85rem; color:#856404;"><b>Info:</b> Anda sedang mengedit kunjungan tanggal ${eLaporan.data_laporan.tgl_kunjungan || '-'}.</div>`);
+        const headerPend = getEl('header-pendampingan');
+        if(isEditLaporan && headerPend) {
+            headerPend.innerHTML = `📝 Mengedit Laporan Pendampingan`;
+            headerPend.insertAdjacentHTML('afterend', `<div style="background:#fff3cd; padding:10px; border-radius:5px; margin-bottom:15px; font-size:0.85rem; color:#856404;"><b>Info:</b> Anda sedang mengedit kunjungan tanggal ${eLaporan?.data_laporan?.tgl_kunjungan || '-'}.</div>`);
             if(getEl('btn-submit-pendampingan')) getEl('btn-submit-pendampingan').innerHTML = "💾 Update Laporan";
         }
 
@@ -949,7 +942,7 @@ const initFormPendampingan = async () => {
 
         if (selJenis && selSasaran) {
             selJenis.onchange = () => {
-                const jenis = selJenis.value; containerQ.innerHTML = ''; if(infoBox) infoBox.style.display = 'none';
+                const jenis = selJenis.value; if(containerQ) containerQ.innerHTML = ''; if(infoBox) infoBox.style.display = 'none';
                 if (!jenis) { selSasaran.innerHTML = '<option value="">-- Pilih Jenis Dahulu --</option>'; selSasaran.disabled = true; return; }
                 const activeReg = regList.filter(r => r.jenis_sasaran === jenis);
                 selSasaran.innerHTML = activeReg.length === 0 ? `<option value="">-- Tidak ada data --</option>` : '<option value="">-- Pilih Sasaran --</option>' + activeReg.map(r => `<option value="${r.id}">${r.nama_sasaran}</option>`).join('');
@@ -957,14 +950,14 @@ const initFormPendampingan = async () => {
             };
 
             selSasaran.onchange = () => {
-                const sasaran = regList.find(r => r.id === selSasaran.value); if (!sasaran) { containerQ.innerHTML = ''; return; }
+                const sasaran = regList.find(r => r.id === selSasaran.value); if (!sasaran) { if(containerQ) containerQ.innerHTML = ''; return; }
                 if (infoBox) { 
                     const nikSasaran = sasaran.data_laporan?.nik || '-';
                     const namaKkIbu = sasaran.data_laporan?.nama_kk || sasaran.data_laporan?.nama_ibu_kandung || '-';
                     infoBox.style.display = 'block'; 
                     infoBox.innerHTML = `<div style="font-weight:bold; color:#0043a8; margin-bottom: 8px; background: #fff; padding: 6px 12px; border-radius: 6px; border: 1px solid #c6c6c6; text-align:center; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">📌 Profil Sasaran Terpilih</div><table style="width:100%; font-size: 0.85rem; background: #fff; padding: 12px; border-radius: 6px; border: 1px solid #ddd; line-height:1.5;"><tr><td style="width:35%; color:#555;">Nama</td><td>: <b>${sasaran.nama_sasaran}</b></td></tr><tr><td style="color:#555;">NIK</td><td>: ${nikSasaran}</td></tr><tr><td style="color:#555;">Nama KK/Ibu</td><td>: ${namaKkIbu}</td></tr><tr><td style="color:#555;">Umur Daftar</td><td>: ${sasaran.data_laporan?.usia_saat_daftar_tahun||'-'} Tahun</td></tr></table>`; 
                 }
-                renderPertanyaanDinamis(sasaran.jenis_sasaran, 'PENDAMPINGAN', containerQ, questions);
+                if(containerQ) renderPertanyaanDinamis(sasaran.jenis_sasaran, 'PENDAMPINGAN', containerQ, questions);
 
                 setTimeout(() => {
                     const visitCount = pendList.filter(p => p.id_sasaran_ref === sasaran.id).length;
@@ -979,7 +972,7 @@ const initFormPendampingan = async () => {
                         });
                     }
 
-                    if (sasaran.jenis_sasaran === 'BADUTA' && sasaran.data_laporan.tanggal_lahir) {
+                    if (sasaran.jenis_sasaran === 'BADUTA' && sasaran.data_laporan?.tanggal_lahir && containerQ) {
                         const tL = new Date(sasaran.data_laporan.tanggal_lahir); const tH = new Date(); let uBln = (tH.getFullYear() - tL.getFullYear()) * 12; uBln -= tL.getMonth(); uBln += tH.getMonth(); if (tH.getDate() < tL.getDate()) uBln--; if (uBln < 0) uBln = 0;
                         let jk = sasaran.data_laporan.jenis_kelamin === 'Laki-laki' ? 'L' : 'P';
                         const kkaData = getKkaData(uBln); let listT = "", listP = ""; kkaData.forEach(k => { let kode = k.kode_aspek ? `[${k.kode_aspek}] ` : ''; listT += `<li><b>${kode}</b>${k.tugas_perkembangan}</li>`; listP += `<li style="margin-bottom:6px;"><b>${kode}</b>${k.pesan_stimulasi}</li>`; });
@@ -1017,7 +1010,7 @@ const initFormPendampingan = async () => {
                             }
                         });
                     } 
-                    else if (sasaran.jenis_sasaran === 'BUMIL') {
+                    else if (sasaran.jenis_sasaran === 'BUMIL' && containerQ) {
                         const widgetLahir = `
                             <div id="widget-melahirkan" style="background: #fcf1f6; padding: 15px; border-radius: 8px; border-left: 4px solid #d63384; margin-bottom: 15px;">
                                 <div class="form-group">
@@ -1089,7 +1082,7 @@ const initFormPendampingan = async () => {
             if(window.editModeLaporan) {
                 selJenis.value = window.editModeLaporan.jenis_sasaran_saat_kunjungan || (window.editModeLaporan.id_sasaran_ref.startsWith('CTN')?'CATIN':window.editModeLaporan.id_sasaran_ref.startsWith('BML')?'BUMIL':window.editModeLaporan.id_sasaran_ref.startsWith('BFS')?'BUFAS':'BADUTA');
                 selJenis.dispatchEvent(new Event('change'));
-                setTimeout(() => { selSasaran.value = window.editModeLaporan.id_sasaran_ref; selSasaran.dispatchEvent(new Event('change')); selJenis.disabled = true; selSasaran.disabled = true; }, 300);
+                setTimeout(() => { if(selSasaran) { selSasaran.value = window.editModeLaporan.id_sasaran_ref; selSasaran.dispatchEvent(new Event('change')); selJenis.disabled = true; selSasaran.disabled = true; } }, 300);
             }
         }
 
@@ -1302,6 +1295,7 @@ const initKalkulator = () => {
 const initSetting = () => {
     try {
         const session = window.currentUser; 
+        if(!session) return;
         if(getEl('set-nama')) getEl('set-nama').value = session.nama || ''; 
         if(getEl('set-id')) getEl('set-id').value = session.username || '';
         
@@ -1335,9 +1329,9 @@ const initSetting = () => {
         const btnSaveProfil = getEl('btn-save-profil');
         if (btnSaveProfil) {
             btnSaveProfil.onclick = async () => {
-                session.status_kader = getEl('set-status-kader').value;
-                session.bpjs = getEl('set-bpjs').value;
-                session.mbg = getEl('set-mbg').value;
+                session.status_kader = getEl('set-status-kader')?.value || '';
+                session.bpjs = getEl('set-bpjs')?.value || '';
+                session.mbg = getEl('set-mbg')?.value || '';
                 session.mbg_insentif = getEl('set-mbg-insentif') ? getEl('set-mbg-insentif').value : '';
                 session.mbg_nominal = getEl('set-mbg-nominal') ? getEl('set-mbg-nominal').value : '';
                 await window.AppDB.putData('kader_session', session);
