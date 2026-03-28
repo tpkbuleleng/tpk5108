@@ -1,5 +1,5 @@
 // ==========================================
-// 📊 DASHBOARD SUPERVISOR (V53 - FIX REKAP READER)
+// 📊 DASHBOARD SUPERVISOR (V54 - PRECOMPUTE & LAZY LOAD API)
 // ==========================================
 import { clearStore, getAllData } from './db.js';
 
@@ -24,19 +24,18 @@ const getRoleTheme = (roleStr) => {
 const fetchDashboardSummary = async () => {
     try {
         const url = `${SCRIPT_URL}?action=getDashboardSummary&token=${window.adminSession.token}`;
-        const urlMaster = `${SCRIPT_URL}?token=${window.adminSession.token}`;
-        const [response, masterRes] = await Promise.all([ fetch(url), fetch(urlMaster) ]);
-        const res = await response.json(); const masterData = await masterRes.json();
+        const response = await fetch(url);
+        const res = await response.json();
         
         if (await window.handleAuthError(res)) return false;
 
         if (res.status === 'success') {
             window.adminData.rekapDashboard = res.data.dashboard || [];
             window.adminData.rekapKader = res.data.kader || [];
-            window.adminData.master_kader = masterData.data ? masterData.data.master_kader || [] : []; 
-            window.adminData.master_pkb = masterData.data ? masterData.data.master_pkb || [] : []; 
-            window.adminData.master_tim_wilayah = masterData.data ? masterData.data.master_tim_wilayah || masterData.data.TIM_WILAYAH || [] : []; 
-            window.adminData.master_menu = masterData.data ? masterData.data.master_menu || [] : []; 
+            window.adminData.master_menu = res.data.master_menu || [];
+            window.adminData.master_tim_wilayah = res.data.master_tim_wilayah || [];
+            // Simpan ke array kosong agar tidak undefined jika dipanggil fungsi lain
+            window.adminData.master_kader = window.adminData.rekapKader; 
             return true;
         } return false;
     } catch (e) { console.error("Gagal menarik data:", e); return false; }
@@ -84,7 +83,6 @@ window.renderAdminView = async (target) => {
     if (target === 'dashboard') {
         let cCatin = 0, cBumil = 0, cBufas = 0, cBaduta = 0, countPrioritas = 0, tLaporan = 0;
         
-        // 🔥 FIX V53: PERBAIKAN LOGIKA PENCOCOKAN WILAYAH
         let fKecamatan = isKabupaten ? window.currentFilterKec : (mapKecRev[window.adminSession.kecamatan] || window.adminSession.kecamatan || 'ALL');
         if (fKecamatan && fKecamatan !== 'ALL') fKecamatan = (mapKecRev[fKecamatan] || fKecamatan).toUpperCase();
         
@@ -99,8 +97,6 @@ window.renderAdminView = async (target) => {
 
             if(fKecamatan !== 'ALL' && dKec !== fKecamatan && dKec !== mapKecRev[fKecamatan]) return;
             if(fDesa !== 'ALL' && dDesa !== fDesa) return;
-            
-            // Jika PKB, pastikan desa yang direkap hanya yang masuk dalam scope tugasnya
             if(roleUpper.includes('PKB') && !allowedDesaPKB.includes('ALL') && !allowedDesaPKB.includes('-') && !allowedDesaPKB.includes(dDesa)) return;
             
             cCatin += (parseInt(d.catin_aktif)||0); cBumil += (parseInt(d.bumil_aktif)||0);
@@ -164,6 +160,9 @@ window.renderAdminView = async (target) => {
     }
 
     else if (target === 'database_tpk') {
+        const ditarik = await fetchRawDataIfNeeded();
+        if(!ditarik) return;
+        
         content.innerHTML = `
             <div class="animate-fade">
                 <div style="background:linear-gradient(135deg, var(--th-dark) 0%, var(--th-main) 100%); padding:25px; border-radius:12px; color:white; margin-bottom:20px; box-shadow:0 4px 10px rgba(0,0,0,0.15); border-bottom:5px solid var(--th-accent);"><h2 style="margin:0 0 5px 0; font-size:1.5rem; font-weight:800; color:var(--th-accent);">👥 Database Tim Pendamping Keluarga</h2><p style="margin:0; opacity:0.9; font-size:0.9rem;">Pusat kendali dan monitoring kapilaritas SDM Kader TPK di wilayah Anda.</p></div>
@@ -375,9 +374,7 @@ export const initAdmin = async (session) => {
 
     document.getElementById('btn-admin-refresh').onclick = async () => {
         const btn = document.getElementById('btn-admin-refresh'); btn.innerText = "⏳ Menyedot..."; btn.disabled = true;
-        
         window.adminData.registrasi = []; window.adminData.pendampingan = [];
-        
         const success = await fetchDashboardSummary();
         if(success) { buildDynamicMenus(); const activeMenuEl = document.querySelector('.admin-menu-item.active, .sub-menu-item.active'); if(activeMenuEl) window.renderAdminView(activeMenuEl.getAttribute('data-target')); else window.renderAdminView('dashboard'); } else { alert("Gagal menyegarkan data. Periksa koneksi internet."); }
         btn.innerText = "🔄 Segarkan Data"; btn.disabled = false;
