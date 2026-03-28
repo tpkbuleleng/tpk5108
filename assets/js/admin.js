@@ -1,11 +1,11 @@
 // ==========================================
-// 📊 DASHBOARD SUPERVISOR (V51 - COMPACT & ANTI-TRUNCATED PATCH)
+// 📊 DASHBOARD SUPERVISOR (V52 - PRECOMPUTE & LAZY LOAD API)
 // ==========================================
 import { clearStore, getAllData } from './db.js';
 
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwZiCcv7MCL21R1VqlOFsx1x_Ax_8yoxVwjIumG3kVYwDSQTfXX9VjQnz2GsAW2ItzAAQ/exec';
 
-window.adminData = { registrasi: [], pendampingan: [], master_kader: [], master_pkb: [], master_tim_wilayah: [], master_menu: [], kader_logins: [] };
+window.adminData = { rekapDashboard: [], rekapKader: [], registrasi: [], pendampingan: [], master_kader: [], master_pkb: [], master_tim_wilayah: [], master_menu: [] };
 window.adminSession = null; window.currentFilterKec = 'ALL'; window.currentFilterDesa = 'ALL'; window.currentFilterBulan = new Date().getMonth() + 1; window.currentFilterTahun = new Date().getFullYear();
 
 window.getKaderName = (uname) => { if(!uname) return '-'; const kaders = window.adminData.master_kader || []; const found = kaders.find(x => String(x.id) === String(uname) || String(x.id_kader) === String(uname) || String(x.username) === String(uname)); return found ? (found.nama_kader || found.nama_lengkap || found.nama || uname) : uname; };
@@ -20,21 +20,47 @@ const getRoleTheme = (roleStr) => {
     return { main: '#0A2342', dark: '#051221', light: '#E8F4FD', accent: '#F1C40F', text: '#FFFFFF', icon: '#F1C40F', btnText: '#0A2342' }; 
 };
 
-const fetchAdminData = async () => {
+// 🚀 FASE 3: TARIKAN DATA KILAT (HANYA DASHBOARD)
+const fetchDashboardSummary = async () => {
     try {
-        const url = `${SCRIPT_URL}?action=getAdminData&role=${window.adminSession.role}&kecamatan=${window.adminSession.kecamatan}&token=${window.adminSession.token}`;
+        const url = `${SCRIPT_URL}?action=getDashboardSummary&token=${window.adminSession.token}`;
         const urlMaster = `${SCRIPT_URL}?token=${window.adminSession.token}`;
         const [response, masterRes] = await Promise.all([ fetch(url), fetch(urlMaster) ]);
         const res = await response.json(); const masterData = await masterRes.json();
+        
         if (await window.handleAuthError(res)) return false;
 
+        if (res.status === 'success') {
+            window.adminData.rekapDashboard = res.data.dashboard || [];
+            window.adminData.rekapKader = res.data.kader || [];
+            window.adminData.master_kader = masterData.data ? masterData.data.master_kader || [] : []; 
+            window.adminData.master_pkb = masterData.data ? masterData.data.master_pkb || [] : []; 
+            window.adminData.master_tim_wilayah = masterData.data ? masterData.data.master_tim_wilayah || masterData.data.TIM_WILAYAH || [] : []; 
+            window.adminData.master_menu = masterData.data ? masterData.data.master_menu || [] : []; 
+            return true;
+        } return false;
+    } catch (e) { console.error("Gagal menarik data:", e); return false; }
+};
+
+// 🛑 FASE 3: TARIKAN DATA BERAT (ON-DEMAND)
+const fetchRawDataIfNeeded = async () => {
+    if (window.adminData.registrasi.length > 0) return true; // Sudah di-cache di memori
+    
+    document.getElementById('admin-content').innerHTML = `<div style="padding:50px; text-align:center; color:var(--th-main);"><div style="font-size:3rem; margin-bottom:15px; animation: spin 2s linear infinite;">⏳</div><h3>Menyedot Data Rinci...</h3><p>Membuka brankas data kecamatan. Harap tunggu...</p></div><style>@keyframes spin { 100% { transform: rotate(360deg); } }</style>`;
+    
+    try {
+        const url = `${SCRIPT_URL}?action=getAdminData&role=${window.adminSession.role}&kecamatan=${window.adminSession.kecamatan}&token=${window.adminSession.token}`;
+        const response = await fetch(url); const res = await response.json();
+        if (await window.handleAuthError(res)) return false;
         if (res.status === 'success') {
             let rawReg = res.data.registrasi || []; let rawPend = res.data.pendampingan || []; const roleUpper = String(window.adminSession.role).toUpperCase();
             const isRestrictedByDesa = roleUpper.includes('PKB') || roleUpper === 'ADMIN_DESA';
             if (isRestrictedByDesa) { const allowedDesa = String(window.adminSession.desa || '').toUpperCase().split(',').map(d => d.trim()); if (!allowedDesa.includes('ALL') && !allowedDesa.includes('-') && allowedDesa.length > 0 && allowedDesa[0] !== "") { rawReg = rawReg.filter(r => allowedDesa.includes(String(r.desa || '').toUpperCase())); const allowedIds = new Set(rawReg.map(r => r.id)); rawPend = rawPend.filter(p => allowedIds.has(p.id_sasaran_ref)); } }
-            window.adminData.registrasi = rawReg; window.adminData.pendampingan = rawPend; window.adminData.master_kader = masterData.data ? masterData.data.master_kader || [] : []; window.adminData.master_pkb = masterData.data ? masterData.data.master_pkb || [] : []; window.adminData.master_tim_wilayah = masterData.data ? masterData.data.master_tim_wilayah || masterData.data.TIM_WILAYAH || [] : []; window.adminData.master_menu = masterData.data ? masterData.data.master_menu || [] : []; window.adminData.kader_logins = res.data.kader_logins || []; return true;
-        } return false;
-    } catch (e) { console.error("Gagal menarik data:", e); return false; }
+            window.adminData.registrasi = rawReg; window.adminData.pendampingan = rawPend;
+            return true;
+        }
+        return false;
+    } catch(e) { return false; }
 };
 
 const exportToCSV = (filename, rows) => { if(!rows || !rows.length) return; const separator = ','; const keys = Object.keys(rows[0]); const csvContent = keys.join(separator) + '\n' + rows.map(row => { return keys.map(k => { let cell = row[k] === null || row[k] === undefined ? '' : row[k]; cell = cell instanceof Date ? cell.toLocaleString() : cell.toString().replace(/"/g, '""'); if (cell.search(/("|,|\n)/g) >= 0) cell = `"${cell}"`; return cell; }).join(separator); }).join('\n'); const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' }); const link = document.createElement('a'); if (link.download !== undefined) { const url = URL.createObjectURL(blob); link.setAttribute('href', url); link.setAttribute('download', filename); link.style.visibility = 'hidden'; document.body.appendChild(link); link.click(); document.body.removeChild(link); } };
@@ -44,41 +70,59 @@ window.renderAdminView = async (target) => {
     const content = document.getElementById('admin-content'); const roleUpper = String(window.adminSession.role).toUpperCase();
     const mapKecRev = { 'GRK': 'GEROKGAK', 'SRT': 'SERIRIT', 'BSB': 'BUSUNGBIU', 'BJR': 'BANJAR', 'SKS': 'SUKASADA', 'BLL': 'BULELENG', 'SWN': 'SAWAN', 'KBT': 'KUBUTAMBAHAN', 'TJK': 'TEJAKULA' };
     
-    let filteredReg = window.adminData.registrasi; let filteredPend = window.adminData.pendampingan;
-    if (window.currentFilterKec !== 'ALL') { filteredReg = filteredReg.filter(r => (r.sumber_kecamatan || '').toUpperCase() === window.currentFilterKec); const allowedIds = new Set(filteredReg.map(r => r.id)); filteredPend = filteredPend.filter(p => allowedIds.has(p.id_sasaran_ref)); }
-    if (window.currentFilterDesa !== 'ALL') { filteredReg = filteredReg.filter(r => (r.desa || '').toUpperCase() === window.currentFilterDesa); const allowedIds = new Set(filteredReg.map(r => r.id)); filteredPend = filteredPend.filter(p => allowedIds.has(p.id_sasaran_ref)); }
-
+    // Generate Opsi Dropdown Filter
     let optKec = `<option value="ALL">🌍 SEMUA KECAMATAN</option>`; let optDesa = `<option value="ALL">🏘️ SEMUA DESA</option>`;
     const isKabupaten = roleUpper.includes('KABUPATEN') || roleUpper.includes('SUPER') || roleUpper.includes('MITRA'); const isKecamatan = roleUpper.includes('KECAMATAN') || roleUpper === 'ADMIN';
     
-    if (isKabupaten) { const listKec = [...new Set(window.adminData.registrasi.map(r => r.sumber_kecamatan).filter(Boolean))]; listKec.forEach(k => { optKec += `<option value="${k}" ${window.currentFilterKec === k ? 'selected' : ''}>${mapKecRev[k] || k}</option>`; }); const listDesa = [...new Set(window.adminData.registrasi.filter(r => window.currentFilterKec === 'ALL' || r.sumber_kecamatan === window.currentFilterKec).map(r => String(r.desa||'').toUpperCase()).filter(Boolean))]; listDesa.sort().forEach(d => { if(d !== '-') optDesa += `<option value="${d}" ${window.currentFilterDesa === d ? 'selected' : ''}>${d}</option>`; }); } 
-    else if (isKecamatan) { optKec = `<option value="${window.currentFilterKec}">${window.adminSession.kecamatan}</option>`; const listDesa = [...new Set(window.adminData.registrasi.map(r => String(r.desa||'').toUpperCase()).filter(Boolean))]; listDesa.sort().forEach(d => { if(d !== '-') optDesa += `<option value="${d}" ${window.currentFilterDesa === d ? 'selected' : ''}>${d}</option>`; }); }
+    if (isKabupaten) { const listKec = [...new Set(window.adminData.master_tim_wilayah.map(r => r.kecamatan).filter(Boolean))]; listKec.forEach(k => { optKec += `<option value="${k}" ${window.currentFilterKec === k ? 'selected' : ''}>${mapKecRev[k] || k}</option>`; }); const listDesa = [...new Set(window.adminData.master_tim_wilayah.filter(r => window.currentFilterKec === 'ALL' || r.kecamatan === window.currentFilterKec || r.kecamatan === mapKecRev[window.currentFilterKec]).map(r => String(r.desa_kelurahan||'').toUpperCase()).filter(Boolean))]; listDesa.sort().forEach(d => { if(d !== '-') optDesa += `<option value="${d}" ${window.currentFilterDesa === d ? 'selected' : ''}>${d}</option>`; }); } 
+    else if (isKecamatan) { optKec = `<option value="${window.currentFilterKec}">${window.adminSession.kecamatan}</option>`; const listDesa = [...new Set(window.adminData.master_tim_wilayah.map(r => String(r.desa_kelurahan||'').toUpperCase()).filter(Boolean))]; listDesa.sort().forEach(d => { if(d !== '-') optDesa += `<option value="${d}" ${window.currentFilterDesa === d ? 'selected' : ''}>${d}</option>`; }); }
     else { optKec = `<option value="${window.currentFilterKec}">${window.adminSession.kecamatan}</option>`; const listDesa = String(window.adminSession.desa || '').toUpperCase().split(',').map(d => d.trim()); optDesa = `<option value="ALL">🏘️ SEMUA DESA</option>` + listDesa.map(d => `<option value="${d}" ${window.currentFilterDesa === d ? 'selected' : ''}>${d}</option>`).join(''); }
 
     const filterWilayahHTML = `<div style="background: white; padding: 15px 25px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); display: flex; gap: 15px; align-items: center; border-left: 4px solid var(--th-main); flex-wrap: wrap;"><div style="font-size: 0.85rem; font-weight: bold; color: #666; white-space: nowrap;">🔍 Filter Wilayah:</div><select id="dash-flt-kec" class="admin-input" style="flex:1; min-width: 150px; font-weight:bold; color:var(--th-dark);" ${isKabupaten ? '' : 'disabled'}>${optKec}</select><select id="dash-flt-desa" class="admin-input" style="flex:1; min-width: 150px; font-weight:bold; color:var(--th-dark);" ${roleUpper.includes('DESA') && String(window.adminSession.desa).indexOf(',') === -1 ? 'disabled' : ''}>${optDesa}</select></div>`;
 
+    // ==========================================
+    // RENDER: DASHBOARD (INSTANT LOAD - BACA REKAP_DASHBOARD)
+    // ==========================================
     if (target === 'dashboard') {
-        let cCatin = 0, cBumil = 0, cBufas = 0, cBaduta = 0; let pCatin = 0, pBumil = 0, pBufas = 0, pBaduta = 0; let countPrioritas = 0; const pendMap = {};
-        filteredPend.forEach(p => { if(!pendMap[p.id_sasaran_ref]) pendMap[p.id_sasaran_ref] = []; pendMap[p.id_sasaran_ref].push(p); });
-        filteredReg.forEach(r => { if(r.status_duplikasi && r.status_duplikasi.includes('DUPLIKAT')) return; if(r.jenis_sasaran === 'CATIN') cCatin++; else if(r.jenis_sasaran === 'BUMIL') cBumil++; else if(r.jenis_sasaran === 'BUFAS') cBufas++; else if(r.jenis_sasaran === 'BADUTA') cBaduta++; if(r.status_sasaran !== 'SELESAI') { let isPrioritas = false; let rD = {}; try { rD = JSON.parse(r.data_laporan || '{}'); }catch(e){} const badAir = ['Sumur Tak Terlindung', 'Mata Air Tak Terlindung', 'Air Permukaan (Sungai/Danau/Waduk/Kolam/Irigasi)', 'Air Hujan']; if (badAir.includes(rD.sumber_air) || rD.fasilitas_bab === 'Tidak Ada') { isPrioritas = true; } else { let myPends = pendMap[r.id] || []; if(myPends.length > 0) { myPends.sort((a,b) => new Date(b.created_at) - new Date(a.created_at)); let pD = {}; try { pD = JSON.parse(myPends[0].data_laporan || '{}'); }catch(e){} if (r.jenis_sasaran === 'BUMIL' && parseFloat(pD.m_lila || pD.lila) < 23.5) isPrioritas = true; if (r.jenis_sasaran === 'BADUTA' && pD.evaluasi_kka === 'Terlambat') isPrioritas = true; } } if(isPrioritas) countPrioritas++; } });
+        let cCatin = 0, cBumil = 0, cBufas = 0, cBaduta = 0, countPrioritas = 0, tLaporan = 0;
+        let pCatin = 0, pBumil = 0, pBufas = 0, pBaduta = 0; // Info rinci laporan pendampingan tidak disave di rekap, tapi totalnya iya
         
-        const kaderKinerja = {}; filteredPend.forEach(p => { let jenis = p.id_sasaran_ref.substring(0,3); if(jenis === 'CTN') pCatin++; else if(jenis === 'BML') pBumil++; else if(jenis === 'BFS') pBufas++; else if(jenis === 'BDT') pBaduta++; if(!kaderKinerja[p.username]) kaderKinerja[p.username] = 0; kaderKinerja[p.username]++; }); const topKader = Object.entries(kaderKinerja).sort((a,b) => b[1] - a[1]).slice(0, 5);
-        let displayDesa = window.adminSession.desa === '-' || window.adminSession.desa === 'ALL' || window.adminSession.desa === '' ? window.adminSession.kecamatan : window.adminSession.desa; if (String(displayDesa).toUpperCase() === 'ALL') displayDesa = 'KABUPATEN BULELENG'; 
-        
-        const isTugas = roleUpper.includes('PKB') || roleUpper.includes('KADER'); const labelWilayah = isTugas ? 'Wilayah Tugas:' : 'Wilayah :';
-        
-        let jmlKader = 0, userAktif = 0, userPasif = 0; const now = new Date(); const currMonth = now.getMonth(); const currYear = now.getFullYear(); const safeLogins = window.adminData.kader_logins || []; const loginMap = {}; safeLogins.forEach(l => loginMap[String(l.id).toUpperCase()] = l.login_terakhir); let filteredKader = window.adminData.master_kader || []; 
-        if (window.currentFilterKec !== 'ALL') { const filterKecFull = mapKecRev[window.currentFilterKec] || window.currentFilterKec; filteredKader = filteredKader.filter(k => String(k.kecamatan).toUpperCase() === filterKecFull); } 
-        if (window.currentFilterDesa !== 'ALL') { filteredKader = filteredKader.filter(k => String(k.desa_kelurahan || k.desa).toUpperCase() === window.currentFilterDesa); } 
-        jmlKader = filteredKader.length; filteredKader.forEach(k => { const idKader = String(k.id_kader || k.nik || k.id).toUpperCase(); const lastLog = loginMap[idKader]; if (lastLog && String(lastLog).trim() !== '') { const dLog = new Date(lastLog); if (dLog.getMonth() === currMonth && dLog.getFullYear() === currYear) userAktif++; else userPasif++; } else { userPasif++; } }); 
-        const showMetricAdmin = roleUpper.includes('PKB') || roleUpper.includes('ADMIN_KECAMATAN') || roleUpper.includes('ADMIN_KABUPATEN'); let extraDashboardHTML = ''; 
-        if (showMetricAdmin) { extraDashboardHTML = `<div style="margin-bottom:15px; font-weight:bold; color:var(--th-dark); border-left:4px solid var(--th-accent); padding-left:10px;">⚡ Quick Status (Sesuai Filter Wilayah)</div><div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:15px; margin-bottom:25px;"><div style="background:white; padding:15px; border-radius:8px; border-bottom:4px solid #dc3545; box-shadow:0 2px 5px rgba(0,0,0,0.05);"><div style="font-size:0.75rem; color:#666; font-weight:bold;">🚨 SASARAN PRIORITAS</div><div style="font-size:1.8rem; font-weight:900; color:#dc3545;">${countPrioritas} <span style="font-size:0.8rem; color:#666; font-weight:normal;">Warga</span></div></div><div style="background:white; padding:15px; border-radius:8px; border-bottom:4px solid var(--th-main); box-shadow:0 2px 5px rgba(0,0,0,0.05);"><div style="font-size:0.75rem; color:#666; font-weight:bold;">👥 JUMLAH KADER</div><div style="font-size:1.8rem; font-weight:900; color:var(--th-main);">${jmlKader} <span style="font-size:0.8rem; color:#666; font-weight:normal;">User</span></div></div><div style="background:white; padding:15px; border-radius:8px; border-bottom:4px solid #198754; box-shadow:0 2px 5px rgba(0,0,0,0.05);"><div style="font-size:0.75rem; color:#666; font-weight:bold;">🟢 KADER AKTIF (BULAN INI)</div><div style="font-size:1.8rem; font-weight:900; color:#198754;">${userAktif} <span style="font-size:0.8rem; color:#666; font-weight:normal;">Login</span></div></div><div style="background:white; padding:15px; border-radius:8px; border-bottom:4px solid #B8860B; box-shadow:0 2px 5px rgba(0,0,0,0.05);"><div style="font-size:0.75rem; color:#666; font-weight:bold;">🟠 KADER PASIF</div><div style="font-size:1.8rem; font-weight:900; color:#B8860B;">${userPasif} <span style="font-size:0.8rem; color:#666; font-weight:normal;">Belum</span></div></div></div>`; }
+        window.adminData.rekapDashboard.forEach(d => {
+            if(window.currentFilterKec !== 'ALL' && d.kecamatan !== window.currentFilterKec && d.kecamatan !== mapKecRev[window.currentFilterKec]) return;
+            if(window.currentFilterDesa !== 'ALL' && d.desa !== window.currentFilterDesa) return;
+            
+            cCatin += (parseInt(d.catin_aktif)||0); cBumil += (parseInt(d.bumil_aktif)||0);
+            cBufas += (parseInt(d.bufas_aktif)||0); cBaduta += (parseInt(d.baduta_aktif)||0);
+            countPrioritas += (parseInt(d.jml_prioritas)||0); tLaporan += (parseInt(d.laporan_bln_ini)||0);
+        });
 
+        // Cari Top 5 Kader
+        let rankKader = [];
+        window.adminData.rekapKader.forEach(k => {
+            if(window.currentFilterKec !== 'ALL' && k.kecamatan !== window.currentFilterKec && k.kecamatan !== mapKecRev[window.currentFilterKec]) return;
+            if(window.currentFilterDesa !== 'ALL' && k.desa !== window.currentFilterDesa) return;
+            rankKader.push({ nama: k.nama_kader || k.username, lapor: parseInt(k.laporan_bln_ini)||0 });
+        });
+        rankKader.sort((a,b) => b.lapor - a.lapor); const topKader = rankKader.slice(0, 5);
+        
+        let displayDesa = window.adminSession.desa === '-' || window.adminSession.desa === 'ALL' || window.adminSession.desa === '' ? window.adminSession.kecamatan : window.adminSession.desa; if (String(displayDesa).toUpperCase() === 'ALL') displayDesa = 'KABUPATEN BULELENG'; const isTugas = roleUpper.includes('PKB') || roleUpper.includes('KADER'); const labelWilayah = isTugas ? 'Wilayah Tugas:' : 'Wilayah :';
+        
+        let jmlKader = 0, userAktif = 0, userPasif = 0;
+        window.adminData.rekapKader.forEach(k => {
+            if(window.currentFilterKec !== 'ALL' && k.kecamatan !== window.currentFilterKec && k.kecamatan !== mapKecRev[window.currentFilterKec]) return;
+            if(window.currentFilterDesa !== 'ALL' && k.desa !== window.currentFilterDesa) return;
+            jmlKader++; if(k.status_aktif === 'AKTIF') userAktif++; else userPasif++;
+        });
+
+        const showMetricAdmin = roleUpper.includes('PKB') || roleUpper.includes('ADMIN_KECAMATAN') || roleUpper.includes('ADMIN_KABUPATEN'); let extraDashboardHTML = ''; 
+        if (showMetricAdmin) { extraDashboardHTML = `<div style="margin-bottom:15px; font-weight:bold; color:var(--th-dark); border-left:4px solid var(--th-accent); padding-left:10px;">⚡ Quick Status (Pre-computed Daily)</div><div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:15px; margin-bottom:25px;"><div style="background:white; padding:15px; border-radius:8px; border-bottom:4px solid #dc3545; box-shadow:0 2px 5px rgba(0,0,0,0.05);"><div style="font-size:0.75rem; color:#666; font-weight:bold;">🚨 SASARAN PRIORITAS</div><div style="font-size:1.8rem; font-weight:900; color:#dc3545;">${countPrioritas} <span style="font-size:0.8rem; color:#666; font-weight:normal;">Warga</span></div></div><div style="background:white; padding:15px; border-radius:8px; border-bottom:4px solid var(--th-main); box-shadow:0 2px 5px rgba(0,0,0,0.05);"><div style="font-size:0.75rem; color:#666; font-weight:bold;">👥 JUMLAH KADER</div><div style="font-size:1.8rem; font-weight:900; color:var(--th-main);">${jmlKader} <span style="font-size:0.8rem; color:#666; font-weight:normal;">User</span></div></div><div style="background:white; padding:15px; border-radius:8px; border-bottom:4px solid #198754; box-shadow:0 2px 5px rgba(0,0,0,0.05);"><div style="font-size:0.75rem; color:#666; font-weight:bold;">🟢 KADER AKTIF (BULAN INI)</div><div style="font-size:1.8rem; font-weight:900; color:#198754;">${userAktif} <span style="font-size:0.8rem; color:#666; font-weight:normal;">Login</span></div></div><div style="background:white; padding:15px; border-radius:8px; border-bottom:4px solid #B8860B; box-shadow:0 2px 5px rgba(0,0,0,0.05);"><div style="font-size:0.75rem; color:#666; font-weight:bold;">🟠 KADER PASIF</div><div style="font-size:1.8rem; font-weight:900; color:#B8860B;">${userPasif} <span style="font-size:0.8rem; color:#666; font-weight:normal;">Belum</span></div></div></div>`; }
+
+        const rTotal = cCatin + cBumil + cBufas + cBaduta;
         content.innerHTML = `
             <div class="animate-fade">
-                <div style="background:linear-gradient(135deg, var(--th-dark) 0%, var(--th-main) 100%); color:var(--th-text); border-radius:12px; padding:25px; margin-bottom:20px; box-shadow:0 4px 10px rgba(0,0,0,0.15); border-bottom:5px solid var(--th-accent);"><p style="margin:0; color:var(--th-accent); font-weight:800; font-size:0.85rem; letter-spacing:1px; text-transform:uppercase;">MONITORING ${window.adminSession.role}</p><h2 style="margin:5px 0 10px 0; font-size:1.6rem; word-wrap:break-word;">${labelWilayah} ${displayDesa}</h2><p style="margin:0; font-size:0.9rem; opacity:0.9;">Total Terhimpun (Sesuai Filter): <b>${filteredReg.length} Sasaran</b> & <b>${filteredPend.length} Kunjungan</b>.</p></div>
+                <div style="background:linear-gradient(135deg, var(--th-dark) 0%, var(--th-main) 100%); color:var(--th-text); border-radius:12px; padding:25px; margin-bottom:20px; box-shadow:0 4px 10px rgba(0,0,0,0.15); border-bottom:5px solid var(--th-accent);"><p style="margin:0; color:var(--th-accent); font-weight:800; font-size:0.85rem; letter-spacing:1px; text-transform:uppercase;">MONITORING ${window.adminSession.role}</p><h2 style="margin:5px 0 10px 0; font-size:1.6rem; word-wrap:break-word;">${labelWilayah} ${displayDesa}</h2><p style="margin:0; font-size:0.9rem; opacity:0.9;">Total Terhimpun (Sesuai Filter): <b>${rTotal} Sasaran</b> & <b>${tLaporan} Kunjungan Bulan Ini</b>.</p></div>
                 ${filterWilayahHTML} ${extraDashboardHTML}
-                <div style="margin-bottom:15px; font-weight:bold; color:var(--th-dark); border-left:4px solid var(--th-accent); padding-left:10px;">📊 Akumulasi Sasaran Terdaftar</div>
+                <div style="margin-bottom:15px; font-weight:bold; color:var(--th-dark); border-left:4px solid var(--th-accent); padding-left:10px;">📊 Akumulasi Sasaran Terdaftar (Aktif)</div>
                 <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:15px; margin-bottom:25px;">
                     <div style="background:white; padding:20px; border-radius:8px; border-bottom:4px solid var(--th-main); box-shadow:0 2px 5px rgba(0,0,0,0.05);"><div style="font-size:0.8rem; color:#666; font-weight:bold;">👰 CATIN</div><div style="font-size:2rem; font-weight:900; color:var(--th-main);">${cCatin}</div></div>
                     <div style="background:white; padding:20px; border-radius:8px; border-bottom:4px solid #e84393; box-shadow:0 2px 5px rgba(0,0,0,0.05);"><div style="font-size:0.8rem; color:#666; font-weight:bold;">🤰 IBU HAMIL</div><div style="font-size:2rem; font-weight:900; color:#e84393;">${cBumil}</div></div>
@@ -87,12 +131,8 @@ window.renderAdminView = async (target) => {
                 </div>
                 <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:15px;">
                     <div style="background:white; padding:20px; border-radius:8px; box-shadow:0 2px 5px rgba(0,0,0,0.05); border:1px solid #e1e8ed;">
-                        <h3 style="margin:0 0 15px 0; font-size:1.1rem; color:var(--th-dark); border-bottom:2px solid var(--th-accent); padding-bottom:10px; display:inline-block;">📈 Statistik Laporan Kunjungan</h3>
-                        <table style="width:100%; border-collapse:collapse; font-size:0.9rem; margin-top:10px;"><tr style="background:#f8f9fa;"><th style="padding:10px; text-align:left; border-bottom:1px solid #ddd; color:var(--th-dark);">Kategori</th><th style="padding:10px; text-align:right; border-bottom:1px solid #ddd; color:var(--th-dark);">Jml Laporan Masuk</th></tr><tr><td style="padding:10px; border-bottom:1px solid #eee;">Calon Pengantin (CATIN)</td><td style="padding:10px; text-align:right; border-bottom:1px solid #eee; font-weight:bold;">${pCatin}</td></tr><tr><td style="padding:10px; border-bottom:1px solid #eee;">Ibu Hamil (BUMIL)</td><td style="padding:10px; text-align:right; border-bottom:1px solid #eee; font-weight:bold;">${pBumil}</td></tr><tr><td style="padding:10px; border-bottom:1px solid #eee;">Ibu Nifas (BUFAS)</td><td style="padding:10px; text-align:right; border-bottom:1px solid #eee; font-weight:bold;">${pBufas}</td></tr><tr><td style="padding:10px; border-bottom:1px solid #eee;">Baduta (0-23 Bulan)</td><td style="padding:10px; text-align:right; border-bottom:1px solid #eee; font-weight:bold;">${pBaduta}</td></tr><tr style="background:var(--th-light);"><td style="padding:10px; font-weight:bold; color:var(--th-dark);">TOTAL LAPORAN</td><td style="padding:10px; text-align:right; font-weight:bold; color:var(--th-main); font-size:1.1rem;">${filteredPend.length}</td></tr></table>
-                    </div>
-                    <div style="background:white; padding:20px; border-radius:8px; box-shadow:0 2px 5px rgba(0,0,0,0.05); border:1px solid #e1e8ed;">
-                        <h3 style="margin:0 0 15px 0; font-size:1.1rem; color:var(--th-dark); border-bottom:2px solid var(--th-accent); padding-bottom:10px; display:inline-block;">🏆 Top 5 Kader Teraktif</h3>
-                        <div style="margin-top:10px;">${topKader.length === 0 ? '<div style="color:#555; text-align:center; padding:20px 0; font-weight:500;">Belum ada laporan masuk.</div>' : ''}${topKader.map((k, idx) => { return `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; border-bottom:1px dashed #eee; padding-bottom:8px;"><div style="font-size:0.85rem;"><span style="color:var(--th-accent); font-weight:bold; margin-right:5px;">#${idx+1}</span> <b style="color:var(--th-dark);">${window.getKaderName(k[0])}</b></div><div style="font-size:0.8rem; background:var(--th-light); color:var(--th-main); padding:2px 8px; border-radius:10px; font-weight:bold; border:1px solid var(--th-main);">${k[1]} Lapor</div></div>` }).join('')}</div>
+                        <h3 style="margin:0 0 15px 0; font-size:1.1rem; color:var(--th-dark); border-bottom:2px solid var(--th-accent); padding-bottom:10px; display:inline-block;">🏆 Top 5 Kader Teraktif (Bulan Ini)</h3>
+                        <div style="margin-top:10px;">${topKader.length === 0 || topKader[0].lapor === 0 ? '<div style="color:#555; text-align:center; padding:20px 0; font-weight:500;">Belum ada laporan masuk.</div>' : ''}${topKader.map((k, idx) => { if(k.lapor === 0) return ''; return `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; border-bottom:1px dashed #eee; padding-bottom:8px;"><div style="font-size:0.85rem;"><span style="color:var(--th-accent); font-weight:bold; margin-right:5px;">#${idx+1}</span> <b style="color:var(--th-dark);">${k.nama}</b></div><div style="font-size:0.8rem; background:var(--th-light); color:var(--th-main); padding:2px 8px; border-radius:10px; font-weight:bold; border:1px solid var(--th-main);">${k.lapor} Lapor</div></div>` }).join('')}</div>
                     </div>
                 </div>
             </div>
@@ -149,6 +189,13 @@ window.renderAdminView = async (target) => {
     }
 
     else if (target === 'sasaran') {
+        const ditarik = await fetchRawDataIfNeeded();
+        if(!ditarik) return;
+
+        let filteredReg = window.adminData.registrasi; 
+        if (window.currentFilterKec !== 'ALL') { filteredReg = filteredReg.filter(r => (r.sumber_kecamatan || '').toUpperCase() === window.currentFilterKec || (r.kecamatan || '').toUpperCase() === mapKecRev[window.currentFilterKec]); }
+        if (window.currentFilterDesa !== 'ALL') { filteredReg = filteredReg.filter(r => (r.desa || '').toUpperCase() === window.currentFilterDesa); }
+
         content.innerHTML = `
             <div class="animate-fade">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap:wrap; gap:10px;"><h2 style="margin:0; font-size:1.4rem; color:var(--th-dark); border-left:4px solid var(--th-accent); padding-left:10px;">📋 Database Sasaran</h2><button class="btn-action" style="background:var(--th-main); color:var(--th-text); border:1px solid var(--th-accent); border-radius:6px; padding:10px 15px; font-size:0.9rem;" onclick="window.exportCSV('sasaran')">📥 Download Excel (CSV)</button></div>
@@ -167,6 +214,13 @@ window.renderAdminView = async (target) => {
     }
 
     else if (target === 'pendampingan') {
+        const ditarik = await fetchRawDataIfNeeded();
+        if(!ditarik) return;
+
+        let filteredPend = window.adminData.pendampingan;
+        if (window.currentFilterKec !== 'ALL') { filteredPend = filteredPend.filter(p => (p.sumber_kecamatan || '').toUpperCase() === window.currentFilterKec || (p.kecamatan || '').toUpperCase() === mapKecRev[window.currentFilterKec]); }
+        // Filter desa untuk pendampingan sedikit tricky (harus join reg), kita batasi via pencarian teks saja untuk kecepatan
+        
         content.innerHTML = `
             <div class="animate-fade">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap:wrap; gap:10px;"><h2 style="margin:0; font-size:1.4rem; color:var(--th-dark); border-left:4px solid var(--th-accent); padding-left:10px;">🤝 Riwayat Pendampingan</h2><button class="btn-action" style="background:var(--th-main); color:var(--th-text); border:1px solid var(--th-accent); border-radius:6px; padding:10px 15px; font-size:0.9rem;" onclick="window.exportCSV('pendampingan')">📥 Download Excel (CSV)</button></div>
@@ -185,6 +239,13 @@ window.renderAdminView = async (target) => {
     }
 
     else if (target === 'cetak_laporan') {
+        const ditarik = await fetchRawDataIfNeeded();
+        if(!ditarik) return;
+        
+        let filteredReg = window.adminData.registrasi; let filteredPend = window.adminData.pendampingan;
+        if (window.currentFilterKec !== 'ALL') { filteredReg = filteredReg.filter(r => (r.sumber_kecamatan || '').toUpperCase() === window.currentFilterKec); const allowedIds = new Set(filteredReg.map(r => r.id)); filteredPend = filteredPend.filter(p => allowedIds.has(p.id_sasaran_ref)); }
+        if (window.currentFilterDesa !== 'ALL') { filteredReg = filteredReg.filter(r => (r.desa || '').toUpperCase() === window.currentFilterDesa); const allowedIds = new Set(filteredReg.map(r => r.id)); filteredPend = filteredPend.filter(p => allowedIds.has(p.id_sasaran_ref)); }
+
         const blnNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']; const curDate = new Date(); const curRealMonth = curDate.getMonth() + 1; const curRealYear = curDate.getFullYear(); let maxMonth = parseInt(window.currentFilterTahun) === curRealYear ? curRealMonth : 12; if(parseInt(window.currentFilterTahun) > curRealYear) maxMonth = 12; let optBulan = ''; for(let i=1; i<=maxMonth; i++) { optBulan += `<option value="${i}" ${window.currentFilterBulan == i ? 'selected' : ''}>${blnNames[i-1]}</option>`; } const years = [2026, 2027, 2028, 2029, 2030]; let optTahun = years.map(y => `<option value="${y}" ${window.currentFilterTahun == y ? 'selected' : ''}>${y}</option>`).join('');
         content.innerHTML = `
             <style>@media print { body * { visibility: hidden; } #admin-sidebar, .admin-header, #filter-area-cetak { display: none !important; } #report-print-area, #report-print-area * { visibility: visible; color: black !important; } #report-print-area { position: absolute; left: 0; top: 0; width: 100%; padding: 10px; background: white; } #report-print-area table { width: 100%; border-collapse: collapse; } #report-print-area th, #report-print-area td { border: 1px solid black !important; } }</style>
@@ -219,12 +280,8 @@ window.renderAdminView = async (target) => {
     }
 };
 
-// ==========================================
-// 4. INISIALISASI KERANGKA (SKELETON)
-// ==========================================
 export const initAdmin = async (session) => {
     window.adminSession = session; const th = getRoleTheme(session.role); const roleUpper = String(session.role).toUpperCase();
-    
     if(roleUpper.includes('KABUPATEN') || roleUpper.includes('SUPER') || roleUpper.includes('MITRA')) { window.currentFilterKec = 'ALL'; } 
     else { const mapKec = { 'GEROKGAK': 'GRK', 'SERIRIT': 'SRT', 'BUSUNGBIU': 'BSB', 'BANJAR': 'BJR', 'SUKASADA': 'SKS', 'BULELENG': 'BLL', 'SAWAN': 'SWN', 'KUBUTAMBAHAN': 'KBT', 'TEJAKULA': 'TJK' }; window.currentFilterKec = mapKec[String(session.kecamatan).toUpperCase()] || String(session.kecamatan).toUpperCase(); }
     window.currentFilterDesa = 'ALL'; const displayKecamatan = String(session.kecamatan || '').toUpperCase() === 'ALL' ? 'KABUPATEN BULELENG' : session.kecamatan;
@@ -256,7 +313,7 @@ export const initAdmin = async (session) => {
             </div>
             <div style="flex:1; display:flex; flex-direction:column; overflow:hidden; width:100%;">
                 <div class="admin-header" style="background:white; padding: 15px 25px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); z-index:5; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #e1e8ed;"><div style="display:flex; align-items:center;"><button id="btn-mobile-menu">☰</button><h2 id="admin-page-title" style="margin:0; font-size:1.3rem; color:var(--th-dark); font-weight:800;">Memuat Data...</h2></div><button id="btn-admin-refresh" style="background:var(--th-accent); color:var(--th-btn-text); border:none; padding:8px 15px; border-radius:6px; font-weight:bold; cursor:pointer; font-size:0.85rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">🔄 Segarkan Data</button></div>
-                <div id="admin-content" style="flex:1; padding: 25px; overflow-y:auto; background:#eef2f5;"><div style="padding:50px; text-align:center; color:var(--th-main);"><h3>⏳ Menyedot Data dari Satelit Pusat...</h3><p>Tunggu sebentar ya, Bapak/Ibu.</p></div></div>
+                <div id="admin-content" style="flex:1; padding: 25px; overflow-y:auto; background:#eef2f5;"><div style="padding:50px; text-align:center; color:var(--th-main);"><h3>⏳ Menyedot Ringkasan Data...</h3><p>Mempersiapkan dashboard kilat. Harap tunggu...</p></div></div>
             </div>
         </div>
     `;
@@ -272,7 +329,7 @@ export const initAdmin = async (session) => {
         menuItems.forEach(item => { 
             item.onclick = async (e) => { 
                 e.stopPropagation(); const activeTarget = item.getAttribute('data-target');
-                if (activeTarget === 'reload_app') { if (confirm("🔄 TARIK PEMBARUAN SISTEM?\\n\\nPerintah ini akan membersihkan memori sistem (Cache) dan memuat ulang aplikasi ke versi terbaru.\\n\\nLanjutkan?")) { try { if ('serviceWorker' in navigator) { const regs = await navigator.serviceWorker.getRegistrations(); for (let r of regs) { await r.unregister(); } } if (window.caches) { const keys = await caches.keys(); for (let k of keys) { await caches.delete(k); } } alert("✅ Memori sistem berhasil dibersihkan! Memuat versi terbaru..."); window.location.reload(true); } catch (e) { window.location.reload(true); } } return; }
+                if (activeTarget === 'reload_app') { if (confirm("🔄 TARIK PEMBARUAN SISTEM?\n\nSistem akan dimuat ulang ke versi terbaru.\n\nLanjutkan?")) { try { if ('serviceWorker' in navigator) { const regs = await navigator.serviceWorker.getRegistrations(); for (let r of regs) { await r.unregister(); } } if (window.caches) { const keys = await caches.keys(); for (let k of keys) { await caches.delete(k); } } alert("✅ Memori sistem berhasil dibersihkan! Memuat versi terbaru..."); window.location.reload(true); } catch (e) { window.location.reload(true); } } return; }
                 document.querySelectorAll('.admin-menu-item, .sub-menu-item').forEach(m => m.classList.remove('active')); item.classList.add('active'); document.getElementById('admin-page-title').innerText = item.innerText.replace('▼', '').replace(/[^\w\s]/gi, '').trim(); 
                 window.renderAdminView(activeTarget); 
                 if(window.innerWidth <= 768) { sidebar.classList.remove('active'); backdrop.classList.remove('active'); }
@@ -297,12 +354,17 @@ export const initAdmin = async (session) => {
 
     document.getElementById('btn-admin-refresh').onclick = async () => {
         const btn = document.getElementById('btn-admin-refresh'); btn.innerText = "⏳ Menyedot..."; btn.disabled = true;
-        const success = await fetchAdminData();
+        
+        // Hapus cache memori lokal agar fetch ulang
+        window.adminData.registrasi = []; window.adminData.pendampingan = [];
+        
+        const success = await fetchDashboardSummary();
         if(success) { buildDynamicMenus(); const activeMenuEl = document.querySelector('.admin-menu-item.active, .sub-menu-item.active'); if(activeMenuEl) window.renderAdminView(activeMenuEl.getAttribute('data-target')); else window.renderAdminView('dashboard'); } else { alert("Gagal menyegarkan data. Periksa koneksi internet."); }
         btn.innerText = "🔄 Segarkan Data"; btn.disabled = false;
     };
 
-    const success = await fetchAdminData();
+    // 🚀 INIT LOAD: HANYA LOAD DASHBOARD SUMMARY (INSTANT)
+    const success = await fetchDashboardSummary();
     if(success) {
         buildDynamicMenus(); document.getElementById('admin-page-title').innerText = 'Dashboard Pemantauan'; window.renderAdminView('dashboard');
         const mDash = document.querySelector('.admin-menu-item[data-target="dashboard"]'); if(mDash) mDash.classList.add('active');
@@ -310,5 +372,4 @@ export const initAdmin = async (session) => {
         document.getElementById('admin-content').innerHTML = `<div style="padding:50px; text-align:center; color:#e94560;"><h3>❌ Gagal Terhubung ke Satelit</h3><p>Pastikan Anda memiliki koneksi internet yang stabil, lalu klik 'Segarkan Data'.</p></div>`; document.getElementById('admin-page-title').innerText = 'Koneksi Terputus';
     }
 };
-
 // === AKHIR DARI KODE ===
