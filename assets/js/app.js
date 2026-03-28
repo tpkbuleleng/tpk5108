@@ -7,7 +7,7 @@ import { initAdmin } from './admin.js';
 
 window.AppDB = { getAllData, getDataById, putData };
 const getEl = (id) => document.getElementById(id);
-const SCRIPT_URL_GLOBAL = 'https://script.google.com/macros/s/AKfycbx0_deS9S3tfxkhCW1zzg8lxZGnQZzpxfw3btNAuTCsSBsBsgaN4kqJ1TpbHnBNZrOrfA/exec';
+const SCRIPT_URL_GLOBAL = 'https://script.google.com/macros/s/AKfycbwZiCcv7MCL21R1VqlOFsx1x_Ax_8yoxVwjIumG3kVYwDSQTfXX9VjQnz2GsAW2ItzAAQ/exec';
 
 // ==========================================
 // 🔥 V30: SISTEM SARAF PERASA (SILENT ERROR TRACKER)
