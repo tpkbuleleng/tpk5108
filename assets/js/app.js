@@ -1,5 +1,5 @@
 // ==========================================
-// 📱 APLIKASI KADER TPK (V59 - BULLETPROOF ANTI-CRASH PATCH) + DATABASE TPK
+// 📱 APLIKASI KADER TPK (V59 - BULLETPROOF ANTI-CRASH PATCH)
 // ==========================================
 import { initDB, putData, getDataById, deleteData, getAllData, clearStore } from './db.js';
 import { downloadMasterData, uploadData } from './sync.js';
@@ -226,170 +226,6 @@ window.mulaiSinkronisasiDashboard = async () => {
         if(window.jalankanSinkronisasi) { await window.jalankanSinkronisasi(); } 
         else { alert("Sistem sinkronisasi belum siap. Memuat ulang..."); location.reload(); }
     } catch (e) { window.logErrorToServer('mulaiSinkronisasiDashboard', e); }
-};
-
-// ==========================================
-// 🔥 FITUR BARU: MENU DATABASE TPK (KADER)
-// ==========================================
-window.initDatabaseTPK = async () => {
-    try {
-        const session = window.currentUser;
-        if(!session) return;
-
-        // 1. Ambil data dari IndexedDB lokal
-        const masterKader = await window.AppDB.getAllData('master_kader').catch(()=>[]);
-        
-        // 2. Proteksi Akses Wilayah (Filter sesuai jabatan)
-        let dataKaderLokal = masterKader;
-        const roleUpper = String(session.role).toUpperCase();
-        
-        if (roleUpper.includes('KECAMATAN') || roleUpper.includes('PKB')) {
-            dataKaderLokal = masterKader.filter(k => String(k.kecamatan).toUpperCase() === String(session.kecamatan).toUpperCase());
-        }
-        if (roleUpper === 'ADMIN_DESA' || (roleUpper.includes('PKB') && session.desa !== '-')) {
-            dataKaderLokal = dataKaderLokal.filter(k => String(k.desa_kelurahan || k.desa).toUpperCase() === String(session.desa).toUpperCase());
-        }
-
-        // 3. Isi Dropdown Filter
-        const elKec = getEl('flt-tpk-kec');
-        const elDesa = getEl('flt-tpk-desa');
-        
-        if (elKec) {
-            const listKec = [...new Set(dataKaderLokal.map(k => k.kecamatan).filter(Boolean))].sort();
-            elKec.innerHTML = '<option value="ALL">Semua Kecamatan</option>' + listKec.map(k => `<option value="${k}">${k}</option>`).join('');
-            
-            // Kunci dropdown jika level Kecamatan/Desa
-            if (roleUpper.includes('KECAMATAN') || roleUpper.includes('PKB') || roleUpper === 'ADMIN_DESA') {
-                elKec.value = session.kecamatan; elKec.disabled = true;
-            }
-        }
-        
-        if (elDesa) {
-            const listDesa = [...new Set(dataKaderLokal.map(k => k.desa_kelurahan || k.desa).filter(Boolean))].sort();
-            elDesa.innerHTML = '<option value="ALL">Semua Desa/Kelurahan</option>' + listDesa.map(d => `<option value="${d}">${d}</option>`).join('');
-            
-            // Kunci dropdown jika level Desa
-            if (roleUpper === 'ADMIN_DESA' || (roleUpper.includes('PKB') && session.desa !== '-')) {
-                elDesa.value = session.desa; elDesa.disabled = true;
-            }
-        }
-
-        // 4. Mesin Render Tabel & Statistik
-        const renderTableKader = () => {
-            const valKec = elKec ? elKec.value : 'ALL';
-            const valDesa = elDesa ? elDesa.value : 'ALL';
-            const valUnsur = getEl('flt-tpk-unsur').value;
-            const valBpjs = getEl('flt-tpk-bpjs').value;
-
-            // Terapkan Filter
-            let finalData = dataKaderLokal.filter(k => {
-                let matchKec = valKec === 'ALL' || String(k.kecamatan).toUpperCase() === valKec.toUpperCase();
-                let matchDesa = valDesa === 'ALL' || String(k.desa_kelurahan || k.desa).toUpperCase() === valDesa.toUpperCase();
-                let unsurKader = String(k.unsur || k.unsur_kader || '').toUpperCase();
-                let matchUnsur = valUnsur === 'ALL' || unsurKader.includes(valUnsur);
-                let statusBpjs = String(k.bpjs || k.status_bpjs || 'TIDAK').toUpperCase();
-                let matchBpjs = valBpjs === 'ALL' || (valBpjs === 'YA' ? statusBpjs === 'YA' : statusBpjs !== 'YA');
-                
-                return matchKec && matchDesa && matchUnsur && matchBpjs;
-            });
-
-            // Kalkulasi Statistik
-            let statNakes=0, statPkk=0, statKb=0, statBpjs=0, statMbg=0;
-            finalData.forEach(k => {
-                let u = String(k.unsur || k.unsur_kader || '').toUpperCase();
-                if (u.includes('BIDAN') || u.includes('NAKES')) statNakes++;
-                else if (u.includes('PKK')) statPkk++;
-                else if (u.includes('KB')) statKb++;
-                
-                if (String(k.bpjs || k.status_bpjs).toUpperCase() === 'YA') statBpjs++;
-                if (String(k.mbg || k.mengantar_mbg).toUpperCase() === 'YA') statMbg++;
-            });
-
-            // Tampilkan Statistik ke Layar
-            const statsHtml = `
-                <div style="background:#fff; border-bottom:4px solid #0d6efd; padding:15px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.05); text-align:center;">
-                    <div style="font-size:1.5rem; font-weight:900; color:#0d6efd;">${finalData.length}</div><div style="font-size:0.7rem; font-weight:bold; color:#666;">TOTAL KADER</div>
-                </div>
-                <div style="background:#fff; border-bottom:4px solid #198754; padding:15px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.05); text-align:center;">
-                    <div style="font-size:1.2rem; font-weight:bold; color:#198754;">${statNakes} <span style="font-size:0.8rem; color:#666;">Bidan</span></div>
-                    <div style="font-size:0.75rem; color:#666;">${statPkk} PKK | ${statKb} KB</div>
-                </div>
-                <div style="background:#fff; border-bottom:4px solid #fd7e14; padding:15px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.05); text-align:center;">
-                    <div style="font-size:1.5rem; font-weight:900; color:#fd7e14;">${statBpjs}</div><div style="font-size:0.7rem; font-weight:bold; color:#666;">PUNYA BPJSTK</div>
-                </div>
-                <div style="background:#fff; border-bottom:4px solid #6f42c1; padding:15px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.05); text-align:center;">
-                    <div style="font-size:1.5rem; font-weight:900; color:#6f42c1;">${statMbg}</div><div style="font-size:0.7rem; font-weight:bold; color:#666;">PENYALUR MBG</div>
-                </div>
-            `;
-            const statsContainer = getEl('tpk-stats-container');
-            if(statsContainer) statsContainer.innerHTML = statsHtml;
-
-            // Render Tabel
-            const tbody = getEl('tbody-database-tpk');
-            if(!tbody) return;
-
-            if (finalData.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" style="padding: 20px; text-align: center; color: #dc3545; font-weight:bold;">❌ Tidak ada data kader yang sesuai dengan filter.</td></tr>';
-            } else {
-                tbody.innerHTML = finalData.map((k, idx) => {
-                    let stBpjs = String(k.bpjs || k.status_bpjs).toUpperCase() === 'YA' 
-                        ? '<span style="background:#e8f4fd; color:#0d6efd; padding:3px 8px; border-radius:12px; font-size:0.7rem; font-weight:bold;">✅ Terdaftar</span>' 
-                        : '<span style="background:#fdf3e8; color:#fd7e14; padding:3px 8px; border-radius:12px; font-size:0.7rem; font-weight:bold;">❌ Belum</span>';
-                    
-                    let stMbg = String(k.mbg || k.mengantar_mbg).toUpperCase() === 'YA'
-                        ? '<span style="background:#e2f0cb; color:#198754; padding:3px 8px; border-radius:12px; font-size:0.7rem; font-weight:bold;">🍲 Penyalur</span>'
-                        : '<span style="color:#aaa; font-size:0.7rem;">-</span>';
-
-                    let un = String(k.unsur || k.unsur_kader || '').toUpperCase();
-                    let badgeUnsur = un.includes('BIDAN') || un.includes('NAKES') ? '🏥 Nakes' : (un.includes('PKK') ? '👩‍🌾 PKK' : '🔵 KB');
-
-                    return `
-                    <tr style="border-bottom: 1px solid #eee;">
-                        <td style="padding: 12px; text-align:center;">${idx + 1}</td>
-                        <td style="padding: 12px;">
-                            <div style="font-weight:bold; color:#0A2342; font-size:0.95rem;">${k.nama_kader || k.nama || '-'}</div>
-                            <div style="font-size:0.75rem; color:#666; margin-top:2px;">ID/NIK: ${k.id_kader || k.nik || '-'}</div>
-                        </td>
-                        <td style="padding: 12px;">
-                            <div style="font-weight:bold; color:#333;">Tim ${k.id_tim || k.tim || '-'}</div>
-                            <div style="font-size:0.75rem; color:#666;">${k.desa_kelurahan || k.desa || '-'}, Kec. ${k.kecamatan || '-'}</div>
-                        </td>
-                        <td style="padding: 12px; text-align:center;"><span style="background:#f4f6f8; border:1px solid #ccc; padding:3px 6px; border-radius:4px; font-size:0.75rem; color:#444;">${badgeUnsur}</span></td>
-                        <td style="padding: 12px; text-align:center;">${stBpjs}</td>
-                        <td style="padding: 12px; text-align:center;">${stMbg}</td>
-                    </tr>`;
-                }).join('');
-            }
-        };
-
-        // 5. Pasang Pendengar Perubahan (Event Listener)
-        ['flt-tpk-kec', 'flt-tpk-desa', 'flt-tpk-unsur', 'flt-tpk-bpjs'].forEach(id => {
-            const el = getEl(id);
-            if(el) el.addEventListener('change', renderTableKader);
-        });
-
-        // Jika Kecamatan diganti, sesuaikan daftar Desa
-        if (elKec && elDesa && !elKec.disabled) {
-            elKec.addEventListener('change', () => {
-                if(elKec.value === 'ALL') {
-                    const listDesa = [...new Set(dataKaderLokal.map(k => k.desa_kelurahan || k.desa).filter(Boolean))].sort();
-                    elDesa.innerHTML = '<option value="ALL">Semua Desa/Kelurahan</option>' + listDesa.map(d => `<option value="${d}">${d}</option>`).join('');
-                } else {
-                    const filterD = dataKaderLokal.filter(k => String(k.kecamatan).toUpperCase() === elKec.value.toUpperCase());
-                    const listDesa = [...new Set(filterD.map(k => k.desa_kelurahan || k.desa).filter(Boolean))].sort();
-                    elDesa.innerHTML = '<option value="ALL">Semua Desa/Kelurahan</option>' + listDesa.map(d => `<option value="${d}">${d}</option>`).join('');
-                }
-                renderTableKader();
-            });
-        }
-
-        renderTableKader();
-
-    } catch(e) {
-        window.logErrorToServer("initDatabaseTPK", e);
-        const tbody = getEl('tbody-database-tpk');
-        if(tbody) tbody.innerHTML = '<tr><td colspan="6" style="color:red; text-align:center; padding:20px;">Terjadi kesalahan saat memuat data.</td></tr>';
-    }
 };
 
 window.renderKonten = async (target) => {
@@ -650,13 +486,6 @@ window.renderKonten = async (target) => {
         } else if (target === 'kalkulator') { const tpl = getEl('template-kalkulator'); if(tpl) { area.appendChild(tpl.content.cloneNode(true)); initKalkulator(); }
         } else if (target === 'cetak_pdf') { const tpl = getEl('template-cetak-pdf'); if(tpl) area.appendChild(tpl.content.cloneNode(true));
         } else if (target === 'setting') { const tpl = getEl('template-setting'); if(tpl) { area.appendChild(tpl.content.cloneNode(true)); initSetting(); }
-        } else if (target === 'database_tpk') { 
-            // 🔥 PENYAMBUNG ROUTER KE MENU DATABASE TPK
-            const tpl = getEl('template-database-tpk'); 
-            if(tpl) { 
-                area.appendChild(tpl.content.cloneNode(true)); 
-                if(window.initDatabaseTPK) window.initDatabaseTPK(); 
-            }
         } else if (target === 'bantuan') { 
             area.innerHTML = `
             <div class="animate-fade">
