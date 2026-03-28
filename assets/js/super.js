@@ -3,7 +3,7 @@
 // ==========================================
 import { getAllData, clearStore } from './db.js';
 
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx0_deS9S3tfxkhCW1zzg8lxZGnQZzpxfw3btNAuTCsSBsBsgaN4kqJ1TpbHnBNZrOrfA/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwZiCcv7MCL21R1VqlOFsx1x_Ax_8yoxVwjIumG3kVYwDSQTfXX9VjQnz2GsAW2ItzAAQ/exec';
 
 // 🔥 PATCH KEAMANAN: Dynamic Memory Token (Sistem Anti-Hardcode)
 window.sessionSuperToken = null;
