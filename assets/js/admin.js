@@ -1,17 +1,18 @@
 // ==========================================
-// 📊 DASHBOARD SUPERVISOR (V47 - DYNAMIC ROUTER & MENU REAL-TIME PATCH)
+// 📊 DASHBOARD SUPERVISOR (V48 - METRIK KADER AKTIF & PRIORITAS)
 // ==========================================
 import { clearStore, getAllData } from './db.js';
 
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwZiCcv7MCL21R1VqlOFsx1x_Ax_8yoxVwjIumG3kVYwDSQTfXX9VjQnz2GsAW2ItzAAQ/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx0_deS9S3tfxkhCW1zzg8lxZGnQZzpxfw3btNAuTCsSBsBsgaN4kqJ1TpbHnBNZrOrfA/exec';
 
-window.adminData = { registrasi: [], pendampingan: [], master_kader: [], master_pkb: [], master_tim_wilayah: [], master_menu: [] };
+window.adminData = { registrasi: [], pendampingan: [], master_kader: [], master_pkb: [], master_tim_wilayah: [], master_menu: [], kader_logins: [] };
 window.adminSession = null;
 window.currentFilterKec = 'ALL';
 window.currentFilterDesa = 'ALL';
-window.currentFilterBulan = new Date().getMonth() + 1;
+window.currentFilterBulan = new Date().getMonth() + 1; // 1-12
 window.currentFilterTahun = new Date().getFullYear();
 
+// 🔥 FUNGSI PELACAK NAMA KADER (GLOBAL)
 window.getKaderName = (uname) => {
     if(!uname) return '-';
     const kaders = window.adminData.master_kader || [];
@@ -54,9 +55,8 @@ const fetchAdminData = async () => {
             window.adminData.master_kader = masterData.data ? masterData.data.master_kader || [] : [];
             window.adminData.master_pkb = masterData.data ? masterData.data.master_pkb || [] : [];
             window.adminData.master_tim_wilayah = masterData.data ? masterData.data.master_tim_wilayah || masterData.data.TIM_WILAYAH || [] : [];
-            
-            // 🔥 SEDOT MENU LANGSUNG DARI GOOGLE SHEET KE RAM (REAL-TIME)
             window.adminData.master_menu = masterData.data ? masterData.data.master_menu || [] : [];
+            window.adminData.kader_logins = res.data.kader_logins || [];
             return true;
         }
         return false;
@@ -92,6 +92,7 @@ window.renderAdminView = async (target) => {
     const content = document.getElementById('admin-content');
     const roleUpper = String(window.adminSession.role).toUpperCase();
     
+    // 🔥 FILTER DATA BERDASARKAN DROPDOWN
     let filteredReg = window.adminData.registrasi;
     let filteredPend = window.adminData.pendampingan;
     
@@ -106,6 +107,7 @@ window.renderAdminView = async (target) => {
         filteredPend = filteredPend.filter(p => allowedIds.has(p.id_sasaran_ref));
     }
 
+    // 🔥 GENERATE OPSI DROPDOWN FILTER
     let optKec = `<option value="ALL">🌍 SEMUA KECAMATAN</option>`;
     let optDesa = `<option value="ALL">🏘️ SEMUA DESA</option>`;
     const isKabupaten = roleUpper.includes('KABUPATEN') || roleUpper.includes('SUPER') || roleUpper.includes('MITRA');
@@ -137,23 +139,105 @@ window.renderAdminView = async (target) => {
         </div>
     `;
 
+    // ==========================================
+    // RENDER: DASHBOARD
+    // ==========================================
     if (target === 'dashboard') {
         let cCatin = 0, cBumil = 0, cBufas = 0, cBaduta = 0; let pCatin = 0, pBumil = 0, pBufas = 0, pBaduta = 0;
-        filteredReg.forEach(r => { if(r.status_duplikasi && r.status_duplikasi.includes('DUPLIKAT')) return; if(r.jenis_sasaran === 'CATIN') cCatin++; else if(r.jenis_sasaran === 'BUMIL') cBumil++; else if(r.jenis_sasaran === 'BUFAS') cBufas++; else if(r.jenis_sasaran === 'BADUTA') cBaduta++; });
+        
+        let countPrioritas = 0;
+        const pendMap = {};
+        filteredPend.forEach(p => { if(!pendMap[p.id_sasaran_ref]) pendMap[p.id_sasaran_ref] = []; pendMap[p.id_sasaran_ref].push(p); });
+
+        filteredReg.forEach(r => { 
+            if(r.status_duplikasi && r.status_duplikasi.includes('DUPLIKAT')) return; 
+            if(r.jenis_sasaran === 'CATIN') cCatin++; else if(r.jenis_sasaran === 'BUMIL') cBumil++; else if(r.jenis_sasaran === 'BUFAS') cBufas++; else if(r.jenis_sasaran === 'BADUTA') cBaduta++; 
+            
+            // Logika Sasaran Prioritas
+            if(r.status_sasaran !== 'SELESAI') {
+                let isPrioritas = false; let rD = {}; try { rD = JSON.parse(r.data_laporan || '{}'); }catch(e){}
+                const badAir = ['Sumur Tak Terlindung', 'Mata Air Tak Terlindung', 'Air Permukaan (Sungai/Danau/Waduk/Kolam/Irigasi)', 'Air Hujan'];
+                if (badAir.includes(rD.sumber_air) || rD.fasilitas_bab === 'Tidak Ada') { isPrioritas = true; } 
+                else {
+                    let myPends = pendMap[r.id] || [];
+                    if(myPends.length > 0) {
+                        myPends.sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+                        let pD = {}; try { pD = JSON.parse(myPends[0].data_laporan || '{}'); }catch(e){}
+                        if (r.jenis_sasaran === 'BUMIL' && parseFloat(pD.m_lila || pD.lila) < 23.5) isPrioritas = true;
+                        if (r.jenis_sasaran === 'BADUTA' && pD.evaluasi_kka === 'Terlambat') isPrioritas = true;
+                    }
+                }
+                if(isPrioritas) countPrioritas++;
+            }
+        });
+
         const kaderKinerja = {};
         filteredPend.forEach(p => { let jenis = p.id_sasaran_ref.substring(0,3); if(jenis === 'CTN') pCatin++; else if(jenis === 'BML') pBumil++; else if(jenis === 'BFS') pBufas++; else if(jenis === 'BDT') pBaduta++; if(!kaderKinerja[p.username]) kaderKinerja[p.username] = 0; kaderKinerja[p.username]++; });
         const topKader = Object.entries(kaderKinerja).sort((a,b) => b[1] - a[1]).slice(0, 5);
+        
         let displayDesa = window.adminSession.desa === '-' || window.adminSession.desa === 'ALL' || window.adminSession.desa === '' ? window.adminSession.kecamatan : window.adminSession.desa;
         if (String(displayDesa).toUpperCase() === 'ALL') displayDesa = 'KABUPATEN BULELENG';
+
+        // 🔥 PENENTUAN LABEL WILAYAH
+        const isTugas = roleUpper.includes('PKB') || roleUpper.includes('KADER');
+        const labelWilayah = isTugas ? 'Wilayah Tugas:' : 'Wilayah :';
+
+        // 🔥 LOGIKA AKTIVITAS KADER UNTUK ADMIN
+        let jmlKader = 0, userAktif = 0, userPasif = 0;
+        const now = new Date(); const currMonth = now.getMonth(); const currYear = now.getFullYear();
+        const safeLogins = window.adminData.kader_logins || [];
+        const loginMap = {}; safeLogins.forEach(l => loginMap[l.id] = l.login_terakhir);
+
+        let filteredKader = window.adminData.master_kader || [];
+        if (window.currentFilterKec !== 'ALL') filteredKader = filteredKader.filter(k => String(k.kecamatan).toUpperCase() === window.currentFilterKec);
+        if (window.currentFilterDesa !== 'ALL') filteredKader = filteredKader.filter(k => String(k.desa_kelurahan || k.desa).toUpperCase() === window.currentFilterDesa);
+        
+        jmlKader = filteredKader.length;
+        filteredKader.forEach(k => {
+            const idKader = k.id_kader || k.nik || k.id; const lastLog = loginMap[idKader];
+            if (lastLog && String(lastLog).trim() !== '') {
+                const dLog = new Date(lastLog);
+                if (dLog.getMonth() === currMonth && dLog.getFullYear() === currYear) userAktif++; else userPasif++;
+            } else { userPasif++; }
+        });
+
+        const showMetricAdmin = roleUpper.includes('PKB') || roleUpper.includes('ADMIN_KECAMATAN') || roleUpper.includes('ADMIN_KABUPATEN');
+        let extraDashboardHTML = '';
+        if (showMetricAdmin) {
+            extraDashboardHTML = `
+                <div style="margin-bottom: 15px; font-weight: bold; color: var(--th-dark); border-left: 4px solid var(--th-accent); padding-left: 10px;">⚡ Quick Status (Sesuai Filter Wilayah)</div>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 25px;">
+                    <div style="background: white; padding: 15px; border-radius: 8px; border-bottom: 4px solid #dc3545; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+                        <div style="font-size:0.75rem; color:#666; font-weight:bold;">🚨 SASARAN PRIORITAS</div>
+                        <div style="font-size:1.8rem; font-weight:900; color:#dc3545;">${countPrioritas} <span style="font-size:0.8rem; color:#666; font-weight:normal;">Warga</span></div>
+                    </div>
+                    <div style="background: white; padding: 15px; border-radius: 8px; border-bottom: 4px solid var(--th-main); box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+                        <div style="font-size:0.75rem; color:#666; font-weight:bold;">👥 JUMLAH KADER</div>
+                        <div style="font-size:1.8rem; font-weight:900; color:var(--th-main);">${jmlKader} <span style="font-size:0.8rem; color:#666; font-weight:normal;">User</span></div>
+                    </div>
+                    <div style="background: white; padding: 15px; border-radius: 8px; border-bottom: 4px solid #198754; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+                        <div style="font-size:0.75rem; color:#666; font-weight:bold;">🟢 KADER AKTIF (BULAN INI)</div>
+                        <div style="font-size:1.8rem; font-weight:900; color:#198754;">${userAktif} <span style="font-size:0.8rem; color:#666; font-weight:normal;">Login</span></div>
+                    </div>
+                    <div style="background: white; padding: 15px; border-radius: 8px; border-bottom: 4px solid #B8860B; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+                        <div style="font-size:0.75rem; color:#666; font-weight:bold;">🟠 KADER PASIF</div>
+                        <div style="font-size:1.8rem; font-weight:900; color:#B8860B;">${userPasif} <span style="font-size:0.8rem; color:#666; font-weight:normal;">Belum</span></div>
+                    </div>
+                </div>
+            `;
+        }
 
         content.innerHTML = `
             <div class="animate-fade">
                 <div style="background: linear-gradient(135deg, var(--th-dark) 0%, var(--th-main) 100%); color: var(--th-text); border-radius: 12px; padding: 25px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.15); border-bottom: 5px solid var(--th-accent);">
                     <p style="margin:0; color: var(--th-accent); font-weight: 800; font-size: 0.85rem; letter-spacing:1px; text-transform:uppercase;">MONITORING ${window.adminSession.role}</p>
-                    <h2 style="margin: 5px 0 10px 0; font-size: 1.6rem; word-wrap: break-word;">Wilayah Tugas: ${displayDesa}</h2>
+                    <h2 style="margin: 5px 0 10px 0; font-size: 1.6rem; word-wrap: break-word;">${labelWilayah} ${displayDesa}</h2>
                     <p style="margin:0; font-size:0.9rem; opacity:0.9;">Total Terhimpun (Sesuai Filter): <b>${filteredReg.length} Sasaran</b> & <b>${filteredPend.length} Kunjungan</b>.</p>
                 </div>
+                
                 ${filterWilayahHTML}
+                ${extraDashboardHTML}
+
                 <div style="margin-bottom: 15px; font-weight: bold; color: var(--th-dark); border-left: 4px solid var(--th-accent); padding-left: 10px;">📊 Akumulasi Sasaran Terdaftar</div>
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 25px;">
                     <div style="background: white; padding: 20px; border-radius: 8px; border-bottom: 4px solid var(--th-main); box-shadow: 0 2px 5px rgba(0,0,0,0.05);"><div style="font-size:0.8rem; color:#666; font-weight:bold;">👰 CATIN</div><div style="font-size:2rem; font-weight:900; color:var(--th-main);">${cCatin}</div></div>
@@ -194,7 +278,7 @@ window.renderAdminView = async (target) => {
             <div class="animate-fade">
                 <div style="background: linear-gradient(135deg, var(--th-dark) 0%, var(--th-main) 100%); padding: 25px; border-radius: 12px; color: white; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.15); border-bottom: 5px solid var(--th-accent);">
                     <h2 style="margin: 0 0 5px 0; font-size: 1.5rem; font-weight: 800; color:var(--th-accent);">👥 Database Tim Pendamping Keluarga</h2>
-                    <p style="margin: 0; opacity: 0.9; font-size: 0.9rem;">Pusat kendali dan monitoring kapilaritas SDM Kader TPK di wilayah tugas Anda.</p>
+                    <p style="margin: 0; opacity: 0.9; font-size: 0.9rem;">Pusat kendali dan monitoring kapilaritas SDM Kader TPK di wilayah Anda.</p>
                 </div>
                 <div id="tpk-stats-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 25px;"></div>
                 <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-bottom: 20px; border: 1px solid #e1e8ed;">
