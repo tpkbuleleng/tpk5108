@@ -1,9 +1,9 @@
 // ==========================================
-// 📊 DASHBOARD SUPERVISOR (V48 - METRIK KADER AKTIF & PRIORITAS)
+// 📊 DASHBOARD SUPERVISOR (V49 - FIX FILTER KECAMATAN & KADER AKTIF)
 // ==========================================
 import { clearStore, getAllData } from './db.js';
 
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwZiCcv7MCL21R1VqlOFsx1x_Ax_8yoxVwjIumG3kVYwDSQTfXX9VjQnz2GsAW2ItzAAQ/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx0_deS9S3tfxkhCW1zzg8lxZGnQZzpxfw3btNAuTCsSBsBsgaN4kqJ1TpbHnBNZrOrfA/exec';
 
 window.adminData = { registrasi: [], pendampingan: [], master_kader: [], master_pkb: [], master_tim_wilayah: [], master_menu: [], kader_logins: [] };
 window.adminSession = null;
@@ -92,6 +92,9 @@ window.renderAdminView = async (target) => {
     const content = document.getElementById('admin-content');
     const roleUpper = String(window.adminSession.role).toUpperCase();
     
+    // 🔥 PETA KODE KECAMATAN GLOBAL
+    const mapKecRev = { 'GRK': 'GEROKGAK', 'SRT': 'SERIRIT', 'BSB': 'BUSUNGBIU', 'BJR': 'BANJAR', 'SKS': 'SUKASADA', 'BLL': 'BULELENG', 'SWN': 'SAWAN', 'KBT': 'KUBUTAMBAHAN', 'TJK': 'TEJAKULA' };
+    
     // 🔥 FILTER DATA BERDASARKAN DROPDOWN
     let filteredReg = window.adminData.registrasi;
     let filteredPend = window.adminData.pendampingan;
@@ -112,7 +115,6 @@ window.renderAdminView = async (target) => {
     let optDesa = `<option value="ALL">🏘️ SEMUA DESA</option>`;
     const isKabupaten = roleUpper.includes('KABUPATEN') || roleUpper.includes('SUPER') || roleUpper.includes('MITRA');
     const isKecamatan = roleUpper.includes('KECAMATAN') || roleUpper === 'ADMIN';
-    const mapKecRev = { 'GRK': 'GEROKGAK', 'SRT': 'SERIRIT', 'BSB': 'BUSUNGBIU', 'BJR': 'BANJAR', 'SKS': 'SUKASADA', 'BLL': 'BULELENG', 'SWN': 'SAWAN', 'KBT': 'KUBUTAMBAHAN', 'TJK': 'TEJAKULA' };
     
     if (isKabupaten) {
         const listKec = [...new Set(window.adminData.registrasi.map(r => r.sumber_kecamatan).filter(Boolean))];
@@ -182,19 +184,27 @@ window.renderAdminView = async (target) => {
         const isTugas = roleUpper.includes('PKB') || roleUpper.includes('KADER');
         const labelWilayah = isTugas ? 'Wilayah Tugas:' : 'Wilayah :';
 
-        // 🔥 LOGIKA AKTIVITAS KADER UNTUK ADMIN
+        // 🔥 LOGIKA AKTIVITAS KADER UNTUK ADMIN (FIX V49: FULL MAPPING)
         let jmlKader = 0, userAktif = 0, userPasif = 0;
         const now = new Date(); const currMonth = now.getMonth(); const currYear = now.getFullYear();
         const safeLogins = window.adminData.kader_logins || [];
-        const loginMap = {}; safeLogins.forEach(l => loginMap[l.id] = l.login_terakhir);
+        const loginMap = {}; safeLogins.forEach(l => loginMap[String(l.id).toUpperCase()] = l.login_terakhir);
 
         let filteredKader = window.adminData.master_kader || [];
-        if (window.currentFilterKec !== 'ALL') filteredKader = filteredKader.filter(k => String(k.kecamatan).toUpperCase() === window.currentFilterKec);
-        if (window.currentFilterDesa !== 'ALL') filteredKader = filteredKader.filter(k => String(k.desa_kelurahan || k.desa).toUpperCase() === window.currentFilterDesa);
+        
+        // Memastikan keseragaman string kecamatan
+        if (window.currentFilterKec !== 'ALL') {
+            const filterKecFull = mapKecRev[window.currentFilterKec] || window.currentFilterKec;
+            filteredKader = filteredKader.filter(k => String(k.kecamatan).toUpperCase() === filterKecFull);
+        }
+        if (window.currentFilterDesa !== 'ALL') {
+            filteredKader = filteredKader.filter(k => String(k.desa_kelurahan || k.desa).toUpperCase() === window.currentFilterDesa);
+        }
         
         jmlKader = filteredKader.length;
         filteredKader.forEach(k => {
-            const idKader = k.id_kader || k.nik || k.id; const lastLog = loginMap[idKader];
+            const idKader = String(k.id_kader || k.nik || k.id).toUpperCase(); 
+            const lastLog = loginMap[idKader];
             if (lastLog && String(lastLog).trim() !== '') {
                 const dLog = new Date(lastLog);
                 if (dLog.getMonth() === currMonth && dLog.getFullYear() === currYear) userAktif++; else userPasif++;
