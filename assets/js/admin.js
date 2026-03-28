@@ -1,5 +1,5 @@
 // ==========================================
-// 📊 DASHBOARD SUPERVISOR (V44 - MOBILE RESPONSIVE SIDEBAR PATCH + AUTO FILTER)
+// 📊 DASHBOARD SUPERVISOR (V45 - INCLUDE DATABASE TPK)
 // ==========================================
 import { clearStore, getAllData } from './db.js';
 
@@ -248,11 +248,193 @@ window.renderAdminView = async (target) => {
             </div>
         `;
         
-        // Listener Filter Dashboard
         const btnKec = document.getElementById('dash-flt-kec');
         if (btnKec) btnKec.addEventListener('change', () => { window.currentFilterKec = btnKec.value; window.currentFilterDesa = 'ALL'; window.renderAdminView('dashboard'); });
         const btnDesa = document.getElementById('dash-flt-desa');
         if (btnDesa) btnDesa.addEventListener('change', () => { window.currentFilterDesa = btnDesa.value; window.renderAdminView('dashboard'); });
+    }
+
+    // ==========================================
+    // RENDER: DATABASE TPK (KADER) 🔥
+    // ==========================================
+    else if (target === 'database_tpk') {
+        content.innerHTML = `
+            <div class="animate-fade">
+                <div style="background: linear-gradient(135deg, var(--th-dark) 0%, var(--th-main) 100%); padding: 25px; border-radius: 12px; color: white; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.15); border-bottom: 5px solid var(--th-accent);">
+                    <h2 style="margin: 0 0 5px 0; font-size: 1.5rem; font-weight: 800; color:var(--th-accent);">👥 Database Tim Pendamping Keluarga</h2>
+                    <p style="margin: 0; opacity: 0.9; font-size: 0.9rem;">Pusat kendali dan monitoring kapilaritas SDM Kader TPK di wilayah tugas Anda.</p>
+                </div>
+
+                <div id="tpk-stats-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 25px;"></div>
+
+                <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-bottom: 20px; border: 1px solid #e1e8ed;">
+                    <h4 style="margin: 0 0 15px 0; color: var(--th-dark); font-size: 1rem; border-bottom: 2px solid var(--th-light); padding-bottom:10px;">🔍 Penyaringan Data Kader</h4>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px;">
+                        <select id="flt-tpk-kec" class="admin-input" style="font-weight:bold; color:var(--th-dark);"><option value="ALL">🌍 Semua Kecamatan</option></select>
+                        <select id="flt-tpk-desa" class="admin-input" style="font-weight:bold; color:var(--th-dark);"><option value="ALL">🏘️ Semua Desa/Kelurahan</option></select>
+                        <select id="flt-tpk-unsur" class="admin-input">
+                            <option value="ALL">🎓 Semua Unsur Kader</option>
+                            <option value="BIDAN">Bidan / Tenaga Kesehatan</option>
+                            <option value="PKK">Kader PKK</option>
+                            <option value="KB">Kader KB</option>
+                        </select>
+                        <select id="flt-tpk-bpjs" class="admin-input">
+                            <option value="ALL">🏥 Status BPJSTK (Semua)</option>
+                            <option value="YA">Memiliki BPJSTK</option>
+                            <option value="TIDAK">Belum Memiliki</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div style="background: white; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); overflow-x: auto; border: 1px solid #e1e8ed;">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>No.</th>
+                                <th>Nama Kader & Info</th>
+                                <th>Wilayah Tugas</th>
+                                <th style="text-align:center;">Unsur</th>
+                                <th style="text-align:center;">BPJSTK</th>
+                                <th style="text-align:center;">Penyalur MBG</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-database-tpk">
+                            <tr><td colspan="6" style="padding: 20px; text-align: center; color: #888;">⏳ Memproses data kader...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+
+        const masterKader = window.adminData.master_kader || [];
+        let dataKaderLokal = masterKader;
+
+        if (roleUpper.includes('KECAMATAN') || roleUpper === 'ADMIN') {
+            dataKaderLokal = masterKader.filter(k => String(k.kecamatan).toUpperCase() === String(window.adminSession.kecamatan).toUpperCase());
+        }
+        if (roleUpper === 'ADMIN_DESA' || roleUpper.includes('PKB')) {
+            const allowedDesa = String(window.adminSession.desa || '').toUpperCase().split(',').map(d => d.trim());
+            if (!allowedDesa.includes('ALL') && !allowedDesa.includes('-') && allowedDesa.length > 0 && allowedDesa[0] !== "") {
+                dataKaderLokal = masterKader.filter(k => allowedDesa.includes(String(k.desa_kelurahan || k.desa).toUpperCase()));
+            } else if (roleUpper.includes('PKB')) { 
+                dataKaderLokal = masterKader.filter(k => String(k.kecamatan).toUpperCase() === String(window.adminSession.kecamatan).toUpperCase());
+            }
+        }
+
+        const elKec = document.getElementById('flt-tpk-kec');
+        const elDesa = document.getElementById('flt-tpk-desa');
+        
+        if (elKec) {
+            const listKec = [...new Set(dataKaderLokal.map(k => k.kecamatan).filter(Boolean))].sort();
+            elKec.innerHTML = '<option value="ALL">🌍 Semua Kecamatan</option>' + listKec.map(k => `<option value="${k}">${k}</option>`).join('');
+            if (!roleUpper.includes('KABUPATEN') && !roleUpper.includes('SUPER') && !roleUpper.includes('MITRA')) {
+                elKec.value = window.adminSession.kecamatan; elKec.disabled = true;
+            }
+        }
+        if (elDesa) {
+            const listDesa = [...new Set(dataKaderLokal.map(k => k.desa_kelurahan || k.desa).filter(Boolean))].sort();
+            elDesa.innerHTML = '<option value="ALL">🏘️ Semua Desa/Kelurahan</option>' + listDesa.map(d => `<option value="${d}">${d}</option>`).join('');
+            if (roleUpper === 'ADMIN_DESA') {
+                elDesa.value = window.adminSession.desa; elDesa.disabled = true;
+            }
+        }
+
+        const renderTableKader = () => {
+            const valKec = elKec ? elKec.value : 'ALL';
+            const valDesa = elDesa ? elDesa.value : 'ALL';
+            const valUnsur = document.getElementById('flt-tpk-unsur').value;
+            const valBpjs = document.getElementById('flt-tpk-bpjs').value;
+
+            let finalData = dataKaderLokal.filter(k => {
+                let matchKec = valKec === 'ALL' || String(k.kecamatan).toUpperCase() === valKec.toUpperCase();
+                let matchDesa = valDesa === 'ALL' || String(k.desa_kelurahan || k.desa).toUpperCase() === valDesa.toUpperCase();
+                let unsurKader = String(k.unsur || k.unsur_kader || '').toUpperCase();
+                let matchUnsur = valUnsur === 'ALL' || unsurKader.includes(valUnsur);
+                let statusBpjs = String(k.bpjs || k.status_bpjs || 'TIDAK').toUpperCase();
+                let matchBpjs = valBpjs === 'ALL' || (valBpjs === 'YA' ? statusBpjs === 'YA' : statusBpjs !== 'YA');
+                return matchKec && matchDesa && matchUnsur && matchBpjs;
+            });
+
+            let statNakes=0, statPkk=0, statKb=0, statBpjs=0, statMbg=0;
+            finalData.forEach(k => {
+                let u = String(k.unsur || k.unsur_kader || '').toUpperCase();
+                if (u.includes('BIDAN') || u.includes('NAKES')) statNakes++;
+                else if (u.includes('PKK')) statPkk++;
+                else if (u.includes('KB')) statKb++;
+                if (String(k.bpjs || k.status_bpjs).toUpperCase() === 'YA') statBpjs++;
+                if (String(k.mbg || k.mengantar_mbg).toUpperCase() === 'YA') statMbg++;
+            });
+
+            document.getElementById('tpk-stats-container').innerHTML = `
+                <div style="background:white; border-bottom:4px solid var(--th-main); padding:20px; border-radius:8px; box-shadow:0 2px 5px rgba(0,0,0,0.05); text-align:center;">
+                    <div style="font-size:2rem; font-weight:900; color:var(--th-main);">${finalData.length}</div><div style="font-size:0.8rem; font-weight:bold; color:#666;">TOTAL KADER</div>
+                </div>
+                <div style="background:white; border-bottom:4px solid #198754; padding:20px; border-radius:8px; box-shadow:0 2px 5px rgba(0,0,0,0.05); text-align:center;">
+                    <div style="font-size:1.4rem; font-weight:900; color:#198754;">${statNakes} <span style="font-size:0.9rem; color:#666;">Bidan</span></div>
+                    <div style="font-size:0.8rem; color:#666; font-weight:bold; margin-top:5px;">${statPkk} PKK | ${statKb} KB</div>
+                </div>
+                <div style="background:white; border-bottom:4px solid #fd7e14; padding:20px; border-radius:8px; box-shadow:0 2px 5px rgba(0,0,0,0.05); text-align:center;">
+                    <div style="font-size:2rem; font-weight:900; color:#fd7e14;">${statBpjs}</div><div style="font-size:0.8rem; font-weight:bold; color:#666;">PUNYA BPJSTK</div>
+                </div>
+                <div style="background:white; border-bottom:4px solid #6f42c1; padding:20px; border-radius:8px; box-shadow:0 2px 5px rgba(0,0,0,0.05); text-align:center;">
+                    <div style="font-size:2rem; font-weight:900; color:#6f42c1;">${statMbg}</div><div style="font-size:0.8rem; font-weight:bold; color:#666;">PENYALUR MBG</div>
+                </div>
+            `;
+
+            const tbody = document.getElementById('tbody-database-tpk');
+            if (finalData.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="padding: 30px; text-align: center; color: #dc3545; font-weight:bold; font-size:1.1rem;">❌ Tidak ada data kader yang cocok dengan filter.</td></tr>';
+            } else {
+                tbody.innerHTML = finalData.map((k, idx) => {
+                    let stBpjs = String(k.bpjs || k.status_bpjs).toUpperCase() === 'YA' 
+                        ? '<span style="background:#e8f4fd; color:var(--th-main); padding:4px 10px; border-radius:12px; font-size:0.75rem; font-weight:bold; border:1px solid #b6d4fe;">✅ Terdaftar</span>' 
+                        : '<span style="background:#fdf3e8; color:#d35400; padding:4px 10px; border-radius:12px; font-size:0.75rem; font-weight:bold; border:1px solid #fadbd8;">❌ Belum</span>';
+                    
+                    let stMbg = String(k.mbg || k.mengantar_mbg).toUpperCase() === 'YA'
+                        ? '<span style="background:#e2f0cb; color:#198754; padding:4px 10px; border-radius:12px; font-size:0.75rem; font-weight:bold; border:1px solid #c3e6cb;">🍲 Penyalur</span>'
+                        : '<span style="color:#aaa; font-size:0.8rem; font-weight:bold;">-</span>';
+
+                    let un = String(k.unsur || k.unsur_kader || '').toUpperCase();
+                    let badgeUnsur = un.includes('BIDAN') || un.includes('NAKES') ? '🏥 Nakes/Bidan' : (un.includes('PKK') ? '👩‍🌾 Kader PKK' : '🔵 Kader KB');
+
+                    return `
+                    <tr>
+                        <td style="text-align:center; font-weight:bold; color:#666;">${idx + 1}</td>
+                        <td>
+                            <div style="font-weight:bold; color:var(--th-main); font-size:1.05rem;">${k.nama_kader || k.nama || '-'}</div>
+                            <div style="font-size:0.8rem; color:#666; margin-top:4px;">ID Kader / NIK: <b>${k.id_kader || k.nik || '-'}</b></div>
+                        </td>
+                        <td>
+                            <div style="font-weight:bold; color:var(--th-dark); font-size:0.95rem;">Tim ${k.id_tim || k.tim || '-'}</div>
+                            <div style="font-size:0.8rem; color:#666; margin-top:2px;">📍 ${k.desa_kelurahan || k.desa || '-'}, Kec. ${k.kecamatan || '-'}</div>
+                        </td>
+                        <td style="text-align:center;"><span style="background:#f8f9fa; border:1px solid #ced4da; padding:4px 8px; border-radius:4px; font-size:0.8rem; font-weight:bold; color:#495057;">${badgeUnsur}</span></td>
+                        <td style="text-align:center;">${stBpjs}</td>
+                        <td style="text-align:center;">${stMbg}</td>
+                    </tr>`;
+                }).join('');
+            }
+        };
+
+        ['flt-tpk-kec', 'flt-tpk-desa', 'flt-tpk-unsur', 'flt-tpk-bpjs'].forEach(id => {
+            const el = document.getElementById(id);
+            if(el) el.addEventListener('change', renderTableKader);
+        });
+
+        if (elKec && elDesa && !elKec.disabled) {
+            elKec.addEventListener('change', () => {
+                if(elKec.value === 'ALL') {
+                    const listDesa = [...new Set(dataKaderLokal.map(k => k.desa_kelurahan || k.desa).filter(Boolean))].sort();
+                    elDesa.innerHTML = '<option value="ALL">🏘️ Semua Desa/Kelurahan</option>' + listDesa.map(d => `<option value="${d}">${d}</option>`).join('');
+                } else {
+                    const filterD = dataKaderLokal.filter(k => String(k.kecamatan).toUpperCase() === elKec.value.toUpperCase());
+                    const listDesa = [...new Set(filterD.map(k => k.desa_kelurahan || k.desa).filter(Boolean))].sort();
+                    elDesa.innerHTML = '<option value="ALL">🏘️ Semua Desa/Kelurahan</option>' + listDesa.map(d => `<option value="${d}">${d}</option>`).join('');
+                }
+                renderTableKader();
+            });
+        }
+        renderTableKader();
     }
 
     // ==========================================
@@ -585,46 +767,15 @@ window.renderAdminView = async (target) => {
             document.getElementById('r-nip-pkb').innerText = pkbNip;
         };
 
-        // 🔥 FIX V44 AUTO FILTER RAM (MENGUBAH RENDER KE DIRECT RE-RENDER)
         document.getElementById('dash-flt-bulan').addEventListener('change', (e) => { window.currentFilterBulan = e.target.value; window.renderAdminView('cetak_laporan'); });
         document.getElementById('dash-flt-tahun').addEventListener('change', (e) => { window.currentFilterTahun = e.target.value; window.renderAdminView('cetak_laporan'); });
         
         const btnKec = document.getElementById('dash-flt-kec');
         if (btnKec) btnKec.addEventListener('change', () => { window.currentFilterKec = btnKec.value; window.currentFilterDesa = 'ALL'; window.renderAdminView('cetak_laporan'); });
         const btnDesa = document.getElementById('dash-flt-desa');
-        if (btnDesa) btnDesa.addEventListener('change', () => { window.currentFilterDesa = btnDesa.value; window.renderAdminView('cetak_laporan'); }); // Mengubah panggil renderReport() menjadi re-render layar utuh
+        if (btnDesa) btnDesa.addEventListener('change', () => { window.currentFilterDesa = btnDesa.value; window.renderAdminView('cetak_laporan'); }); 
 
         renderReport();
-    }
-};
-
-window.exportCSV = (jenis) => {
-    let filteredReg = window.adminData.registrasi;
-    let filteredPend = window.adminData.pendampingan;
-    
-    if (window.currentFilterKec !== 'ALL') {
-        filteredReg = filteredReg.filter(r => (r.sumber_kecamatan || '').toUpperCase() === window.currentFilterKec);
-        const allowedIds = new Set(filteredReg.map(r => r.id));
-        filteredPend = filteredPend.filter(p => allowedIds.has(p.id_sasaran_ref));
-    }
-    if (window.currentFilterDesa !== 'ALL') {
-        filteredReg = filteredReg.filter(r => (r.desa || '').toUpperCase() === window.currentFilterDesa);
-        const allowedIds = new Set(filteredReg.map(r => r.id));
-        filteredPend = filteredPend.filter(p => allowedIds.has(p.id_sasaran_ref));
-    }
-
-    if(jenis === 'sasaran') {
-        const data = filteredReg.map(r => {
-            let detail = {}; try { detail = JSON.parse(r.data_laporan || '{}'); } catch(e){}
-            return { ID_Registrasi: r.id, Tanggal_Daftar: r.created_at, Kader_Pendata: window.getKaderName(r.username), No_Tim: r.id_tim, Jenis_Sasaran: r.jenis_sasaran, Nama_Sasaran: r.nama_sasaran, Desa: r.desa, Dusun: r.dusun, NIK: detail.nik || '', No_KK: detail.nomor_kk || '', Tanggal_Lahir: detail.tanggal_lahir || '', Usia_Tahun: detail.usia_saat_daftar_tahun || '', Alamat_Lengkap: detail.alamat || detail.catin_alamat || '', Status_Aktif: r.status_sasaran };
-        });
-        exportToCSV('Data_Sasaran_TPK.csv', data);
-    } else if (jenis === 'pendampingan') {
-        const data = filteredPend.map(p => {
-            let detail = {}; try { detail = JSON.parse(p.data_laporan || '{}'); } catch(e){}
-            return { ID_Laporan: p.id, Waktu_Input: p.created_at, Kader_Pelapor: window.getKaderName(p.username), ID_Sasaran: p.id_sasaran_ref, Tgl_Kunjungan: detail.tgl_kunjungan || '', Catatan_Hasil: detail.catatan || '', Lokasi_GPS: p.lokasi_gps || '' };
-        });
-        exportToCSV('Data_Pendampingan_TPK.csv', data);
     }
 };
 
@@ -696,6 +847,7 @@ export const initAdmin = async (session) => {
                     <div class="admin-menu-item active" data-target="dashboard">📊 Dashboard Pemantauan</div>
                     <div class="admin-menu-item" data-target="sasaran">📋 Database Sasaran</div>
                     <div class="admin-menu-item" data-target="pendampingan">🤝 Riwayat Pendampingan</div>
+                    <div class="admin-menu-item" data-target="database_tpk">👥 Database Kader TPK</div>
                     <div class="admin-menu-item" data-target="cetak_laporan">🖨️ Cetak Laporan Kader</div>
                     <div class="admin-menu-item" data-target="reload_app" style="color:var(--th-accent); margin-top:10px; border-top: 1px solid rgba(255,255,255,0.1);">🔄 Pembaruan / Update Sistem</div>
                 </div>
