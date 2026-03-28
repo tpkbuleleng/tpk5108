@@ -1,5 +1,5 @@
 // ==========================================
-// 📊 DASHBOARD SUPERVISOR (V52 - PRECOMPUTE & LAZY LOAD API)
+// 📊 DASHBOARD SUPERVISOR (V53 - FIX REKAP READER)
 // ==========================================
 import { clearStore, getAllData } from './db.js';
 
@@ -44,10 +44,8 @@ const fetchDashboardSummary = async () => {
 
 // 🛑 FASE 3: TARIKAN DATA BERAT (ON-DEMAND)
 const fetchRawDataIfNeeded = async () => {
-    if (window.adminData.registrasi.length > 0) return true; // Sudah di-cache di memori
-    
+    if (window.adminData.registrasi.length > 0) return true; 
     document.getElementById('admin-content').innerHTML = `<div style="padding:50px; text-align:center; color:var(--th-main);"><div style="font-size:3rem; margin-bottom:15px; animation: spin 2s linear infinite;">⏳</div><h3>Menyedot Data Rinci...</h3><p>Membuka brankas data kecamatan. Harap tunggu...</p></div><style>@keyframes spin { 100% { transform: rotate(360deg); } }</style>`;
-    
     try {
         const url = `${SCRIPT_URL}?action=getAdminData&role=${window.adminSession.role}&kecamatan=${window.adminSession.kecamatan}&token=${window.adminSession.token}`;
         const response = await fetch(url); const res = await response.json();
@@ -85,11 +83,25 @@ window.renderAdminView = async (target) => {
     // ==========================================
     if (target === 'dashboard') {
         let cCatin = 0, cBumil = 0, cBufas = 0, cBaduta = 0, countPrioritas = 0, tLaporan = 0;
-        let pCatin = 0, pBumil = 0, pBufas = 0, pBaduta = 0; // Info rinci laporan pendampingan tidak disave di rekap, tapi totalnya iya
         
+        // 🔥 FIX V53: PERBAIKAN LOGIKA PENCOCOKAN WILAYAH
+        let fKecamatan = isKabupaten ? window.currentFilterKec : (mapKecRev[window.adminSession.kecamatan] || window.adminSession.kecamatan || 'ALL');
+        if (fKecamatan && fKecamatan !== 'ALL') fKecamatan = (mapKecRev[fKecamatan] || fKecamatan).toUpperCase();
+        
+        let fDesa = window.currentFilterDesa;
+        if (fDesa && fDesa !== 'ALL') fDesa = String(fDesa).toUpperCase().trim();
+        
+        const allowedDesaPKB = roleUpper.includes('PKB') ? String(window.adminSession.desa || '').toUpperCase().split(',').map(d => d.trim()) : [];
+
         window.adminData.rekapDashboard.forEach(d => {
-            if(window.currentFilterKec !== 'ALL' && d.kecamatan !== window.currentFilterKec && d.kecamatan !== mapKecRev[window.currentFilterKec]) return;
-            if(window.currentFilterDesa !== 'ALL' && d.desa !== window.currentFilterDesa) return;
+            const dKec = String(d.kecamatan || d.kec).toUpperCase();
+            const dDesa = String(d.desa).toUpperCase().trim();
+
+            if(fKecamatan !== 'ALL' && dKec !== fKecamatan && dKec !== mapKecRev[fKecamatan]) return;
+            if(fDesa !== 'ALL' && dDesa !== fDesa) return;
+            
+            // Jika PKB, pastikan desa yang direkap hanya yang masuk dalam scope tugasnya
+            if(roleUpper.includes('PKB') && !allowedDesaPKB.includes('ALL') && !allowedDesaPKB.includes('-') && !allowedDesaPKB.includes(dDesa)) return;
             
             cCatin += (parseInt(d.catin_aktif)||0); cBumil += (parseInt(d.bumil_aktif)||0);
             cBufas += (parseInt(d.bufas_aktif)||0); cBaduta += (parseInt(d.baduta_aktif)||0);
@@ -99,8 +111,13 @@ window.renderAdminView = async (target) => {
         // Cari Top 5 Kader
         let rankKader = [];
         window.adminData.rekapKader.forEach(k => {
-            if(window.currentFilterKec !== 'ALL' && k.kecamatan !== window.currentFilterKec && k.kecamatan !== mapKecRev[window.currentFilterKec]) return;
-            if(window.currentFilterDesa !== 'ALL' && k.desa !== window.currentFilterDesa) return;
+            const kKec = String(k.kecamatan || k.kec).toUpperCase();
+            const kDesa = String(k.desa).toUpperCase().trim();
+
+            if(fKecamatan !== 'ALL' && kKec !== fKecamatan && kKec !== mapKecRev[fKecamatan]) return;
+            if(fDesa !== 'ALL' && kDesa !== fDesa) return;
+            if(roleUpper.includes('PKB') && !allowedDesaPKB.includes('ALL') && !allowedDesaPKB.includes('-') && !allowedDesaPKB.includes(kDesa)) return;
+
             rankKader.push({ nama: k.nama_kader || k.username, lapor: parseInt(k.laporan_bln_ini)||0 });
         });
         rankKader.sort((a,b) => b.lapor - a.lapor); const topKader = rankKader.slice(0, 5);
@@ -109,9 +126,14 @@ window.renderAdminView = async (target) => {
         
         let jmlKader = 0, userAktif = 0, userPasif = 0;
         window.adminData.rekapKader.forEach(k => {
-            if(window.currentFilterKec !== 'ALL' && k.kecamatan !== window.currentFilterKec && k.kecamatan !== mapKecRev[window.currentFilterKec]) return;
-            if(window.currentFilterDesa !== 'ALL' && k.desa !== window.currentFilterDesa) return;
-            jmlKader++; if(k.status_aktif === 'AKTIF') userAktif++; else userPasif++;
+            const kKec = String(k.kecamatan || k.kec).toUpperCase();
+            const kDesa = String(k.desa).toUpperCase().trim();
+
+            if(fKecamatan !== 'ALL' && kKec !== fKecamatan && kKec !== mapKecRev[fKecamatan]) return;
+            if(fDesa !== 'ALL' && kDesa !== fDesa) return;
+            if(roleUpper.includes('PKB') && !allowedDesaPKB.includes('ALL') && !allowedDesaPKB.includes('-') && !allowedDesaPKB.includes(kDesa)) return;
+
+            jmlKader++; if(String(k.status_aktif).toUpperCase() === 'AKTIF') userAktif++; else userPasif++;
         });
 
         const showMetricAdmin = roleUpper.includes('PKB') || roleUpper.includes('ADMIN_KECAMATAN') || roleUpper.includes('ADMIN_KABUPATEN'); let extraDashboardHTML = ''; 
@@ -219,7 +241,6 @@ window.renderAdminView = async (target) => {
 
         let filteredPend = window.adminData.pendampingan;
         if (window.currentFilterKec !== 'ALL') { filteredPend = filteredPend.filter(p => (p.sumber_kecamatan || '').toUpperCase() === window.currentFilterKec || (p.kecamatan || '').toUpperCase() === mapKecRev[window.currentFilterKec]); }
-        // Filter desa untuk pendampingan sedikit tricky (harus join reg), kita batasi via pencarian teks saja untuk kecepatan
         
         content.innerHTML = `
             <div class="animate-fade">
@@ -355,7 +376,6 @@ export const initAdmin = async (session) => {
     document.getElementById('btn-admin-refresh').onclick = async () => {
         const btn = document.getElementById('btn-admin-refresh'); btn.innerText = "⏳ Menyedot..."; btn.disabled = true;
         
-        // Hapus cache memori lokal agar fetch ulang
         window.adminData.registrasi = []; window.adminData.pendampingan = [];
         
         const success = await fetchDashboardSummary();
@@ -363,7 +383,6 @@ export const initAdmin = async (session) => {
         btn.innerText = "🔄 Segarkan Data"; btn.disabled = false;
     };
 
-    // 🚀 INIT LOAD: HANYA LOAD DASHBOARD SUMMARY (INSTANT)
     const success = await fetchDashboardSummary();
     if(success) {
         buildDynamicMenus(); document.getElementById('admin-page-title').innerText = 'Dashboard Pemantauan'; window.renderAdminView('dashboard');
