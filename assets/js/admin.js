@@ -57,11 +57,10 @@ const fetchAdminData = async () => {
             }
             window.adminData.registrasi = rawReg;
             window.adminData.pendampingan = rawPend;
-            
             // 🔥 Mengambil data dari RAM
             window.adminData.master_kader = masterData.data ? masterData.data.master_kader || [] : [];
             window.adminData.master_pkb = masterData.data ? masterData.data.master_pkb || [] : [];
-            window.adminData.master_tim_wilayah = masterData.data ? masterData.data.master_tim_wilayah || masterData.data.TIM_WILAYAH || [] : [];
+            window.adminData.master_tim_wilayah = masterData.data ? masterData.data.master_tim_wilayah || [] : [];
             return true;
         }
         return false;
@@ -259,7 +258,7 @@ window.renderAdminView = async (target) => {
     }
 
     // ==========================================
-    // RENDER: DATABASE TPK (KADER) 🔥 FIX V46
+    // RENDER: DATABASE TPK (KADER) 🔥 FIX
     // ==========================================
     else if (target === 'database_tpk') {
         content.innerHTML = `
