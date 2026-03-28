@@ -1,5 +1,5 @@
 // ==========================================
-// 📱 APLIKASI KADER TPK (V60 - JWT SECURITY PATCH)
+// 📱 APLIKASI KADER TPK (V61 - JWT SECURITY & AUTO-EJECT PATCH)
 // ==========================================
 import { initDB, putData, getDataById, deleteData, getAllData, clearStore } from './db.js';
 import { downloadMasterData, uploadData } from './sync.js';
@@ -9,7 +9,7 @@ window.AppDB = { getAllData, getDataById, putData };
 const getEl = (id) => document.getElementById(id);
 const SCRIPT_URL_GLOBAL = 'https://script.google.com/macros/s/AKfycbwZiCcv7MCL21R1VqlOFsx1x_Ax_8yoxVwjIumG3kVYwDSQTfXX9VjQnz2GsAW2ItzAAQ/exec';
 
-// FUNGSI AUTO KICK JIKA TOKEN MATI
+// FUNGSI AUTO KICK JIKA TOKEN MATI ATAU SESI CACAT
 window.handleAuthError = async (res) => {
     if (res && res.status === 'error' && String(res.message).includes('401')) {
         alert(res.message + "\n\nSistem akan mengeluarkan Anda untuk keamanan.");
@@ -96,19 +96,27 @@ const cekPengumuman = async (userRole) => {
 };
 
 // ==========================================
-// INISIALISASI & ROUTER
+// INISIALISASI & ROUTER (FIX V61: AUTO EJECT)
 // ==========================================
 const initApp = async () => {
     try {
         await initDB(); const session = await getDataById('kader_session', 'active_user');
         const vSplash = document.getElementById('view-splash'); const vLogin = document.getElementById('view-login'); const vApp = document.getElementById('view-app');
 
+        // 🔥 Cek apakah ada sesi DAN apakah token JWT sudah ada
         if (session && session.token) {
             const roleUpper = String(session.role).toUpperCase();
             if (roleUpper.includes('SUPER')) { import('./super.js').then(module => { module.initSuperAdmin(session); }).catch(err => { alert("Modul Super Admin tidak ditemukan!"); window.logErrorToServer('Load Super Module', err); }); } 
             else if (roleUpper.includes('ADMIN') || roleUpper.includes('PKB') || roleUpper.includes('MITRA') || roleUpper === 'ADMIN_DESA') { if (typeof initAdmin === 'function') { initAdmin(session); } else { import('./admin.js').then(module => module.initAdmin(session)).catch(err => window.logErrorToServer('Load Admin Module', err)); } } 
             else { masukKeAplikasi(session); }
-        } else { if(vSplash) vSplash.style.display = 'none'; if(vApp) vApp.classList.add('hidden'); if(vLogin) vLogin.classList.remove('hidden'); }
+        } else { 
+            // 🔥 TENDANG PAKSA JIKA SESI LAMA / TIDAK ADA TOKEN
+            if (session) {
+                console.warn("Mendeteksi Sesi Lama tanpa Token. Menghapus sesi...");
+                await clearStore('kader_session');
+            }
+            if(vSplash) vSplash.style.display = 'none'; if(vApp) vApp.classList.add('hidden'); if(vLogin) vLogin.classList.remove('hidden'); 
+        }
     } catch (e) { window.logErrorToServer('initApp', e); }
 };
 
@@ -337,6 +345,18 @@ window.renderKonten = async (target) => {
                                 <div class="form-group"><label>Desa / Kelurahan <span style="color:red">*</span></label><select name="desa" id="reg-desa" class="form-control"></select></div>
                                 <div class="form-group"><label>Dusun / RW <span style="color:red">*</span></label><select name="dusun" id="reg-dusun" class="form-control"></select></div>
                                 <div class="form-group"><label>Alamat Lengkap <span style="color:red">*</span></label><textarea name="alamat" id="reg-alamat" class="form-control" rows="2"></textarea></div>
+                            </div>
+
+                            <div id="wilayah-catin" style="display:none; padding:15px; background:#eef2f5; border-radius:8px; border:1px solid #ced4da; margin-top:15px;">
+                                <h4 style="margin-bottom: 15px; color: var(--primary);">Alamat Domisili Setelah Menikah</h4>
+                                <div class="form-group"><label>Kabupaten/Kota <span style="color:red">*</span></label><select name="catin_kab" id="catin-kab" class="form-control"></select></div>
+                                <div class="form-group"><label>Kecamatan <span style="color:red">*</span></label><select name="catin_kec" id="catin-kec" class="form-control"></select></div>
+                                <div class="form-group"><label>Desa/Kelurahan <span style="color:red">*</span></label><select name="catin_desa" id="catin-desa" class="form-control"></select></div>
+                                <div class="form-group"><label>Dusun / RW <span style="color:red">*</span></label>
+                                    <select id="catin-dusun-sel" class="form-control" style="display:none;"></select>
+                                    <input type="text" id="catin-dusun-txt" class="form-control" placeholder="Ketik nama Dusun/RW...">
+                                </div>
+                                <div class="form-group"><label>Alamat Lengkap <span style="color:red">*</span></label><textarea name="catin_alamat" id="catin-alamat" class="form-control" rows="2"></textarea></div>
                             </div>
 
                             <button type="submit" class="btn btn-primary" style="width:100%; margin-top:15px; font-size:1.1rem; padding:12px;">💾 ${isEdit ? 'Update Data Sasaran' : 'Simpan Sasaran'}</button>
@@ -984,7 +1004,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const res = await response.json();
 
                 if (res.status === 'success') {
-                    // 🔥 SIMPAN TOKEN JWT!
+                    // 🔥 SIMPAN TOKEN JWT LITE!
                     res.session.token = res.token;
                     await initDB(); await putData('kader_session', res.session);
                     if(getEl('kader-id')) getEl('kader-id').value = ''; if(getEl('kader-pin')) getEl('kader-pin').value = '';
