@@ -1,11 +1,11 @@
 // ==========================================
-// 📊 DASHBOARD SUPERVISOR (V45 - INCLUDE DATABASE TPK)
+// 📊 DASHBOARD SUPERVISOR (V46 - MONITORING TPK & MASTER DATA PATCH)
 // ==========================================
 import { clearStore, getAllData } from './db.js';
 
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx0_deS9S3tfxkhCW1zzg8lxZGnQZzpxfw3btNAuTCsSBsBsgaN4kqJ1TpbHnBNZrOrfA/exec';
 
-window.adminData = { registrasi: [], pendampingan: [], master_kader: [], master_pkb: [] };
+window.adminData = { registrasi: [], pendampingan: [], master_kader: [], master_pkb: [], master_tim_wilayah: [] };
 window.adminSession = null;
 window.currentFilterKec = 'ALL';
 window.currentFilterDesa = 'ALL';
@@ -35,7 +35,7 @@ const fetchAdminData = async () => {
         const url = `${SCRIPT_URL}?action=getAdminData&role=${window.adminSession.role}&kecamatan=${window.adminSession.kecamatan}`;
         const [response, masterRes] = await Promise.all([
             fetch(url),
-            fetch(SCRIPT_URL)
+            fetch(SCRIPT_URL) // Mengambil Master Data dari doGet
         ]);
         
         const res = await response.json();
@@ -57,8 +57,11 @@ const fetchAdminData = async () => {
             }
             window.adminData.registrasi = rawReg;
             window.adminData.pendampingan = rawPend;
+            
+            // 🔥 Mengambil data dari RAM
             window.adminData.master_kader = masterData.data ? masterData.data.master_kader || [] : [];
             window.adminData.master_pkb = masterData.data ? masterData.data.master_pkb || [] : [];
+            window.adminData.master_tim_wilayah = masterData.data ? masterData.data.master_tim_wilayah || masterData.data.TIM_WILAYAH || [] : [];
             return true;
         }
         return false;
@@ -188,7 +191,7 @@ window.renderAdminView = async (target) => {
         content.innerHTML = `
             <div class="animate-fade">
                 <div style="background: linear-gradient(135deg, var(--th-dark) 0%, var(--th-main) 100%); color: var(--th-text); border-radius: 12px; padding: 25px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.15); border-bottom: 5px solid var(--th-accent);">
-                    <p style="margin:0; color: var(--th-accent); font-weight: 800; font-size: 0.85rem; letter-spacing:1px; text-transform:uppercase;">RADAR ${window.adminSession.role}</p>
+                    <p style="margin:0; color: var(--th-accent); font-weight: 800; font-size: 0.85rem; letter-spacing:1px; text-transform:uppercase;">MONITORING ${window.adminSession.role}</p>
                     <h2 style="margin: 5px 0 10px 0; font-size: 1.6rem; word-wrap: break-word;">Wilayah Tugas: ${displayDesa}</h2>
                     <p style="margin:0; font-size:0.9rem; opacity:0.9;">Total Terhimpun (Sesuai Filter): <b>${filteredReg.length} Sasaran</b> & <b>${filteredPend.length} Kunjungan</b>.</p>
                 </div>
@@ -248,6 +251,7 @@ window.renderAdminView = async (target) => {
             </div>
         `;
         
+        // Listener Filter Dashboard
         const btnKec = document.getElementById('dash-flt-kec');
         if (btnKec) btnKec.addEventListener('change', () => { window.currentFilterKec = btnKec.value; window.currentFilterDesa = 'ALL'; window.renderAdminView('dashboard'); });
         const btnDesa = document.getElementById('dash-flt-desa');
@@ -255,7 +259,7 @@ window.renderAdminView = async (target) => {
     }
 
     // ==========================================
-    // RENDER: DATABASE TPK (KADER) 🔥
+    // RENDER: DATABASE TPK (KADER) 🔥 FIX V46
     // ==========================================
     else if (target === 'database_tpk') {
         content.innerHTML = `
@@ -290,12 +294,12 @@ window.renderAdminView = async (target) => {
                     <table class="admin-table">
                         <thead>
                             <tr>
-                                <th>No.</th>
-                                <th>Nama Kader & Info</th>
-                                <th>Wilayah Tugas</th>
-                                <th style="text-align:center;">Unsur</th>
-                                <th style="text-align:center;">BPJSTK</th>
-                                <th style="text-align:center;">Penyalur MBG</th>
+                                <th style="padding: 12px; border-bottom: 2px solid var(--th-accent);">No.</th>
+                                <th style="padding: 12px; border-bottom: 2px solid var(--th-accent);">Nama Kader / L/P / No. Tim</th>
+                                <th style="padding: 12px; border-bottom: 2px solid var(--th-accent);">Wilayah Tugas</th>
+                                <th style="padding: 12px; border-bottom: 2px solid var(--th-accent); text-align:center;">Unsur TPK</th>
+                                <th style="padding: 12px; border-bottom: 2px solid var(--th-accent); text-align:center;">BPJSTK</th>
+                                <th style="padding: 12px; border-bottom: 2px solid var(--th-accent); text-align:center;">Penyalur MBG</th>
                             </tr>
                         </thead>
                         <tbody id="tbody-database-tpk">
@@ -306,7 +310,9 @@ window.renderAdminView = async (target) => {
             </div>
         `;
 
+        // Ambil dari RAM (window.adminData) bukan IndexedDB
         const masterKader = window.adminData.master_kader || [];
+        const timWilayah = window.adminData.master_tim_wilayah || [];
         let dataKaderLokal = masterKader;
 
         if (roleUpper.includes('KECAMATAN') || roleUpper === 'ADMIN') {
@@ -348,16 +354,21 @@ window.renderAdminView = async (target) => {
             let finalData = dataKaderLokal.filter(k => {
                 let matchKec = valKec === 'ALL' || String(k.kecamatan).toUpperCase() === valKec.toUpperCase();
                 let matchDesa = valDesa === 'ALL' || String(k.desa_kelurahan || k.desa).toUpperCase() === valDesa.toUpperCase();
-                let unsurKader = String(k.unsur || k.unsur_kader || '').toUpperCase();
+                
+                // Menggunakan kolom k.unsur_tpk sesuai database
+                let unsurKader = String(k.unsur_tpk || k.unsur || k.unsur_kader || '').toUpperCase();
                 let matchUnsur = valUnsur === 'ALL' || unsurKader.includes(valUnsur);
+                if (valUnsur === 'BIDAN') matchUnsur = unsurKader.includes('BIDAN') || unsurKader.includes('NAKES');
+
                 let statusBpjs = String(k.bpjs || k.status_bpjs || 'TIDAK').toUpperCase();
                 let matchBpjs = valBpjs === 'ALL' || (valBpjs === 'YA' ? statusBpjs === 'YA' : statusBpjs !== 'YA');
+                
                 return matchKec && matchDesa && matchUnsur && matchBpjs;
             });
 
             let statNakes=0, statPkk=0, statKb=0, statBpjs=0, statMbg=0;
             finalData.forEach(k => {
-                let u = String(k.unsur || k.unsur_kader || '').toUpperCase();
+                let u = String(k.unsur_tpk || k.unsur || k.unsur_kader || '').toUpperCase();
                 if (u.includes('BIDAN') || u.includes('NAKES')) statNakes++;
                 else if (u.includes('PKK')) statPkk++;
                 else if (u.includes('KB')) statKb++;
@@ -394,19 +405,27 @@ window.renderAdminView = async (target) => {
                         ? '<span style="background:#e2f0cb; color:#198754; padding:4px 10px; border-radius:12px; font-size:0.75rem; font-weight:bold; border:1px solid #c3e6cb;">🍲 Penyalur</span>'
                         : '<span style="color:#aaa; font-size:0.8rem; font-weight:bold;">-</span>';
 
-                    let un = String(k.unsur || k.unsur_kader || '').toUpperCase();
-                    let badgeUnsur = un.includes('BIDAN') || un.includes('NAKES') ? '🏥 Nakes/Bidan' : (un.includes('PKK') ? '👩‍🌾 Kader PKK' : '🔵 Kader KB');
+                    let un = String(k.unsur_tpk || k.unsur || k.unsur_kader || '').toUpperCase();
+                    let badgeUnsur = (un.includes('BIDAN') || un.includes('NAKES')) ? '🏥 Nakes/Bidan' : (un.includes('PKK') ? '👩‍🌾 Kader PKK' : '🔵 Kader KB');
+
+                    let jk = String(k.jenis_kelamin || '').toUpperCase();
+                    let charJk = (jk === 'LK' || jk === 'LAKI-LAKI') ? 'L' : ((jk === 'PR' || jk === 'PEREMPUAN') ? 'P' : '-');
+
+                    // 🔍 Pencarian Dusun via Tim Wilayah
+                    let myDusun = timWilayah.filter(tw => tw.id_tim === k.id_tim).map(tw => tw.dusun_rw).join(', ');
+                    if (!myDusun || myDusun.trim() === '') myDusun = '-';
 
                     return `
                     <tr>
                         <td style="text-align:center; font-weight:bold; color:#666;">${idx + 1}</td>
                         <td>
                             <div style="font-weight:bold; color:var(--th-main); font-size:1.05rem;">${k.nama_kader || k.nama || '-'}</div>
-                            <div style="font-size:0.8rem; color:#666; margin-top:4px;">ID Kader / NIK: <b>${k.id_kader || k.nik || '-'}</b></div>
+                            <div style="font-size:0.8rem; color:#666; margin-top:4px;">JK: <b style="color:#0A2342;">${charJk}</b> | Tim: <b>${k.nomor_tim || k.id_tim || '-'}</b></div>
                         </td>
                         <td>
-                            <div style="font-weight:bold; color:var(--th-dark); font-size:0.95rem;">Tim ${k.id_tim || k.tim || '-'}</div>
-                            <div style="font-size:0.8rem; color:#666; margin-top:2px;">📍 ${k.desa_kelurahan || k.desa || '-'}, Kec. ${k.kecamatan || '-'}</div>
+                            <div style="font-weight:bold; color:var(--th-dark); font-size:0.95rem;">Kec. ${k.kecamatan || '-'}</div>
+                            <div style="font-size:0.8rem; color:#666; margin-top:2px;">Desa: <b>${k.desa_kelurahan || k.desa || '-'}</b></div>
+                            <div style="font-size:0.8rem; color:#888; margin-top:2px;">Dusun: ${myDusun}</div>
                         </td>
                         <td style="text-align:center;"><span style="background:#f8f9fa; border:1px solid #ced4da; padding:4px 8px; border-radius:4px; font-size:0.8rem; font-weight:bold; color:#495057;">${badgeUnsur}</span></td>
                         <td style="text-align:center;">${stBpjs}</td>
@@ -779,6 +798,36 @@ window.renderAdminView = async (target) => {
     }
 };
 
+window.exportCSV = (jenis) => {
+    let filteredReg = window.adminData.registrasi;
+    let filteredPend = window.adminData.pendampingan;
+    
+    if (window.currentFilterKec !== 'ALL') {
+        filteredReg = filteredReg.filter(r => (r.sumber_kecamatan || '').toUpperCase() === window.currentFilterKec);
+        const allowedIds = new Set(filteredReg.map(r => r.id));
+        filteredPend = filteredPend.filter(p => allowedIds.has(p.id_sasaran_ref));
+    }
+    if (window.currentFilterDesa !== 'ALL') {
+        filteredReg = filteredReg.filter(r => (r.desa || '').toUpperCase() === window.currentFilterDesa);
+        const allowedIds = new Set(filteredReg.map(r => r.id));
+        filteredPend = filteredPend.filter(p => allowedIds.has(p.id_sasaran_ref));
+    }
+
+    if(jenis === 'sasaran') {
+        const data = filteredReg.map(r => {
+            let detail = {}; try { detail = JSON.parse(r.data_laporan || '{}'); } catch(e){}
+            return { ID_Registrasi: r.id, Tanggal_Daftar: r.created_at, Kader_Pendata: window.getKaderName(r.username), No_Tim: r.id_tim, Jenis_Sasaran: r.jenis_sasaran, Nama_Sasaran: r.nama_sasaran, Desa: r.desa, Dusun: r.dusun, NIK: detail.nik || '', No_KK: detail.nomor_kk || '', Tanggal_Lahir: detail.tanggal_lahir || '', Usia_Tahun: detail.usia_saat_daftar_tahun || '', Alamat_Lengkap: detail.alamat || detail.catin_alamat || '', Status_Aktif: r.status_sasaran };
+        });
+        exportToCSV('Data_Sasaran_TPK.csv', data);
+    } else if (jenis === 'pendampingan') {
+        const data = filteredPend.map(p => {
+            let detail = {}; try { detail = JSON.parse(p.data_laporan || '{}'); } catch(e){}
+            return { ID_Laporan: p.id, Waktu_Input: p.created_at, Kader_Pelapor: window.getKaderName(p.username), ID_Sasaran: p.id_sasaran_ref, Tgl_Kunjungan: detail.tgl_kunjungan || '', Catatan_Hasil: detail.catatan || '', Lokasi_GPS: p.lokasi_gps || '' };
+        });
+        exportToCSV('Data_Pendampingan_TPK.csv', data);
+    }
+};
+
 // ==========================================
 // 4. INISIALISASI KERANGKA (SKELETON)
 // ==========================================
@@ -840,10 +889,10 @@ export const initAdmin = async (session) => {
             <div id="admin-sidebar" style="width:260px; background: linear-gradient(180deg, var(--th-dark) 0%, var(--th-main) 100%); color:var(--th-text); display:flex; flex-direction:column; box-shadow: 2px 0 10px rgba(0,0,0,0.15); flex-shrink: 0;">
                 <div style="padding: 25px 20px; border-bottom: 1px solid rgba(255,255,255,0.1); text-align:center;">
                     <div style="font-size: 2.5rem; margin-bottom: 5px;">📡</div>
-                    <h3 style="margin:0; font-weight:900; line-height:1.2; color:var(--th-accent); letter-spacing:1px;">RADAR TPK</h3>
+                    <h3 style="margin:0; font-weight:900; line-height:1.2; color:var(--th-accent); letter-spacing:1px;">MONITORING TPK</h3>
                     <div style="font-size:0.75rem; color:var(--th-text); font-weight:bold; margin-top:5px; opacity:0.9;">PANEL SUPERVISOR</div>
                 </div>
-                <div style="flex:1; padding: 20px 0; overflow-y:auto;">
+                <div style="flex:1; padding: 20px 0; overflow-y:auto;" id="admin-menu-container">
                     <div class="admin-menu-item active" data-target="dashboard">📊 Dashboard Pemantauan</div>
                     <div class="admin-menu-item" data-target="sasaran">📋 Database Sasaran</div>
                     <div class="admin-menu-item" data-target="pendampingan">🤝 Riwayat Pendampingan</div>
@@ -891,52 +940,84 @@ export const initAdmin = async (session) => {
         } 
     };
     
-    const menuItems = document.querySelectorAll('.admin-menu-item');
-    menuItems.forEach(item => { 
-        item.onclick = async () => { 
-            const activeTarget = item.getAttribute('data-target');
-            
-            if (activeTarget === 'reload_app') {
-                if (confirm("🔄 TARIK PEMBARUAN SISTEM?\n\nPerintah ini akan membersihkan memori sistem (Cache) dan memuat ulang aplikasi ke versi terbaru dari Server.\n\nLanjutkan?")) {
-                    try {
-                        if ('serviceWorker' in navigator) {
-                            const regs = await navigator.serviceWorker.getRegistrations();
-                            for (let r of regs) { await r.unregister(); }
+    // Terapkan Event Listener Menu Dinamis
+    const attachMenuListeners = () => {
+        const menuItems = document.querySelectorAll('.admin-menu-item');
+        menuItems.forEach(item => { 
+            item.onclick = async () => { 
+                const activeTarget = item.getAttribute('data-target');
+                
+                if (activeTarget === 'reload_app') {
+                    if (confirm("🔄 TARIK PEMBARUAN SISTEM?\n\nPerintah ini akan membersihkan memori sistem (Cache) dan memuat ulang aplikasi ke versi terbaru dari Server.\n\nLanjutkan?")) {
+                        try {
+                            if ('serviceWorker' in navigator) {
+                                const regs = await navigator.serviceWorker.getRegistrations();
+                                for (let r of regs) { await r.unregister(); }
+                            }
+                            if (window.caches) {
+                                const keys = await caches.keys();
+                                for (let k of keys) { await caches.delete(k); }
+                            }
+                            alert("✅ Memori sistem berhasil dibersihkan! Memuat versi terbaru...");
+                            window.location.reload(true);
+                        } catch (e) {
+                            console.error("Gagal menghapus cache:", e);
+                            window.location.reload(true);
                         }
-                        if (window.caches) {
-                            const keys = await caches.keys();
-                            for (let k of keys) { await caches.delete(k); }
-                        }
-                        alert("✅ Memori sistem berhasil dibersihkan! Memuat versi terbaru...");
-                        window.location.reload(true);
-                    } catch (e) {
-                        console.error("Gagal menghapus cache:", e);
-                        window.location.reload(true);
+                    }
+                    return; 
+                }
+
+                menuItems.forEach(m => m.classList.remove('active')); 
+                item.classList.add('active'); 
+                document.getElementById('admin-page-title').innerText = item.innerText.replace(/[^\w\s]/gi, '').trim(); 
+                window.renderAdminView(activeTarget); 
+                
+                if(window.innerWidth <= 768) {
+                    sidebar.classList.remove('active');
+                    backdrop.classList.remove('active');
+                }
+            }; 
+        });
+    };
+
+    // Bangun menu dinamis dari database (Jika ada)
+    const buildDynamicMenus = async () => {
+        try {
+            const allMenu = await getAllData('master_menu').catch(()=>[]);
+            if(allMenu && allMenu.length > 0) {
+                const rUpper = String(window.adminSession.role).toUpperCase();
+                const filteredMenu = allMenu.filter(m => { 
+                    const roles = String(m.role_akses || '').toUpperCase(); 
+                    const isActive = String(m.is_active || 'Y').toUpperCase() === 'Y'; 
+                    return isActive && roles.includes(rUpper); 
+                }).sort((a,b) => (parseInt(a.urutan)||0) - (parseInt(b.urutan)||0));
+
+                if (filteredMenu.length > 0) {
+                    let menuHtml = '';
+                    filteredMenu.forEach(p => {
+                        let textColor = p.target_view === 'reload_app' ? 'color:var(--th-accent); margin-top:10px; border-top: 1px solid rgba(255,255,255,0.1);' : '';
+                        menuHtml += `<div class="admin-menu-item" data-target="${p.target_view}" style="${textColor}">${p.icon || '📌'} ${p.label_menu}</div>`;
+                    });
+                    const container = document.getElementById('admin-menu-container');
+                    if(container) {
+                        container.innerHTML = menuHtml;
+                        attachMenuListeners(); // Re-attach
                     }
                 }
-                return; 
-            }
-
-            menuItems.forEach(m => m.classList.remove('active')); 
-            item.classList.add('active'); 
-            document.getElementById('admin-page-title').innerText = item.innerText.replace(/[^\w\s]/gi, '').trim(); 
-            window.renderAdminView(activeTarget); 
-            
-            // Auto close sidebar on mobile after clicking menu
-            if(window.innerWidth <= 768) {
-                sidebar.classList.remove('active');
-                backdrop.classList.remove('active');
-            }
-        }; 
-    });
+            } else { attachMenuListeners(); }
+        } catch(e) { attachMenuListeners(); }
+    };
+    await buildDynamicMenus();
 
     document.getElementById('btn-admin-refresh').onclick = async () => {
         const btn = document.getElementById('btn-admin-refresh');
         btn.innerText = "⏳ Menyedot..."; btn.disabled = true;
         const success = await fetchAdminData();
         if(success) {
-            const activeMenu = document.querySelector('.admin-menu-item.active').getAttribute('data-target');
-            window.renderAdminView(activeMenu);
+            const activeMenuEl = document.querySelector('.admin-menu-item.active');
+            if(activeMenuEl) window.renderAdminView(activeMenuEl.getAttribute('data-target'));
+            else window.renderAdminView('dashboard');
         } else {
             alert("Gagal menyegarkan data. Periksa koneksi internet.");
         }
