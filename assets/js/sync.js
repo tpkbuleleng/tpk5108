@@ -1,16 +1,25 @@
-import { putData, getAllData } from './db.js';
+import { putData, getAllData, getDataById } from './db.js';
 
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwZiCcv7MCL21R1VqlOFsx1x_Ax_8yoxVwjIumG3kVYwDSQTfXX9VjQnz2GsAW2ItzAAQ/exec';
 
 export const uploadData = async () => {
     try {
+        // 1. Ambil Sesi dan Token JWT dari Memori Lokal
+        const session = await getDataById('kader_session', 'active_user');
+        if(!session || !session.token) return { status: false, count: 0 };
+
         const antrean = await getAllData('sync_queue');
         const dataUnsynced = antrean.filter(a => !a.is_synced);
         
         // Jika tidak ada data yang perlu dikirim, laporkan sukses (0 dikirim)
         if(dataUnsynced.length === 0) return { status: true, count: 0 };
         
-        const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify(dataUnsynced) });
+        // 🔥 INJEKSI TOKEN KE DALAM SETIAP LAPORAN (AGAR LOLOS MIDDLEWARE)
+        const payloadToSend = dataUnsynced.map(item => {
+            return { ...item, token: session.token };
+        });
+
+        const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify(payloadToSend) });
         const res = await response.json();
         
         if(res.status === 'success') {
@@ -29,17 +38,27 @@ export const uploadData = async () => {
 
 export const downloadMasterData = async () => {
     try {
-        const response = await fetch(SCRIPT_URL);
+        // 1. Ambil Sesi dan Token JWT
+        const session = await getDataById('kader_session', 'active_user');
+        if(!session || !session.token) return false;
+
+        // 🔥 INJEKSI TOKEN KE DALAM URL (GET REQUEST)
+        const response = await fetch(`${SCRIPT_URL}?token=${session.token}`);
         const res = await response.json();
         
+        // 🛡️ Tangkap jika ditendang oleh Middleware (Token Expired/Salah)
+        if (res.status === 'error' && String(res.message).includes('401')) {
+            console.error("Akses Ditolak: Token JWT Invalid");
+            return false;
+        }
+
         if (res.status === 'success') {
             const d = res.data;
             const stores = [
                 'master_kader', 'master_tim', 'master_tim_wilayah', 
                 'master_pertanyaan', 'master_wilayah_bali', 'standar_antropometri', 
                 'master_kembang', 'master_wilayah', 'master_menu', 'master_widget',
-                'master_pkb',
-                'master_pengumuman' // 📢 PATCH: Pipa logistik Pusat Siaran berhasil disambung!
+                'master_pkb', 'master_pengumuman'
             ];
             
             for (let s of stores) {
@@ -53,21 +72,19 @@ export const downloadMasterData = async () => {
         return false;
     } catch (error) { 
         console.error("Error downloadMasterData:", error);
-        return false; // Jangan gunakan throw agar tidak menghentikan keseluruhan fungsi
+        return false;
     }
 };
 
 window.jalankanSinkronisasi = async () => {
     try {
-        // 🔥 TAKTIK BARU: AMANKAN LAPORAN KADER TERLEBIH DAHULU (UPLOAD)
         const ul = await uploadData();
         
         if (!ul.status) {
             alert("❌ Gagal mengirim laporan. Pastikan internet Anda stabil atau Server mungkin sedang sibuk.");
-            return; // Hentikan di sini, jangan biarkan UI nge-blank/reload
+            return; 
         }
 
-        // ⬇️ KEMUDIAN, BARU TARIK DATA MASTER (DOWNLOAD)
         const dl = await downloadMasterData();
         
         if (ul.status && dl) { 
@@ -77,12 +94,10 @@ window.jalankanSinkronisasi = async () => {
             alert(msg); 
             location.reload(); 
         } else if (ul.status && !dl) {
-            // Jika upload sukses tapi download gagal, beritahu kader
-            alert("⚠️ Laporan Anda BERHASIL terkirim ke Server, namun sistem gagal mengunduh pembaruan wilayah/pertanyaan terbaru karena sinyal lemah.");
+            alert("⚠️ Laporan Anda BERHASIL terkirim, namun sistem gagal mengunduh pembaruan wilayah terbaru.\n\nKemungkinan Token Sesi Anda kadaluarsa atau sinyal lemah. Silakan Logout dan Login kembali.");
             location.reload();
         }
     } catch (e) { 
         alert("❌ Terjadi gangguan sinyal saat melakukan komunikasi dengan satelit (Server)."); 
-        // Dihapus: location.reload() agar tidak merusak UX
     }
 };
