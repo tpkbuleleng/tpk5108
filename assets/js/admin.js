@@ -1,5 +1,5 @@
 // ==========================================
-// 📊 DASHBOARD SUPERVISOR (V54 - PRECOMPUTE & LAZY LOAD API)
+// 📊 DASHBOARD SUPERVISOR (V55 - FOOLPROOF FILTER MAPPING)
 // ==========================================
 import { clearStore, getAllData } from './db.js';
 
@@ -20,7 +20,6 @@ const getRoleTheme = (roleStr) => {
     return { main: '#0A2342', dark: '#051221', light: '#E8F4FD', accent: '#F1C40F', text: '#FFFFFF', icon: '#F1C40F', btnText: '#0A2342' }; 
 };
 
-// 🚀 FASE 3: TARIKAN DATA KILAT (HANYA DASHBOARD)
 const fetchDashboardSummary = async () => {
     try {
         const url = `${SCRIPT_URL}?action=getDashboardSummary&token=${window.adminSession.token}`;
@@ -34,17 +33,15 @@ const fetchDashboardSummary = async () => {
             window.adminData.rekapKader = res.data.kader || [];
             window.adminData.master_menu = res.data.master_menu || [];
             window.adminData.master_tim_wilayah = res.data.master_tim_wilayah || [];
-            // Simpan ke array kosong agar tidak undefined jika dipanggil fungsi lain
             window.adminData.master_kader = window.adminData.rekapKader; 
             return true;
         } return false;
     } catch (e) { console.error("Gagal menarik data:", e); return false; }
 };
 
-// 🛑 FASE 3: TARIKAN DATA BERAT (ON-DEMAND)
 const fetchRawDataIfNeeded = async () => {
     if (window.adminData.registrasi.length > 0) return true; 
-    document.getElementById('admin-content').innerHTML = `<div style="padding:50px; text-align:center; color:var(--th-main);"><div style="font-size:3rem; margin-bottom:15px; animation: spin 2s linear infinite;">⏳</div><h3>Menyedot Data Rinci...</h3><p>Membuka brankas data kecamatan. Harap tunggu...</p></div><style>@keyframes spin { 100% { transform: rotate(360deg); } }</style>`;
+    document.getElementById('admin-content').innerHTML = `<div style="padding:50px; text-align:center; color:var(--th-main);"><div style="font-size:3rem; margin-bottom:15px; animation: spin 2s linear infinite;">⏳</div><h3>Menyedot Data Rinci...</h3><p>Membuka brankas data. Harap tunggu...</p></div><style>@keyframes spin { 100% { transform: rotate(360deg); } }</style>`;
     try {
         const url = `${SCRIPT_URL}?action=getAdminData&role=${window.adminSession.role}&kecamatan=${window.adminSession.kecamatan}&token=${window.adminSession.token}`;
         const response = await fetch(url); const res = await response.json();
@@ -65,37 +62,50 @@ const exportTableToExcel = (tableID, filename = '') => { const table = document.
 
 window.renderAdminView = async (target) => {
     const content = document.getElementById('admin-content'); const roleUpper = String(window.adminSession.role).toUpperCase();
+    
+    const mapKec = { 'GEROKGAK': 'GRK', 'SERIRIT': 'SRT', 'BUSUNGBIU': 'BSB', 'BANJAR': 'BJR', 'SUKASADA': 'SKS', 'BULELENG': 'BLL', 'SAWAN': 'SWN', 'KUBUTAMBAHAN': 'KBT', 'TEJAKULA': 'TJK' };
     const mapKecRev = { 'GRK': 'GEROKGAK', 'SRT': 'SERIRIT', 'BSB': 'BUSUNGBIU', 'BJR': 'BANJAR', 'SKS': 'SUKASADA', 'BLL': 'BULELENG', 'SWN': 'SAWAN', 'KBT': 'KUBUTAMBAHAN', 'TJK': 'TEJAKULA' };
     
-    // Generate Opsi Dropdown Filter
+    let fKecamatan = window.currentFilterKec;
+    if (!roleUpper.includes('KABUPATEN') && !roleUpper.includes('SUPER') && !roleUpper.includes('MITRA')) { fKecamatan = window.adminSession.kecamatan; }
+    if (fKecamatan && fKecamatan !== 'ALL') fKecamatan = mapKec[String(fKecamatan).toUpperCase()] || String(fKecamatan).toUpperCase();
+    
+    let fDesa = window.currentFilterDesa; if (fDesa && fDesa !== 'ALL') fDesa = String(fDesa).toUpperCase().trim();
+    
     let optKec = `<option value="ALL">🌍 SEMUA KECAMATAN</option>`; let optDesa = `<option value="ALL">🏘️ SEMUA DESA</option>`;
     const isKabupaten = roleUpper.includes('KABUPATEN') || roleUpper.includes('SUPER') || roleUpper.includes('MITRA'); const isKecamatan = roleUpper.includes('KECAMATAN') || roleUpper === 'ADMIN';
     
-    if (isKabupaten) { const listKec = [...new Set(window.adminData.master_tim_wilayah.map(r => r.kecamatan).filter(Boolean))]; listKec.forEach(k => { optKec += `<option value="${k}" ${window.currentFilterKec === k ? 'selected' : ''}>${mapKecRev[k] || k}</option>`; }); const listDesa = [...new Set(window.adminData.master_tim_wilayah.filter(r => window.currentFilterKec === 'ALL' || r.kecamatan === window.currentFilterKec || r.kecamatan === mapKecRev[window.currentFilterKec]).map(r => String(r.desa_kelurahan||'').toUpperCase()).filter(Boolean))]; listDesa.sort().forEach(d => { if(d !== '-') optDesa += `<option value="${d}" ${window.currentFilterDesa === d ? 'selected' : ''}>${d}</option>`; }); } 
-    else if (isKecamatan) { optKec = `<option value="${window.currentFilterKec}">${window.adminSession.kecamatan}</option>`; const listDesa = [...new Set(window.adminData.master_tim_wilayah.map(r => String(r.desa_kelurahan||'').toUpperCase()).filter(Boolean))]; listDesa.sort().forEach(d => { if(d !== '-') optDesa += `<option value="${d}" ${window.currentFilterDesa === d ? 'selected' : ''}>${d}</option>`; }); }
-    else { optKec = `<option value="${window.currentFilterKec}">${window.adminSession.kecamatan}</option>`; const listDesa = String(window.adminSession.desa || '').toUpperCase().split(',').map(d => d.trim()); optDesa = `<option value="ALL">🏘️ SEMUA DESA</option>` + listDesa.map(d => `<option value="${d}" ${window.currentFilterDesa === d ? 'selected' : ''}>${d}</option>`).join(''); }
+    if (isKabupaten) { 
+        const kecCodes = new Set(); window.adminData.master_tim_wilayah.forEach(r => { if(r.kecamatan) kecCodes.add(mapKec[String(r.kecamatan).toUpperCase()] || String(r.kecamatan).toUpperCase()); });
+        Array.from(kecCodes).sort().forEach(kCode => { optKec += `<option value="${kCode}" ${fKecamatan === kCode ? 'selected' : ''}>${mapKecRev[kCode] || kCode}</option>`; }); 
+        const listDesa = [...new Set(window.adminData.master_tim_wilayah.filter(r => fKecamatan === 'ALL' || (mapKec[String(r.kecamatan).toUpperCase()]||String(r.kecamatan).toUpperCase()) === fKecamatan).map(r => String(r.desa_kelurahan||'').toUpperCase()).filter(Boolean))]; 
+        listDesa.sort().forEach(d => { if(d !== '-') optDesa += `<option value="${d}" ${fDesa === d ? 'selected' : ''}>${d}</option>`; }); 
+    } 
+    else if (isKecamatan) { 
+        optKec = `<option value="${fKecamatan}">${window.adminSession.kecamatan}</option>`; 
+        const listDesa = [...new Set(window.adminData.master_tim_wilayah.map(r => String(r.desa_kelurahan||'').toUpperCase()).filter(Boolean))]; 
+        listDesa.sort().forEach(d => { if(d !== '-') optDesa += `<option value="${d}" ${fDesa === d ? 'selected' : ''}>${d}</option>`; }); 
+    }
+    else { 
+        optKec = `<option value="${fKecamatan}">${window.adminSession.kecamatan}</option>`; 
+        const listDesa = String(window.adminSession.desa || '').toUpperCase().split(',').map(d => d.trim()); 
+        optDesa = `<option value="ALL">🏘️ SEMUA DESA</option>` + listDesa.map(d => `<option value="${d}" ${fDesa === d ? 'selected' : ''}>${d}</option>`).join(''); 
+    }
 
     const filterWilayahHTML = `<div style="background: white; padding: 15px 25px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); display: flex; gap: 15px; align-items: center; border-left: 4px solid var(--th-main); flex-wrap: wrap;"><div style="font-size: 0.85rem; font-weight: bold; color: #666; white-space: nowrap;">🔍 Filter Wilayah:</div><select id="dash-flt-kec" class="admin-input" style="flex:1; min-width: 150px; font-weight:bold; color:var(--th-dark);" ${isKabupaten ? '' : 'disabled'}>${optKec}</select><select id="dash-flt-desa" class="admin-input" style="flex:1; min-width: 150px; font-weight:bold; color:var(--th-dark);" ${roleUpper.includes('DESA') && String(window.adminSession.desa).indexOf(',') === -1 ? 'disabled' : ''}>${optDesa}</select></div>`;
 
     // ==========================================
-    // RENDER: DASHBOARD (INSTANT LOAD - BACA REKAP_DASHBOARD)
+    // RENDER: DASHBOARD (INSTANT LOAD)
     // ==========================================
     if (target === 'dashboard') {
         let cCatin = 0, cBumil = 0, cBufas = 0, cBaduta = 0, countPrioritas = 0, tLaporan = 0;
-        
-        let fKecamatan = isKabupaten ? window.currentFilterKec : (mapKecRev[window.adminSession.kecamatan] || window.adminSession.kecamatan || 'ALL');
-        if (fKecamatan && fKecamatan !== 'ALL') fKecamatan = (mapKecRev[fKecamatan] || fKecamatan).toUpperCase();
-        
-        let fDesa = window.currentFilterDesa;
-        if (fDesa && fDesa !== 'ALL') fDesa = String(fDesa).toUpperCase().trim();
-        
         const allowedDesaPKB = roleUpper.includes('PKB') ? String(window.adminSession.desa || '').toUpperCase().split(',').map(d => d.trim()) : [];
 
         window.adminData.rekapDashboard.forEach(d => {
-            const dKec = String(d.kecamatan || d.kec).toUpperCase();
+            let dKec = String(d.kecamatan || d.kec).toUpperCase(); dKec = mapKec[dKec] || dKec;
             const dDesa = String(d.desa).toUpperCase().trim();
 
-            if(fKecamatan !== 'ALL' && dKec !== fKecamatan && dKec !== mapKecRev[fKecamatan]) return;
+            if(fKecamatan !== 'ALL' && dKec !== fKecamatan) return;
             if(fDesa !== 'ALL' && dDesa !== fDesa) return;
             if(roleUpper.includes('PKB') && !allowedDesaPKB.includes('ALL') && !allowedDesaPKB.includes('-') && !allowedDesaPKB.includes(dDesa)) return;
             
@@ -104,13 +114,12 @@ window.renderAdminView = async (target) => {
             countPrioritas += (parseInt(d.jml_prioritas)||0); tLaporan += (parseInt(d.laporan_bln_ini)||0);
         });
 
-        // Cari Top 5 Kader
         let rankKader = [];
         window.adminData.rekapKader.forEach(k => {
-            const kKec = String(k.kecamatan || k.kec).toUpperCase();
+            let kKec = String(k.kecamatan || k.kec).toUpperCase(); kKec = mapKec[kKec] || kKec;
             const kDesa = String(k.desa).toUpperCase().trim();
 
-            if(fKecamatan !== 'ALL' && kKec !== fKecamatan && kKec !== mapKecRev[fKecamatan]) return;
+            if(fKecamatan !== 'ALL' && kKec !== fKecamatan) return;
             if(fDesa !== 'ALL' && kDesa !== fDesa) return;
             if(roleUpper.includes('PKB') && !allowedDesaPKB.includes('ALL') && !allowedDesaPKB.includes('-') && !allowedDesaPKB.includes(kDesa)) return;
 
@@ -122,10 +131,10 @@ window.renderAdminView = async (target) => {
         
         let jmlKader = 0, userAktif = 0, userPasif = 0;
         window.adminData.rekapKader.forEach(k => {
-            const kKec = String(k.kecamatan || k.kec).toUpperCase();
+            let kKec = String(k.kecamatan || k.kec).toUpperCase(); kKec = mapKec[kKec] || kKec;
             const kDesa = String(k.desa).toUpperCase().trim();
 
-            if(fKecamatan !== 'ALL' && kKec !== fKecamatan && kKec !== mapKecRev[fKecamatan]) return;
+            if(fKecamatan !== 'ALL' && kKec !== fKecamatan) return;
             if(fDesa !== 'ALL' && kDesa !== fDesa) return;
             if(roleUpper.includes('PKB') && !allowedDesaPKB.includes('ALL') && !allowedDesaPKB.includes('-') && !allowedDesaPKB.includes(kDesa)) return;
 
