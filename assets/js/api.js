@@ -1,88 +1,70 @@
 // ==========================================
-// PUSAT KOMUNIKASI API (FRONTEND V2.0)
+// PUSAT KOMUNIKASI API & INTERCEPTOR (API.JS)
 // ==========================================
 
 const CONFIG = {
     // ⚠️ WAJIB GANTI DENGAN URL WEB APP DEPLOYMENT TERBARU BAPAK
-    API_URL: 'https://script.google.com/macros/s/AKfycbwZiCcv7MCL21R1VqlOFsx1x_Ax_8yoxVwjIumG3kVYwDSQTfXX9VjQnz2GsAW2ItzAAQ/exec', 
+    API_URL: 'https://script.google.com/macros/s/AKfycbxxxxxxx/exec', 
     APP_VERSION: '1.0.5'
 };
 
-// 1. Helper: Pembuat ID Unik (Untuk Device ID & Request ID)
 function generateUniqueId(prefix = 'ID') {
     return prefix + '-' + Date.now() + '-' + Math.floor(Math.random() * 10000);
 }
 
-// 2. Helper: Mengambil atau Membuat Device ID di HP Kader
 function getDeviceId() {
     let deviceId = localStorage.getItem('DEVICE_ID');
-    if (!deviceId) {
-        deviceId = generateUniqueId('DEV');
-        localStorage.setItem('DEVICE_ID', deviceId);
-    }
+    if (!deviceId) { deviceId = generateUniqueId('DEV'); localStorage.setItem('DEVICE_ID', deviceId); }
     return deviceId;
 }
 
-// 3. FUNGSI INTI: Panggilan API ke Satelit (Backend)
-async function apiCall(action, payload = {}, extraMeta = {}) {
+// Tambahan isSyncing = false agar saat SyncManager bekerja, ia tidak berputar tanpa henti
+window.apiCall = async function(action, payload = {}, extraMeta = {}, isSyncing = false) {
     const sessionToken = localStorage.getItem('SESSION_TOKEN') || '';
 
-    // Merakit koper data sesuai standar Backend V65
+    // Daftarkan fungsi-fungsi yang BOLEH disimpan ke laci offline (Fungsi Write/Tulis)
+    const actionBisaOffline = ['submitPendampingan', 'registerSasaran', 'updateSasaran', 'changeStatusSasaran'];
+    const isActionOffline = actionBisaOffline.includes(action);
+
+    // 🔥 SMART INTERCEPTOR: Jika tidak ada sinyal internet & fungsi ini boleh offline
+    if (!navigator.onLine && isActionOffline && !isSyncing) {
+        await window.DB.saveToQueue(action, payload, extraMeta);
+        if (window.SyncManager) window.SyncManager.updateBadge();
+        console.log(`[Offline] ${action} masuk ke laci IndexedDB.`);
+        // Bohongi app.js bahwa semua beres
+        return { ok: true, status: 'success', message: 'Tersimpan Offline! Data akan dikirim otomatis saat sinyal kembali.', data: { duplicate_flag: false } };
+    }
+
     const requestBody = {
-        action: action,
-        payload: payload,
-        meta: {
-            session_token: sessionToken,
-            device_id: getDeviceId(),
-            app_version: CONFIG.APP_VERSION,
-            request_id: generateUniqueId('REQ'),
-            client_timestamp: new Date().toISOString(),
-            ...extraMeta // Untuk menyisipkan client_submit_id dll
-        }
+        action: action, payload: payload,
+        meta: { session_token: sessionToken, device_id: getDeviceId(), app_version: CONFIG.APP_VERSION, request_id: generateUniqueId('REQ'), client_timestamp: new Date().toISOString(), ...extraMeta }
     };
 
     try {
-        const response = await fetch(CONFIG.API_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'text/plain' }, // Pakai text/plain untuk bypass CORS Google
-            body: JSON.stringify(requestBody)
-        });
-
+        const response = await fetch(CONFIG.API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(requestBody) });
         const data = await response.json();
 
-        // Fitur Canggih: Auto-Update Token jika Backend merespons dengan token baru
-        if (data.session_token || data.token) {
-            localStorage.setItem('SESSION_TOKEN', data.session_token || data.token);
-        }
-
-        // Fitur Canggih: Auto-Logout jika Token Expired / Ditolak Satpam Backend
-        if (!data.ok && (data.code === 401 || (data.message && data.message.toLowerCase().includes('token')))) {
-            console.warn("Sesi ditolak oleh Backend. Memaksa Logout...");
-            forceLogout();
-        }
+        if (data.session_token || data.token) localStorage.setItem('SESSION_TOKEN', data.session_token || data.token);
+        if (!data.ok && (data.code === 401 || (data.message && data.message.toLowerCase().includes('token')))) { console.warn("Sesi ditolak. Logout..."); forceLogout(); }
 
         return data;
 
     } catch (error) {
+        // 🔥 SMART INTERCEPTOR: Jika fetch GAGAL (karena sinyal mati di tengah jalan atau CORS putus)
+        if (isActionOffline && !isSyncing) {
+            await window.DB.saveToQueue(action, payload, extraMeta);
+            if (window.SyncManager) window.SyncManager.updateBadge();
+            console.log(`[Fetch Error Intercepted] ${action} masuk ke laci IndexedDB.`);
+            return { ok: true, status: 'success', message: 'Tersimpan Offline! Jaringan tidak stabil, data masuk ke antrean.', data: { duplicate_flag: false } };
+        }
+        
         console.error(`[API Error] Action: ${action}`, error);
-        return { 
-            ok: false, 
-            status: 'error', 
-            message: 'Gagal terhubung ke server. Periksa koneksi internet Anda.' 
-        };
+        if (isSyncing) throw error; // Lempar error agar SyncManager tahu sedang putus koneksi
+        return { ok: false, status: 'error', message: 'Gagal terhubung ke server. Periksa internet Anda.' };
     }
 }
 
-// 4. Helper: Logout Paksa & Bersihkan Memori HP
 function forceLogout() {
-    localStorage.removeItem('SESSION_TOKEN');
-    localStorage.removeItem('USER_PROFILE');
-    // Arahkan kembali ke halaman login (sesuaikan dengan nama file Bapak)
-    window.location.replace('login.html'); 
-}
-
-// 5. Helper: Mendapatkan Profil yang sedang Login
-function getMyProfile() {
-    const profileStr = localStorage.getItem('USER_PROFILE');
-    return profileStr ? JSON.parse(profileStr) : null;
+    localStorage.removeItem('SESSION_TOKEN'); localStorage.removeItem('USER_PROFILE');
+    window.location.replace('index.html'); 
 }
