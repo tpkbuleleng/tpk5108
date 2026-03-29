@@ -1,104 +1,96 @@
-import { putData, getAllData, getDataById, clearStore } from './db.js';
+// ==========================================
+// KURIR BACKGROUND SYNC (SYNC.JS)
+// ==========================================
 
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwZiCcv7MCL21R1VqlOFsx1x_Ax_8yoxVwjIumG3kVYwDSQTfXX9VjQnz2GsAW2ItzAAQ/exec';
-const APP_VERSION = '1.0.4';
+window.SyncManager = {
+    isSyncing: false,
 
-// 📱 DETEKSI / BUAT DEVICE ID UNTUK BINDING
-export const getDeviceId = () => {
-    let did = localStorage.getItem('device_id');
-    if (!did) {
-        did = 'WEB-' + Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
-        localStorage.setItem('device_id', did);
-    }
-    return did;
-};
-
-// 🔐 MESIN KRIPTOGRAFI SHA-256
-export const generateSignature = async (text) => {
-    const msgUint8 = new TextEncoder().encode(text);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-};
-
-// 🚀 API WRAPPER (STANDAR ENTERPRISE)
-export const apiFetch = async (action, payload = {}, sessionToken = '') => {
-    const body = {
-        action: action,
-        payload: payload,
-        meta: {
-            device_id: getDeviceId(),
-            app_version: APP_VERSION,
-            request_id: 'REQ-' + Date.now(),
-            session_token: sessionToken,
-            signature: ''
-        }
-    };
-    
-    // Segel Koper Data dengan Signature
-    const normalized = JSON.stringify(body);
-    body.meta.signature = await generateSignature(normalized);
-
-    try {
-        const response = await fetch(SCRIPT_URL, {
-            method: 'POST',
-            body: JSON.stringify(body)
-        });
-        return await response.json();
-    } catch (e) {
-        console.error("API Error:", e);
-        return { ok: false, status: 'error', message: 'Koneksi ke satelit terputus.' };
-    }
-};
-
-// 📤 UPLOAD LAPORAN
-export const uploadData = async () => {
-    const session = await getDataById('kader_session', 'active_user');
-    if(!session || !session.token) return { status: false, count: 0 };
-    
-    const antrean = await getAllData('sync_queue');
-    const dataUnsynced = antrean.filter(a => !a.is_synced);
-    if(dataUnsynced.length === 0) return { status: true, count: 0 };
-    
-    const res = await apiFetch('SYNC_BATCH', dataUnsynced, session.token);
-    if(res.ok || res.status === 'success') {
-        for(let d of dataUnsynced) { 
-            d.is_synced = true; 
-            await putData('sync_queue', d); 
-        }
-        return { status: true, count: dataUnsynced.length };
-    }
-    return { status: false, count: 0 };
-};
-
-// 📥 DOWNLOAD SASARAN
-export const downloadMasterData = async () => {
-    const session = await getDataById('kader_session', 'active_user');
-    if(!session || !session.token) return false;
-
-    const res = await apiFetch('PULL_DATA_KADER', { kecamatan: session.kecamatan, id_tim: session.id_tim }, session.token);
-    
-    if (res.ok || res.status === 'success') {
-        const d = res.data;
-        if (d && d.length > 0) {
-            for (let item of d) { await putData('sync_queue', item); }
-        }
-        return true;
-    }
-    return false;
-};
-
-window.jalankanSinkronisasi = async () => {
-    try {
-        const ul = await uploadData();
-        if (!ul.status) { alert("❌ Gagal mengirim laporan. Pastikan internet Anda stabil."); return; }
+    async trySync() {
+        if (this.isSyncing || !navigator.onLine) return;
         
-        const dl = await downloadMasterData();
-        if (ul.status && dl) { 
-            let msg = ul.count > 0 ? `✅ Sinkronisasi Sempurna!\n${ul.count} Laporan berhasil dikirim.` : `✅ Sinkronisasi Berhasil!\nData Sasaran sudah diperbarui.`;
-            alert(msg); location.reload(); 
-        } else if (ul.status && !dl) {
-            alert("⚠️ Laporan Anda BERHASIL terkirim, namun gagal menarik data terbaru."); location.reload();
+        const queue = await window.DB.getQueue();
+        this.updateBadge(queue.length);
+
+        if (queue.length === 0) return;
+
+        this.isSyncing = true;
+        console.log(`🚀 Memulai Sinkronisasi: ${queue.length} antrean ditemukan...`);
+
+        for (const item of queue) {
+            try {
+                // Tembakkan ke API dengan bendera isSyncing = true (Bypass Interceptor)
+                const res = await window.apiCall(item.action, item.payload, item.meta, true);
+
+                // Jika sukses ATAU server menolak karena duplikat, hapus dari antrean lokal
+                if (res.ok || res.duplicate_submit || res.duplicate_detected || (res.code >= 400 && res.code < 500)) {
+                    await window.DB.deleteFromQueue(item.id);
+                    console.log(`✅ Antrean ID ${item.id} berhasil diproses.`);
+                }
+            } catch (err) {
+                console.warn(`⚠️ Gagal memproses antrean ID ${item.id}. Berhenti sinkronisasi sementara.`, err);
+                break; // Hentikan loop jika koneksi terputus lagi di tengah jalan
+            }
         }
-    } catch (e) { alert("❌ Terjadi gangguan sinyal."); }
+
+        this.isSyncing = false;
+        
+        // Update badge lagi setelah selesai
+        const remainingQueue = await window.DB.getQueue();
+        this.updateBadge(remainingQueue.length);
+        
+        // Jika antrean bersih, refresh otomatis tabel rekap & daftar
+        if (remainingQueue.length === 0) {
+            console.log('🎉 Semua data offline berhasil tersinkronisasi!');
+            if (typeof renderKonten === 'function' && document.getElementById('view-app').classList.contains('active')) {
+                 // Refresh halaman aktif diam-diam
+                 if (document.getElementById('tbody-rekap-tim')) renderKonten('rekap');
+            }
+        }
+    },
+
+    async updateBadge(queueLength = null) {
+        const badge = document.getElementById('network-status');
+        if (!badge) return;
+
+        let qLen = queueLength;
+        if (qLen === null) {
+            const queue = await window.DB.getQueue();
+            qLen = queue.length;
+        }
+
+        if (qLen > 0) {
+            badge.innerText = `Menunggu Sync (${qLen})`;
+            badge.className = 'status-badge warning';
+            badge.style.background = '#ffc107';
+            badge.style.color = '#000';
+        } else if (navigator.onLine) {
+            badge.innerText = 'Online';
+            badge.className = 'status-badge online';
+            badge.style.background = '#198754';
+            badge.style.color = '#fff';
+        } else {
+            badge.innerText = 'Offline';
+            badge.className = 'status-badge offline';
+            badge.style.background = '#dc3545';
+            badge.style.color = '#fff';
+        }
+    }
 };
+
+// Pasang Radar Pendeteksi Sinyal Internet
+window.addEventListener('online', () => {
+    console.log("🌐 Sinyal Kembali Terhubung!");
+    window.SyncManager.trySync();
+});
+
+window.addEventListener('offline', () => {
+    console.log("📡 Sinyal Terputus! Beralih ke Mode Offline.");
+    window.SyncManager.updateBadge();
+});
+
+// Pancing radar saat aplikasi pertama kali dibuka
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(() => {
+        if (window.SyncManager) window.SyncManager.updateBadge();
+    }, 2000);
+});
