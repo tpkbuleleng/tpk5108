@@ -1,72 +1,71 @@
-const DB_NAME = 'TPK_Buleleng_DB';
-const DB_VERSION = 8; // 🔥 Naikkan ke Versi 8 untuk menyuntikkan MASTER_PENGUMUMAN
+// ==========================================
+// DATABASE LOKAL (INDEXED DB - DB.JS)
+// ==========================================
 
-export const initDB = () => {
-    return new Promise((resolve, reject) => {
-        const request = indexedDB.open(DB_NAME, DB_VERSION);
+const DB_CONFIG = {
+    NAME: 'TPK_Buleleng_Offline_DB',
+    VERSION: 1,
+    STORE_QUEUE: 'sync_queue'
+};
+
+const dbPromise = new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_CONFIG.NAME, DB_CONFIG.VERSION);
+
+    request.onupgradeneeded = (event) => {
+        const db = event.target.result;
+        // Buat tabel antrean jika belum ada
+        if (!db.objectStoreNames.contains(DB_CONFIG.STORE_QUEUE)) {
+            db.createObjectStore(DB_CONFIG.STORE_QUEUE, { keyPath: 'id', autoIncrement: true });
+        }
+    };
+
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+});
+
+window.DB = {
+    async saveToQueue(action, payload, meta) {
+        const db = await dbPromise;
+        const tx = db.transaction(DB_CONFIG.STORE_QUEUE, 'readwrite');
+        const store = tx.objectStore(DB_CONFIG.STORE_QUEUE);
         
-        request.onupgradeneeded = (e) => {
-            const db = e.target.result;
-            
-            if (db.objectStoreNames.contains('master_user')) db.deleteObjectStore('master_user');
-            if (db.objectStoreNames.contains('master_admin')) db.deleteObjectStore('master_admin');
-
-            const stores = [
-                'master_kader', 'master_tim', 'master_tim_wilayah',
-                'master_pertanyaan', 'master_wilayah_bali', 'standar_antropometri', 
-                'master_kembang', 'master_wilayah', 'master_menu', 'master_widget',
-                'master_pkb', // 🚀 INJEKSI TABEL PKB
-                'master_pengumuman' // 📢 INJEKSI TABEL PUSAT SIARAN
-            ];
-            stores.forEach(store => { if (!db.objectStoreNames.contains(store)) db.createObjectStore(store, { autoIncrement: true }); });
-            if (!db.objectStoreNames.contains('kader_session')) db.createObjectStore('kader_session', { keyPath: 'id' });
-            if (!db.objectStoreNames.contains('sync_queue')) db.createObjectStore('sync_queue', { keyPath: 'id' });
+        const item = { 
+            action: action, 
+            payload: payload, 
+            meta: meta, 
+            timestamp: new Date().toISOString() 
         };
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-    });
-};
+        
+        store.add(item);
+        return new Promise((resolve) => {
+            tx.oncomplete = () => resolve(true);
+            tx.onerror = () => resolve(false);
+        });
+    },
 
-export const putData = async (storeName, data) => {
-    const db = await initDB();
-    return new Promise((resolve, reject) => {
-        const tx = db.transaction(storeName, 'readwrite'); const store = tx.objectStore(storeName);
-        if (Array.isArray(data)) {
-            if (storeName !== 'sync_queue' && storeName !== 'kader_session') store.clear(); 
-            data.forEach(item => store.put(item));
-        } else { store.put(data); }
-        tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error);
-    });
-};
+    async getQueue() {
+        const db = await dbPromise;
+        const tx = db.transaction(DB_CONFIG.STORE_QUEUE, 'readonly');
+        const store = tx.objectStore(DB_CONFIG.STORE_QUEUE);
+        const request = store.getAll();
 
-export const getAllData = async (storeName) => {
-    const db = await initDB();
-    return new Promise((resolve, reject) => {
-        const tx = db.transaction(storeName, 'readonly'); const req = tx.objectStore(storeName).getAll();
-        req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error);
-    });
-};
+        return new Promise((resolve) => {
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => resolve([]);
+        });
+    },
 
-export const getDataById = async (storeName, id) => {
-    const db = await initDB();
-    return new Promise((resolve, reject) => {
-        const tx = db.transaction(storeName, 'readonly'); const req = tx.objectStore(storeName).get(id);
-        req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error);
-    });
-};
+    async deleteFromQueue(id) {
+        const db = await dbPromise;
+        const tx = db.transaction(DB_CONFIG.STORE_QUEUE, 'readwrite');
+        tx.objectStore(DB_CONFIG.STORE_QUEUE).delete(id);
+        return new Promise(resolve => tx.oncomplete = () => resolve(true));
+    },
 
-export const deleteData = async (storeName, id) => {
-    const db = await initDB();
-    return new Promise((resolve, reject) => {
-        const tx = db.transaction(storeName, 'readwrite'); const req = tx.objectStore(storeName).delete(id);
-        req.onsuccess = () => resolve(); req.onerror = () => reject(req.error);
-    });
-};
-
-export const clearStore = async (storeName) => {
-    const db = await initDB();
-    return new Promise((resolve, reject) => {
-        const tx = db.transaction(storeName, 'readwrite'); const req = tx.objectStore(storeName).clear();
-        req.onsuccess = () => resolve(); req.onerror = () => reject(req.error);
-    });
+    async clearStore(storeName) {
+        const db = await dbPromise;
+        const tx = db.transaction(storeName, 'readwrite');
+        tx.objectStore(storeName).clear();
+        return new Promise(resolve => tx.oncomplete = () => resolve(true));
+    }
 };
