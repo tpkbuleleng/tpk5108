@@ -1,5 +1,5 @@
 // ==========================================
-// OTAK UTAMA FRONTEND (APP.JS - V3.0)
+// OTAK UTAMA FRONTEND (APP.JS - V4.0 FINAL UI)
 // ==========================================
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -54,6 +54,7 @@ function renderMenuSidebar() {
         <a href="#" onclick="renderKonten('pendampingan'); closeSidebar();" class="nav-item" style="display:block; padding:15px; border-bottom:1px solid #eee; text-decoration:none; color:#333;">🤝 Laporan Pendampingan</a>
         <a href="#" onclick="renderKonten('daftar-sasaran'); closeSidebar();" class="nav-item" style="display:block; padding:15px; border-bottom:1px solid #eee; text-decoration:none; color:#333;">📋 Daftar Sasaran</a>
         <a href="#" onclick="renderKonten('kalkulator'); closeSidebar();" class="nav-item" style="display:block; padding:15px; border-bottom:1px solid #eee; text-decoration:none; color:#333;">🧮 Kalkulator Cerdas</a>
+        <a href="#" onclick="renderKonten('setting'); closeSidebar();" class="nav-item" style="display:block; padding:15px; border-bottom:1px solid #eee; text-decoration:none; color:#333;">⚙️ Pengaturan</a>
     `;
 }
 
@@ -124,19 +125,20 @@ window.renderKonten = function(templateId) {
     contentArea.innerHTML = '';
     contentArea.appendChild(template.content.cloneNode(true));
 
-    // Router Eksekusi Fungsi
     if (templateId === 'rekap') initHalamanRekap();
     if (templateId === 'registrasi') initHalamanRegistrasi();
     if (templateId === 'pendampingan') initHalamanPendampingan();
+    if (templateId === 'daftar-sasaran') initHalamanDaftarSasaran();
+    if (templateId === 'setting') initHalamanSetting();
+    if (templateId === 'kalkulator') initHalamanKalkulator();
 }
 
 // ==========================================
 // 4. MODUL REKAP / DASHBOARD
 // ==========================================
 async function initHalamanRekap() {
-    const profileStr = localStorage.getItem('USER_PROFILE');
-    if (!profileStr) return;
-    const profile = JSON.parse(profileStr);
+    const profile = JSON.parse(localStorage.getItem('USER_PROFILE'));
+    if (!profile) return;
 
     const tbodyTim = document.getElementById('tbody-rekap-tim');
     const now = new Date();
@@ -188,7 +190,6 @@ function initHalamanRegistrasi() {
     const formReg = document.getElementById('form-registrasi');
     const selectJenis = document.getElementById('reg-jenis');
     
-    // Tampilkan field khusus berdasarkan jenis sasaran
     if (selectJenis) {
         selectJenis.addEventListener('change', (e) => {
             const val = e.target.value;
@@ -204,22 +205,13 @@ function initHalamanRegistrasi() {
             e.preventDefault();
             const btn = formReg.querySelector('button[type="submit"]');
             const profile = JSON.parse(localStorage.getItem('USER_PROFILE'));
-            
-            // Ambil nilai dari form
             const formData = new FormData(formReg);
+            
             const payload = {
-                nama_sasaran: formData.get('nama_sasaran'),
-                nama_kk: formData.get('nama_kk'),
-                jenis_sasaran: formData.get('jenis_sasaran'),
-                nik_sasaran: formData.get('nik'),
-                nomor_kk: formData.get('no_kk'),
-                tanggal_lahir: formData.get('tanggal_lahir'),
-                jenis_kelamin: formData.get('jenis_kelamin'),
-                alamat: formData.get('alamat'),
-                desa: formData.get('desa') || profile.desa,
-                dusun: formData.get('dusun') || profile.dusun,
-                id_tim: profile.id_tim,
-                id_wilayah: profile.desa || profile.id_kecamatan // Fallback wilayah
+                nama_sasaran: formData.get('nama_sasaran'), nama_kk: formData.get('nama_kk'), jenis_sasaran: formData.get('jenis_sasaran'),
+                nik_sasaran: formData.get('nik'), nomor_kk: formData.get('no_kk'), tanggal_lahir: formData.get('tanggal_lahir'),
+                jenis_kelamin: formData.get('jenis_kelamin'), alamat: formData.get('alamat'), desa: formData.get('desa') || profile.desa,
+                dusun: formData.get('dusun') || profile.dusun, id_tim: profile.id_tim, id_wilayah: profile.desa || profile.id_kecamatan
             };
 
             const origText = btn.innerText;
@@ -229,29 +221,15 @@ function initHalamanRegistrasi() {
             try {
                 const res = await apiCall('registerSasaran', payload);
                 if (res.ok) {
-                    if (res.data && res.data.duplicate_flag) {
-                        alert(`⚠️ PERINGATAN POTENSI DUPLIKAT!\n\nSasaran berhasil disimpan, namun sistem mendeteksi kemiripan data di kecamatan/desa lain. Admin akan melakukan review.`);
-                    } else {
-                        alert("✅ Registrasi Sasaran Berhasil!");
-                    }
+                    if (res.data && res.data.duplicate_flag) alert(`⚠️ PERINGATAN POTENSI DUPLIKAT!\nSasaran disimpan, namun sistem mendeteksi kemiripan data di wilayah lain. Admin akan melakukan review.`);
+                    else alert("✅ Registrasi Sasaran Berhasil!");
                     formReg.reset();
-                    document.getElementById('box-ibu-kandung').style.display = 'none';
-                    document.getElementById('box-tgl-nikah').style.display = 'none';
-                    document.getElementById('box-tgl-salin-reg').style.display = 'none';
-                    document.getElementById('wilayah-catin').style.display = 'none';
                 } else {
-                    if (res.duplicate_detected) {
-                        alert(`❌ REGISTRASI DITOLAK!\n\nSistem mengunci pendaftaran karena NIK/Identitas ini SUDAH ADA di database Kabupaten.\nAlasan: ${res.reason_code}`);
-                    } else {
-                        alert("❌ Gagal: " + res.message);
-                    }
+                    if (res.duplicate_detected) alert(`❌ REGISTRASI DITOLAK!\nSistem mengunci pendaftaran karena NIK/Identitas ini SUDAH ADA di database.\nAlasan: ${res.reason_code}`);
+                    else alert("❌ Gagal: " + res.message);
                 }
-            } catch (error) {
-                alert("⚠️ Gagal terhubung ke server.");
-            } finally {
-                btn.innerText = origText;
-                btn.disabled = false;
-            }
+            } catch (error) { alert("⚠️ Gagal terhubung ke server."); } 
+            finally { btn.innerText = origText; btn.disabled = false; }
         });
     }
 }
@@ -265,109 +243,273 @@ async function initHalamanPendampingan() {
     const selectSasaran = document.getElementById('pend-sasaran');
     const infoSasaran = document.getElementById('pend-info-sasaran');
     const formPendampingan = document.getElementById('form-pendampingan');
-
     let listSasaranSatelit = [];
 
-    // 1. Tarik Data Sasaran dari Server untuk Tim Ini
     selectSasaran.innerHTML = `<option value="">⏳ Menarik data sasaran dari Satelit...</option>`;
     selectSasaran.disabled = true;
 
     try {
         const res = await apiCall('getSasaranByTim', { id_tim: profile.id_tim });
         if (res.ok) {
-            // Filter hanya registrasi aktif
             listSasaranSatelit = res.data.filter(r => r.tipe_laporan === 'REGISTRASI' && String(r.status_sasaran).toUpperCase() === 'AKTIF');
             selectSasaran.innerHTML = `<option value="">-- Pilih Sasaran --</option>`;
             selectSasaran.disabled = false;
-        } else {
-            selectSasaran.innerHTML = `<option value="">❌ Gagal menarik data sasaran</option>`;
-        }
-    } catch(e) {
-        selectSasaran.innerHTML = `<option value="">⚠️ Koneksi terputus</option>`;
-    }
+        } else selectSasaran.innerHTML = `<option value="">❌ Gagal menarik data sasaran</option>`;
+    } catch(e) { selectSasaran.innerHTML = `<option value="">⚠️ Koneksi terputus</option>`; }
 
-    // 2. Filter Sasaran berdasarkan Jenis
     if (selectJenis) {
         selectJenis.addEventListener('change', (e) => {
             const jenis = e.target.value;
             selectSasaran.innerHTML = `<option value="">-- Pilih Sasaran --</option>`;
             infoSasaran.style.display = 'none';
-            
             const filtered = listSasaranSatelit.filter(s => s.jenis_sasaran === jenis);
-            filtered.forEach(s => {
-                selectSasaran.innerHTML += `<option value="${s.id}">${s.nama_sasaran} (Dusun: ${s.dusun || '-'})</option>`;
-            });
-            
-            if (filtered.length === 0 && jenis !== "") {
-                selectSasaran.innerHTML = `<option value="">Tidak ada sasaran aktif untuk jenis ini</option>`;
-            }
+            filtered.forEach(s => { selectSasaran.innerHTML += `<option value="${s.id}">${s.nama_sasaran} (Dusun: ${s.dusun || '-'})</option>`; });
         });
     }
 
-    // 3. Tampilkan Info Singkat Saat Sasaran Dipilih
     if (selectSasaran) {
         selectSasaran.addEventListener('change', (e) => {
-            const id = e.target.value;
-            const target = listSasaranSatelit.find(s => s.id === id);
+            const target = listSasaranSatelit.find(s => s.id === e.target.value);
             if (target) {
                 infoSasaran.style.display = 'block';
                 infoSasaran.innerHTML = `<strong>👤 ${target.nama_sasaran}</strong><br><small>NIK: ${target.data_laporan.nik || '-'}</small>`;
-                
-                // TODO: Di masa depan, bangun form dinamis (pertanyaan KB, BB/TB) di sini menggunakan JS
-                document.getElementById('form-pendampingan-dinamis').innerHTML = `
-                    <div style="background:#fff3cd; padding:10px; border-radius:5px; margin-bottom:15px; font-size:0.85rem;">
-                        <i>💡 Form pertanyaan dinamis akan muncul di sini. Saat ini hanya mencatat tanggal & hasil umum.</i>
-                    </div>
-                `;
-            } else {
-                infoSasaran.style.display = 'none';
-                document.getElementById('form-pendampingan-dinamis').innerHTML = '';
-            }
+            } else infoSasaran.style.display = 'none';
         });
     }
 
-    // 4. Proses Submit Pendampingan
     if (formPendampingan) {
         formPendampingan.addEventListener('submit', async (e) => {
             e.preventDefault();
             const btn = formPendampingan.querySelector('button[type="submit"]');
-            
             const formData = new FormData(formPendampingan);
+            
             const payload = {
-                id_sasaran: formData.get('id_sasaran'),
-                tanggal_pendampingan: formData.get('tgl_kunjungan'),
-                keterangan: formData.get('catatan'),
-                jawaban: { status_kunjungan: 'Selesai' } // Simulasi jawaban form
+                id_sasaran: formData.get('id_sasaran'), tanggal_pendampingan: formData.get('tgl_kunjungan'),
+                keterangan: formData.get('catatan'), jawaban: { status_kunjungan: 'Selesai' }
             };
 
-            // 🔥 Buat ID Submit Unik untuk Anti-Double Click
             const submitId = 'SUB-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5);
-
-            const origText = btn.innerText;
-            btn.innerText = "⏳ Mengirim Laporan...";
-            btn.disabled = true;
+            const origText = btn.innerText; btn.innerText = "⏳ Mengirim Laporan..."; btn.disabled = true;
 
             try {
                 const res = await apiCall('submitPendampingan', payload, { client_submit_id: submitId });
-                
                 if (res.ok) {
-                    if (res.duplicate_submit) {
-                        alert("⚠️ Laporan ini sudah pernah terkirim sebelumnya.");
-                    } else {
-                        alert("✅ Laporan Pendampingan Berhasil Disimpan!");
-                        formPendampingan.reset();
-                        infoSasaran.style.display = 'none';
-                        document.getElementById('form-pendampingan-dinamis').innerHTML = '';
-                    }
+                    if (res.duplicate_submit) alert("⚠️ Laporan ini sudah pernah terkirim bulan ini.");
+                    else { alert("✅ Laporan Pendampingan Berhasil Disimpan!"); formPendampingan.reset(); infoSasaran.style.display = 'none'; }
+                } else alert("❌ Gagal: " + res.message);
+            } catch (error) { alert("⚠️ Gagal terhubung ke server."); } 
+            finally { btn.innerText = origText; btn.disabled = false; }
+        });
+    }
+}
+
+// ==========================================
+// 7. MODUL DAFTAR SASARAN & UBAH STATUS
+// ==========================================
+let globalDataSasaran = []; // Cache lokal untuk filter cepat
+async function initHalamanDaftarSasaran() {
+    const profile = JSON.parse(localStorage.getItem('USER_PROFILE'));
+    const listContainer = document.getElementById('list-sasaran');
+    const filterJenis = document.getElementById('filter-jenis');
+    const filterStatus = document.getElementById('filter-status');
+
+    listContainer.innerHTML = `<div style="padding:20px; text-align:center;">⏳ Menarik daftar dari satelit...</div>`;
+
+    try {
+        const res = await apiCall('getSasaranByTim', { id_tim: profile.id_tim });
+        if (res.ok) {
+            globalDataSasaran = res.data.filter(r => r.tipe_laporan === 'REGISTRASI');
+            renderListSasaran();
+        } else {
+            listContainer.innerHTML = `<div style="color:red; text-align:center;">❌ Gagal memuat data: ${res.message}</div>`;
+        }
+    } catch(e) {
+        listContainer.innerHTML = `<div style="color:red; text-align:center;">⚠️ Gagal terhubung ke server.</div>`;
+    }
+
+    // Event Listener Filter (Cepat karena filter array lokal)
+    filterJenis.addEventListener('change', renderListSasaran);
+    filterStatus.addEventListener('change', renderListSasaran);
+
+    // Event Modal
+    document.getElementById('btn-tutup-modal').addEventListener('click', () => {
+        document.getElementById('modal-detail').style.display = 'none';
+    });
+}
+
+function renderListSasaran() {
+    const listContainer = document.getElementById('list-sasaran');
+    const fJenis = document.getElementById('filter-jenis').value;
+    const fStatus = document.getElementById('filter-status').value;
+
+    let filtered = globalDataSasaran;
+    if (fJenis !== 'ALL') filtered = filtered.filter(s => s.jenis_sasaran === fJenis);
+    if (fStatus !== 'ALL') filtered = filtered.filter(s => String(s.status_sasaran).toUpperCase() === fStatus);
+
+    if (filtered.length === 0) {
+        listContainer.innerHTML = `<div style="padding:20px; text-align:center; color:#666;">Tidak ada data sasaran.</div>`;
+        return;
+    }
+
+    let html = '';
+    filtered.forEach(s => {
+        const badgeColor = s.status_sasaran.toUpperCase() === 'AKTIF' ? '#198754' : '#6c757d';
+        html += `
+            <div style="background:#fff; padding:15px; border-radius:8px; border:1px solid #ddd; display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                    <strong style="color:var(--primary); font-size:1.1rem;">${s.nama_sasaran}</strong><br>
+                    <span style="font-size:0.85rem; color:#666;">NIK: ${s.data_laporan.nik || '-'} | Jenis: <b>${s.jenis_sasaran}</b></span>
+                </div>
+                <div style="text-align:right;">
+                    <span style="background:${badgeColor}; color:#fff; padding:3px 8px; border-radius:12px; font-size:0.75rem; font-weight:bold;">${s.status_sasaran}</span>
+                    <button onclick="bukaModalDetail('${s.id}')" style="display:block; margin-top:8px; background:#0d6efd; color:#fff; border:none; padding:5px 10px; border-radius:5px; cursor:pointer; font-size:0.8rem;">Lihat Detail</button>
+                </div>
+            </div>
+        `;
+    });
+    listContainer.innerHTML = html;
+}
+
+window.bukaModalDetail = function(idSasaran) {
+    const s = globalDataSasaran.find(x => x.id === idSasaran);
+    if (!s) return;
+
+    const modal = document.getElementById('modal-detail');
+    const konten = document.getElementById('konten-detail');
+
+    let btnUbahStatus = '';
+    if (String(s.status_sasaran).toUpperCase() === 'AKTIF') {
+        btnUbahStatus = `
+            <hr style="margin:15px 0;">
+            <h4 style="color:#d63384; margin-bottom:10px;">⚠️ Ubah Status Sasaran</h4>
+            <select id="select-ubah-status" class="form-control" style="margin-bottom:10px;">
+                <option value="">-- Pilih Status Baru --</option>
+                <option value="SELESAI">Selesai (Lulus / Tuntas)</option>
+                <option value="PINDAH">Pindah Domisili</option>
+                <option value="MENINGGAL">Meninggal Dunia</option>
+            </select>
+            <button onclick="prosesUbahStatus('${s.id}')" class="btn-primary" style="width:100%; background:#d63384; border:none;">Simpan Perubahan Status</button>
+        `;
+    }
+
+    konten.innerHTML = `
+        <table style="width:100%; font-size:0.9rem; text-align:left; border-collapse: collapse;">
+            <tr><th style="padding:8px 0; border-bottom:1px solid #eee; width:40%;">Nama Sasaran</th><td style="border-bottom:1px solid #eee;">: ${s.nama_sasaran}</td></tr>
+            <tr><th style="padding:8px 0; border-bottom:1px solid #eee;">NIK</th><td style="border-bottom:1px solid #eee;">: ${s.data_laporan.nik || '-'}</td></tr>
+            <tr><th style="padding:8px 0; border-bottom:1px solid #eee;">No KK</th><td style="border-bottom:1px solid #eee;">: ${s.data_laporan.nomor_kk || '-'}</td></tr>
+            <tr><th style="padding:8px 0; border-bottom:1px solid #eee;">Jenis Sasaran</th><td style="border-bottom:1px solid #eee;">: <b>${s.jenis_sasaran}</b></td></tr>
+            <tr><th style="padding:8px 0; border-bottom:1px solid #eee;">Tanggal Lahir</th><td style="border-bottom:1px solid #eee;">: ${s.data_laporan.tanggal_lahir || '-'}</td></tr>
+            <tr><th style="padding:8px 0; border-bottom:1px solid #eee;">Alamat Domisili</th><td style="border-bottom:1px solid #eee;">: ${s.data_laporan.alamat || '-'}, Ds. ${s.desa || '-'}</td></tr>
+            <tr><th style="padding:8px 0; border-bottom:1px solid #eee;">Status Saat Ini</th><td style="border-bottom:1px solid #eee;">: <b style="color:#198754;">${s.status_sasaran}</b></td></tr>
+        </table>
+        ${btnUbahStatus}
+    `;
+    modal.style.display = 'block';
+}
+
+window.prosesUbahStatus = async function(idSasaran) {
+    const statusBaru = document.getElementById('select-ubah-status').value;
+    if (!statusBaru) { alert("Pilih status baru terlebih dahulu!"); return; }
+
+    if (!confirm(`Yakin mengubah status sasaran menjadi ${statusBaru}? Tindakan ini akan tercatat di riwayat server.`)) return;
+
+    try {
+        const res = await apiCall('changeStatusSasaran', { id_sasaran: idSasaran, status_baru: statusBaru, note: 'Diubah melalui Aplikasi HP' });
+        if (res.ok) {
+            alert("✅ Status sasaran berhasil diubah!");
+            document.getElementById('modal-detail').style.display = 'none';
+            initHalamanDaftarSasaran(); // Refresh daftar
+        } else {
+            alert("❌ Gagal merubah status: " + res.message);
+        }
+    } catch(e) {
+        alert("⚠️ Terjadi kesalahan jaringan.");
+    }
+}
+
+// ==========================================
+// 8. MODUL PENGATURAN & GANTI PIN
+// ==========================================
+function initHalamanSetting() {
+    const profile = JSON.parse(localStorage.getItem('USER_PROFILE'));
+    if (!profile) return;
+
+    document.getElementById('set-nama').value = profile.nama || '';
+    document.getElementById('set-id').value = profile.id_user || profile.username || '';
+
+    const formPass = document.getElementById('form-ganti-pass');
+    if (formPass) {
+        formPass.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const inputs = formPass.querySelectorAll('input[type="password"]');
+            const pinLama = inputs[0].value;
+            const pinBaru = inputs[1].value;
+            const btn = formPass.querySelector('button');
+
+            if(pinBaru.length < 6) { alert("PIN Baru minimal 6 digit!"); return; }
+
+            btn.innerText = "⏳ Memproses..."; btn.disabled = true;
+            try {
+                const res = await apiCall('changePassword', { current_password: pinLama, new_password: pinBaru });
+                if (res.ok) {
+                    alert("✅ PIN Berhasil Diperbarui! Silakan gunakan PIN baru untuk login selanjutnya.");
+                    formPass.reset();
                 } else {
                     alert("❌ Gagal: " + res.message);
                 }
-            } catch (error) {
-                alert("⚠️ Gagal terhubung ke server.");
-            } finally {
-                btn.innerText = origText;
-                btn.disabled = false;
-            }
+            } catch(e) { alert("⚠️ Gagal terhubung ke server."); }
+            finally { btn.innerText = "Perbarui PIN"; btn.disabled = false; }
         });
     }
+}
+
+// ==========================================
+// 9. MODUL KALKULATOR CERDAS
+// ==========================================
+function initHalamanKalkulator() {
+    const selector = document.getElementById('calc-selector');
+    
+    selector.addEventListener('change', (e) => {
+        const val = e.target.value;
+        document.getElementById('box-calc-hpl').style.display = val === 'HPL' ? 'block' : 'none';
+        document.getElementById('box-calc-imt').style.display = val === 'IMT' ? 'block' : 'none';
+        document.getElementById('box-calc-kka').style.display = val === 'KKA' ? 'block' : 'none';
+    });
+
+    // Logika HPL (Naegele's rule: +280 days)
+    document.getElementById('btn-hitung-hpl').addEventListener('click', () => {
+        const hpht = document.getElementById('calc-hpht').value;
+        if (!hpht) { alert("Masukkan tanggal HPHT!"); return; }
+        const date = new Date(hpht);
+        date.setDate(date.getDate() + 280);
+        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        document.getElementById('hasil-hpl').innerText = "Perkiraan Lahir: " + date.toLocaleDateString('id-ID', options);
+    });
+
+    // Logika IMT (BB / (TB in meter)^2)
+    document.getElementById('btn-hitung-imt').addEventListener('click', () => {
+        const bb = parseFloat(document.getElementById('calc-bb').value);
+        const tb = parseFloat(document.getElementById('calc-tb').value) / 100;
+        if (!bb || !tb) { alert("Masukkan BB dan TB dengan benar!"); return; }
+        
+        const imt = (bb / (tb * tb)).toFixed(1);
+        let status = ''; let color = '';
+        if (imt < 18.5) { status = 'Kurus (Kekurangan Berat Badan)'; color = '#dc3545'; }
+        else if (imt >= 18.5 && imt < 25) { status = 'Normal (Ideal)'; color = '#198754'; }
+        else if (imt >= 25 && imt < 27) { status = 'Gemuk (Overweight)'; color = '#ffc107'; }
+        else { status = 'Obesitas'; color = '#dc3545'; }
+
+        document.getElementById('hasil-imt').innerHTML = `IMT: <span style="font-size:1.5rem; color:${color};">${imt}</span><br><span style="color:${color};">${status}</span>`;
+    });
+
+    // Logika KKA (Kembang Anak Dasar)
+    document.getElementById('calc-usia-kka').addEventListener('change', (e) => {
+        const hasil = document.getElementById('hasil-kka');
+        const v = e.target.value;
+        if (v === '0-3') hasil.innerHTML = "<b>Target Kembang (0-3 Bln):</b><br>- Mengangkat kepala setinggi 45°<br>- Melihat dan menatap wajah anda<br>- Mengoceh spontan atau bereaksi dengan mengoceh";
+        else if (v === '3-6') hasil.innerHTML = "<b>Target Kembang (3-6 Bln):</b><br>- Berbalik dari telungkup ke telentang<br>- Mempertahankan posisi kepala tetap tegak<br>- Meraih benda yang ada di dekatnya";
+        else if (v === '6-12') hasil.innerHTML = "<b>Target Kembang (6-12 Bln):</b><br>- Duduk mandiri<br>- Berdiri merambat<br>- Mengucapkan 'Ma-ma' atau 'Pa-pa' tanpa arti";
+        else if (v === '12-24') hasil.innerHTML = "<b>Target Kembang (12-24 Bln):</b><br>- Berjalan sendiri<br>- Minum dari gelas<br>- Mencoret-coret menggunakan alat tulis";
+        else hasil.innerHTML = '';
+    });
 }
