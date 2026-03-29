@@ -1,103 +1,104 @@
-import { putData, getAllData, getDataById } from './db.js';
+import { putData, getAllData, getDataById, clearStore } from './db.js';
 
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwZiCcv7MCL21R1VqlOFsx1x_Ax_8yoxVwjIumG3kVYwDSQTfXX9VjQnz2GsAW2ItzAAQ/exec';
+const APP_VERSION = '1.0.4';
 
-export const uploadData = async () => {
-    try {
-        // 1. Ambil Sesi dan Token JWT dari Memori Lokal
-        const session = await getDataById('kader_session', 'active_user');
-        if(!session || !session.token) return { status: false, count: 0 };
+// 📱 DETEKSI / BUAT DEVICE ID UNTUK BINDING
+export const getDeviceId = () => {
+    let did = localStorage.getItem('device_id');
+    if (!did) {
+        did = 'WEB-' + Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
+        localStorage.setItem('device_id', did);
+    }
+    return did;
+};
 
-        const antrean = await getAllData('sync_queue');
-        const dataUnsynced = antrean.filter(a => !a.is_synced);
-        
-        // Jika tidak ada data yang perlu dikirim, laporkan sukses (0 dikirim)
-        if(dataUnsynced.length === 0) return { status: true, count: 0 };
-        
-        // 🔥 INJEKSI TOKEN KE DALAM SETIAP LAPORAN (AGAR LOLOS MIDDLEWARE)
-        const payloadToSend = dataUnsynced.map(item => {
-            return { ...item, token: session.token };
-        });
+// 🔐 MESIN KRIPTOGRAFI SHA-256
+export const generateSignature = async (text) => {
+    const msgUint8 = new TextEncoder().encode(text);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+};
 
-        const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify(payloadToSend) });
-        const res = await response.json();
-        
-        if(res.status === 'success') {
-            for(let d of dataUnsynced) { 
-                d.is_synced = true; 
-                await putData('sync_queue', d); 
-            }
-            return { status: true, count: dataUnsynced.length };
+// 🚀 API WRAPPER (STANDAR ENTERPRISE)
+export const apiFetch = async (action, payload = {}, sessionToken = '') => {
+    const body = {
+        action: action,
+        payload: payload,
+        meta: {
+            device_id: getDeviceId(),
+            app_version: APP_VERSION,
+            request_id: 'REQ-' + Date.now(),
+            session_token: sessionToken,
+            signature: ''
         }
-        return { status: false, count: 0 };
-    } catch(e) { 
-        console.error("Error uploadData:", e);
-        return { status: false, count: 0 };
+    };
+    
+    // Segel Koper Data dengan Signature
+    const normalized = JSON.stringify(body);
+    body.meta.signature = await generateSignature(normalized);
+
+    try {
+        const response = await fetch(SCRIPT_URL, {
+            method: 'POST',
+            body: JSON.stringify(body)
+        });
+        return await response.json();
+    } catch (e) {
+        console.error("API Error:", e);
+        return { ok: false, status: 'error', message: 'Koneksi ke satelit terputus.' };
     }
 };
 
-export const downloadMasterData = async () => {
-    try {
-        // 1. Ambil Sesi dan Token JWT
-        const session = await getDataById('kader_session', 'active_user');
-        if(!session || !session.token) return false;
-
-        // 🔥 INJEKSI TOKEN KE DALAM URL (GET REQUEST)
-        const response = await fetch(`${SCRIPT_URL}?token=${session.token}`);
-        const res = await response.json();
-        
-        // 🛡️ Tangkap jika ditendang oleh Middleware (Token Expired/Salah)
-        if (res.status === 'error' && String(res.message).includes('401')) {
-            console.error("Akses Ditolak: Token JWT Invalid");
-            return false;
+// 📤 UPLOAD LAPORAN
+export const uploadData = async () => {
+    const session = await getDataById('kader_session', 'active_user');
+    if(!session || !session.token) return { status: false, count: 0 };
+    
+    const antrean = await getAllData('sync_queue');
+    const dataUnsynced = antrean.filter(a => !a.is_synced);
+    if(dataUnsynced.length === 0) return { status: true, count: 0 };
+    
+    const res = await apiFetch('SYNC_BATCH', dataUnsynced, session.token);
+    if(res.ok || res.status === 'success') {
+        for(let d of dataUnsynced) { 
+            d.is_synced = true; 
+            await putData('sync_queue', d); 
         }
-
-        if (res.status === 'success') {
-            const d = res.data;
-            const stores = [
-                'master_kader', 'master_tim', 'master_tim_wilayah', 
-                'master_pertanyaan', 'master_wilayah_bali', 'standar_antropometri', 
-                'master_kembang', 'master_wilayah', 'master_menu', 'master_widget',
-                'master_pkb', 'master_pengumuman'
-            ];
-            
-            for (let s of stores) {
-                if (d[s] && d[s].length > 0) { 
-                    await putData(s, d[s]); 
-                }
-            }
-            console.log("Sinkronisasi Master Berhasil"); 
-            return true;
-        }
-        return false;
-    } catch (error) { 
-        console.error("Error downloadMasterData:", error);
-        return false;
+        return { status: true, count: dataUnsynced.length };
     }
+    return { status: false, count: 0 };
+};
+
+// 📥 DOWNLOAD SASARAN
+export const downloadMasterData = async () => {
+    const session = await getDataById('kader_session', 'active_user');
+    if(!session || !session.token) return false;
+
+    const res = await apiFetch('PULL_DATA_KADER', { kecamatan: session.kecamatan, id_tim: session.id_tim }, session.token);
+    
+    if (res.ok || res.status === 'success') {
+        const d = res.data;
+        if (d && d.length > 0) {
+            for (let item of d) { await putData('sync_queue', item); }
+        }
+        return true;
+    }
+    return false;
 };
 
 window.jalankanSinkronisasi = async () => {
     try {
         const ul = await uploadData();
+        if (!ul.status) { alert("❌ Gagal mengirim laporan. Pastikan internet Anda stabil."); return; }
         
-        if (!ul.status) {
-            alert("❌ Gagal mengirim laporan. Pastikan internet Anda stabil atau Server mungkin sedang sibuk.");
-            return; 
-        }
-
         const dl = await downloadMasterData();
-        
         if (ul.status && dl) { 
-            let msg = ul.count > 0 
-                ? `✅ Sinkronisasi Sempurna!\n${ul.count} Laporan berhasil diamankan di Server dan Data Aplikasi sudah diperbarui.` 
-                : `✅ Sinkronisasi Berhasil!\nData referensi aplikasi sudah diperbarui.`;
-            alert(msg); 
-            location.reload(); 
+            let msg = ul.count > 0 ? `✅ Sinkronisasi Sempurna!\n${ul.count} Laporan berhasil dikirim.` : `✅ Sinkronisasi Berhasil!\nData Sasaran sudah diperbarui.`;
+            alert(msg); location.reload(); 
         } else if (ul.status && !dl) {
-            alert("⚠️ Laporan Anda BERHASIL terkirim, namun sistem gagal mengunduh pembaruan wilayah terbaru.\n\nKemungkinan Token Sesi Anda kadaluarsa atau sinyal lemah. Silakan Logout dan Login kembali.");
-            location.reload();
+            alert("⚠️ Laporan Anda BERHASIL terkirim, namun gagal menarik data terbaru."); location.reload();
         }
-    } catch (e) { 
-        alert("❌ Terjadi gangguan sinyal saat melakukan komunikasi dengan satelit (Server)."); 
-    }
+    } catch (e) { alert("❌ Terjadi gangguan sinyal."); }
 };
