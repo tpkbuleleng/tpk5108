@@ -328,7 +328,7 @@
 
     <template id="template-kalkulator">
         <div class="card animate-fade">
-            <button onclick="renderKonten('bantuan')" style="margin-bottom: 15px; background: none; border: none; color: var(--primary); font-weight: bold; cursor: pointer;">⬅️ Kembali ke Bantuan</button>
+            <button onclick="renderKonten('rekap')" style="margin-bottom: 15px; background: none; border: none; color: var(--primary); font-weight: bold; cursor: pointer;">⬅️ Kembali ke Dashboard</button>
             <h3 style="margin-bottom: 20px; color: var(--primary);">🧮 Kalkulator Cerdas</h3>
             
             <div style="margin-bottom: 20px;">
@@ -370,6 +370,9 @@
     
     <script src="assets/js/api.js"></script>
 
+    <script src="assets/js/db.js"></script>
+    <script src="assets/js/sync.js"></script>
+
     <script src="assets/js/app.js" type="module"></script>
     
     <script>
@@ -383,15 +386,5 @@
             });
         }
     </script>
-    <script src="assets/js/api.js"></script>
-
-    <script src="assets/js/db.js"></script>
-    <script src="assets/js/sync.js"></script>
-
-    <script src="assets/js/app.js" type="module"></script>
-    
-    <script>
-        if ('serviceWorker' in navigator) {
-            // ... (Kode Service Worker Bapak) ...
 </body>
 </html>
