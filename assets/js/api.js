@@ -4,7 +4,7 @@
 
 const CONFIG = {
     // ⚠️ WAJIB GANTI DENGAN URL WEB APP DEPLOYMENT TERBARU BAPAK
-    API_URL: 'https://script.google.com/macros/s/AKfycbxxxxxxx/exec', 
+    API_URL: 'https://script.google.com/macros/s/AKfycbwZiCcv7MCL21R1VqlOFsx1x_Ax_8yoxVwjIumG3kVYwDSQTfXX9VjQnz2GsAW2ItzAAQ/exec', 
     APP_VERSION: '1.0.5'
 };
 
