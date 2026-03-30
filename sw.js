@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tpk-buleleng-vfinal2.6'; // Kode versi, ubah angka jika ada update besar
+const CACHE_NAME = 'tpk-buleleng-vfinal2.7'; // Kode versi, ubah angka jika ada update besar
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
