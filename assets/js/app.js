@@ -17,18 +17,32 @@ async function initApp() {
         console.log('INIT PROFILE:', profileRaw);
         console.log('INIT TOKEN:', token);
 
+        const loginScreen = document.getElementById('login-screen');
+        const appScreen = document.getElementById('app');
+
+        // jika session masih ada -> langsung masuk
         if (profileRaw && token) {
             const profile = JSON.parse(profileRaw);
+
+            if (loginScreen) loginScreen.style.display = 'none';
+            if (appScreen) appScreen.style.display = 'block';
 
             tampilkanBeranda(profile);
             return;
         }
 
-        tampilkanLogin();
+        // jika tidak ada session -> tampilkan login screen
+        if (loginScreen) loginScreen.style.display = 'block';
+        if (appScreen) appScreen.style.display = 'none';
 
     } catch (err) {
         console.error('initApp error:', err);
-        tampilkanLogin();
+
+        const loginScreen = document.getElementById('login-screen');
+        const appScreen = document.getElementById('app');
+
+        if (loginScreen) loginScreen.style.display = 'block';
+        if (appScreen) appScreen.style.display = 'none';
     }
 }
 
