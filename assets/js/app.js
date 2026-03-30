@@ -2,16 +2,6 @@
 // OTAK UTAMA FRONTEND (APP.JS - V5.2 AUDITED)
 // ==========================================
 
-// 🔥 AUTO-CLEANER: Menghancurkan Service Worker (PWA) lama yang membajak layar
-if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.getRegistrations().then(function(registrations) {
-        for(let registration of registrations) {
-            registration.unregister();
-            console.log('🧹 Cache PWA dibersihkan secara paksa.');
-        }
-    });
-}
-
 document.addEventListener('DOMContentLoaded', () => {
     initApp();
 });
@@ -122,16 +112,20 @@ function setupEventListeners() {
             btnSubmit.disabled = true;
 
             try {
-                const res = await apiCall('login', { id_user: idUser, password: pin });
-                if (res.ok) {
-                    localStorage.setItem('USER_PROFILE', JSON.stringify(res.profile));
-                    tampilkanBeranda(res.profile);
-                } else {
-                    alert("❌ Gagal Login: " + res.message);
-                }
-            } catch (error) {
-                alert("⚠️ Terjadi kesalahan jaringan.");
-            } finally {
+    const res = await apiCall('login', { id_user: idUser, password: pin });
+    if (res.ok) {
+        const profile = res.profile || res.session || {};
+        const token = res.session_token || res.token || localStorage.getItem('SESSION_TOKEN') || '';
+
+        if (token) localStorage.setItem('SESSION_TOKEN', token);
+        localStorage.setItem('USER_PROFILE', JSON.stringify(profile));
+        tampilkanBeranda(profile);
+    } else {
+        alert("❌ Gagal Login: " + res.message);
+    }
+} catch (error) {
+    alert("⚠️ Terjadi kesalahan jaringan.");
+} finally {
                 btnSubmit.innerText = originalText;
                 btnSubmit.disabled = false;
             }
