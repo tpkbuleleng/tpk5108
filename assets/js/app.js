@@ -1,6 +1,16 @@
 // ==========================================
-// OTAK UTAMA FRONTEND (APP.JS - V5.1 PROTEKSI SPASI)
+// OTAK UTAMA FRONTEND (APP.JS - V5.2 AUDITED)
 // ==========================================
+
+// 🔥 AUTO-CLEANER: Menghancurkan Service Worker (PWA) lama yang membajak layar
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then(function(registrations) {
+        for(let registration of registrations) {
+            registration.unregister();
+            console.log('🧹 Cache PWA dibersihkan secara paksa.');
+        }
+    });
+}
 
 document.addEventListener('DOMContentLoaded', () => {
     initApp();
@@ -15,21 +25,30 @@ async function initApp() {
 }
 
 function cekSesiLogin() {
-    const token = localStorage.getItem('SESSION_TOKEN');
-    const profileStr = localStorage.getItem('USER_PROFILE');
+    try {
+        const token = localStorage.getItem('SESSION_TOKEN');
+        const profileStr = localStorage.getItem('USER_PROFILE');
 
-    document.getElementById('view-splash').classList.add('hidden');
-    document.getElementById('view-splash').classList.remove('active');
+        document.getElementById('view-splash').classList.add('hidden');
+        document.getElementById('view-splash').classList.remove('active');
 
-    if (token && profileStr) {
-        tampilkanBeranda(JSON.parse(profileStr));
-    } else {
+        if (token && profileStr) {
+            tampilkanBeranda(JSON.parse(profileStr));
+        } else {
+            document.getElementById('view-login').classList.remove('hidden');
+            document.getElementById('view-login').classList.add('active');
+        }
+    } catch (e) {
+        // Pelindung jika memori HP corrupt
+        localStorage.removeItem('SESSION_TOKEN');
+        localStorage.removeItem('USER_PROFILE');
         document.getElementById('view-login').classList.remove('hidden');
         document.getElementById('view-login').classList.add('active');
     }
 }
 
 function tampilkanBeranda(profile) {
+    if (!profile) return;
     document.getElementById('view-login').classList.add('hidden');
     document.getElementById('view-login').classList.remove('active');
     
@@ -162,7 +181,6 @@ async function initHalamanRekap() {
     if (!profileStr) return;
     const profile = JSON.parse(profileStr);
     
-    // 🔥 PEMBERSIH SPASI AUTO-UNDERSCORE 🔥
     const role = String(profile.role_akses).toUpperCase().trim().replace(/\s+/g, '_');
 
     const tbodyTim = document.getElementById('tbody-rekap-tim');
@@ -274,7 +292,7 @@ function initHalamanRegistrasi() {
         formReg.addEventListener('submit', async (e) => {
             e.preventDefault();
             const btn = formReg.querySelector('button[type="submit"]');
-            const profile = JSON.parse(localStorage.getItem('USER_PROFILE'));
+            const profile = JSON.parse(localStorage.getItem('USER_PROFILE') || '{}');
             const formData = new FormData(formReg);
             
             const payload = {
@@ -306,7 +324,7 @@ function initHalamanRegistrasi() {
 // 7. MODUL PENDAMPINGAN (LAPORAN)
 // ==========================================
 async function initHalamanPendampingan() {
-    const profile = JSON.parse(localStorage.getItem('USER_PROFILE'));
+    const profile = JSON.parse(localStorage.getItem('USER_PROFILE') || '{}');
     const selectJenis = document.getElementById('pend-jenis');
     const selectSasaran = document.getElementById('pend-sasaran');
     const infoSasaran = document.getElementById('pend-info-sasaran');
@@ -376,7 +394,7 @@ async function initHalamanPendampingan() {
 // ==========================================
 let globalDataSasaran = []; 
 async function initHalamanDaftarSasaran() {
-    const profile = JSON.parse(localStorage.getItem('USER_PROFILE'));
+    const profile = JSON.parse(localStorage.getItem('USER_PROFILE') || '{}');
     const listContainer = document.getElementById('list-sasaran');
     const filterJenis = document.getElementById('filter-jenis');
     const filterStatus = document.getElementById('filter-status');
