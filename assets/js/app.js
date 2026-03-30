@@ -1,5 +1,5 @@
 // ==========================================
-// OTAK UTAMA FRONTEND (APP.JS - V5.0 ULTIMATE)
+// OTAK UTAMA FRONTEND (APP.JS - V5.1 PROTEKSI SPASI)
 // ==========================================
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -36,24 +36,26 @@ function tampilkanBeranda(profile) {
     document.getElementById('view-app').classList.remove('hidden');
     document.getElementById('view-app').classList.add('active');
 
+    // Bersihkan spasi dari role jika masih ada di memori lama
+    const cleanRole = String(profile.role_akses || 'KADER').toUpperCase().trim().replace(/\s+/g, '_');
+
     document.getElementById('sidebar-nama').innerText = profile.nama || 'Nama User';
-    document.getElementById('sidebar-role').innerText = profile.role_akses || 'KADER';
+    document.getElementById('sidebar-role').innerText = cleanRole;
     
     const namaPanggilan = (profile.nama || 'User').split(' ')[0];
     document.getElementById('user-greeting').innerText = `Halo, ${namaPanggilan}`;
 
-    renderMenuSidebar(profile.role_akses);
+    renderMenuSidebar(cleanRole);
     renderKonten('rekap'); // Default buka halaman Rekap
 }
 
 function renderMenuSidebar(role) {
     const nav = document.getElementById('dynamic-menu-container');
-    const roleUpper = String(role).toUpperCase();
+    const roleUpper = String(role).toUpperCase().trim().replace(/\s+/g, '_');
     let menuHtml = '';
 
     menuHtml += `<a href="#" onclick="renderKonten('rekap'); closeSidebar();" class="nav-item" style="display:block; padding:15px; border-bottom:1px solid #eee; text-decoration:none; color:#333;">📊 Dashboard & Rekap</a>`;
     
-    // Sembunyikan form input untuk Admin Pusat
     if (roleUpper !== 'ADMIN_KABUPATEN' && roleUpper !== 'SUPER_ADMIN') {
         menuHtml += `<a href="#" onclick="renderKonten('registrasi'); closeSidebar();" class="nav-item" style="display:block; padding:15px; border-bottom:1px solid #eee; text-decoration:none; color:#333;">📝 Registrasi Sasaran</a>`;
         menuHtml += `<a href="#" onclick="renderKonten('pendampingan'); closeSidebar();" class="nav-item" style="display:block; padding:15px; border-bottom:1px solid #eee; text-decoration:none; color:#333;">🤝 Laporan Pendampingan</a>`;
@@ -78,15 +80,9 @@ function closeSidebar() {
 // ==========================================
 window.prosesLogout = async function() {
     if (!confirm('🚪 Yakin ingin Keluar Aplikasi?\n\nJika Anda Kader, pastikan data sinkronisasi Offline sudah terkirim (Status Online Hijau).')) return;
-    
-    // Beritahu satelit untuk menghancurkan token (Bypass interceptor jika offline)
     try { await window.apiCall('logout', {}, {}, true); } catch(e) { console.log("Logout diabaikan oleh server/offline"); }
-    
-    // Hapus memori sesi di HP
     localStorage.removeItem('SESSION_TOKEN');
     localStorage.removeItem('USER_PROFILE');
-    
-    // Refresh halaman agar kembali ke layar Login
     window.location.reload();
 };
 
@@ -165,7 +161,9 @@ async function initHalamanRekap() {
     const profileStr = localStorage.getItem('USER_PROFILE');
     if (!profileStr) return;
     const profile = JSON.parse(profileStr);
-    const role = String(profile.role_akses).toUpperCase();
+    
+    // 🔥 PEMBERSIH SPASI AUTO-UNDERSCORE 🔥
+    const role = String(profile.role_akses).toUpperCase().trim().replace(/\s+/g, '_');
 
     const tbodyTim = document.getElementById('tbody-rekap-tim');
     const tbodyKader = document.getElementById('tbody-rekap-kader');
@@ -175,7 +173,6 @@ async function initHalamanRekap() {
     if (tbodyTim) tbodyTim.innerHTML = `<tr><td colspan="3" style="padding:20px;">⏳ Menarik data dari Satelit...</td></tr>`;
 
     try {
-        // 🔥 JIKA ADMIN KABUPATEN / SUPER ADMIN
         if (role === 'ADMIN_KABUPATEN' || role === 'SUPER_ADMIN') {
             if (tbodyKader) {
                 const boxKader = tbodyKader.closest('div').parentElement;
@@ -216,9 +213,7 @@ async function initHalamanRekap() {
                 if (tbodyTim) tbodyTim.innerHTML = `<tr><td colspan="3" style="color:red; padding:20px;">❌ Gagal memuat: ${res.message}</td></tr>`;
             }
 
-        } 
-        // 🔥 JIKA KADER / ADMIN KECAMATAN
-        else {
+        } else {
             if (tbodyKader) tbodyKader.innerHTML = `<tr><td colspan="3" style="padding:20px; color:#666;">Data individu Anda tergabung di Rekap Tim di bawah.</td></tr>`;
 
             const res = await apiCall('getRekapBulananTim', { id_tim: profile.id_tim, periode_key: periodeKey });
@@ -289,18 +284,16 @@ function initHalamanRegistrasi() {
                 dusun: formData.get('dusun') || profile.dusun, id_tim: profile.id_tim, id_wilayah: profile.desa || profile.id_kecamatan
             };
 
-            const origText = btn.innerText;
-            btn.innerText = "⏳ Mengirim Data...";
-            btn.disabled = true;
+            const origText = btn.innerText; btn.innerText = "⏳ Mengirim Data..."; btn.disabled = true;
 
             try {
                 const res = await apiCall('registerSasaran', payload);
                 if (res.ok) {
-                    if (res.data && res.data.duplicate_flag) alert(`⚠️ PERINGATAN POTENSI DUPLIKAT!\nSasaran disimpan, namun sistem mendeteksi kemiripan data di wilayah lain. Admin akan melakukan review.`);
+                    if (res.data && res.data.duplicate_flag) alert(`⚠️ PERINGATAN POTENSI DUPLIKAT!\nSasaran disimpan, namun sistem mendeteksi kemiripan data di wilayah lain.`);
                     else alert(res.message || "✅ Registrasi Sasaran Berhasil!");
                     formReg.reset();
                 } else {
-                    if (res.duplicate_detected) alert(`❌ REGISTRASI DITOLAK!\nSistem mengunci pendaftaran karena NIK/Identitas ini SUDAH ADA di database.\nAlasan: ${res.reason_code}`);
+                    if (res.duplicate_detected) alert(`❌ REGISTRASI DITOLAK!\nNIK/Identitas ini SUDAH ADA di database.\nAlasan: ${res.reason_code}`);
                     else alert("❌ Gagal: " + res.message);
                 }
             } catch (error) { alert("⚠️ Terjadi kesalahan jaringan."); } 
@@ -320,7 +313,7 @@ async function initHalamanPendampingan() {
     const formPendampingan = document.getElementById('form-pendampingan');
     let listSasaranSatelit = [];
 
-    selectSasaran.innerHTML = `<option value="">⏳ Menarik data sasaran dari Satelit...</option>`;
+    selectSasaran.innerHTML = `<option value="">⏳ Menarik data dari Satelit...</option>`;
     selectSasaran.disabled = true;
 
     try {
@@ -387,13 +380,10 @@ async function initHalamanDaftarSasaran() {
     const listContainer = document.getElementById('list-sasaran');
     const filterJenis = document.getElementById('filter-jenis');
     const filterStatus = document.getElementById('filter-status');
-    const roleUpper = String(profile.role_akses).toUpperCase();
 
     listContainer.innerHTML = `<div style="padding:20px; text-align:center;">⏳ Menarik daftar dari satelit...</div>`;
 
     try {
-        // Jika admin Kabupaten buka, tarik sebagian data master atau bypass (bisa diatur nanti),
-        // Sementara kita tembak ke API, Backend sudah menangani filter by role.
         const res = await apiCall('getSasaranByTim', { id_tim: profile.id_tim });
         if (res.ok) {
             globalDataSasaran = res.data.filter(r => r.tipe_laporan === 'REGISTRASI');
@@ -409,11 +399,7 @@ async function initHalamanDaftarSasaran() {
     if (filterStatus) filterStatus.addEventListener('change', renderListSasaran);
 
     const btnTutupModal = document.getElementById('btn-tutup-modal');
-    if (btnTutupModal) {
-        btnTutupModal.addEventListener('click', () => {
-            document.getElementById('modal-detail').style.display = 'none';
-        });
-    }
+    if (btnTutupModal) btnTutupModal.addEventListener('click', () => { document.getElementById('modal-detail').style.display = 'none'; });
 }
 
 function renderListSasaran() {
@@ -425,10 +411,7 @@ function renderListSasaran() {
     if (fJenis !== 'ALL') filtered = filtered.filter(s => s.jenis_sasaran === fJenis);
     if (fStatus !== 'ALL') filtered = filtered.filter(s => String(s.status_sasaran).toUpperCase() === fStatus);
 
-    if (filtered.length === 0) {
-        listContainer.innerHTML = `<div style="padding:20px; text-align:center; color:#666;">Tidak ada data sasaran.</div>`;
-        return;
-    }
+    if (filtered.length === 0) { listContainer.innerHTML = `<div style="padding:20px; text-align:center; color:#666;">Tidak ada data sasaran.</div>`; return; }
 
     let html = '';
     filtered.forEach(s => {
@@ -497,7 +480,7 @@ window.prosesUbahStatus = async function(idSasaran) {
         if (res.ok) {
             alert(res.message || "✅ Status sasaran berhasil diubah!");
             document.getElementById('modal-detail').style.display = 'none';
-            initHalamanDaftarSasaran(); // Refresh daftar
+            initHalamanDaftarSasaran(); 
         } else {
             alert("❌ Gagal merubah status: " + res.message);
         }
@@ -510,8 +493,9 @@ window.prosesUbahStatus = async function(idSasaran) {
 // 9. MODUL PENGATURAN & GANTI PIN
 // ==========================================
 function initHalamanSetting() {
-    const profile = JSON.parse(localStorage.getItem('USER_PROFILE'));
-    if (!profile) return;
+    const profileStr = localStorage.getItem('USER_PROFILE');
+    if (!profileStr) return;
+    const profile = JSON.parse(profileStr);
 
     const elNama = document.getElementById('set-nama');
     const elId = document.getElementById('set-id');
