@@ -1,11 +1,13 @@
-const CACHE_NAME = 'tpk-buleleng-vfinal3.2'; // Kode versi, ubah angka jika ada update besar
+const CACHE_NAME = 'tpk-buleleng-vfinal3.3'; 
+
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
     './assets/css/style.css',
-    './assets/js/app.js',
+    './assets/js/api.js',  // <-- WAJIB DITAMBAHKAN
     './assets/js/db.js',
     './assets/js/sync.js',
+    './assets/js/app.js',
     './assets/img/logo.png',
     './manifest.json'
 ];
