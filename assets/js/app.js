@@ -10,8 +10,26 @@ document.addEventListener('DOMContentLoaded', () => {
 // 1. INISIALISASI & KONTROL TAMPILAN
 // ==========================================
 async function initApp() {
-    setTimeout(() => { cekSesiLogin(); }, 1500);
-    setupEventListeners();
+    try {
+        const profileRaw = localStorage.getItem('USER_PROFILE');
+        const token = localStorage.getItem('SESSION_TOKEN');
+
+        console.log('INIT PROFILE:', profileRaw);
+        console.log('INIT TOKEN:', token);
+
+        if (profileRaw && token) {
+            const profile = JSON.parse(profileRaw);
+
+            tampilkanBeranda(profile);
+            return;
+        }
+
+        tampilkanLogin();
+
+    } catch (err) {
+        console.error('initApp error:', err);
+        tampilkanLogin();
+    }
 }
 
 function cekSesiLogin() {
@@ -114,15 +132,21 @@ function setupEventListeners() {
             try {
     const res = await apiCall('login', { id_user: idUser, password: pin });
     if (res.ok) {
-        const profile = res.profile || res.session || {};
-        const token = res.session_token || res.token || localStorage.getItem('SESSION_TOKEN') || '';
+    const profile = res.profile || res.session || {};
+    const token = res.session_token || res.token || '';
 
-        if (token) localStorage.setItem('SESSION_TOKEN', token);
-        localStorage.setItem('USER_PROFILE', JSON.stringify(profile));
-        tampilkanBeranda(profile);
-    } else {
-        alert("❌ Gagal Login: " + res.message);
+    console.log('LOGIN SUCCESS:', res);
+
+    if (token) {
+        localStorage.setItem('SESSION_TOKEN', token);
     }
+
+    localStorage.setItem('USER_PROFILE', JSON.stringify(profile));
+
+    tampilkanBeranda(profile);
+} else {
+    alert("❌ Gagal Login: " + res.message);
+}
 } catch (error) {
     alert("⚠️ Terjadi kesalahan jaringan.");
 } finally {
