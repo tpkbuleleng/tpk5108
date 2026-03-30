@@ -1,15 +1,14 @@
-const CACHE_NAME = 'tpk-buleleng-vfinal3.3'; 
-
+const CACHE_NAME = 'tpk-buleleng-vfinal3.4';
 const ASSETS_TO_CACHE = [
-    './',
-    './index.html',
-    './assets/css/style.css',
-    './assets/js/api.js',  // <-- WAJIB DITAMBAHKAN
-    './assets/js/db.js',
-    './assets/js/sync.js',
-    './assets/js/app.js',
-    './assets/img/logo.png',
-    './manifest.json'
+  './',
+  './index.html',
+  './assets/css/style.css',
+  './assets/js/api.js',
+  './assets/js/db.js',
+  './assets/js/sync.js',
+  './assets/js/app.js',
+  './assets/img/logo.png',
+  './manifest.json'
 ];
 
 // 1. INSTALASI: Masukkan semua senjata utama ke dalam Gudang Cache
