@@ -23,6 +23,7 @@
     }
 
     OfflineSync.renderSummary();
+    RekapKaderScreen.ensureDefaultMonth?.();
   }
 
   function cacheElements() {
@@ -60,6 +61,16 @@
     els.penEditReason = document.getElementById('pen-edit-reason');
     els.btnSavePenDraft = document.getElementById('btn-save-pen-draft');
     els.btnResetPendampingan = document.getElementById('btn-reset-pendampingan');
+
+    els.btnBackFromSync = document.getElementById('btn-back-from-sync');
+    els.btnSyncAllScreen = document.getElementById('btn-sync-all-screen');
+    els.btnRefreshSyncScreen = document.getElementById('btn-refresh-sync-screen');
+    els.syncFilterAction = document.getElementById('sync-filter-action');
+    els.syncFilterStatus = document.getElementById('sync-filter-status');
+    els.syncFilterKeyword = document.getElementById('sync-filter-keyword');
+
+    els.btnBackFromRekap = document.getElementById('btn-back-from-rekap');
+    els.btnLoadRekap = document.getElementById('btn-load-rekap');
   }
 
   function bindEvents() {
@@ -87,7 +98,11 @@
 
     els.loginForm?.addEventListener('submit', handleLoginSubmit);
     els.btnLogout?.addEventListener('click', handleLogout);
-    els.btnSyncNow?.addEventListener('click', () => OfflineSync.syncAll());
+    els.btnSyncNow?.addEventListener('click', async () => {
+      await OfflineSync.syncAll();
+      SyncScreen.render?.();
+      updateDashboardDraftCount();
+    });
 
     els.btnBackDashboardFromList?.addEventListener('click', () => Router.toDashboard());
     els.btnBackListFromDetail?.addEventListener('click', () => Router.toSasaranList());
@@ -135,6 +150,7 @@
     els.regForm?.addEventListener('submit', async (e) => {
       e.preventDefault();
       await RegistrasiForm.submit();
+      updateDashboardDraftCount();
     });
 
     els.btnSaveRegDraft?.addEventListener('click', () => {
@@ -164,6 +180,7 @@
     els.pendampinganForm?.addEventListener('submit', async (e) => {
       e.preventDefault();
       await PendampinganForm.submit();
+      updateDashboardDraftCount();
     });
 
     els.btnSavePenDraft?.addEventListener('click', () => {
@@ -205,6 +222,22 @@
       }
     }, 400));
 
+    els.btnBackFromSync?.addEventListener('click', () => Router.toDashboard());
+    els.btnSyncAllScreen?.addEventListener('click', async () => {
+      await OfflineSync.syncAll();
+      SyncScreen.render();
+      updateDashboardDraftCount();
+    });
+    els.btnRefreshSyncScreen?.addEventListener('click', () => SyncScreen.render());
+    els.syncFilterAction?.addEventListener('change', () => SyncScreen.render());
+    els.syncFilterStatus?.addEventListener('change', () => SyncScreen.render());
+    els.syncFilterKeyword?.addEventListener('input', debounce(() => SyncScreen.render(), 300));
+
+    els.btnBackFromRekap?.addEventListener('click', () => Router.toDashboard());
+    els.btnLoadRekap?.addEventListener('click', async () => {
+      await RekapKaderScreen.load();
+    });
+
     document.addEventListener('click', handleDocumentClick);
   }
 
@@ -240,7 +273,16 @@
 
       Auth.handleLoginSuccess(result);
       await Bootstrap.loadInitialRefs();
+
       renderDashboard();
+
+      try {
+        const dash = await DashboardService.getDashboardKaderSummary();
+        if (dash?.ok) {
+          applyDashboardSummary(dash.data || {});
+        }
+      } catch (_) {}
+
       await SasaranList.loadAndRender();
       Router.toDashboard();
       Notifier.show('Login berhasil.');
@@ -270,8 +312,20 @@
     UI.setText('stat-sasaran', String(profile.jumlah_sasaran || 0));
     UI.setText('stat-pendampingan', String(profile.jumlah_pendampingan || 0));
 
+    updateDashboardDraftCount();
     Menu.render(profile.role_akses || 'KADER');
     OfflineSync.renderSummary();
+  }
+
+  function applyDashboardSummary(data) {
+    UI.setText('stat-sasaran', String(data.jumlah_sasaran || 0));
+    UI.setText('stat-pendampingan', String(data.jumlah_pendampingan || 0));
+    updateDashboardDraftCount(data.jumlah_draft_pending);
+  }
+
+  function updateDashboardDraftCount(explicitValue) {
+    const value = explicitValue != null ? explicitValue : OfflineSync.getQueue().length;
+    UI.setText('stat-draft', String(value || 0));
   }
 
   async function handleDocumentClick(event) {
@@ -302,6 +356,23 @@
     if (editPendampinganBtn) {
       const idPendampingan = editPendampinganBtn.dataset.editPendampingan;
       await PendampinganForm.openEdit(idPendampingan);
+      return;
+    }
+
+    const retryBtn = event.target.closest('[data-sync-retry-id]');
+    if (retryBtn) {
+      await OfflineSync.retryOne(retryBtn.dataset.syncRetryId);
+      SyncScreen.render();
+      updateDashboardDraftCount();
+      return;
+    }
+
+    const deleteBtn = event.target.closest('[data-sync-delete-id]');
+    if (deleteBtn) {
+      OfflineSync.removeById(deleteBtn.dataset.syncDeleteId);
+      SyncScreen.render();
+      updateDashboardDraftCount();
+      Notifier.show('Draft dihapus dari antrean lokal.');
     }
   }
 
@@ -327,6 +398,16 @@
         await PendampinganForm.openCreate();
         break;
       }
+
+      case 'draft-sync':
+        Router.toSyncScreen();
+        SyncScreen.render();
+        break;
+
+      case 'rekap-saya':
+        Router.toRekapKader();
+        await RekapKaderScreen.load();
+        break;
 
       default:
         Notifier.show(`Menu ${key} akan diaktifkan pada tahap berikutnya.`);
