@@ -169,3 +169,49 @@
   padding: 14px;
   background: #fbfdff;
 }
+
+.validation-list {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.validation-item-ok {
+  color: var(--color-success);
+}
+
+.validation-item-warn {
+  color: var(--color-warning);
+}
+
+.validation-item-error {
+  color: var(--color-danger);
+}
+
+.sticky-submit-bar {
+  position: sticky;
+  bottom: 0;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  background: rgba(255, 255, 255, 0.96);
+  padding-top: 14px;
+  margin-top: 20px;
+  backdrop-filter: blur(4px);
+}
+
+.dynamic-field-card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  background: #fff;
+}
+
+@media (max-width: 640px) {
+  .form-group-span-2 {
+    grid-column: span 1;
+  }
+
+  .sticky-submit-bar {
+    grid-template-columns: 1fr;
+  }
+}
