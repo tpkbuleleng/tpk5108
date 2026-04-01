@@ -3,6 +3,7 @@ window.RegistrasiForm = {
     RegistrasiState.setMode('create');
     RegistrasiState.clearEditItem();
     Router.toRegistrasi();
+
     this.resetForm();
     this.applyModeUI();
     this.prefillScope();
@@ -11,15 +12,20 @@ window.RegistrasiForm = {
   },
 
   async openEdit(item) {
+    const safeItem = item || {};
+
     RegistrasiState.setMode('edit');
-    RegistrasiState.setEditItem(item || {});
+    RegistrasiState.setEditItem(safeItem);
     Router.toRegistrasi();
+
     this.resetForm();
     this.applyModeUI();
     this.prefillScope();
-    this.fillForm(item || {});
-    await this.loadDynamicFields(item?.jenis_sasaran || '');
-    this.fillDynamicFields(item || {});
+    this.fillForm(safeItem);
+
+    await this.loadDynamicFields(safeItem.jenis_sasaran || '');
+    this.fillDynamicFields(safeItem);
+
     this.renderValidation();
   },
 
@@ -42,56 +48,66 @@ window.RegistrasiForm = {
   resetForm() {
     const form = document.getElementById('registrasi-form');
     if (form) form.reset();
-    UI.setHTML('registrasi-dynamic-fields', '<p class="muted-text">Pilih jenis sasaran untuk memuat pertanyaan khusus.</p>');
+
+    UI.setHTML(
+      'registrasi-dynamic-fields',
+      '<p class="muted-text">Pilih jenis sasaran untuk memuat pertanyaan khusus.</p>'
+    );
   },
 
   prefillScope() {
     const profile = Session.getProfile() || {};
     const selected = SasaranState.getSelected() || {};
+    const editItem = RegistrasiState.getEditItem() || {};
+    const mode = RegistrasiState.getMode();
 
-    const kec = profile.nama_kecamatan || selected.nama_kecamatan || '';
-    const desa = profile.nama_desa || selected.nama_desa || selected.nama_wilayah || '';
+    const kecamatan =
+      mode === 'edit'
+        ? (editItem.nama_kecamatan || profile.nama_kecamatan || '')
+        : (profile.nama_kecamatan || selected.nama_kecamatan || '');
 
-    const kecEl = document.getElementById('reg-kecamatan');
-    const desaEl = document.getElementById('reg-desa');
+    const desa =
+      mode === 'edit'
+        ? (editItem.nama_desa || profile.nama_desa || '')
+        : (profile.nama_desa || selected.nama_desa || '');
 
-    if (kecEl) kecEl.value = kec;
-    if (desaEl) desaEl.value = desa;
+    UI.setValue('reg-kecamatan', kecamatan);
+    UI.setValue('reg-desa', desa);
   },
 
   fillForm(item) {
     const map = {
       'reg-jenis-sasaran': item.jenis_sasaran || '',
       'reg-nama-sasaran': item.nama_sasaran || item.nama || '',
-      'reg-nik': item.nik || '',
+      'reg-nik': item.nik || item.nik_sasaran || '',
       'reg-no-kk': item.nomor_kk || item.no_kk || '',
       'reg-jenis-kelamin': item.jenis_kelamin || '',
       'reg-tanggal-lahir': item.tanggal_lahir || item.tgl_lahir || '',
       'reg-kecamatan': item.nama_kecamatan || '',
-      'reg-desa': item.nama_desa || item.nama_wilayah || '',
+      'reg-desa': item.nama_desa || '',
       'reg-dusun': item.nama_dusun || '',
       'reg-alamat': item.alamat || ''
     };
 
-    Object.entries(map).forEach(([id, value]) => {
-      const el = document.getElementById(id);
-      if (el) el.value = value;
-    });
+    Object.entries(map).forEach(([id, value]) => UI.setValue(id, value));
   },
 
   async loadDynamicFields(jenisSasaran) {
     if (!jenisSasaran) {
-      UI.setHTML('registrasi-dynamic-fields', '<p class="muted-text">Pilih jenis sasaran untuk memuat pertanyaan khusus.</p>');
+      UI.setHTML(
+        'registrasi-dynamic-fields',
+        '<p class="muted-text">Pilih jenis sasaran untuk memuat pertanyaan khusus.</p>'
+      );
       return;
     }
 
     try {
       const result = await RegistrasiService.getFormDefinition(jenisSasaran);
       const fields = this.normalizeDynamicFields(result?.data, jenisSasaran);
-      this.renderDynamicFields(fields);
+      DynamicForm.render('registrasi-dynamic-fields', fields, {});
     } catch (err) {
       const fallback = FormMapper.getDefaultDynamicFields(jenisSasaran);
-      this.renderDynamicFields(fallback);
+      DynamicForm.render('registrasi-dynamic-fields', fallback, {});
     }
   },
 
@@ -102,61 +118,35 @@ window.RegistrasiForm = {
     return FormMapper.getDefaultDynamicFields(jenisSasaran);
   },
 
-  renderDynamicFields(fields) {
-    const container = document.getElementById('registrasi-dynamic-fields');
-    if (!container) return;
-
-    if (!fields.length) {
-      container.innerHTML = '<p class="muted-text">Tidak ada field khusus untuk jenis ini.</p>';
-      return;
-    }
-
-    container.innerHTML = fields.map(field => {
-      const type = field.type || 'text';
-      return `
-        <div class="dynamic-field-card">
-          <div class="form-group">
-            <label for="dyn-${field.question_code}">${field.label}${field.required ? ' *' : ''}</label>
-            ${this.makeInput(field, type)}
-          </div>
-        </div>
-      `;
-    }).join('');
-  },
-
-  makeInput(field, type) {
-    const id = `dyn-${field.question_code}`;
-    const required = field.required ? 'required' : '';
-    const placeholder = field.placeholder || '';
-
-    if (type === 'textarea') {
-      return `<textarea id="${id}" data-dyn-key="${field.question_code}" rows="3" placeholder="${placeholder}" ${required}></textarea>`;
-    }
-
-    if (type === 'select' && Array.isArray(field.options)) {
-      const options = field.options.map(opt => `<option value="${opt.value || opt}">${opt.label || opt}</option>`).join('');
-      return `<select id="${id}" data-dyn-key="${field.question_code}" ${required}><option value="">Pilih</option>${options}</select>`;
-    }
-
-    return `<input id="${id}" data-dyn-key="${field.question_code}" type="${type}" placeholder="${placeholder}" ${required} />`;
-  },
-
   fillDynamicFields(item) {
-    const extra = item.extra_fields || item.field_values || item.jawaban || {};
-    Object.entries(extra).forEach(([key, value]) => {
-      const el = document.querySelector(`[data-dyn-key="${key}"]`);
-      if (el) el.value = value;
-    });
+    let extra = item.extra_fields || item.field_values || item.jawaban || {};
+
+    if ((!extra || typeof extra !== 'object') && item.extra_fields_json) {
+      try {
+        extra = JSON.parse(item.extra_fields_json);
+      } catch (_) {
+        extra = {};
+      }
+    }
+
+    if (!extra || typeof extra !== 'object') {
+      extra = {};
+    }
+
+    DynamicForm.fill('registrasi-dynamic-fields', extra);
   },
 
   collectFormData() {
     const localDraft = DraftManager.getRegistrasiDraft()?.data || {};
     const mode = RegistrasiState.getMode();
+    const editItem = RegistrasiState.getEditItem() || {};
+
     const stableClientSubmitId = mode === 'create'
       ? ClientId.ensure(localDraft.client_submit_id, 'SUB')
       : '';
 
     return {
+      id_sasaran: editItem.id_sasaran || editItem.id || '',
       jenis_sasaran: document.getElementById('reg-jenis-sasaran')?.value || '',
       nama_sasaran: document.getElementById('reg-nama-sasaran')?.value?.trim() || '',
       nik: document.getElementById('reg-nik')?.value?.trim() || '',
@@ -167,18 +157,10 @@ window.RegistrasiForm = {
       nama_desa: document.getElementById('reg-desa')?.value || '',
       nama_dusun: document.getElementById('reg-dusun')?.value?.trim() || '',
       alamat: document.getElementById('reg-alamat')?.value?.trim() || '',
-      extra_fields: this.collectDynamicFields(),
+      extra_fields: DynamicForm.collect('registrasi-dynamic-fields'),
       client_submit_id: stableClientSubmitId,
       sync_source: 'ONLINE'
     };
-  },
-
-  collectDynamicFields() {
-    const values = {};
-    document.querySelectorAll('[data-dyn-key]').forEach(el => {
-      values[el.dataset.dynKey] = el.value;
-    });
-    return values;
   },
 
   validate(data) {
@@ -216,7 +198,7 @@ window.RegistrasiForm = {
       issues.push({ type: 'warn', text: 'Nama desa belum terisi.' });
     }
 
-    if (!issues.length) {
+    if (!issues.some(item => item.type === 'error')) {
       issues.push({ type: 'ok', text: 'Validasi dasar lolos. Form siap dikirim.' });
     }
 
@@ -241,6 +223,7 @@ window.RegistrasiForm = {
     if (!draft?.data) return;
 
     this.fillForm(draft.data);
+
     const jenis = draft.data.jenis_sasaran || '';
     if (jenis) {
       this.loadDynamicFields(jenis).then(() => {
@@ -252,13 +235,14 @@ window.RegistrasiForm = {
 
   autosaveDraft() {
     if (RegistrasiState.getMode() !== 'create') return;
+
     const data = this.collectFormData();
     DraftManager.saveRegistrasiDraft(data);
   },
 
   async submit() {
     const mode = RegistrasiState.getMode();
-    const editItem = RegistrasiState.getEditItem();
+    const editItem = RegistrasiState.getEditItem() || {};
     const data = this.collectFormData();
     const issues = this.validate(data);
     const hasError = issues.some(item => item.type === 'error');
@@ -272,7 +256,11 @@ window.RegistrasiForm = {
 
     const payload = FormMapper.buildPayload(data, mode, editItem);
 
-    UI.setLoading('btn-submit-registrasi', true, mode === 'edit' ? 'Menyimpan...' : 'Mengirim...');
+    UI.setLoading(
+      'btn-submit-registrasi',
+      true,
+      mode === 'edit' ? 'Menyimpan...' : 'Mengirim...'
+    );
 
     try {
       if (!navigator.onLine) {
@@ -293,21 +281,34 @@ window.RegistrasiForm = {
       DraftManager.clearRegistrasiDraft();
       RegistrasiState.clearEditItem();
       RegistrasiState.setMode('create');
+
       this.resetForm();
       this.prefillScope();
       this.applyModeUI();
       this.renderValidation();
+
       await SasaranList.loadAndRender();
+
+      if (mode === 'edit') {
+        const targetId = payload.id_sasaran || editItem.id_sasaran || editItem.id || '';
+        if (targetId) {
+          await SasaranDetail.openById(targetId);
+        } else {
+          Router.toSasaranList();
+        }
+      } else {
+        Router.toSasaranList();
+      }
 
       if (result?.data?.duplicate) {
         Notifier.show('Registrasi sasaran sudah pernah tersimpan sebelumnya.');
       } else {
-        Notifier.show(mode === 'edit'
-          ? 'Perubahan data sasaran berhasil disimpan.'
-          : 'Registrasi sasaran berhasil disimpan.');
+        Notifier.show(
+          mode === 'edit'
+            ? 'Perubahan data sasaran berhasil disimpan.'
+            : 'Registrasi sasaran berhasil disimpan.'
+        );
       }
-
-      Router.toSasaranList();
     } catch (err) {
       DraftManager.saveRegistrasiDraft(payload);
       Notifier.show(err.message || 'Terjadi kesalahan saat menyimpan data.');
