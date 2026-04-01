@@ -236,6 +236,11 @@ window.PendampinganForm = {
     const profile = Session.getProfile() || {};
     const editItem = PendampinganState.getEditItem() || {};
     const mode = PendampinganState.getMode();
+    const localDraft = PendampinganDraft.getLocal()?.data || {};
+
+    const stableClientSubmitId = mode === 'create'
+      ? ClientId.ensure(localDraft.client_submit_id, 'SUB')
+      : '';
 
     return {
       mode,
@@ -252,6 +257,8 @@ window.PendampinganForm = {
       nama_kader: profile.nama_kader || profile.nama || '',
       id_tim: profile.id_tim || '',
       nama_tim: profile.nama_tim || '',
+      client_submit_id: stableClientSubmitId,
+      sync_source: mode === 'create' ? 'ONLINE' : 'ONLINE',
       extra_fields: this.collectDynamicFields()
     };
   },
@@ -376,7 +383,8 @@ window.PendampinganForm = {
           status_kunjungan: data.status_kunjungan,
           catatan_umum: data.catatan_umum,
           extra_fields: data.extra_fields,
-          edit_reason: data.edit_reason
+          edit_reason: data.edit_reason,
+          sync_source: 'ONLINE'
         };
       } else {
         payload = {
@@ -391,13 +399,15 @@ window.PendampinganForm = {
           nama_kader: data.nama_kader,
           id_tim: data.id_tim,
           nama_tim: data.nama_tim,
+          client_submit_id: data.client_submit_id,
+          sync_source: 'ONLINE',
           extra_fields: data.extra_fields
         };
       }
 
       if (!navigator.onLine && mode === 'create') {
         PendampinganDraft.enqueueOffline(payload);
-        PendampinganDraft.saveLocal(data);
+        PendampinganDraft.saveLocal(payload);
         Notifier.show('Sedang offline. Pendampingan disimpan ke antrean sinkronisasi.');
         return;
       }
@@ -422,7 +432,11 @@ window.PendampinganForm = {
       const selectedId = currentSelected.id_sasaran || currentSelected.id || data.id_sasaran;
       await SasaranDetail.openById(selectedId);
 
-      Notifier.show(mode === 'edit' ? 'Pendampingan berhasil diperbarui.' : 'Pendampingan berhasil dikirim.');
+      if (result?.data?.duplicate) {
+        Notifier.show('Pendampingan sudah pernah tersimpan sebelumnya.');
+      } else {
+        Notifier.show(mode === 'edit' ? 'Pendampingan berhasil diperbarui.' : 'Pendampingan berhasil dikirim.');
+      }
     } catch (err) {
       if (mode === 'create') {
         PendampinganDraft.saveLocal(data);
