@@ -18,14 +18,14 @@ window.Menu = {
       ];
     }
 
-    return [
-      { key: 'registrasi', title: 'Registrasi Sasaran', desc: 'Tambah sasaran baru' },
-      { key: 'daftar-sasaran', title: 'Daftar Sasaran', desc: 'Lihat data sasaran tim' },
-      { key: 'pendampingan', title: 'Lapor Pendampingan', desc: 'Input laporan pendampingan' },
-      { key: 'draft-sync', title: 'Draft & Sinkronisasi', desc: 'Kelola draft offline' },
-      { key: 'rekap-saya', title: 'Rekap Saya', desc: 'Lihat statistik kader' },
-      { key: 'profil', title: 'Profil', desc: 'Lihat akun dan ganti password' }
-    ];
+   return [
+  { key: 'registrasi', title: 'Registrasi Sasaran', desc: 'Tambah sasaran baru' },
+  { key: 'daftar-sasaran', title: 'Daftar Sasaran', desc: 'Lihat data sasaran tim' },
+  { key: 'pendampingan', title: 'Lapor Pendampingan', desc: 'Input laporan pendampingan' },
+  { key: 'draft-sync', title: 'Draft & Sinkronisasi', desc: 'Kelola draft offline' },
+  { key: 'rekap-saya', title: 'Rekap Saya', desc: 'Lihat statistik kader' },
+  { key: 'profil', title: 'Profil', desc: 'Lihat akun dan ganti password' }
+];
   },
 
   render(role) {
