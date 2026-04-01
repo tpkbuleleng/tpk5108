@@ -13,14 +13,19 @@ window.Api = {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), APP_CONFIG.REQUEST_TIMEOUT_MS);
 
+    const resolvedClientSubmitId = ClientId.ensure(
+      options.clientSubmitId || payload.client_submit_id || '',
+      'SUB'
+    );
+
     const requestBody = {
       action,
-      payload,
+      payload: Object.assign({}, payload),
       token: options.skipToken ? '' : Session.getToken(),
       app_version: APP_CONFIG.APP_VERSION,
-      sync_source: options.syncSource || 'ONLINE',
-      client_submit_id: options.clientSubmitId || `SUB-${Date.now()}`,
-      device_id: options.deviceId || this.makeDeviceId()
+      sync_source: options.syncSource || payload.sync_source || 'ONLINE',
+      client_submit_id: resolvedClientSubmitId,
+      device_id: options.deviceId || payload.device_id || this.makeDeviceId()
     };
 
     try {
