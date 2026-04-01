@@ -8,7 +8,7 @@ window.Api = {
   },
 
   getStableDeviceId() {
-    const storageKey = 'stable_device_id';
+    const storageKey = APP_CONFIG.STORAGE_KEYS.DEVICE_ID;
     let deviceId = StorageHelper.get(storageKey, '');
 
     if (deviceId) return deviceId;
