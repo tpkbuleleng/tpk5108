@@ -1,4 +1,42 @@
 window.SasaranList = {
+  async init() {
+    const cached = SasaranState.getList();
+    if (cached.length) {
+      this.renderList(cached);
+      UI.setText('sasaran-list-meta', `${cached.length} data sasaran dari cache lokal.`);
+    }
+  },
+
+  async loadAndRender() {
+    const filters = this.getFilters();
+    UI.setHTML('sasaran-list-container', '<p class="muted-text">Sedang memuat data sasaran...</p>');
+
+    try {
+      const result = await SasaranService.getSasaranByTim(filters);
+      if (!result?.ok) {
+        throw new Error(result?.message || 'Gagal memuat daftar sasaran.');
+      }
+
+      const items = this.normalizeList(result?.data);
+      SasaranState.setList(items);
+      this.renderList(items);
+      UI.setText('sasaran-list-meta', `${items.length} data sasaran berhasil dimuat.`);
+    } catch (err) {
+      const cached = SasaranState.getList();
+      if (cached.length) {
+        this.renderList(cached);
+        UI.setText('sasaran-list-meta', `Menampilkan ${cached.length} data cache lokal.`);
+        Notifier.show(`Gagal refresh: ${err.message}`);
+        return;
+      }
+
+      UI.setHTML('sasaran-list-container', `<p class="muted-text">${err.message}</p>`);
+      UI.setText('sasaran-list-meta', 'Gagal memuat data sasaran.');
+    }
+  },
+
+  getFilters() {
+    return {
       keyword: document.getElementById('filter-keyword-sasaran')?.value?.trim() || '',
       jenis_sasaran: document.getElementById('filter-jenis-sasaran')?.value || '',
       status_sasaran: document.getElementById('filter-status-sasaran')?.value || ''
