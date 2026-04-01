@@ -1,30 +1,93 @@
 window.Auth = {
   async login(idKader, password) {
-    return Api.post('login', {
-      id_kader: String(idKader || '').trim(),
-      password: String(password || '').trim()
-    }, { skipToken: true });
+    return Api.post(
+      'login',
+      {
+        id_kader: String(idKader || '').trim(),
+        password: String(password || '').trim()
+      },
+      { skipToken: true }
+    );
   },
 
   handleLoginSuccess(result) {
     const data = result?.data || {};
 
-    Session.setToken(data.session_token || data.token || '');
-    Session.setProfile(data.profile || null);
+    const token =
+      data.session_token ||
+      data.token ||
+      '';
+
+    const profile =
+      data.profile ||
+      data.user ||
+      null;
+
+    const bootstrap =
+      data.bootstrap_refs ||
+      data.bootstrap ||
+      null;
+
+    Session.setToken(token);
+    Session.setProfile(profile);
+
+    if (bootstrap) {
+      StorageHelper.set(APP_CONFIG.STORAGE_KEYS.BOOTSTRAP, bootstrap);
+    }
+
+    return {
+      token,
+      profile,
+      bootstrap
+    };
   },
 
   logout() {
-    Session.logout();
-    UI.showScreen('login-screen');
+    try {
+      Session.logout?.();
+    } catch (_) {
+      try {
+        Session.clear?.();
+      } catch (_) {}
+    }
+
+    try {
+      SasaranState?.clearSelected?.();
+      SasaranState?.clearList?.();
+    } catch (_) {}
+
+    try {
+      PendampinganState?.reset?.();
+    } catch (_) {}
+
+    try {
+      DraftManager?.clearRegistrasiDraft?.();
+    } catch (_) {}
+
+    try {
+      PendampinganDraft?.clearLocal?.();
+    } catch (_) {}
+
+    try {
+      Router?.toLogin?.();
+    } catch (_) {
+      UI.showScreen('login-screen');
+    }
   },
 
   guard() {
-    if (Session.isLoggedIn()) {
-      UI.showScreen('dashboard-screen');
+    const loggedIn = Session.isLoggedIn?.();
+
+    if (loggedIn) {
       return true;
     }
 
-    UI.showScreen('login-screen');
+    try {
+      Router?.toLogin?.();
+    } catch (_) {
+      UI.showScreen('login-screen');
+    }
+
     return false;
   }
 };
