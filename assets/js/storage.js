@@ -20,13 +20,29 @@ window.StorageHelper = {
   },
 
   remove(key) {
-    localStorage.removeItem(key);
+    try {
+      localStorage.removeItem(key);
+      return true;
+    } catch (err) {
+      console.error('Storage remove error:', err);
+      return false;
+    }
   },
 
   clearSession() {
-    this.remove(APP_CONFIG.STORAGE_KEYS.SESSION_TOKEN);
-    this.remove(APP_CONFIG.STORAGE_KEYS.PROFILE);
-    this.remove(APP_CONFIG.STORAGE_KEYS.BOOTSTRAP);
-    this.remove(APP_CONFIG.STORAGE_KEYS.SELECTED_SASARAN);
+    const keys = APP_CONFIG.STORAGE_KEYS || {};
+
+    [
+      keys.SESSION_TOKEN,
+      keys.PROFILE,
+      keys.BOOTSTRAP,
+      keys.SELECTED_SASARAN,
+      'registrasiMode',
+      'registrasiEditItem',
+      'pendampinganMode',
+      'pendampinganEditItem'
+    ].forEach(key => {
+      if (key) this.remove(key);
+    });
   }
 };
