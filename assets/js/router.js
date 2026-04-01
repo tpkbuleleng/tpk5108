@@ -25,5 +25,13 @@ window.Router = {
 
   toPendampingan() {
     UI.showScreen('pendampingan-screen');
+  },
+
+  toSyncScreen() {
+    UI.showScreen('sync-screen');
+  },
+
+  toRekapKader() {
+    UI.showScreen('rekap-kader-screen');
   }
 };
