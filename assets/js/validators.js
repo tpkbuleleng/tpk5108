@@ -13,5 +13,9 @@ window.Validators = {
 
   isRequired(value) {
     return value !== null && value !== undefined && String(value).trim() !== '';
+  },
+
+  isNonEmptyObject(value) {
+    return value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length > 0;
   }
 };
