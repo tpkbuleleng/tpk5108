@@ -149,3 +149,23 @@
     flex-direction: column;
   }
 }
+
+.top-space {
+  margin-top: 18px;
+}
+
+.form-group-span-2 {
+  grid-column: span 2;
+}
+
+.dynamic-form-container {
+  display: grid;
+  gap: 12px;
+}
+
+.validation-box {
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  background: #fbfdff;
+}
