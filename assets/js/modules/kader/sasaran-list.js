@@ -17,7 +17,9 @@ window.SasaranList = {
         throw new Error(result?.message || 'Gagal memuat daftar sasaran.');
       }
 
-      const items = this.normalizeList(result?.data);
+      const rawItems = SasaranService.normalizeListResponse(result);
+      const items = SasaranService.normalizeSasaranList(rawItems);
+
       SasaranState.setList(items);
       this.renderList(items);
       UI.setText('sasaran-list-meta', `${items.length} data sasaran berhasil dimuat.`);
@@ -43,13 +45,6 @@ window.SasaranList = {
     };
   },
 
-  normalizeList(data) {
-    if (Array.isArray(data)) return data;
-    if (Array.isArray(data?.items)) return data.items;
-    if (Array.isArray(data?.rows)) return data.rows;
-    return [];
-  },
-
   renderList(items) {
     const container = document.getElementById('sasaran-list-container');
     if (!container) return;
@@ -63,12 +58,13 @@ window.SasaranList = {
   },
 
   cardTemplate(item) {
-    const id = item.id_sasaran || item.id || '-';
-    const nama = item.nama_sasaran || item.nama || '-';
+    const id = item.id_sasaran || '-';
+    const nama = item.nama_sasaran || '-';
     const jenis = item.jenis_sasaran || '-';
-    const status = item.status_sasaran || item.status || '-';
-    const wilayah = item.nama_wilayah || item.wilayah || item.nama_desa || '-';
+    const status = item.status_sasaran || '-';
+    const wilayah = [item.nama_dusun, item.nama_desa, item.nama_kecamatan].filter(Boolean).join(' / ') || '-';
     const nik = item.nik || '-';
+    const tim = item.nama_tim || item.id_tim || '-';
     const badgeClass = this.getStatusBadgeClass(status);
 
     return `
@@ -84,6 +80,7 @@ window.SasaranList = {
         <div class="sasaran-card-meta">
           <div><span class="label">Jenis</span><strong>${jenis}</strong></div>
           <div><span class="label">NIK</span><strong>${nik}</strong></div>
+          <div><span class="label">Tim</span><strong>${tim}</strong></div>
           <div><span class="label">Wilayah</span><strong>${wilayah}</strong></div>
         </div>
 
@@ -100,11 +97,12 @@ window.SasaranList = {
     if (value === 'AKTIF') return 'badge-success-soft';
     if (value === 'NONAKTIF') return 'badge-danger-soft';
     if (value === 'SELESAI') return 'badge-success';
+    if (value === 'PERLU_REVIEW') return 'badge-warning';
     return 'badge-neutral';
   },
 
   findById(idSasaran) {
-    return this.getCurrentList().find(item => (item.id_sasaran || item.id) === idSasaran) || null;
+    return this.getCurrentList().find(item => item.id_sasaran === idSasaran) || null;
   },
 
   getCurrentList() {
