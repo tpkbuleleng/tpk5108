@@ -66,5 +66,14 @@ window.SasaranDetail = {
     if (value === 'NONAKTIF') return 'badge-danger-soft';
     if (value === 'SELESAI') return 'badge-success';
     return 'badge-neutral';
+  },
+
+    openEditSelected() {
+    const item = SasaranState.getSelected();
+    if (!item) {
+      Notifier.show('Data sasaran belum dipilih.');
+      return;
+    }
+    RegistrasiForm.openEdit(item);
   }
 };
