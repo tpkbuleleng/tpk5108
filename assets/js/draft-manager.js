@@ -1,8 +1,12 @@
 window.DraftManager = {
   saveRegistrasiDraft(payload) {
+    const stableClientSubmitId = ClientId.ensure(payload.client_submit_id, 'SUB');
+
     RegistrasiState.setDraft({
       saved_at: new Date().toISOString(),
-      data: payload
+      data: Object.assign({}, payload, {
+        client_submit_id: stableClientSubmitId
+      })
     });
   },
 
@@ -15,17 +19,21 @@ window.DraftManager = {
   },
 
   enqueueOfflineRegistrasi(payload) {
-    const queue = OfflineSync.getQueue();
-    queue.push({
-      id: `Q-${Date.now()}`,
+    const stableClientSubmitId = ClientId.ensure(payload.client_submit_id, 'SUB');
+
+    return OfflineSync.add({
+      id: ClientId.queueId(),
       action: 'submitRegistrasiSasaran',
-      payload,
-      client_submit_id: `SUB-${Date.now()}`,
+      payload: Object.assign({}, payload, {
+        client_submit_id: stableClientSubmitId,
+        sync_source: 'OFFLINE_DRAFT'
+      }),
+      client_submit_id: stableClientSubmitId,
       created_at: new Date().toISOString(),
       retry_count: 0,
-      sync_status: 'PENDING'
+      sync_status: 'PENDING',
+      last_error: '',
+      last_synced_at: ''
     });
-    OfflineSync.saveQueue(queue);
-    OfflineSync.renderSummary();
   }
 };
