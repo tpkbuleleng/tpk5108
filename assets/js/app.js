@@ -18,6 +18,7 @@
       Router.toDashboard();
       Bootstrap.loadInitialRefs();
       SasaranList.init();
+      await tryRefreshDashboardSummary();
     } else {
       Router.toLogin();
     }
@@ -98,10 +99,12 @@
 
     els.loginForm?.addEventListener('submit', handleLoginSubmit);
     els.btnLogout?.addEventListener('click', handleLogout);
+
     els.btnSyncNow?.addEventListener('click', async () => {
       await OfflineSync.syncAll();
       SyncScreen.render?.();
       updateDashboardDraftCount();
+      await tryRefreshDashboardSummary();
     });
 
     els.btnBackDashboardFromList?.addEventListener('click', () => Router.toDashboard());
@@ -151,12 +154,14 @@
       e.preventDefault();
       await RegistrasiForm.submit();
       updateDashboardDraftCount();
+      await tryRefreshDashboardSummary();
     });
 
     els.btnSaveRegDraft?.addEventListener('click', () => {
       const data = RegistrasiForm.collectFormData();
       DraftManager.saveRegistrasiDraft(data);
       Notifier.show('Draft registrasi disimpan lokal.');
+      updateDashboardDraftCount();
     });
 
     els.btnResetRegistrasi?.addEventListener('click', () => {
@@ -165,6 +170,7 @@
       RegistrasiForm.applyModeUI();
       DraftManager.clearRegistrasiDraft();
       RegistrasiForm.renderValidation();
+      updateDashboardDraftCount();
       Notifier.show('Form registrasi direset.');
     });
 
@@ -181,6 +187,7 @@
       e.preventDefault();
       await PendampinganForm.submit();
       updateDashboardDraftCount();
+      await tryRefreshDashboardSummary();
     });
 
     els.btnSavePenDraft?.addEventListener('click', () => {
@@ -190,6 +197,7 @@
       }
       const data = PendampinganForm.collectFormData();
       PendampinganDraft.saveLocal(data);
+      updateDashboardDraftCount();
       Notifier.show('Draft pendampingan disimpan lokal.');
     });
 
@@ -212,6 +220,7 @@
       }
 
       PendampinganForm.renderValidation();
+      updateDashboardDraftCount();
       Notifier.show('Form pendampingan direset.');
     });
 
@@ -227,6 +236,7 @@
       await OfflineSync.syncAll();
       SyncScreen.render();
       updateDashboardDraftCount();
+      await tryRefreshDashboardSummary();
     });
     els.btnRefreshSyncScreen?.addEventListener('click', () => SyncScreen.render());
     els.syncFilterAction?.addEventListener('change', () => SyncScreen.render());
@@ -275,15 +285,9 @@
       await Bootstrap.loadInitialRefs();
 
       renderDashboard();
-
-      try {
-        const dash = await DashboardService.getDashboardKaderSummary();
-        if (dash?.ok) {
-          applyDashboardSummary(dash.data || {});
-        }
-      } catch (_) {}
-
+      await tryRefreshDashboardSummary();
       await SasaranList.loadAndRender();
+
       Router.toDashboard();
       Notifier.show('Login berhasil.');
     } catch (err) {
@@ -307,7 +311,7 @@
     UI.setText('profile-nama', profile.nama_kader || profile.nama || '-');
     UI.setText('profile-role', profile.role_akses || '-');
     UI.setText('profile-id', profile.id_kader || '-');
-    UI.setText('profile-tim', profile.nama_tim || '-');
+    UI.setText('profile-tim', profile.nama_tim || profile.id_tim || '-');
     UI.setText('profile-wilayah', profile.nama_wilayah || profile.nama_kecamatan || '-');
     UI.setText('stat-sasaran', String(profile.jumlah_sasaran || 0));
     UI.setText('stat-pendampingan', String(profile.jumlah_pendampingan || 0));
@@ -317,15 +321,23 @@
     OfflineSync.renderSummary();
   }
 
+  async function tryRefreshDashboardSummary() {
+    try {
+      const dash = await DashboardService.getDashboardKaderSummary();
+      if (dash?.ok) {
+        applyDashboardSummary(dash.data || {});
+      }
+    } catch (_) {}
+  }
+
   function applyDashboardSummary(data) {
     UI.setText('stat-sasaran', String(data.jumlah_sasaran || 0));
     UI.setText('stat-pendampingan', String(data.jumlah_pendampingan || 0));
-    updateDashboardDraftCount(data.jumlah_draft_pending);
+    updateDashboardDraftCount();
   }
 
-  function updateDashboardDraftCount(explicitValue) {
-    const value = explicitValue != null ? explicitValue : OfflineSync.getQueue().length;
-    UI.setText('stat-draft', String(value || 0));
+  function updateDashboardDraftCount() {
+    UI.setText('stat-draft', String(OfflineSync.getQueue().length || 0));
   }
 
   async function handleDocumentClick(event) {
@@ -347,7 +359,7 @@
       const item = SasaranList.findById(idSasaran);
       if (item) {
         SasaranState.setSelected(item);
-        Notifier.show(`Sasaran ${item.nama_sasaran || item.nama || idSasaran} dipilih.`);
+        Notifier.show(`Sasaran ${item.nama_sasaran || idSasaran} dipilih.`);
       }
       return;
     }
@@ -364,6 +376,7 @@
       await OfflineSync.retryOne(retryBtn.dataset.syncRetryId);
       SyncScreen.render();
       updateDashboardDraftCount();
+      await tryRefreshDashboardSummary();
       return;
     }
 
@@ -427,7 +440,7 @@
     if (!('serviceWorker' in navigator)) return;
 
     try {
-      await navigator.serviceWorker.register('./service-worker.js');
+      await navigator.serviceWorker.register('./sw.js');
       console.log('Service worker registered');
     } catch (err) {
       console.warn('Service worker gagal didaftarkan:', err);
