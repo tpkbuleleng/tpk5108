@@ -478,6 +478,163 @@
         </section>
       </main>
     </section>
+
+    <!-- SYNC SCREEN -->
+    <section id="sync-screen" class="screen hidden">
+      <header class="topbar">
+        <div>
+          <h2 class="topbar-title">Draft Offline & Sinkronisasi</h2>
+          <p class="topbar-subtitle">Kelola draft yang belum tersinkron ke backend</p>
+        </div>
+        <div class="topbar-actions">
+          <button id="btn-back-from-sync" class="btn btn-secondary btn-sm">Kembali</button>
+        </div>
+      </header>
+
+      <main class="page-content">
+        <section class="card">
+          <div class="section-header row-between">
+            <div>
+              <h3>Ringkasan Sinkronisasi</h3>
+              <p id="sync-screen-meta" class="muted-text">Belum ada data antrean.</p>
+            </div>
+          </div>
+
+          <div class="stats-grid">
+            <article class="card stat-card">
+              <span class="label">Total Draft</span>
+              <strong id="sync-total-count">0</strong>
+            </article>
+            <article class="card stat-card">
+              <span class="label">Pending</span>
+              <strong id="sync-pending-count">0</strong>
+            </article>
+            <article class="card stat-card">
+              <span class="label">Gagal</span>
+              <strong id="sync-failed-count">0</strong>
+            </article>
+          </div>
+
+          <div class="section-actions action-grid-2 top-space">
+            <button id="btn-sync-all-screen" class="btn btn-primary">Sinkronkan Semua</button>
+            <button id="btn-refresh-sync-screen" class="btn btn-secondary">Refresh Daftar</button>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="section-header">
+            <h3>Filter Draft</h3>
+          </div>
+
+          <div class="filters-grid">
+            <div class="form-group">
+              <label for="sync-filter-action">Jenis Draft</label>
+              <select id="sync-filter-action">
+                <option value="">Semua</option>
+                <option value="submitRegistrasiSasaran">Registrasi Sasaran</option>
+                <option value="submitPendampingan">Pendampingan</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="sync-filter-status">Status</label>
+              <select id="sync-filter-status">
+                <option value="">Semua</option>
+                <option value="PENDING">PENDING</option>
+                <option value="FAILED">FAILED</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="sync-filter-keyword">Cari ID / Nama</label>
+              <input id="sync-filter-keyword" type="text" placeholder="Cari client_submit_id / id_sasaran / nama" />
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="section-header">
+            <h3>Daftar Draft</h3>
+          </div>
+          <div id="sync-list-container" class="list-stack">
+            <p class="muted-text">Belum ada draft offline.</p>
+          </div>
+        </section>
+      </main>
+    </section>
+
+    <!-- REKAP KADER -->
+    <section id="rekap-kader-screen" class="screen hidden">
+      <header class="topbar">
+        <div>
+          <h2 class="topbar-title">Rekap Saya</h2>
+          <p class="topbar-subtitle">Ringkasan aktivitas kader dan tim</p>
+        </div>
+        <div class="topbar-actions">
+          <button id="btn-back-from-rekap" class="btn btn-secondary btn-sm">Kembali</button>
+        </div>
+      </header>
+
+      <main class="page-content">
+        <section class="card">
+          <div class="section-header row-between">
+            <div>
+              <h3>Filter Rekap</h3>
+              <p class="muted-text">Pilih periode untuk melihat ringkasan aktivitas</p>
+            </div>
+          </div>
+
+          <div class="filters-grid">
+            <div class="form-group">
+              <label for="rekap-filter-bulan">Bulan</label>
+              <input id="rekap-filter-bulan" type="month" />
+            </div>
+
+            <div class="form-group">
+              <label>&nbsp;</label>
+              <button id="btn-load-rekap" class="btn btn-primary btn-block">Muat Rekap</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="stats-grid">
+          <article class="card stat-card">
+            <span class="label">Sasaran Aktif</span>
+            <strong id="rekap-stat-sasaran-aktif">0</strong>
+          </article>
+          <article class="card stat-card">
+            <span class="label">Pendampingan Periode</span>
+            <strong id="rekap-stat-pendampingan">0</strong>
+          </article>
+          <article class="card stat-card">
+            <span class="label">Draft Pending</span>
+            <strong id="rekap-stat-draft">0</strong>
+          </article>
+          <article class="card stat-card">
+            <span class="label">Sasaran Ditindaklanjuti</span>
+            <strong id="rekap-stat-followup">0</strong>
+          </article>
+        </section>
+
+        <section class="card">
+          <div class="section-header">
+            <h3>Ringkasan</h3>
+          </div>
+          <div id="rekap-summary-box" class="list-stack">
+            <p class="muted-text">Rekap belum dimuat.</p>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="section-header">
+            <h3>Aktivitas Terbaru</h3>
+          </div>
+          <div id="rekap-activity-list" class="list-stack">
+            <p class="muted-text">Belum ada aktivitas terbaru.</p>
+          </div>
+        </section>
+      </main>
+    </section>
   </div>
 
   <div id="toast-container" class="toast-container"></div>
@@ -488,6 +645,7 @@
   <script src="./js/notifier.js"></script>
   <script src="./js/validators.js"></script>
   <script src="./js/ui-helpers.js"></script>
+  <script src="./js/client-id.js"></script>
   <script src="./js/api.js"></script>
   <script src="./js/auth.js"></script>
   <script src="./js/bootstrap.js"></script>
@@ -511,6 +669,12 @@
   <script src="./js/pendampingan-draft.js"></script>
   <script src="./js/pendampingan-service.js"></script>
   <script src="./js/pendampingan-form.js"></script>
+
+  <script src="./js/sync-ui.js"></script>
+  <script src="./js/sync-screen.js"></script>
+  <script src="./js/dashboard-service.js"></script>
+  <script src="./js/rekap-kader-service.js"></script>
+  <script src="./js/rekap-kader-screen.js"></script>
 
   <script src="./js/app.js"></script>
 </body>
