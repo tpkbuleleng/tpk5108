@@ -7,7 +7,7 @@ window.SyncUI = {
     return map[action] || action || '-';
   },
 
-  getStatusBadge(status) {
+  getStatusBadgeClass(status) {
     const value = String(status || '').toUpperCase();
     if (value === 'FAILED') return 'badge badge-danger-soft';
     if (value === 'PENDING') return 'badge badge-warning';
@@ -28,7 +28,7 @@ window.SyncUI = {
             <h4 class="sasaran-card-title">${this.getActionLabel(item.action)}</h4>
             <p class="muted-text">${primaryName}</p>
           </div>
-          <span class="${this.getStatusBadge(status)}">${status}</span>
+          <span class="${this.getStatusBadgeClass(status)}">${status}</span>
         </div>
 
         <div class="queue-card-meta">
