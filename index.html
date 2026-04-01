@@ -1,4 +1,70 @@
 <!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0B57D0" />
+  <meta name="description" content="TPK Kabupaten Buleleng" />
+  <title>TPK Kabupaten Buleleng</title>
+
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="icon" href="./assets/img/logo_tpk.png" />
+  <link rel="stylesheet" href="./assets/css/theme.css" />
+  <link rel="stylesheet" href="./assets/css/app.css" />
+</head>
+<body>
+  <div id="app-shell">
+    <!-- SPLASH -->
+    <section id="splash-screen" class="screen active splash-screen">
+      <div class="splash-card">
+        <img src="./assets/img/splash-logo.png" alt="Logo TPK" class="splash-logo" />
+        <h1>TPK KABUPATEN BULELENG</h1>
+        <p class="version-text">Versi <span id="app-version">-</span></p>
+        <div class="loader"></div>
+        <p id="splash-status" class="muted-text">Menyiapkan aplikasi...</p>
+      </div>
+    </section>
+
+    <!-- LOGIN -->
+    <section id="login-screen" class="screen hidden">
+      <div class="auth-card">
+        <div class="auth-header">
+          <img src="./assets/img/logo_tpk.png" alt="Logo TPK" class="auth-logo" />
+          <h2>Masuk Aplikasi</h2>
+          <p>Silakan login menggunakan ID Kader dan password Anda</p>
+        </div>
+
+        <form id="login-form" novalidate>
+          <div class="form-group">
+            <label for="login-id-kader">ID Kader</label>
+            <input id="login-id-kader" name="id_kader" type="text" autocomplete="username" placeholder="Contoh: TPK10001" required />
+          </div>
+
+          <div class="form-group">
+            <label for="login-password">Password</label>
+            <div class="input-with-action">
+              <input id="login-password" name="password" type="password" inputmode="numeric" maxlength="16" autocomplete="current-password" placeholder="16 digit password" required />
+              <button type="button" id="toggle-password" class="btn-icon" aria-label="Tampilkan password">👁</button>
+            </div>
+            <small class="field-hint">Password harus 16 digit angka.</small>
+          </div>
+
+          <div class="form-group hidden" id="backend-url-group">
+            <label for="backend-url">URL Backend</label>
+            <input id="backend-url" name="backend_url" type="url" placeholder="https://script.google.com/..." />
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" id="btn-login" class="btn btn-primary btn-block">Masuk</button>
+            <button type="button" id="btn-toggle-backend" class="btn btn-secondary btn-block">Pengaturan Backend</button>
+          </div>
+        </form>
+
+        <div id="login-message" class="message-box hidden"></div>
+      </div>
+    </section>
+
+    <!-- DASHBOARD -->
     <section id="dashboard-screen" class="screen hidden">
       <header class="topbar">
         <div>
@@ -59,6 +125,359 @@
         </section>
       </main>
     </section>
+
+    <!-- DAFTAR SASARAN -->
+    <section id="sasaran-list-screen" class="screen hidden">
+      <header class="topbar">
+        <div>
+          <h2 class="topbar-title">Daftar Sasaran</h2>
+          <p class="topbar-subtitle">Sasaran sesuai tim dan wilayah kerja</p>
+        </div>
+        <div class="topbar-actions">
+          <button id="btn-back-dashboard-from-list" class="btn btn-secondary btn-sm">Kembali</button>
+        </div>
+      </header>
+
+      <main class="page-content">
+        <section class="card">
+          <div class="section-header">
+            <h3>Filter & Pencarian</h3>
+          </div>
+
+          <div class="filters-grid">
+            <div class="form-group">
+              <label for="filter-keyword-sasaran">Cari Nama / ID Sasaran</label>
+              <input id="filter-keyword-sasaran" type="text" placeholder="Ketik nama atau ID sasaran" />
+            </div>
+
+            <div class="form-group">
+              <label for="filter-jenis-sasaran">Jenis Sasaran</label>
+              <select id="filter-jenis-sasaran">
+                <option value="">Semua Jenis</option>
+                <option value="CATIN">CATIN</option>
+                <option value="BUMIL">BUMIL</option>
+                <option value="BUFAS">BUFAS</option>
+                <option value="BADUTA">BADUTA</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="filter-status-sasaran">Status</label>
+              <select id="filter-status-sasaran">
+                <option value="">Semua Status</option>
+                <option value="AKTIF">AKTIF</option>
+                <option value="NONAKTIF">NONAKTIF</option>
+                <option value="SELESAI">SELESAI</option>
+                <option value="RUJUK">RUJUK</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="section-actions">
+            <button id="btn-refresh-sasaran" class="btn btn-primary">Refresh Data</button>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="section-header row-between">
+            <div>
+              <h3>Data Sasaran</h3>
+              <p id="sasaran-list-meta" class="muted-text">Belum ada data dimuat.</p>
+            </div>
+          </div>
+
+          <div id="sasaran-list-container" class="list-stack">
+            <p class="muted-text">Belum ada data sasaran.</p>
+          </div>
+        </section>
+      </main>
+    </section>
+
+    <!-- DETAIL SASARAN -->
+    <section id="sasaran-detail-screen" class="screen hidden">
+      <header class="topbar">
+        <div>
+          <h2 class="topbar-title">Detail Sasaran</h2>
+          <p class="topbar-subtitle">Informasi lengkap sasaran terpilih</p>
+        </div>
+        <div class="topbar-actions">
+          <button id="btn-back-list-from-detail" class="btn btn-secondary btn-sm">Kembali</button>
+        </div>
+      </header>
+
+      <main class="page-content">
+        <section class="card">
+          <div class="section-header row-between">
+            <div>
+              <h3 id="detail-nama-sasaran">-</h3>
+              <p id="detail-id-sasaran" class="muted-text">ID Sasaran: -</p>
+            </div>
+            <span id="detail-status-badge" class="badge badge-warning">-</span>
+          </div>
+
+          <div class="profile-grid">
+            <div><span class="label">Jenis Sasaran</span><strong id="detail-jenis">-</strong></div>
+            <div><span class="label">NIK</span><strong id="detail-nik">-</strong></div>
+            <div><span class="label">No. KK</span><strong id="detail-kk">-</strong></div>
+            <div><span class="label">Tanggal Lahir</span><strong id="detail-tanggal-lahir">-</strong></div>
+            <div><span class="label">Wilayah</span><strong id="detail-wilayah">-</strong></div>
+            <div><span class="label">Terakhir Diperbarui</span><strong id="detail-updated-at">-</strong></div>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="section-header">
+            <h3>Informasi Tambahan</h3>
+          </div>
+          <div id="detail-extra-fields" class="profile-grid">
+            <div><span class="label">Belum ada</span><strong>-</strong></div>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="section-header">
+            <h3>Riwayat Ringkas Pendampingan</h3>
+          </div>
+          <div id="detail-riwayat-ringkas" class="list-stack">
+            <p class="muted-text">Riwayat belum dimuat.</p>
+          </div>
+
+          <div class="section-actions action-grid-2">
+            <button id="btn-go-to-pendampingan" class="btn btn-primary">Buat Pendampingan</button>
+            <button id="btn-go-to-edit-sasaran" class="btn btn-secondary">Edit Data Sasaran</button>
+          </div>
+        </section>
+      </main>
+    </section>
+
+    <!-- REGISTRASI -->
+    <section id="registrasi-screen" class="screen hidden">
+      <header class="topbar">
+        <div>
+          <h2 id="registrasi-screen-title" class="topbar-title">Registrasi Sasaran</h2>
+          <p id="registrasi-screen-subtitle" class="topbar-subtitle">Input data sasaran baru</p>
+        </div>
+        <div class="topbar-actions">
+          <button id="btn-back-from-registrasi" class="btn btn-secondary btn-sm">Kembali</button>
+        </div>
+      </header>
+
+      <main class="page-content">
+        <section class="card">
+          <div class="section-header row-between">
+            <div>
+              <h3>Mode Form</h3>
+              <p id="registrasi-mode-info" class="muted-text">Mode registrasi baru</p>
+            </div>
+            <span id="registrasi-mode-badge" class="badge badge-success-soft">CREATE</span>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="section-header">
+            <h3>Identitas Dasar</h3>
+          </div>
+
+          <form id="registrasi-form" novalidate>
+            <div class="filters-grid">
+              <div class="form-group">
+                <label for="reg-jenis-sasaran">Jenis Sasaran *</label>
+                <select id="reg-jenis-sasaran" name="jenis_sasaran" required>
+                  <option value="">Pilih jenis sasaran</option>
+                  <option value="CATIN">CATIN</option>
+                  <option value="BUMIL">BUMIL</option>
+                  <option value="BUFAS">BUFAS</option>
+                  <option value="BADUTA">BADUTA</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label for="reg-nama-sasaran">Nama Sasaran *</label>
+                <input id="reg-nama-sasaran" name="nama_sasaran" type="text" placeholder="Masukkan nama sasaran" required />
+              </div>
+
+              <div class="form-group">
+                <label for="reg-nik">NIK *</label>
+                <input id="reg-nik" name="nik" type="text" inputmode="numeric" maxlength="16" placeholder="16 digit NIK" required />
+                <small class="field-hint">Jika tidak diketahui, gunakan 16 digit angka 9.</small>
+              </div>
+
+              <div class="form-group">
+                <label for="reg-no-kk">Nomor KK *</label>
+                <input id="reg-no-kk" name="nomor_kk" type="text" inputmode="numeric" maxlength="16" placeholder="16 digit Nomor KK" required />
+                <small class="field-hint">Jika tidak diketahui, gunakan 16 digit angka 9.</small>
+              </div>
+
+              <div class="form-group">
+                <label for="reg-jenis-kelamin">Jenis Kelamin</label>
+                <select id="reg-jenis-kelamin" name="jenis_kelamin">
+                  <option value="">Pilih jenis kelamin</option>
+                  <option value="L">Laki-laki</option>
+                  <option value="P">Perempuan</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label for="reg-tanggal-lahir">Tanggal Lahir</label>
+                <input id="reg-tanggal-lahir" name="tanggal_lahir" type="date" />
+              </div>
+            </div>
+
+            <div class="section-header top-space">
+              <h3>Wilayah & Alamat</h3>
+            </div>
+
+            <div class="filters-grid">
+              <div class="form-group">
+                <label for="reg-kecamatan">Kecamatan</label>
+                <input id="reg-kecamatan" name="nama_kecamatan" type="text" readonly />
+              </div>
+
+              <div class="form-group">
+                <label for="reg-desa">Desa/Kelurahan</label>
+                <input id="reg-desa" name="nama_desa" type="text" readonly />
+              </div>
+
+              <div class="form-group">
+                <label for="reg-dusun">Dusun/RW/Banjar Dinas</label>
+                <input id="reg-dusun" name="nama_dusun" type="text" placeholder="Isi dusun / RW / banjar dinas" />
+              </div>
+
+              <div class="form-group form-group-span-2">
+                <label for="reg-alamat">Alamat</label>
+                <textarea id="reg-alamat" name="alamat" rows="3" placeholder="Alamat rinci sasaran"></textarea>
+              </div>
+            </div>
+
+            <div class="section-header top-space row-between">
+              <div>
+                <h3>Pertanyaan Khusus</h3>
+                <p class="muted-text">Field khusus akan berubah sesuai jenis sasaran</p>
+              </div>
+            </div>
+
+            <div id="registrasi-dynamic-fields" class="dynamic-form-container">
+              <p class="muted-text">Pilih jenis sasaran untuk memuat pertanyaan khusus.</p>
+            </div>
+
+            <div class="section-header top-space">
+              <h3>Validasi Ringkas</h3>
+            </div>
+            <div id="registrasi-validation-box" class="validation-box">
+              <p class="muted-text">Validasi akan tampil di sini sebelum submit.</p>
+            </div>
+
+            <div class="sticky-submit-bar">
+              <button type="button" id="btn-save-reg-draft" class="btn btn-secondary">Simpan Draft</button>
+              <button type="button" id="btn-reset-registrasi" class="btn btn-secondary">Reset</button>
+              <button type="submit" id="btn-submit-registrasi" class="btn btn-primary">Submit Registrasi</button>
+            </div>
+          </form>
+        </section>
+      </main>
+    </section>
+
+    <!-- PENDAMPINGAN -->
+    <section id="pendampingan-screen" class="screen hidden">
+      <header class="topbar">
+        <div>
+          <h2 class="topbar-title">Lapor Pendampingan</h2>
+          <p class="topbar-subtitle">Input laporan pendampingan sasaran terpilih</p>
+        </div>
+        <div class="topbar-actions">
+          <button id="btn-back-from-pendampingan" class="btn btn-secondary btn-sm">Kembali</button>
+        </div>
+      </header>
+
+      <main class="page-content">
+        <section class="card">
+          <div class="section-header row-between">
+            <div>
+              <h3 id="pendampingan-nama-sasaran">-</h3>
+              <p id="pendampingan-id-sasaran" class="muted-text">ID Sasaran: -</p>
+            </div>
+            <span id="pendampingan-status-badge" class="badge badge-neutral">-</span>
+          </div>
+
+          <div class="profile-grid">
+            <div><span class="label">Jenis Sasaran</span><strong id="pendampingan-jenis">-</strong></div>
+            <div><span class="label">Wilayah</span><strong id="pendampingan-wilayah">-</strong></div>
+            <div><span class="label">Kader</span><strong id="pendampingan-kader">-</strong></div>
+            <div><span class="label">Tim</span><strong id="pendampingan-tim">-</strong></div>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="section-header row-between">
+            <div>
+              <h3>Mode Form</h3>
+              <p id="pendampingan-mode-info" class="muted-text">Mode input baru</p>
+            </div>
+            <span id="pendampingan-mode-badge" class="badge badge-success-soft">CREATE</span>
+          </div>
+        </section>
+
+        <section class="card">
+          <form id="pendampingan-form" novalidate>
+            <div class="section-header">
+              <h3>Identitas Laporan</h3>
+            </div>
+
+            <div class="filters-grid">
+              <div class="form-group">
+                <label for="pen-tanggal">Tanggal Pendampingan *</label>
+                <input id="pen-tanggal" name="tanggal_pendampingan" type="date" required />
+              </div>
+
+              <div class="form-group">
+                <label for="pen-status-kunjungan">Status Kunjungan</label>
+                <select id="pen-status-kunjungan" name="status_kunjungan">
+                  <option value="">Pilih status</option>
+                  <option value="HADIR">HADIR</option>
+                  <option value="TIDAK_BERTEMU">TIDAK_BERTEMU</option>
+                  <option value="DITUNDA">DITUNDA</option>
+                  <option value="RUJUK">RUJUK</option>
+                </select>
+              </div>
+
+              <div class="form-group form-group-span-2">
+                <label for="pen-catatan-umum">Catatan Umum</label>
+                <textarea id="pen-catatan-umum" name="catatan_umum" rows="3" placeholder="Catatan umum hasil pendampingan"></textarea>
+              </div>
+            </div>
+
+            <div id="edit-reason-group" class="form-group hidden top-space">
+              <label for="pen-edit-reason">Alasan Edit *</label>
+              <textarea id="pen-edit-reason" rows="2" placeholder="Jelaskan alasan perubahan"></textarea>
+            </div>
+
+            <div class="section-header top-space row-between">
+              <div>
+                <h3>Pertanyaan Pendampingan</h3>
+                <p class="muted-text">Field dinamis sesuai jenis sasaran</p>
+              </div>
+            </div>
+
+            <div id="pendampingan-dynamic-fields" class="dynamic-form-container">
+              <p class="muted-text">Field pendampingan akan dimuat otomatis.</p>
+            </div>
+
+            <div class="section-header top-space">
+              <h3>Validasi Ringkas</h3>
+            </div>
+            <div id="pendampingan-validation-box" class="validation-box">
+              <p class="muted-text">Validasi pendampingan akan tampil di sini.</p>
+            </div>
+
+            <div class="sticky-submit-bar">
+              <button type="button" id="btn-save-pen-draft" class="btn btn-secondary">Simpan Draft</button>
+              <button type="button" id="btn-reset-pendampingan" class="btn btn-secondary">Reset</button>
+              <button type="submit" id="btn-submit-pendampingan" class="btn btn-primary">Submit Pendampingan</button>
+            </div>
+          </form>
+        </section>
+      </main>
+    </section>
   </div>
 
   <div id="toast-container" class="toast-container"></div>
@@ -76,6 +495,23 @@
   <script src="./js/offline-sync.js"></script>
   <script src="./js/menu.js"></script>
   <script src="./js/dynamic-form.js"></script>
+
+  <script src="./js/sasaran-state.js"></script>
+  <script src="./js/sasaran-service.js"></script>
+  <script src="./js/sasaran-list.js"></script>
+  <script src="./js/sasaran-detail.js"></script>
+
+  <script src="./js/registrasi-state.js"></script>
+  <script src="./js/form-mapper.js"></script>
+  <script src="./js/draft-manager.js"></script>
+  <script src="./js/registrasi-service.js"></script>
+  <script src="./js/registrasi-form.js"></script>
+
+  <script src="./js/pendampingan-state.js"></script>
+  <script src="./js/pendampingan-draft.js"></script>
+  <script src="./js/pendampingan-service.js"></script>
+  <script src="./js/pendampingan-form.js"></script>
+
   <script src="./js/app.js"></script>
 </body>
 </html>
