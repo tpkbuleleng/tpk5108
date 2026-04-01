@@ -4,22 +4,44 @@ window.Session = {
   },
 
   setToken(token) {
-    return StorageHelper.set(APP_CONFIG.STORAGE_KEYS.SESSION_TOKEN, token || '');
+    return StorageHelper.set(
+      APP_CONFIG.STORAGE_KEYS.SESSION_TOKEN,
+      String(token || '').trim()
+    );
   },
 
   getProfile() {
-    return StorageHelper.get(APP_CONFIG.STORAGE_KEYS.PROFILE, null);
+    const profile = StorageHelper.get(APP_CONFIG.STORAGE_KEYS.PROFILE, null);
+    return profile && typeof profile === 'object' ? profile : null;
   },
 
   setProfile(profile) {
-    return StorageHelper.set(APP_CONFIG.STORAGE_KEYS.PROFILE, profile || null);
+    const safeProfile =
+      profile && typeof profile === 'object'
+        ? profile
+        : null;
+
+    return StorageHelper.set(APP_CONFIG.STORAGE_KEYS.PROFILE, safeProfile);
+  },
+
+  hasToken() {
+    return !!this.getToken();
+  },
+
+  hasProfile() {
+    return !!this.getProfile();
   },
 
   isLoggedIn() {
-    return !!this.getToken() && !!this.getProfile();
+    return this.hasToken() && this.hasProfile();
+  },
+
+  clear() {
+    StorageHelper.remove(APP_CONFIG.STORAGE_KEYS.SESSION_TOKEN);
+    StorageHelper.remove(APP_CONFIG.STORAGE_KEYS.PROFILE);
   },
 
   logout() {
-    StorageHelper.clearSession();
+    this.clear();
   }
 };
