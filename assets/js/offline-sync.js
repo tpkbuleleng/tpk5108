@@ -5,44 +5,52 @@ window.OfflineSync = {
 
   saveQueue(queue) {
     StorageHelper.set(APP_CONFIG.STORAGE_KEYS.SYNC_QUEUE, Array.isArray(queue) ? queue : []);
+    this.touchLastSyncAt();
+    return this.getQueue();
   },
 
-  normalizeQueueItem(item) {
-    const normalized = Object.assign({}, item);
-
-    normalized.id = String(normalized.id || ClientId.queueId()).trim();
-    normalized.action = String(normalized.action || '').trim();
-    normalized.payload = normalized.payload || {};
-    normalized.client_submit_id = ClientId.ensure(
-      normalized.client_submit_id || normalized.payload.client_submit_id || '',
-      'SUB'
-    );
-    normalized.created_at = normalized.created_at || new Date().toISOString();
-    normalized.retry_count = Number(normalized.retry_count || 0);
-    normalized.sync_status = String(normalized.sync_status || 'PENDING').toUpperCase();
-    normalized.last_error = normalized.last_error || '';
-    normalized.last_synced_at = normalized.last_synced_at || '';
-
-    normalized.payload = Object.assign({}, normalized.payload, {
-      client_submit_id: normalized.client_submit_id
-    });
-
-    return normalized;
+  touchLastSyncAt() {
+    StorageHelper.set(APP_CONFIG.STORAGE_KEYS.LAST_SYNC_AT, new Date().toISOString());
   },
 
   add(item) {
     const queue = this.getQueue();
-    const normalized = this.normalizeQueueItem(item);
+
+    const normalized = {
+      id: item.id || ClientId.queueId(),
+      action: item.action || '',
+      payload: item.payload || {},
+      client_submit_id: item.client_submit_id || item.payload?.client_submit_id || '',
+      created_at: item.created_at || new Date().toISOString(),
+      retry_count: Number(item.retry_count || 0),
+      sync_status: item.sync_status || 'PENDING',
+      last_error: item.last_error || '',
+      last_synced_at: item.last_synced_at || ''
+    };
+
     queue.push(normalized);
     this.saveQueue(queue);
     this.renderSummary();
+
     return normalized;
   },
 
-  removeById(queueId) {
-    const queue = this.getQueue().filter(item => item.id !== queueId);
+  update(itemId, patch = {}) {
+    const queue = this.getQueue().map(item => {
+      if (item.id !== itemId) return item;
+      return Object.assign({}, item, patch);
+    });
+
     this.saveQueue(queue);
     this.renderSummary();
+    return queue.find(item => item.id === itemId) || null;
+  },
+
+  removeById(itemId) {
+    const queue = this.getQueue().filter(item => item.id !== itemId);
+    this.saveQueue(queue);
+    this.renderSummary();
+    return queue;
   },
 
   clearAll() {
@@ -50,137 +58,146 @@ window.OfflineSync = {
     this.renderSummary();
   },
 
-  async syncAll() {
-    const queue = this.getQueue().map(item => this.normalizeQueueItem(item));
-    if (!queue.length) {
-      Notifier.show('Tidak ada draft yang perlu disinkronkan.');
-      return;
+  async retryOne(itemId) {
+    const queue = this.getQueue();
+    const item = queue.find(q => q.id === itemId);
+
+    if (!item) {
+      Notifier.show('Item antrean tidak ditemukan.');
+      return null;
     }
 
-    const stillPending = [];
-    let successCount = 0;
-    let duplicateCount = 0;
-    let failedCount = 0;
-
-    for (const item of queue) {
-      try {
-        const result = await Api.post(item.action, item.payload, {
-          clientSubmitId: item.client_submit_id,
-          syncSource: item.payload.sync_source || 'OFFLINE_DRAFT'
-        });
-
-        const isOk = !!result?.ok;
-        const isDuplicate = !!result?.data?.duplicate;
-
-        if (isOk) {
-          if (isDuplicate) {
-            duplicateCount += 1;
-          } else {
-            successCount += 1;
-          }
-          continue;
-        }
-
-        item.retry_count = Number(item.retry_count || 0) + 1;
-        item.sync_status = 'FAILED';
-        item.last_error = result?.message || 'Sinkronisasi gagal.';
-        item.last_synced_at = new Date().toISOString();
-        stillPending.push(item);
-        failedCount += 1;
-      } catch (err) {
-        item.retry_count = Number(item.retry_count || 0) + 1;
-        item.sync_status = 'FAILED';
-        item.last_error = err.message || 'Sinkronisasi gagal.';
-        item.last_synced_at = new Date().toISOString();
-        stillPending.push(item);
-        failedCount += 1;
-      }
-    }
-
-    this.saveQueue(stillPending);
-    StorageHelper.set(APP_CONFIG.STORAGE_KEYS.LAST_SYNC_AT, new Date().toISOString());
-    this.renderSummary();
-
-    const messages = [];
-    if (successCount) messages.push(`${successCount} berhasil`);
-    if (duplicateCount) messages.push(`${duplicateCount} duplikat terdeteksi aman`);
-    if (failedCount) messages.push(`${failedCount} gagal`);
-
-    Notifier.show(
-      messages.length
-        ? `Sinkronisasi selesai: ${messages.join(', ')}.`
-        : 'Sinkronisasi selesai.'
-    );
+    return this.syncItem(item);
   },
 
-  async retryOne(queueId) {
-    const queue = this.getQueue().map(item => this.normalizeQueueItem(item));
-    const index = queue.findIndex(item => item.id === queueId);
-
-    if (index === -1) {
-      Notifier.show('Item antrean tidak ditemukan.');
-      return;
+  async syncAll() {
+    if (!navigator.onLine) {
+      Notifier.show('Masih offline. Sinkronisasi belum dapat dijalankan.');
+      return {
+        ok: false,
+        message: 'Offline',
+        synced: 0,
+        failed: 0
+      };
     }
 
-    const item = queue[index];
+    const queue = this.getQueue();
+    if (!queue.length) {
+      this.renderSummary();
+      Notifier.show('Tidak ada draft yang perlu disinkronkan.');
+      return {
+        ok: true,
+        synced: 0,
+        failed: 0
+      };
+    }
+
+    let synced = 0;
+    let failed = 0;
+
+    for (const item of queue) {
+      const result = await this.syncItem(item);
+      if (result?.ok) {
+        synced++;
+      } else {
+        failed++;
+      }
+    }
+
+    this.renderSummary();
+
+    if (failed > 0) {
+      Notifier.show(`Sinkronisasi selesai. Berhasil: ${synced}, gagal: ${failed}`, 'warn');
+    } else {
+      Notifier.show(`Sinkronisasi selesai. Berhasil: ${synced}`, 'success');
+    }
+
+    return {
+      ok: failed === 0,
+      synced,
+      failed
+    };
+  },
+
+  async syncItem(item) {
+    if (!item?.action) {
+      return {
+        ok: false,
+        message: 'Action antrean kosong.'
+      };
+    }
 
     try {
-      const result = await Api.post(item.action, item.payload, {
-        clientSubmitId: item.client_submit_id,
-        syncSource: item.payload.sync_source || 'OFFLINE_DRAFT'
-      });
-
-      if (result?.ok) {
-        queue.splice(index, 1);
-        this.saveQueue(queue);
-        this.renderSummary();
-
-        if (result?.data?.duplicate) {
-          Notifier.show('Item sinkronisasi terdeteksi sudah pernah tersimpan.');
-        } else {
-          Notifier.show('Item berhasil disinkronkan.');
+      const response = await Api.post(
+        item.action,
+        item.payload || {},
+        {
+          clientSubmitId: item.client_submit_id || item.payload?.client_submit_id || '',
+          syncSource: item.payload?.sync_source || 'OFFLINE_DRAFT'
         }
-        return;
+      );
+
+      if (!response?.ok) {
+        const message = response?.message || 'Sinkronisasi gagal.';
+        this.update(item.id, {
+          sync_status: 'FAILED',
+          retry_count: Number(item.retry_count || 0) + 1,
+          last_error: message,
+          last_synced_at: new Date().toISOString()
+        });
+
+        return {
+          ok: false,
+          message
+        };
       }
 
-      item.retry_count = Number(item.retry_count || 0) + 1;
-      item.sync_status = 'FAILED';
-      item.last_error = result?.message || 'Sinkronisasi gagal.';
-      item.last_synced_at = new Date().toISOString();
+      // Jika backend mendeteksi duplicate via client_submit_id,
+      // antrean tetap dianggap selesai agar tidak terus mengulang.
+      this.removeById(item.id);
 
-      queue[index] = item;
-      this.saveQueue(queue);
-      this.renderSummary();
-      Notifier.show(item.last_error);
+      return {
+        ok: true,
+        data: response?.data || {}
+      };
     } catch (err) {
-      item.retry_count = Number(item.retry_count || 0) + 1;
-      item.sync_status = 'FAILED';
-      item.last_error = err.message || 'Sinkronisasi gagal.';
-      item.last_synced_at = new Date().toISOString();
+      this.update(item.id, {
+        sync_status: 'FAILED',
+        retry_count: Number(item.retry_count || 0) + 1,
+        last_error: err.message || 'Terjadi kesalahan sinkronisasi.',
+        last_synced_at: new Date().toISOString()
+      });
 
-      queue[index] = item;
-      this.saveQueue(queue);
-      this.renderSummary();
-      Notifier.show(item.last_error);
+      return {
+        ok: false,
+        message: err.message || 'Terjadi kesalahan sinkronisasi.'
+      };
     }
   },
 
   renderSummary() {
     const queue = this.getQueue();
-    UI.setText('stat-draft', String(queue.length));
+    const total = queue.length;
+    const pending = queue.filter(item => (item.sync_status || 'PENDING') === 'PENDING').length;
+    const failed = queue.filter(item => (item.sync_status || '') === 'FAILED').length;
 
-    if (!queue.length) {
-      UI.setHTML('sync-summary', '<p class="muted-text">Semua draft sudah sinkron.</p>');
+    const summaryId = 'sync-summary';
+    const container = document.getElementById(summaryId);
+    if (!container) return;
+
+    if (!total) {
+      container.innerHTML = `
+        <p class="muted-text">Tidak ada draft offline. Semua data sudah bersih.</p>
+      `;
       return;
     }
 
-    const failedCount = queue.filter(item => String(item.sync_status).toUpperCase() === 'FAILED').length;
-    const pendingCount = queue.length - failedCount;
-
-    UI.setHTML('sync-summary', `
-      <p><strong>${queue.length}</strong> draft masih menunggu sinkronisasi.</p>
-      <p class="muted-text">Pending: ${pendingCount} | Gagal: ${failedCount}</p>
-      <p class="muted-text">Pastikan koneksi internet stabil sebelum sinkronisasi.</p>
-    `);
+    container.innerHTML = `
+      <div class="profile-grid">
+        <div><span class="label">Total Draft</span><strong>${total}</strong></div>
+        <div><span class="label">Pending</span><strong>${pending}</strong></div>
+        <div><span class="label">Gagal</span><strong>${failed}</strong></div>
+      </div>
+    `;
   }
 };
