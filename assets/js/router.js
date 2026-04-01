@@ -21,5 +21,9 @@ window.Router = {
 
   toRegistrasi() {
     UI.showScreen('registrasi-screen');
+  },
+
+  toPendampingan() {
+    UI.showScreen('pendampingan-screen');
   }
 };
