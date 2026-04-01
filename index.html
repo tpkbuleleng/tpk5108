@@ -1,390 +1,81 @@
 <!DOCTYPE html>
-<html lang="id">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>TPK KABUPATEN BULELENG</title>
-    <link rel="stylesheet" href="assets/css/style.css">
-    <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#0d6efd">
-    <link rel="icon" href="assets/img/logo.png">
-</head>
-<body>
-
-    <main id="view-splash" class="view-section splash-container active">
-        <img src="assets/img/logo.png" alt="Logo TPK" class="splash-logo">
-        <h2 class="splash-title">TPK KABUPATEN BULELENG</h2>
-        <div class="loader"></div>
-    </main>
-
-    <main id="view-login" class="view-section hidden">
-        <div class="login-card">
-            <img src="assets/img/logo.png" alt="Logo" class="login-logo">
-            <p class="app-subtitle">Aplikasi Pencatatan dan Pelaporan</p>
-            <h2 class="app-title">TPK KABUPATEN BULELENG</h2>
-            <form id="form-login" class="modern-form">
-                <div class="form-group"><label>ID Pengguna</label><input type="text" id="kader-id" class="form-control" placeholder="Masukkan ID" required></div>
-                <div class="form-group">
-                    <label>PIN / Password</label>
-                    <div class="password-field">
-                        <input type="password" id="kader-pin" class="form-control" placeholder="••••••" required>
-                        <span class="toggle-eye" onclick="const p=document.getElementById('kader-pin');p.type=p.type==='password'?'text':'password';">👁️</span>
-                    </div>
-                </div>
-                <button type="submit" id="btn-login-submit" class="btn-primary">Masuk</button>
-            </form>
+    <section id="dashboard-screen" class="screen hidden">
+      <header class="topbar">
+        <div>
+          <h2 class="topbar-title">TPK Kabupaten Buleleng</h2>
+          <p id="topbar-subtitle" class="topbar-subtitle">Dashboard</p>
         </div>
-    </main>
-
-    <main id="view-app" class="view-section hidden">
-        <header class="app-header">
-            <div class="header-left">
-                <button id="btn-menu" class="btn-burger">☰</button>
-                <div class="header-info">
-                    <h1 id="user-greeting">DASHBOARD</h1>
-                    <span id="network-status" class="status-badge offline">Offline</span>
-                </div>
-            </div>
-            <button class="btn-logout-icon" onclick="window.prosesLogout()">🚪</button>
-        </header>
-
-        <div id="sidebar-overlay" class="sidebar-overlay"></div>
-        <aside id="sidebar" class="sidebar">
-            <div class="sidebar-user-box">
-                <img src="assets/img/logo.png" alt="Logo" class="sidebar-avatar">
-                <div class="sidebar-user-text">
-                    <h3 id="sidebar-nama">Nama User</h3>
-                    <p id="sidebar-role">Role Akses</p>
-                </div>
-            </div>
-            <nav id="dynamic-menu-container" class="sidebar-nav"></nav>
-        </aside>
-
-        <section id="content-area" class="content-body"></section>
-    </main>
-
-    <template id="template-registrasi">
-        <div class="card animate-fade">
-            <h3 style="margin-bottom: 15px; color: var(--primary);">📝 Registrasi Sasaran Baru</h3>
-            <form id="form-registrasi" class="modern-form">
-                
-                <div class="form-group"><label>Nama Sasaran</label><input type="text" name="nama_sasaran" class="form-control" placeholder="Sesuai KTP" required></div>
-                <div class="form-group"><label>Nama Kepala Keluarga</label><input type="text" name="nama_kk" class="form-control" placeholder="Sesuai KK" required></div>
-
-                <div class="form-group" id="box-ibu-kandung" style="display: none; background: #f8f9fa; padding: 10px; border-left: 3px solid #198754;">
-                    <label style="color: #198754; font-weight: bold; font-size: 0.9rem;">Nama Ibu Kandung (Khusus BADUTA)</label>
-                    <input type="text" id="input-ibu-kandung" name="nama_ibu_kandung" class="form-control" placeholder="Isi nama ibu kandung">
-                </div>
-
-                <div class="form-group">
-                    <label>Jenis Sasaran</label>
-                    <select id="reg-jenis" name="jenis_sasaran" class="form-control" required>
-                        <option value="">-- Pilih Jenis --</option>
-                        <option value="CATIN">CATIN (Calon Pengantin)</option>
-                        <option value="BUMIL">BUMIL (Ibu Hamil)</option>
-                        <option value="BUFAS">BUFAS (Ibu Pasca Persalinan)</option>
-                        <option value="BADUTA">BADUTA (Anak 0-23 Bulan)</option>
-                    </select>
-                </div>
-
-                <div class="form-group"><label>NIK (16 Digit Angka)</label><input type="text" name="nik" class="form-control" maxlength="16" minlength="16" pattern="[0-9]{16}" oninput="this.value=this.value.replace(/[^0-9]/g,'');" placeholder="Contoh: 5108xxxxxxxxxxxx" required></div>
-                <div class="form-group"><label>No KK</label><input type="text" name="no_kk" class="form-control" maxlength="16" minlength="16" pattern="[0-9]{16}" oninput="this.value=this.value.replace(/[^0-9]/g,'');" placeholder="Masukkan 16 digit No KK"></div>
-                <div class="form-group"><label>Tanggal Lahir</label><input type="date" name="tanggal_lahir" class="form-control" required></div>
-
-                <div class="form-group">
-                    <label>Jenis Kelamin</label>
-                    <select name="jenis_kelamin" class="form-control" required>
-                        <option value="Perempuan">Perempuan</option>
-                        <option value="Laki-laki">Laki-laki</option>
-                    </select>
-                </div>
-
-                <div class="form-group" id="box-tgl-nikah" style="display: none; background: #e8f4fd; padding: 15px; border-radius: 8px; border-left: 4px solid #0d6efd;">
-                    <label style="color: #0d6efd; font-weight: bold; margin-bottom:5px; display:block;">📅 Tanggal Pernikahan (Khusus CATIN)</label>
-                    <input type="date" id="input-tgl-nikah" name="tanggal_pernikahan" class="form-control">
-                </div>
-
-                <div class="form-group" id="box-tgl-salin-reg" style="display: none; background: #fcf1f6; padding: 15px; border-radius: 8px; border-left: 4px solid #d63384;">
-                    <label style="color: #d63384; font-weight: bold; margin-bottom:5px; display:block;">👶 Tanggal Persalinan / Melahirkan (Khusus BUFAS)</label>
-                    <p style="font-size: 0.75rem; color: #666; margin-top: 0; margin-bottom: 8px;">*Sasaran akan aktif selama masa nifas (42 Hari).</p>
-                    <input type="date" id="input-tgl-salin-reg" name="tgl_persalinan" class="form-control">
-                </div>
-
-                <div id="wilayah-catin" style="display: none; background: #fff3cd; padding: 15px; border-radius: 8px; margin-top: 15px; margin-bottom: 15px; border-left: 4px solid #ffc107;">
-                    <label style="color: #856404; font-weight: bold; margin-bottom: 10px; display: block;">📍 Alamat Asal (Khusus CATIN)</label>
-                    <div class="form-group"><label>Provinsi</label><input type="text" name="prov_asal" class="form-control" value="BALI" readonly></div>
-                    <div class="form-group"><label>Kabupaten/Kota</label><select id="catin-kab" name="kab_asal" class="form-control"></select></div>
-                    <div class="form-group"><label>Kecamatan</label><select id="catin-kec" name="kec_asal" class="form-control"></select></div>
-                    <div class="form-group"><label>Desa / Kelurahan</label><select id="catin-desa" name="desa_asal" class="form-control"></select></div>
-                    <div class="form-group"><label>Dusun / Banjar / RW</label><input type="text" name="dusun_asal" class="form-control" placeholder="Ketik Dusun/Banjar Asal"></div>
-                </div>
-
-                <div id="wilayah-domisili">
-                    <hr style="margin: 20px 0; border: 0; border-top: 2px dashed #eee;">
-                    <h4 style="margin-bottom: 15px; color: var(--primary);">Alamat Domisili</h4>
-                    <div class="form-group"><label>Desa/Kelurahan Domisili</label><select id="reg-desa" name="desa" class="form-control" required></select></div>
-                    <div class="form-group"><label>Dusun/RW Domisili</label><select id="reg-dusun" name="dusun" class="form-control" required></select></div>
-                    <div class="form-group"><label>Alamat Lengkap</label><textarea id="reg-alamat" name="alamat" class="form-control" rows="2" placeholder="Nama Jalan / Banjar" required></textarea></div>
-                </div>
-
-                <div id="pertanyaan-dinamis" style="margin-top: 20px;"></div>
-                <button type="submit" class="btn-primary" style="margin-top: 20px; width: 100%;">💾 Simpan Registrasi</button>
-            </form>
+        <div class="topbar-actions">
+          <span id="network-badge" class="badge badge-warning">Offline</span>
+          <button id="btn-logout" class="btn btn-danger btn-sm">Keluar</button>
         </div>
-    </template>
+      </header>
 
-    <template id="template-daftar-sasaran">
-        <div class="card animate-fade">
-            <h3 style="margin-bottom: 15px; color: var(--primary);">📋 Daftar Sasaran</h3>
-            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                <select id="filter-jenis" class="form-control" style="flex: 1; padding: 8px; font-weight: bold;">
-                    <option value="ALL">Semua Jenis</option>
-                    <option value="CATIN">CATIN</option>
-                    <option value="BUMIL">BUMIL</option>
-                    <option value="BUFAS">BUFAS</option>
-                    <option value="BADUTA">BADUTA</option>
-                </select>
-                <select id="filter-status" class="form-control" style="flex: 1; padding: 8px; font-weight: bold;">
-                    <option value="ALL">Semua Status</option>
-                    <option value="AKTIF">Aktif</option>
-                    <option value="SELESAI">Selesai</option>
-                </select>
-            </div>
-            <div id="list-sasaran" style="display: flex; flex-direction: column; gap: 10px;"></div>
-        </div>
+      <main class="page-content">
+        <section class="card profile-card">
+          <h3>Profil Pengguna</h3>
+          <div class="profile-grid">
+            <div><span class="label">Nama</span><strong id="profile-nama">-</strong></div>
+            <div><span class="label">Role</span><strong id="profile-role">-</strong></div>
+            <div><span class="label">ID Kader</span><strong id="profile-id">-</strong></div>
+            <div><span class="label">Tim</span><strong id="profile-tim">-</strong></div>
+            <div><span class="label">Wilayah</span><strong id="profile-wilayah">-</strong></div>
+          </div>
+        </section>
 
-        <div id="modal-detail" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 9999; padding: 20px; box-sizing: border-box; overflow-y: auto;">
-            <div class="card animate-fade" style="margin-top: 20px; position: relative; max-width: 500px; margin-left: auto; margin-right: auto;">
-                <button id="btn-tutup-modal" style="position: absolute; right: 15px; top: 15px; background: #dc3545; color: white; border: none; border-radius: 5px; padding: 6px 12px; font-weight: bold; cursor: pointer;">Tutup</button>
-                <h3 style="color: var(--primary); margin-bottom: 15px; padding-right: 60px;">🔍 Detail Sasaran</h3>
-                <div id="konten-detail"></div>
-            </div>
-        </div>
-    </template>
+        <section class="stats-grid">
+          <article class="card stat-card">
+            <span class="label">Jumlah Sasaran</span>
+            <strong id="stat-sasaran">0</strong>
+          </article>
+          <article class="card stat-card">
+            <span class="label">Pendampingan Bulan Ini</span>
+            <strong id="stat-pendampingan">0</strong>
+          </article>
+          <article class="card stat-card">
+            <span class="label">Draft Pending</span>
+            <strong id="stat-draft">0</strong>
+          </article>
+        </section>
 
-    <template id="template-pendampingan">
-        <div class="card animate-fade">
-            <h3 style="margin-bottom: 15px; color: var(--primary);">🤝 Laporan Pendampingan</h3>
-            <form id="form-pendampingan" class="modern-form">
-                
-                <div class="form-group">
-                    <label>Jenis Sasaran</label>
-                    <select id="pend-jenis" class="form-control" required>
-                        <option value="">-- Pilih Jenis Sasaran --</option>
-                        <option value="CATIN">CATIN</option>
-                        <option value="BUMIL">BUMIL</option>
-                        <option value="BUFAS">BUFAS</option>
-                        <option value="BADUTA">BADUTA</option>
-                    </select>
-                </div>
+        <section class="card">
+          <div class="section-header">
+            <h3>Menu Utama</h3>
+            <p class="muted-text">Menu akan menyesuaikan hak akses pengguna</p>
+          </div>
+          <div id="menu-grid" class="menu-grid"></div>
+        </section>
 
-                <div class="form-group">
-                    <label>Pilih Sasaran</label>
-                    <select id="pend-sasaran" name="id_sasaran" class="form-control" required disabled>
-                        <option value="">-- Pilih Jenis Dahulu --</option>
-                    </select>
-                </div>
+        <section class="card">
+          <div class="section-header">
+            <h3>Status Sinkronisasi</h3>
+          </div>
+          <div id="sync-summary" class="sync-summary">
+            <p class="muted-text">Belum ada data sinkronisasi.</p>
+          </div>
+          <div class="section-actions">
+            <button id="btn-sync-now" class="btn btn-primary">Sinkronkan Sekarang</button>
+          </div>
+        </section>
+      </main>
+    </section>
+  </div>
 
-                <div id="pend-info-sasaran" style="display: none; background: #e8f4fd; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #0d6efd;">
-                </div>
+  <div id="toast-container" class="toast-container"></div>
 
-                <div id="form-pendampingan-dinamis"></div>
-                
-                <div class="form-group"><label>Tanggal Kunjungan</label><input type="date" name="tgl_kunjungan" class="form-control" required></div>
-                <div class="form-group"><label>Catatan Umum / Hasil</label><textarea name="catatan" class="form-control" rows="3" required></textarea></div>
-                <button type="submit" class="btn-primary" style="margin-top: 15px; width: 100%;">💾 Simpan Pendampingan</button>
-            </form>
-        </div>
-    </template>
-
-    <template id="template-rekap">
-        <div class="animate-fade">
-            <h3 style="margin:0 0 15px 0; color:#0043a8; font-size:1.3rem;">📊 Rekapitulasi Bulanan</h3>
-            
-            <div style="background:white; padding:15px; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.1); margin-bottom:15px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; border-left: 4px solid #0043a8;">
-                <strong style="color:#444;">📅 Filter Periode:</strong>
-                <select id="flt-rekap-bulan" class="form-control" style="width:auto; min-width:120px; font-weight:bold; color:#0043a8;"></select>
-                <select id="flt-rekap-tahun" class="form-control" style="width:auto; min-width:100px; font-weight:bold; color:#0043a8;"></select>
-            </div>
-
-            <div style="background:#fff; padding:15px; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.1); margin-bottom:15px;">
-                <h4 style="margin-top:0; color:#0A2342; border-bottom:2px solid #eee; padding-bottom:10px;"><span class="icon">👤</span> Rekap Kader (Anda)</h4>
-                <div style="overflow-x:auto;">
-                    <table style="width:100%; border-collapse:collapse; font-size:0.9rem; text-align:center;">
-                        <thead><tr style="background:#0d6efd; color:white;"><th style="padding:10px; text-align:left;">Jenis Sasaran</th><th style="padding:10px;">Sasaran Aktif</th><th style="padding:10px;">Pendampingan</th></tr></thead>
-                        <tbody id="tbody-rekap-kader"></tbody>
-                    </table>
-                </div>
-            </div>
-
-            <div style="background:#fff; padding:15px; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.1);">
-                <h4 style="margin-top:0; color:#0A2342; border-bottom:2px solid #eee; padding-bottom:10px;"><span class="icon">👥</span> Rekap Tim</h4>
-                <div style="overflow-x:auto;">
-                    <table style="width:100%; border-collapse:collapse; font-size:0.9rem; text-align:center;">
-                        <thead><tr style="background:#198754; color:white;"><th style="padding:10px; text-align:left;">Jenis Sasaran</th><th style="padding:10px;">Sasaran Aktif</th><th style="padding:10px;">Pendampingan</th></tr></thead>
-                        <tbody id="tbody-rekap-tim"></tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </template>
-
-    <template id="template-cetak-pdf">
-        <div class="card animate-fade" style="text-align: center;">
-            <h3 style="margin-bottom: 15px; color: var(--primary);">🖨️ Cetak PDF</h3>
-            <p style="font-size: 0.9rem; color: #666; margin-bottom: 20px;">Fitur unduh laporan (Memerlukan koneksi internet).</p>
-            <button class="btn-primary" style="background: #dc3545;" onclick="alert('Fitur cetak PDF akan aktif setelah tersambung ke Server Google.')">⬇️ Download PDF</button>
-        </div>
-    </template>
-
-    <template id="template-setting">
-        <div class="animate-fade">
-            <h3 style="margin:0 0 15px 0; color:var(--primary); font-size:1.3rem;">⚙️ Pengaturan</h3>
-            
-            <div style="background:#fff; padding:15px; border-radius:8px; border:1px solid #ced4da; margin-bottom:15px;">
-                <h4 style="margin-top:0; color:#444;"><span class="icon">👤</span> Profil Kader</h4>
-                <div class="form-group">
-                    <label>Nama Kader</label>
-                    <input type="text" id="set-nama" class="form-control" readonly style="background:#f8f9fa;">
-                </div>
-                <div class="form-group">
-                    <label>ID / Username</label>
-                    <input type="text" id="set-id" class="form-control" readonly style="background:#f8f9fa;">
-                </div>
-                
-                <div class="form-group">
-                    <label>Status Kader TPK</label>
-                    <select id="set-status-kader" class="form-control">
-                        <option value="">-- Pilih Status --</option>
-                        <option value="Baru">Baru</option>
-                        <option value="Lama">Lama</option>
-                    </select>
-                </div>
-                
-                <div class="form-group">
-                    <label>Memiliki BPJS Ketenagakerjaan <br><i style="font-size:0.8rem; color:#666; font-weight:normal;">(Data di Update Setiap Saat Jika Ada Perubahan)</i></label>
-                    <select id="set-bpjs" class="form-control">
-                        <option value="">-- Pilih --</option>
-                        <option value="Ya">Ya</option>
-                        <option value="Tidak">Tidak</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Mengantar MBG 3B <br><i style="font-size:0.8rem; color:#666; font-weight:normal;">(Data di Update Setiap Saat Jika Ada Perubahan)</i></label>
-                    <select id="set-mbg" class="form-control">
-                        <option value="">-- Pilih --</option>
-                        <option value="Ya">Ya</option>
-                        <option value="Tidak">Tidak</option>
-                    </select>
-                </div>
-                
-                <div class="form-group" id="box-mbg-insentif" style="display:none;">
-                    <label>Menerima Insentif Mengantar MBG 3B <br><i style="font-size:0.8rem; color:#666; font-weight:normal;">(Data di Update Setiap Saat Jika Ada Perubahan)</i></label>
-                    <select id="set-mbg-insentif" class="form-control">
-                        <option value="">-- Pilih --</option>
-                        <option value="Menerima">Menerima</option>
-                        <option value="Tidak">Tidak</option>
-                    </select>
-                </div>
-                <div class="form-group" id="box-mbg-nominal" style="display:none;">
-                    <label>Nominal Insentif Yang Diterima Setiap Pengantaran Kepada 1 Sasaran <br><i style="font-size:0.8rem; color:#666; font-weight:normal;">(Data di Update Setiap Saat Jika Ada Perubahan)</i></label>
-                    <div style="display: flex; align-items: center;">
-                        <span style="background: #eee; padding: 10px; border: 1px solid #ced4da; border-right: none; border-radius: 6px 0 0 6px; font-weight: bold;">Rp.</span>
-                        <input type="text" id="set-mbg-nominal" class="form-control" style="border-radius: 0 6px 6px 0;" placeholder="Contoh: 50.000" oninput="this.value = this.value.replace(/[^0-9]/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, '.')">
-                    </div>
-                </div>
-
-                <button type="button" id="btn-save-profil" class="btn btn-primary" style="width:100%; margin-top:10px; font-size:1.1rem; padding:12px;">💾 Simpan Profil Terkini</button>
-                <p style="font-size:0.75rem; color:#888; margin-top:10px;">*Perubahan pada profil utama (Nama/ID) harus dilakukan melalui Admin Kecamatan di Server Master Database.</p>
-            </div>
-
-            <div style="background:#fff; padding:15px; border-radius:8px; border:1px solid #ced4da; margin-bottom:15px;">
-                <h4 style="margin-top:0; color:#444;"><span class="icon">📱</span> Tampilan Aplikasi</h4>
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-                    <label style="margin:0; font-weight:bold;">Mode Gelap (Dark Mode)</label>
-                    <label class="switch"><input type="checkbox" id="toggle-dark-mode"><span class="slider round"></span></label>
-                </div>
-                <div>
-                    <label style="display:block; margin-bottom:10px; font-weight:bold;">Ukuran Teks (Font Size)</label>
-                    <div style="display:flex; gap:10px;">
-                        <button id="btn-text-min" class="btn btn-secondary" style="flex:1;">A- (Kecil)</button>
-                        <button id="btn-text-normal" class="btn btn-primary" style="flex:1;">Normal</button>
-                        <button id="btn-text-plus" class="btn btn-secondary" style="flex:1;">A+ (Besar)</button>
-                    </div>
-                </div>
-            </div>
-
-            <div style="background:#fff; padding:15px; border-radius:8px; border:1px solid #ced4da; margin-bottom:15px;">
-                <h4 style="margin-top:0; color:#444;"><span class="icon">🔒</span> Keamanan</h4>
-                <form id="form-ganti-pass">
-                    <div class="form-group"><label>PIN Lama</label><input type="password" class="form-control" required></div>
-                    <div class="form-group"><label>PIN Baru</label><input type="password" class="form-control" required></div>
-                    <button type="submit" class="btn btn-primary" style="width:100%;">Perbarui PIN</button>
-                    <p style="font-size:0.75rem; color:#888; margin-top:10px;">*Fitur ganti PIN saat ini dinonaktifkan. Hubungi Admin Kecamatan jika lupa PIN.</p>
-                </form>
-            </div>
-        </div>
-    </template>
-
-    <template id="template-kalkulator">
-        <div class="card animate-fade">
-            <button onclick="renderKonten('rekap')" style="margin-bottom: 15px; background: none; border: none; color: var(--primary); font-weight: bold; cursor: pointer;">⬅️ Kembali ke Dashboard</button>
-            <h3 style="margin-bottom: 20px; color: var(--primary);">🧮 Kalkulator Cerdas</h3>
-            
-            <div style="margin-bottom: 20px;">
-                <select id="calc-selector" class="form-control" style="font-weight: bold; font-size: 1.1rem;">
-                    <option value="HPL">📅 Hitung HPL (Kehamilan)</option>
-                    <option value="IMT">⚖️ Hitung IMT (Gizi Tubuh)</option>
-                    <option value="KKA">👶 Cek KKA (Kembang Anak)</option>
-                </select>
-            </div>
-
-            <div id="box-calc-hpl" style="background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #ddd;">
-                <div class="form-group"><label>Hari Pertama Haid Terakhir (HPHT)</label><input type="date" id="calc-hpht" class="form-control"></div>
-                <button id="btn-hitung-hpl" class="btn-primary" style="width:100%; margin-bottom:10px;">Hitung HPL</button>
-                <div id="hasil-hpl" style="font-weight: bold; color: #d63384; text-align: center; font-size: 1.1rem;"></div>
-            </div>
-
-            <div id="box-calc-imt" style="display: none; background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #ddd;">
-                <div class="form-group"><label>Berat Badan (Kg)</label><input type="number" id="calc-bb" class="form-control" placeholder="Contoh: 55"></div>
-                <div class="form-group"><label>Tinggi Badan (Cm)</label><input type="number" id="calc-tb" class="form-control" placeholder="Contoh: 160"></div>
-                <button id="btn-hitung-imt" class="btn-primary" style="width:100%; margin-bottom:10px;">Hitung Status Gizi</button>
-                <div id="hasil-imt" style="font-weight: bold; text-align: center; font-size: 1.1rem;"></div>
-            </div>
-
-            <div id="box-calc-kka" style="display: none; background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #ddd;">
-                <div class="form-group">
-                    <label>Pilih Usia Anak (Baduta)</label>
-                    <select id="calc-usia-kka" class="form-control">
-                        <option value="">-- Pilih Usia --</option>
-                        <option value="0-3">0 - 3 Bulan</option>
-                        <option value="3-6">3 - 6 Bulan</option>
-                        <option value="6-12">6 - 12 Bulan</option>
-                        <option value="12-24">12 - 24 Bulan</option>
-                    </select>
-                </div>
-                <div id="hasil-kka" style="font-size: 0.9rem; color: #444; line-height: 1.5;"></div>
-            </div>
-        </div>
-    </template>
-    
-    <script src="assets/js/api.js"></script>
-
-    <script src="assets/js/db.js"></script>
-    <script src="assets/js/sync.js"></script>
-
-    <script src="assets/js/app.js" type="module"></script>
-    
-    <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js').then(reg => {
-                    console.log('🛡️ Service Worker Aktif di ruang lingkup:', reg.scope);
-                }).catch(err => {
-                    console.log('❌ Service Worker gagal mendarat:', err);
-                });
-            });
-        }
-    </script>
+  <script src="./js/app-config.js"></script>
+  <script src="./js/storage.js"></script>
+  <script src="./js/session.js"></script>
+  <script src="./js/notifier.js"></script>
+  <script src="./js/validators.js"></script>
+  <script src="./js/ui-helpers.js"></script>
+  <script src="./js/api.js"></script>
+  <script src="./js/auth.js"></script>
+  <script src="./js/bootstrap.js"></script>
+  <script src="./js/router.js"></script>
+  <script src="./js/offline-sync.js"></script>
+  <script src="./js/menu.js"></script>
+  <script src="./js/dynamic-form.js"></script>
+  <script src="./js/app.js"></script>
 </body>
 </html>
