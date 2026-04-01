@@ -1,4 +1,45 @@
 window.SasaranDetail = {
+  async openById(idSasaran) {
+    const fallbackItem = SasaranList.findById(idSasaran);
+    if (fallbackItem) {
+      SasaranState.setSelected(fallbackItem);
+      this.renderBasic(fallbackItem);
+    }
+
+    Router.toSasaranDetail();
+
+    try {
+      const result = await SasaranService.getSasaranDetail(idSasaran);
+      if (!result?.ok) {
+        throw new Error(result?.message || 'Gagal memuat detail sasaran.');
+      }
+
+      const detail = this.normalizeDetail(result?.data);
+      SasaranState.setSelected(detail);
+      this.renderFull(detail);
+    } catch (err) {
+      Notifier.show(err.message);
+    }
+  },
+
+  normalizeDetail(data) {
+    if (data?.item) return data.item;
+    if (data?.detail) return data.detail;
+    return data || {};
+  },
+
+  renderBasic(item) {
+    this.renderFull(item || {});
+  },
+
+  renderFull(item) {
+    const status = item.status_sasaran || item.status || '-';
+    const wilayah = item.nama_wilayah || item.wilayah || item.nama_desa || item.nama_kecamatan || '-';
+
+    UI.setText('detail-nama-sasaran', item.nama_sasaran || item.nama || '-');
+    UI.setText('detail-id-sasaran', `ID Sasaran: ${item.id_sasaran || item.id || '-'}`);
+    UI.setText('detail-jenis', item.jenis_sasaran || '-');
+    UI.setText('detail-nik', item.nik || '-');
     UI.setText('detail-kk', item.nomor_kk || item.no_kk || '-');
     UI.setText('detail-tanggal-lahir', item.tanggal_lahir || item.tgl_lahir || '-');
     UI.setText('detail-wilayah', wilayah);
@@ -43,13 +84,30 @@ window.SasaranDetail = {
       return;
     }
 
-    const html = items.slice(0, 5).map(item => `
-      <div class="riwayat-item">
-        <div><span class="label">Tanggal</span><strong>${item.tanggal_pendampingan || item.tanggal || '-'}</strong></div>
-        <div><span class="label">Status</span><strong>${item.status || 'Tersimpan'}</strong></div>
-        <div><span class="label">Catatan</span><strong>${item.catatan || item.keterangan || '-'}</strong></div>
-      </div>
-    `).join('');
+    const html = items.slice(0, 10).map(item => {
+      const idPendampingan = item.id_pendampingan || '';
+      const canEdit = item.can_edit !== false;
+
+      return `
+        <div class="riwayat-item">
+          <div><span class="label">Tanggal</span><strong>${item.tanggal_pendampingan || item.tanggal || '-'}</strong></div>
+          <div><span class="label">Status</span><strong>${item.status_kunjungan || item.status || 'Tersimpan'}</strong></div>
+          <div><span class="label">Catatan</span><strong>${item.catatan_umum || item.catatan || item.keterangan || '-'}</strong></div>
+          <div><span class="label">ID Pendampingan</span><strong>${idPendampingan || '-'}</strong></div>
+          <div class="sasaran-card-actions">
+            ${idPendampingan ? `
+              <button
+                class="btn btn-secondary btn-sm"
+                data-edit-pendampingan="${idPendampingan}"
+                ${canEdit ? '' : 'disabled'}
+              >
+                Edit Pendampingan
+              </button>
+            ` : ''}
+          </div>
+        </div>
+      `;
+    }).join('');
 
     UI.setHTML('detail-riwayat-ringkas', html);
   },
@@ -68,7 +126,7 @@ window.SasaranDetail = {
     return 'badge-neutral';
   },
 
-    openEditSelected() {
+  openEditSelected() {
     const item = SasaranState.getSelected();
     if (!item) {
       Notifier.show('Data sasaran belum dipilih.');
