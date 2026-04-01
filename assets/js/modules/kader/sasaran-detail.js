@@ -14,18 +14,12 @@ window.SasaranDetail = {
         throw new Error(result?.message || 'Gagal memuat detail sasaran.');
       }
 
-      const detail = this.normalizeDetail(result?.data);
+      const detail = SasaranService.normalizeSasaranDetailResponse(result);
       SasaranState.setSelected(detail);
       this.renderFull(detail);
     } catch (err) {
       Notifier.show(err.message);
     }
-  },
-
-  normalizeDetail(data) {
-    if (data?.item) return data.item;
-    if (data?.detail) return data.detail;
-    return data || {};
   },
 
   renderBasic(item) {
@@ -52,14 +46,31 @@ window.SasaranDetail = {
     }
 
     this.renderExtraFields(item);
-    this.renderRiwayatRingkas(item.riwayat_pendampingan || item.riwayat || []);
+    this.renderRiwayatRingkas(item.riwayat_pendampingan || []);
   },
 
   renderExtraFields(item) {
     const excludeKeys = new Set([
-      'id_sasaran', 'id', 'nama_sasaran', 'nama', 'jenis_sasaran', 'nik', 'nomor_kk', 'no_kk',
-      'tanggal_lahir', 'tgl_lahir', 'nama_wilayah', 'wilayah', 'nama_desa', 'nama_kecamatan',
-      'status_sasaran', 'status', 'updated_at', 'last_updated_at', 'riwayat_pendampingan', 'riwayat'
+      'id_sasaran',
+      'id',
+      'nama_sasaran',
+      'nama',
+      'jenis_sasaran',
+      'nik',
+      'nomor_kk',
+      'no_kk',
+      'tanggal_lahir',
+      'tgl_lahir',
+      'nama_wilayah',
+      'wilayah',
+      'nama_desa',
+      'nama_kecamatan',
+      'status_sasaran',
+      'status',
+      'updated_at',
+      'last_updated_at',
+      'riwayat_pendampingan',
+      'riwayat'
     ]);
 
     const entries = Object.entries(item || {})
@@ -90,9 +101,9 @@ window.SasaranDetail = {
 
       return `
         <div class="riwayat-item">
-          <div><span class="label">Tanggal</span><strong>${item.tanggal_pendampingan || item.tanggal || '-'}</strong></div>
-          <div><span class="label">Status</span><strong>${item.status_kunjungan || item.status || 'Tersimpan'}</strong></div>
-          <div><span class="label">Catatan</span><strong>${item.catatan_umum || item.catatan || item.keterangan || '-'}</strong></div>
+          <div><span class="label">Tanggal</span><strong>${item.tanggal_pendampingan || '-'}</strong></div>
+          <div><span class="label">Status</span><strong>${item.status_kunjungan || 'Tersimpan'}</strong></div>
+          <div><span class="label">Catatan</span><strong>${item.catatan_umum || '-'}</strong></div>
           <div><span class="label">ID Pendampingan</span><strong>${idPendampingan || '-'}</strong></div>
           <div class="sasaran-card-actions">
             ${idPendampingan ? `
