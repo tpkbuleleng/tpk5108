@@ -33,12 +33,19 @@ window.SyncScreen = {
     const filtered = this.getFilteredQueue();
 
     UI.setText('sync-total-count', String(queue.length));
-    UI.setText('sync-pending-count', String(queue.filter(item => String(item.sync_status || 'PENDING').toUpperCase() === 'PENDING').length));
-    UI.setText('sync-failed-count', String(queue.filter(item => String(item.sync_status || 'PENDING').toUpperCase() === 'FAILED').length));
+    UI.setText(
+      'sync-pending-count',
+      String(queue.filter(item => String(item.sync_status || 'PENDING').toUpperCase() === 'PENDING').length)
+    );
+    UI.setText(
+      'sync-failed-count',
+      String(queue.filter(item => String(item.sync_status || 'PENDING').toUpperCase() === 'FAILED').length)
+    );
 
-    UI.setText('sync-screen-meta', queue.length
-      ? `${queue.length} draft tersimpan lokal.`
-      : 'Belum ada data antrean.');
+    UI.setText(
+      'sync-screen-meta',
+      queue.length ? `${queue.length} draft tersimpan lokal.` : 'Belum ada data antrean.'
+    );
 
     const container = document.getElementById('sync-list-container');
     if (!container) return;
