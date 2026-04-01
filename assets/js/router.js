@@ -17,5 +17,9 @@ window.Router = {
 
   toSasaranDetail() {
     UI.showScreen('sasaran-detail-screen');
+  },
+
+  toRegistrasi() {
+    UI.showScreen('registrasi-screen');
   }
 };
