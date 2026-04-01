@@ -1,4 +1,8 @@
 window.Router = {
+  toSplash() {
+    UI.showScreen('splash-screen');
+  },
+
   toLogin() {
     UI.showScreen('login-screen');
   },
@@ -7,7 +11,11 @@ window.Router = {
     UI.showScreen('dashboard-screen');
   },
 
-  toSplash() {
-    UI.showScreen('splash-screen');
+  toSasaranList() {
+    UI.showScreen('sasaran-list-screen');
+  },
+
+  toSasaranDetail() {
+    UI.showScreen('sasaran-detail-screen');
   }
 };
