@@ -1,46 +1,54 @@
 (function () {
-      }
-
-      Auth.handleLoginSuccess(result);
-      await Bootstrap.loadInitialRefs();
-      renderDashboard();
-      Router.toDashboard();
-      Notifier.show('Login berhasil.');
-    } catch (err) {
-      Notifier.setMessageBox('login-message', err.message, true);
-    } finally {
-      UI.setLoading('btn-login', false);
-    }
-  }
-
-  function handleLogout() {
-    Auth.logout();
-    Notifier.show('Anda telah keluar dari aplikasi.');
-  }
-
-  function renderDashboard() {
-    const profile = Session.getProfile() || {};
-
-    UI.setText('topbar-subtitle', profile.role_akses || 'Dashboard');
-    UI.setText('profile-nama', profile.nama_kader || profile.nama || '-');
-    UI.setText('profile-role', profile.role_akses || '-');
-    UI.setText('profile-id', profile.id_kader || '-');
-    UI.setText('profile-tim', profile.nama_tim || '-');
-    UI.setText('profile-wilayah', profile.nama_wilayah || profile.nama_kecamatan || '-');
-
-    UI.setText('stat-sasaran', String(profile.jumlah_sasaran || 0));
     UI.setText('stat-pendampingan', String(profile.jumlah_pendampingan || 0));
 
     Menu.render(profile.role_akses || 'KADER');
     OfflineSync.renderSummary();
   }
 
-  function handleMenuClick(event) {
-    const btn = event.target.closest('[data-menu-key]');
-    if (!btn) return;
+  async function handleDocumentClick(event) {
+    const menuBtn = event.target.closest('[data-menu-key]');
+    if (menuBtn) {
+      const key = menuBtn.dataset.menuKey;
+      return handleMenuNavigation(key);
+    }
 
-    const key = btn.dataset.menuKey;
-    Notifier.show(`Menu ${key} belum dihubungkan ke modul tahap berikutnya.`);
+    const detailBtn = event.target.closest('[data-open-sasaran-detail]');
+    if (detailBtn) {
+      const idSasaran = detailBtn.dataset.openSasaranDetail;
+      return SasaranDetail.openById(idSasaran);
+    }
+
+    const pilihBtn = event.target.closest('[data-pilih-sasaran]');
+    if (pilihBtn) {
+      const idSasaran = pilihBtn.dataset.pilihSasaran;
+      const item = SasaranList.findById(idSasaran);
+      if (item) {
+        SasaranState.setSelected(item);
+        Notifier.show(`Sasaran ${item.nama_sasaran || item.nama || idSasaran} dipilih.`);
+      }
+    }
+  }
+
+  async function handleMenuNavigation(key) {
+    switch (key) {
+      case 'daftar-sasaran':
+        Router.toSasaranList();
+        await SasaranList.loadAndRender();
+        break;
+      case 'pendampingan': {
+        const selected = SasaranState.getSelected();
+        if (!selected) {
+          Router.toSasaranList();
+          Notifier.show('Pilih sasaran terlebih dahulu sebelum membuat pendampingan.');
+          await SasaranList.loadAndRender();
+          return;
+        }
+        Notifier.show('Modul pendampingan akan disambungkan pada tahap berikutnya.');
+        break;
+      }
+      default:
+        Notifier.show(`Menu ${key} akan diaktifkan pada tahap berikutnya.`);
+    }
   }
 
   function updateNetworkStatus() {
@@ -65,5 +73,13 @@
 
   function delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  function debounce(fn, wait = 300) {
+    let timeout;
+    return (...args) => {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => fn(...args), wait);
+    };
   }
 })();
