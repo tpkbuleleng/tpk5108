@@ -1,8 +1,12 @@
 window.PendampinganDraft = {
   saveLocal(payload) {
+    const stableClientSubmitId = ClientId.ensure(payload.client_submit_id, 'SUB');
+
     PendampinganState.setDraft({
       saved_at: new Date().toISOString(),
-      data: payload
+      data: Object.assign({}, payload, {
+        client_submit_id: stableClientSubmitId
+      })
     });
   },
 
@@ -20,20 +24,21 @@ window.PendampinganDraft = {
       throw new Error('Edit pendampingan tidak didukung dalam mode offline.');
     }
 
-    const queue = OfflineSync.getQueue();
-    const clientSubmitId = `SUB-${Date.now()}`;
+    const stableClientSubmitId = ClientId.ensure(payload.client_submit_id, 'SUB');
 
-    queue.push({
-      id: `Q-${Date.now()}`,
+    return OfflineSync.add({
+      id: ClientId.queueId(),
       action: 'submitPendampingan',
-      payload,
-      client_submit_id: clientSubmitId,
+      payload: Object.assign({}, payload, {
+        client_submit_id: stableClientSubmitId,
+        sync_source: 'OFFLINE_DRAFT'
+      }),
+      client_submit_id: stableClientSubmitId,
       created_at: new Date().toISOString(),
       retry_count: 0,
-      sync_status: 'PENDING'
+      sync_status: 'PENDING',
+      last_error: '',
+      last_synced_at: ''
     });
-
-    OfflineSync.saveQueue(queue);
-    OfflineSync.renderSummary();
   }
 };
