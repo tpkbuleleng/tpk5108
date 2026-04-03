@@ -1,16 +1,6 @@
 window.Api = {
   getBaseUrl() {
-    const keys = window.APP_CONFIG?.STORAGE_KEYS || {};
-    return (
-      localStorage.getItem(keys.API_URL) ||
-      window.APP_CONFIG?.API_BASE_URL ||
-      ''
-    ).trim();
-  },
-
-  setBaseUrl(url) {
-    const keys = window.APP_CONFIG?.STORAGE_KEYS || {};
-    localStorage.setItem(keys.API_URL, String(url || '').trim());
+    return (window.APP_CONFIG?.API_BASE_URL || '').trim();
   },
 
   async post(action, payload = {}) {
@@ -43,7 +33,6 @@ window.Api = {
       throw new Error(`HTTP ${response.status}`);
     }
 
-    const result = await response.json();
-    return result;
+    return await response.json();
   }
 };
