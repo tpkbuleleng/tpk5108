@@ -1,15 +1,21 @@
 window.DashboardService = {
-  async getDashboardKaderSummary() {
-    return Api.post('getDashboardKaderSummary', {});
-  },
-
-  async getRekapKader(bulan) {
-    return Api.post('getRekapKader', {
-      bulan: bulan || ''
+  async getDashboardSummary(periodeKey = '') {
+    return Api.post('getDashboardSummary', {
+      periode_key: periodeKey || ''
     });
   },
 
-  async getTimWilayah() {
-    return Api.post('getTimWilayah', {});
+  async getRekapBulananTim(periodeKey = '') {
+    return Api.post('getRekapBulananTim', {
+      periode_key: periodeKey || ''
+    });
+  },
+
+  async getMyProfile() {
+    return Api.post('getMyProfile', {});
+  },
+
+  async getMyPermissions() {
+    return Api.post('getMyPermissions', {});
   }
 };
