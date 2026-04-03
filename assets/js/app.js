@@ -180,24 +180,24 @@
     });
   }
 
-  const syncBtn = qs('btn-sync-now');
-  if (syncBtn) {
-    syncBtn.addEventListener('click', function () {
-      alert('Fitur sinkronisasi akan disambungkan pada tahap berikutnya.');
-    });
-  }
-
-  const syncHeaderBtn = qs('btn-sync-now-header');
-  if (syncHeaderBtn) {
-    syncHeaderBtn.addEventListener('click', function () {
-      alert('Fitur sinkronisasi akan disambungkan pada tahap berikutnya.');
-    });
-  }
-
   const settingsBtn = qs('btn-settings');
   if (settingsBtn) {
     settingsBtn.addEventListener('click', function () {
       alert('Menu pengaturan akan disambungkan pada tahap berikutnya.');
+    });
+  }
+
+  const menuSync = qs('menu-sync-inline');
+  if (menuSync) {
+    menuSync.addEventListener('click', function () {
+      alert('Sinkronisasi data akan dijalankan.');
+    });
+  }
+
+  const menuBantuan = qs('menu-bantuan');
+  if (menuBantuan) {
+    menuBantuan.addEventListener('click', function () {
+      alert('Menu bantuan akan disambungkan pada tahap berikutnya.');
     });
   }
 }
