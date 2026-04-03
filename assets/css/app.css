@@ -1379,3 +1379,189 @@ textarea {
     grid-template-columns: 1fr;
   }
 }
+
+/* =========================================
+   HEADER CENTERED FINAL
+========================================= */
+
+.topbar-dashboard-centered {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: auto;
+  padding: 14px 16px 16px;
+  text-align: center;
+}
+
+.topbar-brand-centered {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.topbar-brand-centered .topbar-brand-text {
+  text-align: left;
+}
+
+.topbar-dashboard-centered .topbar-title {
+  margin-bottom: 2px;
+}
+
+.topbar-dashboard-centered .topbar-subtitle {
+  margin: 0;
+}
+
+.topbar-actions-centered {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.topbar-actions-centered .btn,
+.topbar-actions-centered .badge {
+  min-width: 120px;
+}
+
+.topbar-actions-centered .badge {
+  min-height: 40px;
+}
+
+/* =========================================
+   MENU EXTRA SEJAJAR
+========================================= */
+
+.menu-grid-extra-inline {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.menu-grid-extra-inline .menu-card {
+  min-height: 104px;
+}
+
+/* =========================================
+   FOOTER
+========================================= */
+
+.app-footer {
+  width: min(100%, 1120px);
+  margin: 18px auto 28px;
+  padding: 0 18px;
+  text-align: center;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #183153;
+  font-weight: 600;
+}
+
+/* =========================================
+   TABLET
+========================================= */
+
+@media (max-width: 1024px) {
+  .menu-grid-extra-inline {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* =========================================
+   MOBILE
+========================================= */
+
+@media (max-width: 768px) {
+  .topbar-dashboard-centered {
+    padding: 12px 14px 14px;
+    gap: 10px;
+  }
+
+  .topbar-brand-centered {
+    gap: 10px;
+  }
+
+  .topbar-logo {
+    width: 42px;
+    height: 42px;
+  }
+
+  .topbar-dashboard-centered .topbar-title {
+    font-size: 18px;
+  }
+
+  .topbar-dashboard-centered .topbar-subtitle {
+    font-size: 13px;
+  }
+
+  .topbar-actions-centered {
+    gap: 8px;
+  }
+
+  .topbar-actions-centered .btn,
+  .topbar-actions-centered .badge {
+    min-width: 108px;
+  }
+
+  .menu-grid-extra-inline {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .app-footer {
+    padding: 0 14px;
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 640px) {
+  .topbar-brand-centered {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .topbar-brand-centered .topbar-brand-text {
+    text-align: left;
+  }
+
+  .topbar-actions-centered {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+    gap: 8px;
+  }
+
+  .topbar-actions-centered .btn,
+  .topbar-actions-centered .badge {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .menu-grid-extra-inline {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .app-footer {
+    font-size: 12px;
+    margin: 16px auto 24px;
+  }
+}
+
+@media (max-width: 420px) {
+  .topbar-dashboard-centered .topbar-title {
+    font-size: 17px;
+  }
+
+  .topbar-dashboard-centered .topbar-subtitle {
+    font-size: 12px;
+  }
+
+  .topbar-logo {
+    width: 38px;
+    height: 38px;
+  }
+
+  .menu-grid-extra-inline {
+    grid-template-columns: 1fr;
+  }
+}
