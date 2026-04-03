@@ -128,6 +128,12 @@
   setText('profile-unsur', profile.unsur_tpk || '-');
   setText('profile-id', profile.id_user || profile.username);
   setText('profile-tim', profile.nomor_tim || profile.id_tim);
+
+  setText('profile-kecamatan', profile.kecamatan || '-');
+  setText('profile-desa', profile.desa_kelurahan || profile.desa || '-');
+  setText('profile-dusun', profile.dusun_rw || profile.dusun || '-');
+
+  // opsional, kalau elemen lama masih ada
   setText(
     'profile-wilayah',
     profile.wilayah_tugas ||
