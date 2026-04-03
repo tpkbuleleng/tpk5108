@@ -125,17 +125,18 @@
   }
 
   function renderProfile(profile) {
-    profile = profile || {};
+  profile = profile || {};
 
-    setText('profile-nama', profile.nama || profile.nama_user);
-    setText('profile-unsur', profile.unsur_tpk || '-');
-    setText('profile-id', profile.id_user || profile.username);
-    setText('profile-tim', profile.nomor_tim || profile.id_tim);
+  setText('profile-nama', profile.nama || profile.nama_user);
+  setText('profile-unsur', profile.unsur_tpk || '-');
+  setText('profile-id', profile.id_user || profile.username);
+  setText('profile-tim', profile.nomor_tim || profile.id_tim);
 
-    setText('profile-kecamatan', profile.kecamatan || '-');
-    setText('profile-desa', profile.desa_kelurahan || profile.desa || '-');
-    setText('profile-dusun', profile.dusun_rw || profile.dusun || '-');
-  }
+  setText('profile-desa', profile.desa_kelurahan || profile.desa || '-');
+  setText('profile-dusun', profile.dusun_rw || profile.dusun || '-');
+
+  setText('header-kecamatan', profile.kecamatan || '-');
+}
 
   function renderMenu(profile) {
     if (!window.Menu || typeof window.Menu.render !== 'function') return;
@@ -166,26 +167,40 @@
   }
 
   function attachGlobalUIEvents() {
-    window.addEventListener('online', setNetworkBadge);
-    window.addEventListener('offline', setNetworkBadge);
+  window.addEventListener('online', setNetworkBadge);
+  window.addEventListener('offline', setNetworkBadge);
 
-    const logoutBtn = qs('btn-logout');
-    if (logoutBtn) {
-      logoutBtn.addEventListener('click', function () {
-        const keys = getStorageKeys();
-        localStorage.removeItem(keys.SESSION_TOKEN || 'tpk_session_token');
-        localStorage.removeItem(keys.PROFILE || 'tpk_profile');
-        window.location.href = 'index.html';
-      });
-    }
-
-    const syncBtn = qs('btn-sync-now');
-    if (syncBtn) {
-      syncBtn.addEventListener('click', function () {
-        alert('Fitur sinkronisasi akan disambungkan pada tahap berikutnya.');
-      });
-    }
+  const logoutBtn = qs('btn-logout');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', function () {
+      const keys = getStorageKeys();
+      localStorage.removeItem(keys.SESSION_TOKEN || 'tpk_session_token');
+      localStorage.removeItem(keys.PROFILE || 'tpk_profile');
+      window.location.href = 'index.html';
+    });
   }
+
+  const syncBtn = qs('btn-sync-now');
+  if (syncBtn) {
+    syncBtn.addEventListener('click', function () {
+      alert('Fitur sinkronisasi akan disambungkan pada tahap berikutnya.');
+    });
+  }
+
+  const syncHeaderBtn = qs('btn-sync-now-header');
+  if (syncHeaderBtn) {
+    syncHeaderBtn.addEventListener('click', function () {
+      alert('Fitur sinkronisasi akan disambungkan pada tahap berikutnya.');
+    });
+  }
+
+  const settingsBtn = qs('btn-settings');
+  if (settingsBtn) {
+    settingsBtn.addEventListener('click', function () {
+      alert('Menu pengaturan akan disambungkan pada tahap berikutnya.');
+    });
+  }
+}
 
   async function loadDashboardData() {
     let profile = getProfileFromStorage() || {};
