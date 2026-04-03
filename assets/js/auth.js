@@ -1,97 +1,3 @@
-window.Auth = {
-  async login(idKader, password) {
-    return Api.post(
-      'login',
-      {
-        id_kader: String(idKader || '').trim(),
-        password: String(password || '').trim()
-      },
-      { skipToken: true }
-    );
-  },
-
-  handleLoginSuccess(result) {
-    const data = result?.data || {};
-
-    const token =
-      data.session_token ||
-      data.token ||
-      '';
-
-    const profile =
-      data.profile ||
-      data.user ||
-      null;
-
-    const bootstrap =
-      data.bootstrap_refs ||
-      data.bootstrap ||
-      null;
-
-    Session.setToken(token);
-    Session.setProfile(profile);
-
-    if (bootstrap) {
-      StorageHelper.set(APP_CONFIG.STORAGE_KEYS.BOOTSTRAP, bootstrap);
-    }
-
-    return {
-      token,
-      profile,
-      bootstrap
-    };
-  },
-
-  logout() {
-    try {
-      Session.logout?.();
-    } catch (_) {
-      try {
-        Session.clear?.();
-      } catch (_) {}
-    }
-
-    try {
-      SasaranState?.clearSelected?.();
-      SasaranState?.clearList?.();
-    } catch (_) {}
-
-    try {
-      PendampinganState?.reset?.();
-    } catch (_) {}
-
-    try {
-      DraftManager?.clearRegistrasiDraft?.();
-    } catch (_) {}
-
-    try {
-      PendampinganDraft?.clearLocal?.();
-    } catch (_) {}
-
-    try {
-      Router?.toLogin?.();
-    } catch (_) {
-      UI.showScreen('login-screen');
-    }
-  },
-
-  guard() {
-    const loggedIn = Session.isLoggedIn?.();
-
-    if (loggedIn) {
-      return true;
-    }
-
-    try {
-      Router?.toLogin?.();
-    } catch (_) {
-      UI.showScreen('login-screen');
-    }
-
-    return false;
-  }
-};
-
 (function () {
   const CONFIG = window.APP_CONFIG || {};
   const STORAGE_KEYS = CONFIG.STORAGE_KEYS || {};
@@ -172,43 +78,7 @@ window.Auth = {
       const isHidden = passwordInput.type === 'password';
       passwordInput.type = isHidden ? 'text' : 'password';
       toggleBtn.setAttribute('aria-label', isHidden ? 'Sembunyikan password' : 'Lihat password');
-    });
-  }
-
-  function setupBackendConfig() {
-    const showBackendSettings = !!CONFIG.SHOW_BACKEND_SETTINGS;
-
-    const backendSection = qs('backendConfigSection');
-    const backendInput = qs('backendUrlInput');
-    const saveBackendBtn = qs('saveBackendBtn');
-    const openBackendBtn = qs('openBackendConfigBtn');
-
-    if (!backendSection || !backendInput || !saveBackendBtn || !openBackendBtn) return;
-
-    backendInput.value = window.Api.getBaseUrl();
-
-    if (!showBackendSettings) {
-      backendSection.classList.add('hidden');
-      openBackendBtn.classList.add('hidden');
-      return;
-    }
-
-    openBackendBtn.classList.remove('hidden');
-
-    openBackendBtn.addEventListener('click', function () {
-      backendSection.classList.toggle('hidden');
-    });
-
-    saveBackendBtn.addEventListener('click', function () {
-      const url = String(backendInput.value || '').trim();
-
-      if (!url) {
-        showMessage('URL backend tidak boleh kosong.');
-        return;
-      }
-
-      window.Api.setBaseUrl(url);
-      showMessage('URL backend berhasil disimpan.', 'success');
+      toggleBtn.setAttribute('title', isHidden ? 'Sembunyikan password' : 'Lihat password');
     });
   }
 
@@ -231,7 +101,7 @@ window.Auth = {
       return;
     }
 
-    window.location.href = 'index.html';
+    window.location.href = 'dashboard.html';
   }
 
   async function handleLoginSubmit(event) {
@@ -282,7 +152,6 @@ window.Auth = {
 
     setupLogo();
     setupPasswordToggle();
-    setupBackendConfig();
 
     form.addEventListener('submit', handleLoginSubmit);
   }
