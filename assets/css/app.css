@@ -59,6 +59,11 @@ img {
   display: block;
 }
 
+.screen.active.splash-screen,
+.screen.active.login-page {
+  display: flex;
+}
+
 /* =========================
    SPLASH
 ========================= */
