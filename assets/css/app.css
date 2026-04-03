@@ -1565,3 +1565,137 @@ textarea {
     grid-template-columns: 1fr;
   }
 }
+
+/* =========================================
+   HEADER ACTION SPLIT
+========================================= */
+
+.topbar-actions-split {
+  width: min(100%, 980px);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.topbar-actions-left,
+.topbar-actions-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.topbar-actions-left .btn,
+.topbar-actions-right .btn,
+.topbar-actions-left .badge,
+.topbar-actions-right .badge {
+  min-width: 120px;
+}
+
+.topbar-actions-left .badge {
+  min-height: 40px;
+  justify-content: center;
+}
+
+/* =========================================
+   MENU EXTRA SEJAJAR & TINGGI SERAGAM
+========================================= */
+
+.menu-grid-extra-inline {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-top: 12px;
+}
+
+.menu-grid-extra-inline .menu-card {
+  min-height: 106px;
+  height: 100%;
+}
+
+.menu-grid .menu-card,
+.menu-grid-extra-inline .menu-card {
+  min-height: 106px;
+}
+
+/* =========================================
+   FOOTER FINAL
+========================================= */
+
+.app-footer {
+  width: min(100%, 1120px);
+  margin: 18px auto 24px;
+  padding: 0 18px 10px;
+  text-align: center;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #183153;
+  font-weight: 600;
+}
+
+/* =========================================
+   TABLET
+========================================= */
+
+@media (max-width: 1024px) {
+  .menu-grid-extra-inline {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* =========================================
+   MOBILE
+========================================= */
+
+@media (max-width: 768px) {
+  .topbar-actions-split {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .topbar-actions-left,
+  .topbar-actions-right {
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .menu-grid-extra-inline {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .app-footer {
+    font-size: 13px;
+    padding: 0 14px 12px;
+  }
+}
+
+@media (max-width: 640px) {
+  .topbar-actions-left,
+  .topbar-actions-right {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .topbar-actions-left .btn,
+  .topbar-actions-right .btn,
+  .topbar-actions-left .badge,
+  .topbar-actions-right .badge {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .menu-grid-extra-inline {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .app-footer {
+    margin: 14px auto 20px;
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 420px) {
+  .menu-grid-extra-inline {
+    grid-template-columns: 1fr;
+  }
+}
