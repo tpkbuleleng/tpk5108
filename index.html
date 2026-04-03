@@ -8,7 +8,7 @@
   <title>TPK Kabupaten Buleleng</title>
 
   <link rel="manifest" href="./manifest.json" />
-  <link rel="icon" href="./assets/img/logo.png" />
+  <link rel="icon" href="./assets/img/logo-tpk.png" />
   <link rel="stylesheet" href="./assets/css/theme.css" />
   <link rel="stylesheet" href="./assets/css/app.css" />
 </head>
@@ -17,7 +17,11 @@
     <!-- SPLASH -->
     <section id="splash-screen" class="screen active splash-screen">
       <div class="splash-card">
-        <img src="./assets/img/logo.png" alt="Logo TPK" class="splash-logo" />
+        <img
+          src="./assets/img/logo-tpk.png"
+          alt="Logo TPK"
+          class="splash-logo"
+        />
         <h1>TPK KABUPATEN BULELENG</h1>
         <p class="version-text">Versi <span id="app-version">-</span></p>
         <div class="loader"></div>
@@ -27,83 +31,83 @@
 
     <!-- LOGIN -->
     <section id="login-screen" class="screen hidden login-page">
-  <section class="login-card" aria-labelledby="loginTitle">
-    <img
-      id="loginLogo"
-      class="login-logo"
-      src="./assets/img/logo-tpk.png"
-      alt="Logo TPK Kabupaten Buleleng"
-      loading="eager"
-      decoding="async"
-    >
-
-    <h1 id="loginTitle" class="login-title">Masuk Aplikasi</h1>
-
-    <p class="login-subtitle">
-      Silakan login menggunakan ID Kader dan password Anda
-    </p>
-
-    <form id="loginForm" novalidate>
-      <div class="form-group">
-        <label for="loginIdUser">ID Kader</label>
-        <input
-          id="loginIdUser"
-          name="id_user"
-          type="text"
-          autocomplete="username"
-          autocapitalize="characters"
-          spellcheck="false"
-          placeholder="Contoh: TPK10001"
-          required
+      <section class="login-card" aria-labelledby="loginTitle">
+        <img
+          id="loginLogo"
+          class="login-logo"
+          src="./assets/img/logo-tpk.png"
+          alt="Logo TPK Kabupaten Buleleng"
+          loading="eager"
+          decoding="async"
         >
-      </div>
 
-      <div class="form-group">
-        <label for="loginPassword">Password</label>
+        <h1 id="loginTitle" class="login-title">Masuk Aplikasi</h1>
 
-        <div class="password-wrap">
-          <input
-            id="loginPassword"
-            name="password"
-            type="password"
-            autocomplete="current-password"
-            spellcheck="false"
-            placeholder="Masukkan password"
-            required
-          >
+        <p class="login-subtitle">
+          Silakan login menggunakan ID Kader dan password Anda
+        </p>
+
+        <form id="loginForm" novalidate>
+          <div class="form-group">
+            <label for="loginIdUser">ID Kader</label>
+            <input
+              id="loginIdUser"
+              name="id_user"
+              type="text"
+              autocomplete="username"
+              autocapitalize="characters"
+              spellcheck="false"
+              placeholder="Contoh: TPK10001"
+              required
+            >
+          </div>
+
+          <div class="form-group">
+            <label for="loginPassword">Password</label>
+
+            <div class="password-wrap">
+              <input
+                id="loginPassword"
+                name="password"
+                type="password"
+                autocomplete="current-password"
+                spellcheck="false"
+                placeholder="Masukkan password"
+                required
+              >
+              <button
+                type="button"
+                id="togglePasswordBtn"
+                class="password-toggle-btn"
+                aria-label="Lihat password"
+                title="Lihat password"
+              >
+                👁
+              </button>
+            </div>
+
+            <small class="input-hint">
+              Masukkan password sesuai akun yang terdaftar.
+            </small>
+          </div>
+
           <button
-            type="button"
-            id="togglePasswordBtn"
-            class="password-toggle-btn"
-            aria-label="Lihat password"
-            title="Lihat password"
+            type="submit"
+            id="loginSubmitBtn"
+            class="btn btn-primary"
           >
-            👁
+            Masuk
           </button>
-        </div>
 
-        <small class="input-hint">
-          Masukkan password sesuai akun yang terdaftar.
-        </small>
-      </div>
-
-      <button
-        type="submit"
-        id="loginSubmitBtn"
-        class="btn btn-primary"
-      >
-        Masuk
-      </button>
-
-      <div
-        id="loginMessage"
-        class="login-message hidden"
-        role="alert"
-        aria-live="polite"
-      ></div>
-    </form>
-  </section>
-</section>
+          <div
+            id="loginMessage"
+            class="login-message hidden"
+            role="alert"
+            aria-live="polite"
+          ></div>
+        </form>
+      </section>
+    </section>
 
     <!-- DASHBOARD -->
     <section id="dashboard-screen" class="screen hidden">
