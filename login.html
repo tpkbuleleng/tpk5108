@@ -4,7 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Masuk - TPK Kabupaten Buleleng</title>
+
   <meta name="theme-color" content="#0b57d0">
+  <meta name="description" content="Aplikasi PWA TPK Kabupaten Buleleng">
 
   <link rel="manifest" href="manifest.json">
   <link rel="stylesheet" href="assets/css/theme.css">
@@ -12,16 +14,18 @@
 </head>
 <body>
   <main class="login-page">
-    <section class="login-card">
+    <section class="login-card" aria-labelledby="loginTitle">
       <img
         id="loginLogo"
         class="login-logo"
         src="assets/img/logo-tpk.png"
         alt="Logo TPK Kabupaten Buleleng"
+        loading="eager"
         decoding="async"
       >
 
-      <h1 class="login-title">Masuk Aplikasi</h1>
+      <h1 id="loginTitle" class="login-title">Masuk Aplikasi</h1>
+
       <p class="login-subtitle">
         Silakan login menggunakan ID Kader dan password Anda
       </p>
@@ -35,12 +39,15 @@
             name="id_user"
             placeholder="Contoh: TPK10001"
             autocomplete="username"
+            autocapitalize="characters"
+            spellcheck="false"
             required
           >
         </div>
 
         <div class="form-group">
           <label for="loginPassword">Password</label>
+
           <div class="password-wrap">
             <input
               type="password"
@@ -48,8 +55,10 @@
               name="password"
               placeholder="Masukkan password"
               autocomplete="current-password"
+              spellcheck="false"
               required
             >
+
             <button
               type="button"
               id="togglePasswordBtn"
@@ -60,16 +69,26 @@
               👁
             </button>
           </div>
+
           <small class="input-hint">
             Masukkan password sesuai akun yang terdaftar.
           </small>
         </div>
 
-        <button type="submit" id="loginSubmitBtn" class="btn btn-primary">
+        <button
+          type="submit"
+          id="loginSubmitBtn"
+          class="btn btn-primary"
+        >
           Masuk
         </button>
 
-        <div id="loginMessage" class="login-message hidden"></div>
+        <div
+          id="loginMessage"
+          class="login-message hidden"
+          role="alert"
+          aria-live="polite"
+        ></div>
       </form>
     </section>
   </main>
