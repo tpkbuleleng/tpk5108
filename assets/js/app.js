@@ -62,9 +62,12 @@
   function setText(id, value, fallback = '-') {
     const el = qs(id);
     if (!el) return;
-    const safeValue = value === undefined || value === null || String(value).trim() === ''
-      ? fallback
-      : String(value);
+
+    const safeValue =
+      value === undefined || value === null || String(value).trim() === ''
+        ? fallback
+        : String(value);
+
     el.textContent = safeValue;
   }
 
@@ -122,29 +125,18 @@
   }
 
   function renderProfile(profile) {
-  profile = profile || {};
+    profile = profile || {};
 
-  setText('profile-nama', profile.nama || profile.nama_user);
-  setText('profile-unsur', profile.unsur_tpk || '-');
-  setText('profile-id', profile.id_user || profile.username);
-  setText('profile-tim', profile.nomor_tim || profile.id_tim);
+    setText('profile-nama', profile.nama || profile.nama_user);
+    setText('profile-unsur', profile.unsur_tpk || '-');
+    setText('profile-id', profile.id_user || profile.username);
+    setText('profile-tim', profile.nomor_tim || profile.id_tim);
 
-  setText('profile-kecamatan', profile.kecamatan || '-');
-  setText('profile-desa', profile.desa_kelurahan || profile.desa || '-');
-  setText('profile-dusun', profile.dusun_rw || profile.dusun || '-');
+    setText('profile-kecamatan', profile.kecamatan || '-');
+    setText('profile-desa', profile.desa_kelurahan || profile.desa || '-');
+    setText('profile-dusun', profile.dusun_rw || profile.dusun || '-');
+  }
 
-  // opsional, kalau elemen lama masih ada
-  setText(
-    'profile-wilayah',
-    profile.wilayah_tugas ||
-    profile.wilayah ||
-    [
-      profile.kecamatan,
-      profile.desa_kelurahan || profile.desa,
-      profile.dusun_rw || profile.dusun
-    ].filter(Boolean).join(', ')
-  );
-}
   function renderMenu(profile) {
     if (!window.Menu || typeof window.Menu.render !== 'function') return;
 
@@ -186,45 +178,52 @@
         window.location.href = 'index.html';
       });
     }
+
+    const syncBtn = qs('btn-sync-now');
+    if (syncBtn) {
+      syncBtn.addEventListener('click', function () {
+        alert('Fitur sinkronisasi akan disambungkan pada tahap berikutnya.');
+      });
+    }
   }
 
   async function loadDashboardData() {
-  let profile = getProfileFromStorage() || {};
+    let profile = getProfileFromStorage() || {};
 
-  if (window.DashboardService?.getMyProfile) {
-    try {
-      const profileResult = await window.DashboardService.getMyProfile();
-      if (profileResult?.ok && profileResult?.data) {
-        profile = profileResult.data.profile || profileResult.data || profile;
+    if (window.DashboardService?.getMyProfile) {
+      try {
+        const profileResult = await window.DashboardService.getMyProfile();
+        if (profileResult?.ok && profileResult?.data) {
+          profile = profileResult.data.profile || profileResult.data || profile;
 
-        const keys = getStorageKeys();
-        localStorage.setItem(
-          keys.PROFILE || 'tpk_profile',
-          JSON.stringify(profile)
-        );
+          const keys = getStorageKeys();
+          localStorage.setItem(
+            keys.PROFILE || 'tpk_profile',
+            JSON.stringify(profile)
+          );
+        }
+      } catch (err) {
+        console.warn('GET_PROFILE_FAILED', err);
       }
-    } catch (err) {
-      console.warn('GET_PROFILE_FAILED', err);
+    }
+
+    renderProfile(profile || {});
+    renderMenu(profile || {});
+    setNetworkBadge();
+
+    if (window.DashboardService?.getDashboardSummary) {
+      try {
+        const summaryResult = await window.DashboardService.getDashboardSummary('');
+        if (summaryResult?.ok) {
+          renderDashboardSummary(summaryResult.data || {});
+        } else {
+          console.warn('GET_DASHBOARD_SUMMARY_FAILED', summaryResult);
+        }
+      } catch (err) {
+        console.warn('GET_DASHBOARD_SUMMARY_FAILED', err);
+      }
     }
   }
-
-  renderProfile(profile || {});
-  renderMenu(profile || {});
-  setNetworkBadge();
-
-  if (window.DashboardService?.getDashboardSummary) {
-    try {
-      const summaryResult = await window.DashboardService.getDashboardSummary('');
-      if (summaryResult?.ok) {
-        renderDashboardSummary(summaryResult.data || {});
-      } else {
-        console.warn('GET_DASHBOARD_SUMMARY_FAILED', summaryResult);
-      }
-    } catch (err) {
-      console.warn('GET_DASHBOARD_SUMMARY_FAILED', err);
-    }
-  }
-}
 
   async function delay(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
