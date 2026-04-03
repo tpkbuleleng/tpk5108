@@ -111,11 +111,18 @@
   }
 
   function fillAppVersion() {
-    const versionNode = qs('app-version');
-    if (versionNode) {
-      versionNode.textContent = window.APP_CONFIG?.APP_VERSION || '-';
-    }
+  const appVersion = window.APP_CONFIG?.APP_VERSION || '-';
+
+  const versionNode = qs('app-version');
+  if (versionNode) {
+    versionNode.textContent = appVersion;
   }
+
+  const footerVersionNode = qs('footer-app-version');
+  if (footerVersionNode) {
+    footerVersionNode.textContent = appVersion;
+  }
+}
 
   function setSplashStatus(text) {
     const el = qs('splash-status');
