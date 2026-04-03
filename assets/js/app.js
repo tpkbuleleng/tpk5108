@@ -132,10 +132,11 @@
     'profile-wilayah',
     profile.wilayah_tugas ||
     profile.wilayah ||
-    profile.desa_kelurahan ||
-    profile.desa ||
-    profile.kecamatan ||
-    profile.id_kecamatan
+    [
+      profile.kecamatan,
+      profile.desa_kelurahan || profile.desa,
+      profile.dusun_rw || profile.dusun
+    ].filter(Boolean).join(', ')
   );
 }
   function renderMenu(profile) {
