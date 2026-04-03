@@ -4,7 +4,7 @@ window.APP_CONFIG = {
 
   API_BASE_URL: 'https://script.google.com/macros/s/AKfycbwZiCcv7MCL21R1VqlOFsx1x_Ax_8yoxVwjIumG3kVYwDSQTfXX9VjQnz2GsAW2ItzAAQ/exec',
 
-  LOGIN_LOGO_URL: 'assets/img/logo-tpk.png',
+  LOGIN_LOGO_URL: 'assets/img/logo.png',
 
   STORAGE_KEYS: {
     SESSION_TOKEN: 'tpk_session_token',
