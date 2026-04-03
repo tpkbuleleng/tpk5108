@@ -22,9 +22,7 @@
   }
 
   function normalizeIdUser(value) {
-    return String(value || '')
-      .trim()
-      .toUpperCase();
+    return String(value || '').trim().toUpperCase();
   }
 
   function normalizePassword(value) {
@@ -95,16 +93,12 @@
 
       toggleBtn.setAttribute(
         'aria-label',
-        isPassword
-          ? 'Sembunyikan password'
-          : 'Lihat password'
+        isPassword ? 'Sembunyikan password' : 'Lihat password'
       );
 
       toggleBtn.setAttribute(
         'title',
-        isPassword
-          ? 'Sembunyikan password'
-          : 'Lihat password'
+        isPassword ? 'Sembunyikan password' : 'Lihat password'
       );
     });
   }
@@ -135,7 +129,8 @@
       return;
     }
 
-    window.location.href = 'dashboard.html';
+    // aplikasi utama memakai shell index.html
+    window.location.href = 'index.html';
   }
 
   async function submitLogin(idUser, password) {
@@ -156,18 +151,10 @@
 
     clearMessage();
 
-    const idUser = normalizeIdUser(
-      qs('loginIdUser')?.value
-    );
+    const idUser = normalizeIdUser(qs('loginIdUser')?.value);
+    const password = normalizePassword(qs('loginPassword')?.value);
 
-    const password = normalizePassword(
-      qs('loginPassword')?.value
-    );
-
-    const validationMessage = validateLoginForm(
-      idUser,
-      password
-    );
+    const validationMessage = validateLoginForm(idUser, password);
 
     if (validationMessage) {
       showMessage(validationMessage);
@@ -177,10 +164,7 @@
     try {
       setLoading(true);
 
-      const result = await submitLogin(
-        idUser,
-        password
-      );
+      const result = await submitLogin(idUser, password);
 
       console.log('LOGIN_RESULT', result);
 
@@ -201,7 +185,6 @@
       }, 500);
     } catch (error) {
       console.error('LOGIN_ERROR', error);
-
       showMessage(
         'Koneksi ke backend gagal atau respons tidak valid.'
       );
@@ -216,15 +199,8 @@
 
     setupLogo();
     setupPasswordToggle();
-
-    form.addEventListener(
-      'submit',
-      handleLoginSubmit
-    );
+    form.addEventListener('submit', handleLoginSubmit);
   }
 
-  document.addEventListener(
-    'DOMContentLoaded',
-    initLoginPage
-  );
+  document.addEventListener('DOMContentLoaded', initLoginPage);
 })();
