@@ -183,39 +183,42 @@
   }
 
   async function loadDashboardData() {
-    let profile = getProfileFromStorage();
+  let profile = getProfileFromStorage() || {};
 
-    if ((!profile || !profile.id_user) && window.DashboardService?.getMyProfile) {
-      try {
-        const profileResult = await window.DashboardService.getMyProfile();
-        if (profileResult?.ok && profileResult?.data) {
-          profile = profileResult.data.profile || profileResult.data || profile;
-          const keys = getStorageKeys();
-          localStorage.setItem(
-            keys.PROFILE || 'tpk_profile',
-            JSON.stringify(profile)
-          );
-        }
-      } catch (err) {
-        console.warn('GET_PROFILE_FAILED', err);
+  if (window.DashboardService?.getMyProfile) {
+    try {
+      const profileResult = await window.DashboardService.getMyProfile();
+      if (profileResult?.ok && profileResult?.data) {
+        profile = profileResult.data.profile || profileResult.data || profile;
+
+        const keys = getStorageKeys();
+        localStorage.setItem(
+          keys.PROFILE || 'tpk_profile',
+          JSON.stringify(profile)
+        );
       }
-    }
-
-    renderProfile(profile || {});
-    renderMenu(profile || {});
-    setNetworkBadge();
-
-    if (window.DashboardService?.getDashboardSummary) {
-      try {
-        const summaryResult = await window.DashboardService.getDashboardSummary('');
-        if (summaryResult?.ok) {
-          renderDashboardSummary(summaryResult.data || {});
-        }
-      } catch (err) {
-        console.warn('GET_DASHBOARD_SUMMARY_FAILED', err);
-      }
+    } catch (err) {
+      console.warn('GET_PROFILE_FAILED', err);
     }
   }
+
+  renderProfile(profile || {});
+  renderMenu(profile || {});
+  setNetworkBadge();
+
+  if (window.DashboardService?.getDashboardSummary) {
+    try {
+      const summaryResult = await window.DashboardService.getDashboardSummary('');
+      if (summaryResult?.ok) {
+        renderDashboardSummary(summaryResult.data || {});
+      } else {
+        console.warn('GET_DASHBOARD_SUMMARY_FAILED', summaryResult);
+      }
+    } catch (err) {
+      console.warn('GET_DASHBOARD_SUMMARY_FAILED', err);
+    }
+  }
+}
 
   async function delay(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
