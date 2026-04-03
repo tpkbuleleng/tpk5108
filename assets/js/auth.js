@@ -129,7 +129,6 @@
       return;
     }
 
-    // aplikasi utama memakai shell index.html
     window.location.href = 'index.html';
   }
 
@@ -177,7 +176,6 @@
       }
 
       saveSession(result);
-
       showMessage('Login berhasil.', 'success');
 
       setTimeout(function () {
