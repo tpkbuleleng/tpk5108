@@ -10,7 +10,11 @@
     let deviceId = localStorage.getItem(STORAGE_KEYS.DEVICE_ID);
 
     if (!deviceId) {
-      deviceId = 'WEB-' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+      deviceId =
+        'WEB-' +
+        Math.random().toString(36).slice(2, 10) +
+        Date.now().toString(36);
+
       localStorage.setItem(STORAGE_KEYS.DEVICE_ID, deviceId);
     }
 
@@ -18,7 +22,13 @@
   }
 
   function normalizeIdUser(value) {
-    return String(value || '').trim().toUpperCase();
+    return String(value || '')
+      .trim()
+      .toUpperCase();
+  }
+
+  function normalizePassword(value) {
+    return String(value || '').trim();
   }
 
   function showMessage(message, type = 'error') {
@@ -75,16 +85,26 @@
     if (!passwordInput || !toggleBtn) return;
 
     toggleBtn.addEventListener('click', function () {
-      const isPassword = passwordInput.getAttribute('type') === 'password';
+      const isPassword =
+        passwordInput.getAttribute('type') === 'password';
 
-      passwordInput.setAttribute('type', isPassword ? 'text' : 'password');
+      passwordInput.setAttribute(
+        'type',
+        isPassword ? 'text' : 'password'
+      );
+
       toggleBtn.setAttribute(
         'aria-label',
-        isPassword ? 'Sembunyikan password' : 'Lihat password'
+        isPassword
+          ? 'Sembunyikan password'
+          : 'Lihat password'
       );
+
       toggleBtn.setAttribute(
         'title',
-        isPassword ? 'Sembunyikan password' : 'Lihat password'
+        isPassword
+          ? 'Sembunyikan password'
+          : 'Lihat password'
       );
     });
   }
@@ -94,14 +114,21 @@
     const profile = data.profile || {};
 
     if (data.session_token) {
-      localStorage.setItem(STORAGE_KEYS.SESSION_TOKEN, data.session_token);
+      localStorage.setItem(
+        STORAGE_KEYS.SESSION_TOKEN,
+        data.session_token
+      );
     }
 
-    localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(profile));
+    localStorage.setItem(
+      STORAGE_KEYS.PROFILE,
+      JSON.stringify(profile)
+    );
   }
 
   function redirectAfterLogin(result) {
-    const wajibGantiPassword = !!result?.data?.wajib_ganti_password;
+    const wajibGantiPassword =
+      !!result?.data?.wajib_ganti_password;
 
     if (wajibGantiPassword) {
       window.location.href = 'change-password.html';
@@ -119,17 +146,29 @@
       app_version: CONFIG.APP_VERSION || '2.1.0'
     };
 
+    console.log('LOGIN_PAYLOAD', payload);
+
     return await window.Api.post('login', payload);
   }
 
   async function handleLoginSubmit(event) {
     event.preventDefault();
+
     clearMessage();
 
-    const idUser = normalizeIdUser(qs('loginIdUser')?.value);
-    const password = String(qs('loginPassword')?.value || '').trim();
+    const idUser = normalizeIdUser(
+      qs('loginIdUser')?.value
+    );
 
-    const validationMessage = validateLoginForm(idUser, password);
+    const password = normalizePassword(
+      qs('loginPassword')?.value
+    );
+
+    const validationMessage = validateLoginForm(
+      idUser,
+      password
+    );
+
     if (validationMessage) {
       showMessage(validationMessage);
       return;
@@ -138,22 +177,34 @@
     try {
       setLoading(true);
 
-      const result = await submitLogin(idUser, password);
+      const result = await submitLogin(
+        idUser,
+        password
+      );
+
+      console.log('LOGIN_RESULT', result);
 
       if (!result || result.ok === false) {
-        showMessage(result?.message || 'Login gagal. Periksa kembali ID dan password.');
+        showMessage(
+          result?.message ||
+            'Login gagal. Periksa kembali ID dan password.'
+        );
         return;
       }
 
       saveSession(result);
+
       showMessage('Login berhasil.', 'success');
 
       setTimeout(function () {
         redirectAfterLogin(result);
-      }, 400);
+      }, 500);
     } catch (error) {
       console.error('LOGIN_ERROR', error);
-      showMessage('Koneksi ke backend gagal atau respons tidak valid.');
+
+      showMessage(
+        'Koneksi ke backend gagal atau respons tidak valid.'
+      );
     } finally {
       setLoading(false);
     }
@@ -166,8 +217,14 @@
     setupLogo();
     setupPasswordToggle();
 
-    form.addEventListener('submit', handleLoginSubmit);
+    form.addEventListener(
+      'submit',
+      handleLoginSubmit
+    );
   }
 
-  document.addEventListener('DOMContentLoaded', initLoginPage);
+  document.addEventListener(
+    'DOMContentLoaded',
+    initLoginPage
+  );
 })();
