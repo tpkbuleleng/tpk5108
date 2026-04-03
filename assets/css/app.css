@@ -1050,3 +1050,68 @@ textarea {
     font-size: 17px;
   }
 }
+
+/* =========================================
+   BLOK KHUSUS WILAYAH TUGAS
+========================================= */
+
+.profile-grid-4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.wilayah-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.wilayah-grid strong {
+  display: block;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text);
+  word-break: break-word;
+}
+
+.wilayah-grid-span {
+  grid-column: span 2;
+}
+
+.wilayah-grid .label {
+  margin-bottom: 6px;
+}
+
+/* tablet */
+@media (max-width: 768px) {
+  .profile-grid-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .wilayah-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+}
+
+/* HP */
+@media (max-width: 640px) {
+  .profile-grid-4 {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .wilayah-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .wilayah-grid-span {
+    grid-column: span 1;
+  }
+
+  .wilayah-grid strong {
+    font-size: 17px;
+    line-height: 1.6;
+  }
+}
