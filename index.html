@@ -112,88 +112,90 @@
     <!-- DASHBOARD -->
     <section id="dashboard-screen" class="screen hidden">
       <header class="topbar topbar-dashboard topbar-dashboard-centered">
-  <div class="topbar-brand topbar-brand-centered">
-    <img src="./assets/img/logo.png" alt="Logo TPK" class="topbar-logo" />
+        <div class="topbar-brand topbar-brand-centered">
+          <img src="./assets/img/logo.png" alt="Logo TPK" class="topbar-logo" />
 
-    <div class="topbar-brand-text">
-      <h1 class="topbar-title">TPK Kabupaten Buleleng</h1>
-      <p class="topbar-subtitle">
-        Dashboard Kecamatan <span id="header-kecamatan">-</span>
-      </p>
-    </div>
-  </div>
+          <div class="topbar-brand-text">
+            <h1 class="topbar-title">TPK Kabupaten Buleleng</h1>
+            <p class="topbar-subtitle">
+              Dashboard Kecamatan <span id="header-kecamatan">-</span>
+            </p>
+          </div>
+        </div>
 
-  <div class="topbar-actions topbar-actions-centered">
-    <span id="network-badge" class="badge badge-success-soft">
-      Online
-    </span>
+        <div class="topbar-actions topbar-actions-split">
+          <div class="topbar-actions-left">
+            <span id="network-badge" class="badge badge-success-soft">
+              Online
+            </span>
 
-    <button id="btn-sync-now-header" class="btn btn-sm btn-header-sync" type="button">
-      Sinkronkan
-    </button>
+            <button id="btn-sync-now-header" class="btn btn-sm btn-header-sync" type="button">
+              Sinkronkan
+            </button>
+          </div>
 
-    <button id="btn-settings" class="btn btn-sm btn-secondary btn-header-settings" type="button">
-      Pengaturan
-    </button>
+          <div class="topbar-actions-right">
+            <button id="btn-settings" class="btn btn-sm btn-secondary btn-header-settings" type="button">
+              Pengaturan
+            </button>
 
-    <button id="btn-logout" class="btn btn-sm btn-danger" type="button">
-      Keluar
-    </button>
-  </div>
-</header>
+            <button id="btn-logout" class="btn btn-sm btn-danger" type="button">
+              Keluar
+            </button>
+          </div>
+        </div>
+      </header>
 
       <main class="page-content">
-  <footer class="app-footer">
-  <span>TPK Kabupaten Buleleng - Versi aplikasi <span id="footer-app-version">-</span></span>
-</footer>
         <!-- PROFIL PENGGUNA -->
-<section class="card card-compact">
-  <div class="section-header section-header-compact">
-    <h3>Profil Pengguna</h3>
-  </div>
+        <section class="card card-compact">
+          <div class="section-header section-header-compact">
+            <h3>Profil Pengguna</h3>
+          </div>
 
-  <div class="profile-grid profile-grid-4">
-    <div>
-      <span class="label">Nama Pengguna</span>
-      <strong id="profile-nama">-</strong>
-    </div>
+          <div class="profile-grid profile-grid-4">
+            <div>
+              <span class="label">Nama Pengguna</span>
+              <strong id="profile-nama">-</strong>
+            </div>
 
-    <div>
-      <span class="label">Unsur TPK</span>
-      <strong id="profile-unsur">-</strong>
-    </div>
+            <div>
+              <span class="label">Unsur TPK</span>
+              <strong id="profile-unsur">-</strong>
+            </div>
 
-    <div>
-      <span class="label">ID Pengguna</span>
-      <strong id="profile-id">-</strong>
-    </div>
+            <div>
+              <span class="label">ID Pengguna</span>
+              <strong id="profile-id">-</strong>
+            </div>
 
-    <div>
-      <span class="label">Nomor Tim</span>
-      <strong id="profile-tim">-</strong>
-    </div>
-  </div>
-</section>
+            <div>
+              <span class="label">Nomor Tim</span>
+              <strong id="profile-tim">-</strong>
+            </div>
+          </div>
+        </section>
 
-<!-- WILAYAH TUGAS -->
-<section class="card card-compact">
-  <div class="section-header section-header-compact">
-    <h3>Wilayah Tugas</h3>
-  </div>
+        <!-- WILAYAH TUGAS -->
+        <section class="card card-compact">
+          <div class="section-header section-header-compact">
+            <h3>Wilayah Tugas</h3>
+          </div>
 
-  <div class="wilayah-grid wilayah-grid-2">
-    <div>
-      <span class="label">Desa/Kelurahan</span>
-      <strong id="profile-desa">-</strong>
-    </div>
+          <div class="wilayah-grid wilayah-grid-2">
+            <div>
+              <span class="label">Desa/Kelurahan</span>
+              <strong id="profile-desa">-</strong>
+            </div>
 
-    <div class="wilayah-grid-span">
-      <span class="label">Dusun/RW</span>
-      <strong id="profile-dusun">-</strong>
-    </div>
-  </div>
-</section>
+            <div class="wilayah-grid-span">
+              <span class="label">Dusun/RW</span>
+              <strong id="profile-dusun">-</strong>
+            </div>
+          </div>
+        </section>
 
+        <!-- STATISTIK -->
         <section class="stats-grid">
           <article class="card stat-card">
             <span class="label">Jumlah Sasaran</span>
@@ -209,26 +211,19 @@
           </article>
         </section>
 
+        <!-- MENU UTAMA -->
         <section class="card">
           <div class="section-header">
             <h3>Menu Utama</h3>
             <p class="muted-text">Menu akan menyesuaikan hak akses pengguna</p>
           </div>
           <div id="menu-grid" class="menu-grid"></div>
-
-<div class="menu-grid menu-grid-extra menu-grid-extra-inline">
-  <button class="menu-card" id="menu-sync-inline">
-    <h4>Sinkronisasi</h4>
-    <p class="muted-text">Sinkronkan data offline</p>
-  </button>
-
-  <button class="menu-card" id="menu-bantuan">
-    <h4>Bantuan</h4>
-    <p class="muted-text">Panduan penggunaan aplikasi</p>
-  </button>
-</div>
         </section>
       </main>
+
+      <footer class="app-footer">
+        <span>TPK Kabupaten Buleleng - Versi aplikasi <span id="footer-app-version">-</span></span>
+      </footer>
     </section>
 
     <!-- DAFTAR SASARAN -->
