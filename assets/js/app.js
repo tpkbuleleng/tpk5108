@@ -122,18 +122,22 @@
   }
 
   function renderProfile(profile) {
-    profile = profile || {};
+  profile = profile || {};
 
-    setText('profile-nama', profile.nama || profile.nama_user);
-    setText('profile-role', profile.role_akses || profile.role);
-    setText('profile-id', profile.id_user || profile.username);
-    setText('profile-tim', profile.id_tim || profile.nomor_tim);
-    setText(
-      'profile-wilayah',
-      profile.dusun || profile.desa || profile.kecamatan || profile.id_kecamatan
-    );
-  }
-
+  setText('profile-nama', profile.nama || profile.nama_user);
+  setText('profile-unsur', profile.unsur_tpk || '-');
+  setText('profile-id', profile.id_user || profile.username);
+  setText('profile-tim', profile.nomor_tim || profile.id_tim);
+  setText(
+    'profile-wilayah',
+    profile.wilayah_tugas ||
+    profile.wilayah ||
+    profile.desa_kelurahan ||
+    profile.desa ||
+    profile.kecamatan ||
+    profile.id_kecamatan
+  );
+}
   function renderMenu(profile) {
     if (!window.Menu || typeof window.Menu.render !== 'function') return;
 
