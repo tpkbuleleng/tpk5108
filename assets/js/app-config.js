@@ -1,6 +1,6 @@
 window.APP_CONFIG = {
   APP_NAME: 'TPK KABUPATEN BULELENG',
-  APP_VERSION: '2.1.0',
+  APP_VERSION: '2.1.1',
 
   API_BASE_URL: 'https://script.google.com/macros/s/AKfycbwZiCcv7MCL21R1VqlOFsx1x_Ax_8yoxVwjIumG3kVYwDSQTfXX9VjQnz2GsAW2ItzAAQ/exec',
 
