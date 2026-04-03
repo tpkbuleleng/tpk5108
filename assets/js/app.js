@@ -180,6 +180,13 @@
     });
   }
 
+  const syncHeaderBtn = qs('btn-sync-now-header');
+  if (syncHeaderBtn) {
+    syncHeaderBtn.addEventListener('click', function () {
+      alert('Sinkronisasi data akan dijalankan.');
+    });
+  }
+
   const settingsBtn = qs('btn-settings');
   if (settingsBtn) {
     settingsBtn.addEventListener('click', function () {
