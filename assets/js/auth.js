@@ -47,7 +47,7 @@
     btn.textContent = isLoading ? 'Memproses...' : 'Masuk';
   }
 
-  function validateLogin(idUser, password) {
+  function validateLoginForm(idUser, password) {
     if (!idUser) {
       return 'ID Kader wajib diisi.';
     }
@@ -75,10 +75,17 @@
     if (!passwordInput || !toggleBtn) return;
 
     toggleBtn.addEventListener('click', function () {
-      const isHidden = passwordInput.type === 'password';
-      passwordInput.type = isHidden ? 'text' : 'password';
-      toggleBtn.setAttribute('aria-label', isHidden ? 'Sembunyikan password' : 'Lihat password');
-      toggleBtn.setAttribute('title', isHidden ? 'Sembunyikan password' : 'Lihat password');
+      const isPassword = passwordInput.getAttribute('type') === 'password';
+
+      passwordInput.setAttribute('type', isPassword ? 'text' : 'password');
+      toggleBtn.setAttribute(
+        'aria-label',
+        isPassword ? 'Sembunyikan password' : 'Lihat password'
+      );
+      toggleBtn.setAttribute(
+        'title',
+        isPassword ? 'Sembunyikan password' : 'Lihat password'
+      );
     });
   }
 
@@ -94,14 +101,25 @@
   }
 
   function redirectAfterLogin(result) {
-    const wajibGanti = !!result?.data?.wajib_ganti_password;
+    const wajibGantiPassword = !!result?.data?.wajib_ganti_password;
 
-    if (wajibGanti) {
+    if (wajibGantiPassword) {
       window.location.href = 'change-password.html';
       return;
     }
 
     window.location.href = 'dashboard.html';
+  }
+
+  async function submitLogin(idUser, password) {
+    const payload = {
+      id_user: idUser,
+      password: password,
+      device_id: getDeviceId(),
+      app_version: CONFIG.APP_VERSION || '2.1.0'
+    };
+
+    return await window.Api.post('login', payload);
   }
 
   async function handleLoginSubmit(event) {
@@ -111,21 +129,16 @@
     const idUser = normalizeIdUser(qs('loginIdUser')?.value);
     const password = String(qs('loginPassword')?.value || '').trim();
 
-    const validationError = validateLogin(idUser, password);
-    if (validationError) {
-      showMessage(validationError);
+    const validationMessage = validateLoginForm(idUser, password);
+    if (validationMessage) {
+      showMessage(validationMessage);
       return;
     }
 
     try {
       setLoading(true);
 
-      const result = await window.Api.post('login', {
-        id_user: idUser,
-        password: password,
-        device_id: getDeviceId(),
-        app_version: CONFIG.APP_VERSION || '2.1.0'
-      });
+      const result = await submitLogin(idUser, password);
 
       if (!result || result.ok === false) {
         showMessage(result?.message || 'Login gagal. Periksa kembali ID dan password.');
