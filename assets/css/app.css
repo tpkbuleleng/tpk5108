@@ -1017,3 +1017,36 @@ textarea {
     font-size: 20px;
   }
 }
+
+.wilayah-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.wilayah-grid strong {
+  display: block;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--text);
+  word-break: break-word;
+}
+
+.wilayah-grid-span {
+  grid-column: span 2;
+}
+
+@media (max-width: 640px) {
+  .wilayah-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .wilayah-grid-span {
+    grid-column: span 1;
+  }
+
+  .wilayah-grid strong {
+    font-size: 17px;
+  }
+}
