@@ -26,43 +26,84 @@
     </section>
 
     <!-- LOGIN -->
-    <section id="login-screen" class="screen hidden">
-      <div class="auth-card">
-        <div class="auth-header">
-          <img src="./assets/img/logo.png" alt="Logo TPK" class="auth-logo" />
-          <h2>Masuk Aplikasi</h2>
-          <p>Silakan login menggunakan ID Kader dan password Anda</p>
+    <section id="login-screen" class="screen hidden login-page">
+  <section class="login-card" aria-labelledby="loginTitle">
+    <img
+      id="loginLogo"
+      class="login-logo"
+      src="./assets/img/logo-tpk.png"
+      alt="Logo TPK Kabupaten Buleleng"
+      loading="eager"
+      decoding="async"
+    >
+
+    <h1 id="loginTitle" class="login-title">Masuk Aplikasi</h1>
+
+    <p class="login-subtitle">
+      Silakan login menggunakan ID Kader dan password Anda
+    </p>
+
+    <form id="loginForm" novalidate>
+      <div class="form-group">
+        <label for="loginIdUser">ID Kader</label>
+        <input
+          id="loginIdUser"
+          name="id_user"
+          type="text"
+          autocomplete="username"
+          autocapitalize="characters"
+          spellcheck="false"
+          placeholder="Contoh: TPK10001"
+          required
+        >
+      </div>
+
+      <div class="form-group">
+        <label for="loginPassword">Password</label>
+
+        <div class="password-wrap">
+          <input
+            id="loginPassword"
+            name="password"
+            type="password"
+            autocomplete="current-password"
+            spellcheck="false"
+            placeholder="Masukkan password"
+            required
+          >
+          <button
+            type="button"
+            id="togglePasswordBtn"
+            class="password-toggle-btn"
+            aria-label="Lihat password"
+            title="Lihat password"
+          >
+            👁
+          </button>
         </div>
 
-        <form id="login-form" novalidate>
-          <div class="form-group">
-            <label for="login-id-kader">ID Kader</label>
-            <input id="login-id-kader" name="id_kader" type="text" autocomplete="username" placeholder="Contoh: TPK10001" required />
-          </div>
-
-          <div class="form-group">
-            <label for="login-password">Password</label>
-            <div class="input-with-action">
-              <input id="login-password" name="password" type="password" inputmode="numeric" maxlength="16" autocomplete="current-password" placeholder="16 digit password" required />
-              <button type="button" id="toggle-password" class="btn-icon" aria-label="Tampilkan password">👁</button>
-            </div>
-            <small class="field-hint">Password harus 16 digit angka.</small>
-          </div>
-
-          <div class="form-group hidden" id="backend-url-group">
-            <label for="backend-url">URL Backend</label>
-            <input id="backend-url" name="backend_url" type="url" placeholder="https://script.google.com/..." />
-          </div>
-
-          <div class="form-actions">
-            <button type="submit" id="btn-login" class="btn btn-primary btn-block">Masuk</button>
-            <button type="button" id="btn-toggle-backend" class="btn btn-secondary btn-block">Pengaturan Backend</button>
-          </div>
-        </form>
-
-        <div id="login-message" class="message-box hidden"></div>
+        <small class="input-hint">
+          Masukkan password sesuai akun yang terdaftar.
+        </small>
       </div>
-    </section>
+
+      <button
+        type="submit"
+        id="loginSubmitBtn"
+        class="btn btn-primary"
+      >
+        Masuk
+      </button>
+
+      <div
+        id="loginMessage"
+        class="login-message hidden"
+        role="alert"
+        aria-live="polite"
+      ></div>
+    </form>
+  </section>
+</section>
 
     <!-- DASHBOARD -->
     <section id="dashboard-screen" class="screen hidden">
