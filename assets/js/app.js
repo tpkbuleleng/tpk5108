@@ -1,4 +1,6 @@
 (function () {
+  'use strict';
+
   console.log('app.js loaded');
 
   window.Api = {
@@ -82,6 +84,7 @@
     if (target) {
       target.classList.remove('hidden');
       target.classList.add('active');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   }
 
@@ -100,7 +103,10 @@
 
   function getProfileFromStorage() {
     const keys = getStorageKeys();
-    const raw = localStorage.getItem(keys.PROFILE || 'tpk_profile');
+    const raw =
+      localStorage.getItem(keys.PROFILE || 'tpk_profile') ||
+      localStorage.getItem('profile');
+
     if (!raw) return null;
 
     try {
@@ -110,19 +116,34 @@
     }
   }
 
+  function saveProfileToStorage(profile) {
+    try {
+      const keys = getStorageKeys();
+      localStorage.setItem(keys.PROFILE || 'tpk_profile', JSON.stringify(profile || {}));
+      localStorage.setItem('profile', JSON.stringify(profile || {}));
+    } catch (err) {
+      console.warn('SAVE_PROFILE_FAILED', err);
+    }
+  }
+
   function fillAppVersion() {
-  const appVersion = window.APP_CONFIG?.APP_VERSION || '-';
+    const appVersion = window.APP_CONFIG?.APP_VERSION || '-';
 
-  const versionNode = qs('app-version');
-  if (versionNode) {
-    versionNode.textContent = appVersion;
-  }
+    const versionNode = qs('app-version');
+    if (versionNode) {
+      versionNode.textContent = appVersion;
+    }
 
-  const footerVersionNode = qs('footer-app-version');
-  if (footerVersionNode) {
-    footerVersionNode.textContent = appVersion;
+    const footerVersionNode = qs('footer-app-version');
+    if (footerVersionNode) {
+      footerVersionNode.textContent = appVersion;
+    }
+
+    const settingsVersionNode = qs('settings-app-version');
+    if (settingsVersionNode) {
+      settingsVersionNode.textContent = appVersion;
+    }
   }
-}
 
   function setSplashStatus(text) {
     const el = qs('splash-status');
@@ -132,24 +153,48 @@
   }
 
   function renderProfile(profile) {
-  profile = profile || {};
+    profile = profile || {};
 
-  setText('profile-nama', profile.nama || profile.nama_user);
-  setText('profile-unsur', profile.unsur_tpk || '-');
-  setText('profile-id', profile.id_user || profile.username);
-  setText('profile-tim', profile.nomor_tim || profile.id_tim);
+    setText('profile-nama', profile.nama || profile.nama_user);
+    setText('profile-unsur', profile.unsur_tpk || '-');
+    setText('profile-id', profile.id_user || profile.username);
+    setText('profile-tim', profile.nomor_tim || profile.id_tim);
 
-  setText('profile-desa', profile.desa_kelurahan || profile.desa || '-');
-  setText('profile-dusun', profile.dusun_rw || profile.dusun || '-');
+    setText('profile-desa', profile.desa_kelurahan || profile.desa || '-');
+    setText('profile-dusun', profile.dusun_rw || profile.dusun || '-');
+    setText('header-kecamatan', profile.kecamatan || '-');
 
-  setText('header-kecamatan', profile.kecamatan || '-');
-}
+    syncProfileModal(profile);
+  }
+
+  function syncProfileModal(profile) {
+    profile = profile || getProfileFromStorage() || {};
+
+    setText('modal-profile-nama', profile.nama || profile.nama_user);
+    setText('modal-profile-id', profile.id_user || profile.username);
+    setText('modal-profile-unsur', profile.unsur_tpk || '-');
+    setText('modal-profile-tim', profile.nomor_tim || profile.id_tim || '-');
+    setText('modal-profile-kecamatan', profile.kecamatan || '-');
+    setText('modal-profile-desa', profile.desa_kelurahan || profile.desa || '-');
+    setText('modal-profile-dusun', profile.dusun_rw || profile.dusun || '-');
+  }
 
   function renderMenu(profile) {
-    if (!window.Menu || typeof window.Menu.render !== 'function') return;
-
     const role = profile?.role_akses || profile?.role || 'KADER';
-    window.Menu.render(role);
+
+    if (window.Menu && typeof window.Menu.renderMenu === 'function') {
+      window.Menu.renderMenu(role);
+      return;
+    }
+
+    if (window.Menu && typeof window.Menu.setRole === 'function') {
+      window.Menu.setRole(role);
+      return;
+    }
+
+    if (window.Menu && typeof window.Menu.init === 'function') {
+      window.Menu.init();
+    }
   }
 
   function renderDashboardSummary(data) {
@@ -173,48 +218,79 @@
     }
   }
 
+  function showToast(message, type) {
+    if (window.Notifier && typeof window.Notifier.show === 'function') {
+      window.Notifier.show(message, type || 'info');
+      return;
+    }
+
+    if (window.UIHelpers && typeof window.UIHelpers.showToast === 'function') {
+      window.UIHelpers.showToast(message, type || 'info');
+      return;
+    }
+
+    alert(message);
+  }
+
+  function runHeaderSync() {
+    if (window.OfflineSync && typeof window.OfflineSync.syncQueueNow === 'function') {
+      window.OfflineSync.syncQueueNow();
+      return;
+    }
+
+    if (window.SyncUI && typeof window.SyncUI.syncAll === 'function') {
+      window.SyncUI.syncAll();
+      return;
+    }
+
+    if (window.Menu && typeof window.Menu.renderMenu === 'function') {
+      // tidak perlu apa-apa, hanya fallback di bawah
+    }
+
+    showScreen('sync-screen');
+    showToast('Membuka halaman sinkronisasi.', 'info');
+  }
+
+  function openSettingsModal() {
+    if (window.App && typeof window.App.openSettingsDialog === 'function') {
+      window.App.openSettingsDialog();
+      return;
+    }
+
+    showToast('Menu pengaturan belum tersedia.', 'warning');
+  }
+
+  function logoutNow() {
+    const keys = getStorageKeys();
+    localStorage.removeItem(keys.SESSION_TOKEN || 'tpk_session_token');
+    localStorage.removeItem(keys.PROFILE || 'tpk_profile');
+    localStorage.removeItem('profile');
+    window.location.href = 'index.html';
+  }
+
   function attachGlobalUIEvents() {
-  window.addEventListener('online', setNetworkBadge);
-  window.addEventListener('offline', setNetworkBadge);
+    window.addEventListener('online', setNetworkBadge);
+    window.addEventListener('offline', setNetworkBadge);
 
-  const logoutBtn = qs('btn-logout');
-  if (logoutBtn) {
-    logoutBtn.addEventListener('click', function () {
-      const keys = getStorageKeys();
-      localStorage.removeItem(keys.SESSION_TOKEN || 'tpk_session_token');
-      localStorage.removeItem(keys.PROFILE || 'tpk_profile');
-      window.location.href = 'index.html';
-    });
-  }
+    const logoutBtn = qs('btn-logout');
+    if (logoutBtn) {
+      logoutBtn.addEventListener('click', logoutNow);
+    }
 
-  const syncHeaderBtn = qs('btn-sync-now-header');
-  if (syncHeaderBtn) {
-    syncHeaderBtn.addEventListener('click', function () {
-      alert('Sinkronisasi data akan dijalankan.');
-    });
-  }
+    const syncHeaderBtn = qs('btn-sync-now-header');
+    if (syncHeaderBtn) {
+      syncHeaderBtn.addEventListener('click', function () {
+        runHeaderSync();
+      });
+    }
 
-  const settingsBtn = qs('btn-settings');
-  if (settingsBtn) {
-    settingsBtn.addEventListener('click', function () {
-      alert('Menu pengaturan akan disambungkan pada tahap berikutnya.');
-    });
+    const settingsBtn = qs('btn-settings');
+    if (settingsBtn) {
+      settingsBtn.addEventListener('click', function () {
+        openSettingsModal();
+      });
+    }
   }
-
-  const menuSync = qs('menu-sync-inline');
-  if (menuSync) {
-    menuSync.addEventListener('click', function () {
-      alert('Sinkronisasi data akan dijalankan.');
-    });
-  }
-
-  const menuBantuan = qs('menu-bantuan');
-  if (menuBantuan) {
-    menuBantuan.addEventListener('click', function () {
-      alert('Menu bantuan akan disambungkan pada tahap berikutnya.');
-    });
-  }
-}
 
   async function loadDashboardData() {
     let profile = getProfileFromStorage() || {};
@@ -224,12 +300,7 @@
         const profileResult = await window.DashboardService.getMyProfile();
         if (profileResult?.ok && profileResult?.data) {
           profile = profileResult.data.profile || profileResult.data || profile;
-
-          const keys = getStorageKeys();
-          localStorage.setItem(
-            keys.PROFILE || 'tpk_profile',
-            JSON.stringify(profile)
-          );
+          saveProfileToStorage(profile);
         }
       } catch (err) {
         console.warn('GET_PROFILE_FAILED', err);
@@ -254,7 +325,7 @@
     }
   }
 
-  async function delay(ms) {
+  function delay(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
