@@ -56,24 +56,36 @@ window.RegistrasiForm = {
   },
 
   prefillScope() {
-    const profile = Session.getProfile() || {};
-    const selected = SasaranState.getSelected() || {};
-    const editItem = RegistrasiState.getEditItem() || {};
-    const mode = RegistrasiState.getMode();
+  const profile = Session.getProfile() || {};
+  const selected = SasaranState.getSelected() || {};
+  const editItem = RegistrasiState.getEditItem() || {};
+  const mode = RegistrasiState.getMode();
 
-    const kecamatan =
-      mode === 'edit'
-        ? (editItem.nama_kecamatan || profile.nama_kecamatan || '')
-        : (profile.nama_kecamatan || selected.nama_kecamatan || '');
+  const kecamatan =
+    mode === 'edit'
+      ? (editItem.nama_kecamatan || profile.kecamatan || profile.nama_kecamatan || '')
+      : (profile.kecamatan || profile.nama_kecamatan || selected.nama_kecamatan || '');
 
-    const desa =
-      mode === 'edit'
-        ? (editItem.nama_desa || profile.nama_desa || '')
-        : (profile.nama_desa || selected.nama_desa || '');
+  const desa =
+    mode === 'edit'
+      ? (editItem.nama_desa || editItem.desa || profile.desa || profile.nama_desa || '')
+      : (profile.desa || profile.nama_desa || selected.nama_desa || '');
 
-    UI.setValue('reg-kecamatan', kecamatan);
-    UI.setValue('reg-desa', desa);
-  },
+  const dusunRaw =
+    mode === 'edit'
+      ? (editItem.nama_dusun || editItem.dusun || profile.dusun || profile.nama_dusun || '')
+      : (profile.dusun || profile.nama_dusun || selected.nama_dusun || '');
+
+  const dusunOptions = this.parseDusunOptions(dusunRaw);
+
+  this.setSelectOptions('reg-kecamatan', kecamatan ? [kecamatan] : []);
+  this.setSelectOptions('reg-desa', desa ? [desa] : []);
+  this.setSelectOptions(
+    'reg-dusun',
+    dusunOptions.length ? dusunOptions : (dusunRaw ? [dusunRaw] : []),
+    mode === 'edit' ? (editItem.nama_dusun || editItem.dusun || '') : ''
+  );
+}
 
   fillForm(item) {
     const map = {
