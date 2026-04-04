@@ -337,3 +337,30 @@ window.RegistrasiForm = {
     }
   }
 };
+
+applyJenisRules() {
+  const jenis = document.getElementById('reg-jenis-sasaran')?.value || '';
+  const genderEl = document.getElementById('reg-jenis-kelamin');
+  const ibuGroup = document.getElementById('group-reg-nama-ibu-kandung');
+  const ibuInput = document.getElementById('reg-nama-ibu-kandung');
+
+  if (!genderEl) return;
+
+  if (jenis === 'BUMIL' || jenis === 'BUFAS') {
+    genderEl.value = 'P';
+    genderEl.disabled = true;
+  } else {
+    genderEl.disabled = false;
+  }
+
+  if (jenis === 'BADUTA') {
+    ibuGroup?.classList.remove('hidden');
+    if (ibuInput) ibuInput.required = true;
+  } else {
+    ibuGroup?.classList.add('hidden');
+    if (ibuInput) {
+      ibuInput.required = false;
+      ibuInput.value = '';
+    }
+  }
+}
