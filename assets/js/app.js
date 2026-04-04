@@ -73,27 +73,6 @@
     el.textContent = safeValue;
   }
 
-  function setInputValue(id, value) {
-    const el = qs(id);
-    if (!el) return;
-    el.value = value == null ? '' : String(value);
-  }
-
-  function showMessage(id, message, type) {
-    const el = qs(id);
-    if (!el) return;
-
-    if (!message) {
-      el.className = 'login-message hidden';
-      el.textContent = '';
-      return;
-    }
-
-    el.className = `login-message ${type || 'success'}`;
-    el.textContent = message;
-    el.classList.remove('hidden');
-  }
-
   function showScreen(screenId) {
     const screens = document.querySelectorAll('.screen');
     screens.forEach((screen) => {
@@ -152,19 +131,13 @@
     const appVersion = window.APP_CONFIG?.APP_VERSION || '-';
 
     const versionNode = qs('app-version');
-    if (versionNode) {
-      versionNode.textContent = appVersion;
-    }
+    if (versionNode) versionNode.textContent = appVersion;
 
     const footerVersionNode = qs('footer-app-version');
-    if (footerVersionNode) {
-      footerVersionNode.textContent = appVersion;
-    }
+    if (footerVersionNode) footerVersionNode.textContent = appVersion;
 
     const settingsVersionNode = qs('settings-app-version');
-    if (settingsVersionNode) {
-      settingsVersionNode.textContent = appVersion;
-    }
+    if (settingsVersionNode) settingsVersionNode.textContent = appVersion;
   }
 
   function setSplashStatus(text) {
@@ -172,6 +145,18 @@
     if (el) {
       el.textContent = text;
     }
+  }
+
+  function formatRupiah(value) {
+    const number = Number(String(value || '0').replace(/[^\d]/g, '')) || 0;
+    return 'Rp ' + number.toLocaleString('id-ID');
+  }
+
+  function normalizeYesNo(value) {
+    const raw = String(value || '').trim().toUpperCase();
+    if (raw === 'YA' || raw === 'Y' || raw === 'YES' || raw === 'TRUE' || raw === '1') return 'YA';
+    if (raw === 'TIDAK' || raw === 'NO' || raw === 'FALSE' || raw === '0') return 'TIDAK';
+    return '';
   }
 
   function syncProfileModal(profile) {
@@ -185,19 +170,22 @@
     setText('modal-profile-desa', profile.desa_kelurahan || profile.desa || profile.nama_desa || '-');
     setText('modal-profile-dusun', profile.dusun_rw || profile.dusun || profile.nama_dusun || '-');
 
-    setInputValue('profile-status-kader', profile.status_kader_tpk || '');
-    setInputValue('profile-nomor-wa', profile.nomor_wa || '');
-    setInputValue('profile-memiliki-bpjstk', profile.memiliki_bpjstk || '');
-    setInputValue('profile-mengantar-mbg', profile.mengantar_mbg_3b || '');
-    setInputValue('profile-mendapat-insentif', profile.mendapat_insentif_mbg_3b || '');
-    setInputValue(
-      'profile-insentif-per-sasaran',
-      profile.insentif_mbg_3b_per_sasaran != null
-        ? profile.insentif_mbg_3b_per_sasaran
-        : ''
-    );
+    setText('modal-profile-status-kader', profile.status_kader_tpk || '-');
+    setText('modal-profile-nomor-wa', profile.nomor_wa || '-');
+    setText('modal-profile-bpjstk', normalizeYesNo(profile.memiliki_bpjstk) || '-');
+    setText('modal-profile-mbg', normalizeYesNo(profile.mengantar_mbg_3b) || '-');
+    setText('modal-profile-mbg-insentif', normalizeYesNo(profile.mendapat_insentif_mbg_3b) || '-');
 
-    showMessage('profile-edit-message', '', '');
+    const rupiahValue =
+      profile.insentif_mbg_3b_per_sasaran ||
+      profile.insentif_mbg_3b ||
+      profile.insentif_mbg ||
+      '';
+
+    setText(
+      'modal-profile-mbg-rupiah',
+      rupiahValue ? formatRupiah(rupiahValue) : '-'
+    );
   }
 
   function renderProfile(profile) {
@@ -322,9 +310,7 @@
     if (btnBackRegistrasi) {
       btnBackRegistrasi.addEventListener('click', function () {
         try {
-          const mode =
-            window.RegistrasiState?.getMode?.() || 'create';
-
+          const mode = window.RegistrasiState?.getMode?.() || 'create';
           if (mode === 'edit') {
             showScreen('sasaran-detail-screen');
           } else {
@@ -368,129 +354,235 @@
     }
   }
 
-  function normalizeYesNo(value) {
-    const v = String(value || '').trim().toUpperCase();
-    if (v === 'YA' || v === 'Y' || v === 'TRUE' || v === '1') return 'YA';
-    if (v === 'TIDAK' || v === 'N' || v === 'FALSE' || v === '0') return 'TIDAK';
-    return '';
+  function toggleProfileEditRules() {
+    const mengantar = normalizeYesNo(qs('profile-mengantar-mbg')?.value);
+    const mendapat = normalizeYesNo(qs('profile-mendapat-insentif-mbg')?.value);
+
+    const groupInsentif = qs('group-profile-mbg-insentif');
+    const groupRupiah = qs('group-profile-insentif-rupiah');
+    const insentifSelect = qs('profile-mendapat-insentif-mbg');
+    const rupiahInput = qs('profile-insentif-rupiah');
+
+    if (!groupInsentif || !groupRupiah || !insentifSelect || !rupiahInput) return;
+
+    if (mengantar === 'YA') {
+      groupInsentif.classList.remove('hidden');
+      insentifSelect.required = true;
+    } else {
+      groupInsentif.classList.add('hidden');
+      groupRupiah.classList.add('hidden');
+      insentifSelect.required = false;
+      insentifSelect.value = '';
+      rupiahInput.required = false;
+      rupiahInput.value = '';
+      return;
+    }
+
+    if (mendapat === 'YA') {
+      groupRupiah.classList.remove('hidden');
+      rupiahInput.required = true;
+    } else {
+      groupRupiah.classList.add('hidden');
+      rupiahInput.required = false;
+      rupiahInput.value = '';
+    }
   }
 
-  function getProfileEditPayload() {
+  function setProfileFormMode(isEdit) {
+    const viewMode = qs('profile-view-mode');
+    const editMode = qs('profile-edit-mode');
+
+    if (viewMode) viewMode.classList.toggle('hidden', !!isEdit);
+    if (editMode) editMode.classList.toggle('hidden', !isEdit);
+  }
+
+  function populateProfileForm() {
+    const profile = getProfileFromStorage() || {};
+
+    const statusKader = qs('profile-status-kader');
+    const nomorWa = qs('profile-nomor-wa');
+    const memilikiBpjstk = qs('profile-memiliki-bpjstk');
+    const mengantarMbg = qs('profile-mengantar-mbg');
+    const mendapatInsentif = qs('profile-mendapat-insentif-mbg');
+    const insentifRupiah = qs('profile-insentif-rupiah');
+    const messageBox = qs('profile-edit-message');
+
+    if (statusKader) statusKader.value = String(profile.status_kader_tpk || '').toUpperCase();
+    if (nomorWa) nomorWa.value = profile.nomor_wa || '';
+    if (memilikiBpjstk) memilikiBpjstk.value = normalizeYesNo(profile.memiliki_bpjstk);
+    if (mengantarMbg) mengantarMbg.value = normalizeYesNo(profile.mengantar_mbg_3b);
+    if (mendapatInsentif) mendapatInsentif.value = normalizeYesNo(profile.mendapat_insentif_mbg_3b);
+
+    const rupiahValue =
+      profile.insentif_mbg_3b_per_sasaran ||
+      profile.insentif_mbg_3b ||
+      profile.insentif_mbg ||
+      '';
+
+    if (insentifRupiah) {
+      insentifRupiah.value = rupiahValue ? formatRupiah(rupiahValue) : '';
+    }
+
+    if (messageBox) {
+      messageBox.classList.add('hidden');
+      messageBox.textContent = '';
+      messageBox.className = 'login-message hidden';
+    }
+
+    toggleProfileEditRules();
+    setProfileFormMode(false);
+  }
+
+  function bindProfileEditEvents() {
+    const btnEdit = qs('btn-profile-edit');
+    if (btnEdit) {
+      btnEdit.addEventListener('click', function () {
+        populateProfileForm();
+        setProfileFormMode(true);
+      });
+    }
+
+    const btnCancel = qs('btn-profile-cancel-edit');
+    if (btnCancel) {
+      btnCancel.addEventListener('click', function () {
+        setProfileFormMode(false);
+      });
+    }
+
+    const mengantarMbg = qs('profile-mengantar-mbg');
+    if (mengantarMbg) {
+      mengantarMbg.addEventListener('change', toggleProfileEditRules);
+    }
+
+    const mendapatInsentif = qs('profile-mendapat-insentif-mbg');
+    if (mendapatInsentif) {
+      mendapatInsentif.addEventListener('change', toggleProfileEditRules);
+    }
+
+    const rupiahInput = qs('profile-insentif-rupiah');
+    if (rupiahInput) {
+      rupiahInput.addEventListener('input', function () {
+        const digits = String(rupiahInput.value || '').replace(/[^\d]/g, '');
+        rupiahInput.value = digits ? formatRupiah(digits) : '';
+      });
+    }
+
+    const form = qs('profile-edit-form');
+    if (form) {
+      form.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        await saveProfileEdit();
+      });
+    }
+  }
+
+  function showProfileEditMessage(message, type) {
+    const box = qs('profile-edit-message');
+    if (!box) return;
+
+    box.textContent = message || '';
+    box.className = 'login-message ' + (type || 'success');
+    box.classList.remove('hidden');
+  }
+
+  function collectProfileEditPayload() {
     const statusKader = String(qs('profile-status-kader')?.value || '').trim().toUpperCase();
     const nomorWa = String(qs('profile-nomor-wa')?.value || '').replace(/[^\d]/g, '');
-    const memilikiBpjstk = normalizeYesNo(qs('profile-memiliki-bpjstk')?.value || '');
-    const mengantarMbg = normalizeYesNo(qs('profile-mengantar-mbg')?.value || '');
-    const mendapatInsentif =
-      mengantarMbg === 'YA'
-        ? normalizeYesNo(qs('profile-mendapat-insentif')?.value || '')
-        : 'TIDAK';
-
-    const insentifRaw = String(qs('profile-insentif-per-sasaran')?.value || '').replace(/[^\d]/g, '');
+    const memilikiBpjstk = normalizeYesNo(qs('profile-memiliki-bpjstk')?.value);
+    const mengantarMbg = normalizeYesNo(qs('profile-mengantar-mbg')?.value);
+    const mendapatInsentif = normalizeYesNo(qs('profile-mendapat-insentif-mbg')?.value);
+    const insentifDigits = String(qs('profile-insentif-rupiah')?.value || '').replace(/[^\d]/g, '');
 
     return {
       status_kader_tpk: statusKader,
       nomor_wa: nomorWa,
       memiliki_bpjstk: memilikiBpjstk,
       mengantar_mbg_3b: mengantarMbg,
-      mendapat_insentif_mbg_3b: mendapatInsentif,
+      mendapat_insentif_mbg_3b: mengantarMbg === 'YA' ? mendapatInsentif : 'TIDAK',
       insentif_mbg_3b_per_sasaran:
         mengantarMbg === 'YA' && mendapatInsentif === 'YA'
-          ? Number(insentifRaw || 0)
-          : 0
+          ? insentifDigits
+          : ''
     };
   }
 
-  function validateProfileEditPayload(payload) {
-    const errors = [];
-
+  function validateProfileEdit(payload) {
     if (!payload.status_kader_tpk) {
-      errors.push('Status Kader wajib dipilih.');
+      throw new Error('Status Kader wajib dipilih.');
     }
 
     if (!payload.nomor_wa) {
-      errors.push('Nomor WA wajib diisi.');
+      throw new Error('Nomor WA wajib diisi.');
+    }
+
+    if (payload.nomor_wa.length < 10) {
+      throw new Error('Nomor WA belum valid.');
     }
 
     if (!payload.memiliki_bpjstk) {
-      errors.push('Pilihan Memiliki BPJSTK wajib diisi.');
+      throw new Error('Pilihan Memiliki BPJSTK wajib diisi.');
     }
 
     if (!payload.mengantar_mbg_3b) {
-      errors.push('Pilihan Mengantar MBG 3B wajib diisi.');
+      throw new Error('Pilihan Mengantar MBG 3B wajib diisi.');
     }
 
     if (payload.mengantar_mbg_3b === 'YA' && !payload.mendapat_insentif_mbg_3b) {
-      errors.push('Pilihan Mendapat Insentif MBG 3B wajib diisi.');
+      throw new Error('Pilihan Mendapat Insentif MBG 3B wajib diisi.');
     }
 
     if (
       payload.mengantar_mbg_3b === 'YA' &&
       payload.mendapat_insentif_mbg_3b === 'YA' &&
-      Number(payload.insentif_mbg_3b_per_sasaran || 0) <= 0
+      !payload.insentif_mbg_3b_per_sasaran
     ) {
-      errors.push('Insentif MBG 3B per sasaran wajib diisi.');
+      throw new Error('Insentif MBG 3B per sasaran wajib diisi.');
     }
-
-    return errors;
   }
 
   async function saveProfileEdit() {
-    const payload = getProfileEditPayload();
-    const errors = validateProfileEditPayload(payload);
-
-    if (errors.length) {
-      showMessage('profile-edit-message', errors[0], 'error');
-      return;
-    }
-
-    const saveBtn = qs('btn-profile-save');
-    if (saveBtn && window.UI?.setLoading) {
-      UI.setLoading('btn-profile-save', true, 'Menyimpan...');
-    }
-
-    showMessage('profile-edit-message', '', '');
+    const btnSave = qs('btn-profile-save');
+    const payload = collectProfileEditPayload();
 
     try {
-      let result = null;
+      validateProfileEdit(payload);
 
-      if (window.DashboardService && typeof window.DashboardService.updateMyProfile === 'function') {
-        result = await window.DashboardService.updateMyProfile(payload);
-      } else {
-        result = await Api.post('updateMyProfile', payload);
+      if (btnSave) {
+        btnSave.disabled = true;
+        btnSave.textContent = 'Menyimpan...';
       }
+
+      const result = await Api.post('updateMyProfile', payload);
 
       if (!result?.ok) {
         throw new Error(result?.message || 'Gagal menyimpan profil.');
       }
 
-      const currentProfile = getProfileFromStorage() || {};
-      const updatedProfile = Object.assign({}, currentProfile, payload);
+      let profile = getProfileFromStorage() || {};
+      const updated = Object.assign({}, profile, payload);
 
-      saveProfileToStorage(updatedProfile);
-      renderProfile(updatedProfile);
-
-      if (window.ProfileModalUI && typeof window.ProfileModalUI.closeEdit === 'function') {
-        window.ProfileModalUI.closeEdit();
+      if (result?.data && typeof result.data === 'object') {
+        profile = Object.assign({}, updated, result.data);
+      } else {
+        profile = updated;
       }
 
+      saveProfileToStorage(profile);
+      renderProfile(profile);
+      syncProfileModal(profile);
+      populateProfileForm();
+      setProfileFormMode(false);
+
+      showProfileEditMessage('Profil berhasil diperbarui.', 'success');
       showToast('Profil berhasil diperbarui.', 'success');
     } catch (err) {
-      showMessage('profile-edit-message', err.message || 'Gagal menyimpan profil.', 'error');
+      showProfileEditMessage(err.message || 'Gagal menyimpan profil.', 'error');
+      showToast(err.message || 'Gagal menyimpan profil.', 'warn');
     } finally {
-      if (saveBtn && window.UI?.setLoading) {
-        UI.setLoading('btn-profile-save', false);
+      if (btnSave) {
+        btnSave.disabled = false;
+        btnSave.textContent = 'Simpan Perubahan';
       }
-    }
-  }
-
-  function bindProfileSaveHandler() {
-    const profileForm = qs('profile-edit-form');
-    if (profileForm && !profileForm.dataset.bound) {
-      profileForm.dataset.bound = '1';
-      profileForm.addEventListener('submit', async function (e) {
-        e.preventDefault();
-        await saveProfileEdit();
-      });
     }
   }
 
@@ -542,4 +634,67 @@
 
       await delay(1200);
 
-      if (hasSession
+      if (hasSessionToken()) {
+        setSplashStatus('Membuka dashboard...');
+        await delay(300);
+        showScreen('dashboard-screen');
+        await loadDashboardData();
+        return;
+      }
+
+      setSplashStatus('Membuka halaman login...');
+      await delay(250);
+      showScreen('login-screen');
+    } catch (error) {
+      console.error('BOOTSTRAP_ERROR', error);
+      setSplashStatus('Gagal memulai aplikasi');
+      await delay(800);
+      showScreen('login-screen');
+    }
+  }
+
+  function registerServiceWorker() {
+    if (!('serviceWorker' in navigator)) return;
+
+    window.addEventListener('load', async function () {
+      try {
+        await navigator.serviceWorker.register('./sw.js');
+        console.log('Service worker registered');
+      } catch (err) {
+        console.warn('Service worker gagal didaftarkan:', err);
+      }
+    });
+  }
+
+  function exposeAppHooks() {
+    if (!window.App) window.App = {};
+
+    window.App.populateProfileForm = populateProfileForm;
+    window.App.openProfileDialog = function () {
+      syncProfileModal();
+      populateProfileForm();
+      const modal = qs('profile-modal');
+      if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('active');
+      }
+    };
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    try {
+      registerServiceWorker();
+      attachGlobalUIEvents();
+      bindBackButtons();
+      bindProfileEditEvents();
+      exposeAppHooks();
+      bootstrapApp();
+    } catch (err) {
+      console.error('APP_INIT_ERROR', err);
+      setSplashStatus('Terjadi kendala saat memulai aplikasi');
+      setTimeout(function () {
+        showScreen('login-screen');
+      }, 500);
+    }
+  });
+})();
