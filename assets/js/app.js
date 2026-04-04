@@ -290,7 +290,42 @@
         openSettingsModal();
       });
     }
+  function bindBackButtons() {
+  const map = [
+    ['btn-back-dashboard-from-list', 'dashboard-screen'],
+    ['btn-back-list-from-detail', 'sasaran-list-screen'],
+    ['btn-back-from-sync', 'dashboard-screen'],
+    ['btn-back-from-rekap', 'dashboard-screen']
+  ];
+
+  map.forEach(([btnId, targetScreen]) => {
+    const btn = qs(btnId);
+    if (!btn) return;
+
+    btn.addEventListener('click', function () {
+      showScreen(targetScreen);
+    });
+  });
+
+  const btnBackRegistrasi = qs('btn-back-from-registrasi');
+  if (btnBackRegistrasi) {
+    btnBackRegistrasi.addEventListener('click', function () {
+      const mode = window.RegistrasiState?.getMode?.() || 'create';
+      if (mode === 'edit') {
+        showScreen('sasaran-detail-screen');
+      } else {
+        showScreen('dashboard-screen');
+      }
+    });
   }
+
+  const btnBackPendampingan = qs('btn-back-from-pendampingan');
+  if (btnBackPendampingan) {
+    btnBackPendampingan.addEventListener('click', function () {
+      showScreen('sasaran-detail-screen');
+    });
+  }
+}
 
   async function loadDashboardData() {
     let profile = getProfileFromStorage() || {};
