@@ -29,8 +29,8 @@
     }
 
     .modal-panel {
-      width: min(100%, 560px);
-      max-height: min(88vh, 820px);
+      width: min(100%, 620px);
+      max-height: min(90vh, 860px);
       overflow-y: auto;
       background: var(--surface);
       border: 1px solid var(--border);
@@ -132,6 +132,17 @@
       word-break: break-word;
     }
 
+    .profile-form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px 14px;
+      margin-top: 10px;
+    }
+
+    .profile-form-grid .form-group-span-2 {
+      grid-column: span 2;
+    }
+
     .help-list {
       margin: 10px 0 0;
       padding-left: 18px;
@@ -156,6 +167,24 @@
       font-size: 116%;
     }
 
+    .currency-input-wrap {
+      position: relative;
+    }
+
+    .currency-prefix {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--muted);
+      font-weight: 700;
+      pointer-events: none;
+    }
+
+    .currency-input-wrap input {
+      padding-left: 42px !important;
+    }
+
     @media (max-width: 640px) {
       .modal-panel {
         width: 100%;
@@ -163,8 +192,13 @@
         border-radius: 18px;
       }
 
-      .profile-mini-grid {
+      .profile-mini-grid,
+      .profile-form-grid {
         grid-template-columns: 1fr;
+      }
+
+      .profile-form-grid .form-group-span-2 {
+        grid-column: span 1;
       }
 
       .setting-actions,
@@ -310,7 +344,6 @@
       </header>
 
       <main class="page-content">
-        <!-- PROFIL PENGGUNA -->
         <section class="card card-compact">
           <div class="section-header section-header-compact">
             <h3>Profil Pengguna</h3>
@@ -339,7 +372,6 @@
           </div>
         </section>
 
-        <!-- WILAYAH TUGAS -->
         <section class="card card-compact">
           <div class="section-header section-header-compact">
             <h3>Wilayah Tugas</h3>
@@ -358,7 +390,6 @@
           </div>
         </section>
 
-        <!-- STATISTIK -->
         <section class="stats-grid">
           <article class="card stat-card">
             <span class="label">Jumlah Sasaran</span>
@@ -376,7 +407,6 @@
           </article>
         </section>
 
-        <!-- MENU UTAMA -->
         <section class="card card-compact">
           <div class="section-header section-header-compact">
             <h3>Menu Utama</h3>
@@ -568,8 +598,8 @@
               </div>
 
               <div class="form-group hidden" id="group-reg-nama-ibu-kandung">
-              <label for="reg-nama-ibu-kandung">Nama Ibu Kandung *</label>
-              <input id="reg-nama-ibu-kandung" name="nama_ibu_kandung" type="text" placeholder="Masukkan nama ibu kandung" />
+                <label for="reg-nama-ibu-kandung">Nama Ibu Kandung *</label>
+                <input id="reg-nama-ibu-kandung" name="nama_ibu_kandung" type="text" placeholder="Masukkan nama ibu kandung" />
               </div>
 
               <div class="form-group">
@@ -607,17 +637,17 @@
               <div class="form-group">
                 <label for="reg-kecamatan">Kecamatan *</label>
                 <select id="reg-kecamatan" name="nama_kecamatan" required></select>
-            </div>
+              </div>
 
               <div class="form-group">
-              <label for="reg-desa">Desa/Kelurahan *</label>
-              <select id="reg-desa" name="nama_desa" required></select>
-            </div>
+                <label for="reg-desa">Desa/Kelurahan *</label>
+                <select id="reg-desa" name="nama_desa" required></select>
+              </div>
 
               <div class="form-group">
-              <label for="reg-dusun">Dusun/RW *</label>
-              <select id="reg-dusun" name="nama_dusun" required></select>
-            </div>
+                <label for="reg-dusun">Dusun/RW *</label>
+                <select id="reg-dusun" name="nama_dusun" required></select>
+              </div>
 
               <div class="form-group form-group-span-2">
                 <label for="reg-alamat">Alamat Lengkap</label>
@@ -976,25 +1006,108 @@
 
       <div class="modal-body">
         <section class="profile-group">
-          <h4>Informasi Dasar</h4>
-          <div class="profile-mini-grid">
+          <div class="row-between">
             <div>
-              <span class="label">Nama Pengguna</span>
-              <strong id="modal-profile-nama">-</strong>
+              <h4>Informasi Dasar</h4>
             </div>
-            <div>
-              <span class="label">ID Pengguna</span>
-              <strong id="modal-profile-id">-</strong>
-            </div>
-            <div>
-              <span class="label">Unsur TPK</span>
-              <strong id="modal-profile-unsur">-</strong>
-            </div>
-            <div>
-              <span class="label">Nomor Tim</span>
-              <strong id="modal-profile-tim">-</strong>
+            <div class="section-actions" style="margin-top:0;">
+              <button type="button" class="btn btn-secondary btn-sm" id="btn-profile-edit-toggle">Edit Profil</button>
             </div>
           </div>
+
+          <div id="profile-view-section">
+            <div class="profile-mini-grid">
+              <div>
+                <span class="label">Nama Pengguna</span>
+                <strong id="modal-profile-nama">-</strong>
+              </div>
+              <div>
+                <span class="label">ID Pengguna</span>
+                <strong id="modal-profile-id">-</strong>
+              </div>
+              <div>
+                <span class="label">Unsur TPK</span>
+                <strong id="modal-profile-unsur">-</strong>
+              </div>
+              <div>
+                <span class="label">Nomor Tim</span>
+                <strong id="modal-profile-tim">-</strong>
+              </div>
+            </div>
+          </div>
+
+          <form id="profile-edit-form" class="hidden" novalidate>
+            <div class="profile-form-grid">
+              <div class="form-group">
+                <label for="profile-status-kader">Status Kader *</label>
+                <select id="profile-status-kader" name="status_kader_tpk" required>
+                  <option value="">Pilih status kader</option>
+                  <option value="BARU">Baru</option>
+                  <option value="LAMA">Lama</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label for="profile-nomor-wa">Nomor WA *</label>
+                <input
+                  id="profile-nomor-wa"
+                  name="nomor_wa"
+                  type="text"
+                  inputmode="numeric"
+                  placeholder="Contoh: 081234567890"
+                  required
+                />
+              </div>
+
+              <div class="form-group">
+                <label for="profile-memiliki-bpjstk">Memiliki BPJSTK *</label>
+                <select id="profile-memiliki-bpjstk" name="memiliki_bpjstk" required>
+                  <option value="">Pilih jawaban</option>
+                  <option value="YA">Ya</option>
+                  <option value="TIDAK">Tidak</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label for="profile-mengantar-mbg">Mengantar MBG 3B *</label>
+                <select id="profile-mengantar-mbg" name="mengantar_mbg_3b" required>
+                  <option value="">Pilih jawaban</option>
+                  <option value="YA">Ya</option>
+                  <option value="TIDAK">Tidak</option>
+                </select>
+              </div>
+
+              <div class="form-group hidden" id="group-profile-insentif-status">
+                <label for="profile-mendapat-insentif">Mendapat Insentif Pengantaran MBG 3B *</label>
+                <select id="profile-mendapat-insentif" name="mendapat_insentif_mbg_3b">
+                  <option value="">Pilih jawaban</option>
+                  <option value="YA">Ya</option>
+                  <option value="TIDAK">Tidak</option>
+                </select>
+              </div>
+
+              <div class="form-group hidden" id="group-profile-insentif-nilai">
+                <label for="profile-insentif-per-sasaran">Insentif MBG 3B per Sasaran dalam setiap Pengantaran *</label>
+                <div class="currency-input-wrap">
+                  <span class="currency-prefix">Rp</span>
+                  <input
+                    id="profile-insentif-per-sasaran"
+                    name="insentif_mbg_3b_per_sasaran"
+                    type="text"
+                    inputmode="numeric"
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div id="profile-edit-message" class="login-message hidden" role="alert" aria-live="polite"></div>
+
+            <div class="modal-actions">
+              <button type="button" class="btn btn-secondary" id="btn-profile-cancel-edit">Batal</button>
+              <button type="submit" class="btn btn-primary" id="btn-profile-save">Simpan Profil</button>
+            </div>
+          </form>
         </section>
 
         <section class="profile-group">
@@ -1235,6 +1348,103 @@
         });
       }
 
+      function bindProfileModalState() {
+        var mbgSelect = $('profile-mengantar-mbg');
+        var insentifSelect = $('profile-mendapat-insentif');
+        var groupStatus = $('group-profile-insentif-status');
+        var groupNilai = $('group-profile-insentif-nilai');
+        var insentifInput = $('profile-insentif-per-sasaran');
+
+        function apply() {
+          var mengantar = (mbgSelect?.value || '').toUpperCase();
+          var mendapat = (insentifSelect?.value || '').toUpperCase();
+
+          if (groupStatus) {
+            groupStatus.classList.toggle('hidden', mengantar !== 'YA');
+          }
+
+          if (groupNilai) {
+            groupNilai.classList.toggle('hidden', !(mengantar === 'YA' && mendapat === 'YA'));
+          }
+
+          if (insentifSelect) {
+            insentifSelect.required = mengantar === 'YA';
+            if (mengantar !== 'YA') insentifSelect.value = '';
+          }
+
+          if (insentifInput) {
+            insentifInput.required = mengantar === 'YA' && mendapat === 'YA';
+            if (!(mengantar === 'YA' && mendapat === 'YA')) insentifInput.value = '';
+          }
+        }
+
+        if (mbgSelect && !mbgSelect.dataset.bound) {
+          mbgSelect.dataset.bound = '1';
+          mbgSelect.addEventListener('change', apply);
+        }
+
+        if (insentifSelect && !insentifSelect.dataset.bound) {
+          insentifSelect.dataset.bound = '1';
+          insentifSelect.addEventListener('change', apply);
+        }
+
+        if (insentifInput && !insentifInput.dataset.bound) {
+          insentifInput.dataset.bound = '1';
+          insentifInput.addEventListener('input', function () {
+            var clean = String(insentifInput.value || '').replace(/[^\d]/g, '');
+            insentifInput.value = clean;
+          });
+        }
+
+        apply();
+      }
+
+      function bindProfileEditButtons() {
+        var btnToggle = $('btn-profile-edit-toggle');
+        var btnCancel = $('btn-profile-cancel-edit');
+        var viewSection = $('profile-view-section');
+        var formSection = $('profile-edit-form');
+
+        function openEdit() {
+          viewSection?.classList.add('hidden');
+          formSection?.classList.remove('hidden');
+          btnToggle.textContent = 'Edit Profil';
+          bindProfileModalState();
+        }
+
+        function closeEdit() {
+          formSection?.classList.add('hidden');
+          viewSection?.classList.remove('hidden');
+          var msg = $('profile-edit-message');
+          if (msg) {
+            msg.classList.add('hidden');
+            msg.textContent = '';
+            msg.className = 'login-message hidden';
+          }
+        }
+
+        if (btnToggle) {
+          btnToggle.addEventListener('click', function () {
+            if (formSection?.classList.contains('hidden')) {
+              openEdit();
+            } else {
+              closeEdit();
+            }
+          });
+        }
+
+        if (btnCancel) {
+          btnCancel.addEventListener('click', function () {
+            closeEdit();
+          });
+        }
+
+        window.ProfileModalUI = {
+          openEdit: openEdit,
+          closeEdit: closeEdit
+        };
+      }
+
       function bindModalButtons() {
         var btnSettings = $('btn-settings');
         if (btnSettings) {
@@ -1341,6 +1551,8 @@
         bindModalButtons();
         bindSettingsActions();
         bindKeyboardClose();
+        bindProfileModalState();
+        bindProfileEditButtons();
         exposeGlobalHooks();
       });
     })();
