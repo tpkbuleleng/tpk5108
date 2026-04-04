@@ -29,13 +29,13 @@
     }
 
     .modal-panel {
-      width: min(100%, 620px);
-      max-height: min(90vh, 860px);
+      width: min(100%, 640px);
+      max-height: min(88vh, 860px);
       overflow-y: auto;
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 20px;
-      box-shadow: var(--shadow-lg, 0 14px 36px rgba(12, 38, 76, 0.12));
+      box-shadow: 0 14px 36px rgba(12, 38, 76, 0.12);
       padding: 18px 18px 16px;
     }
 
@@ -132,14 +132,18 @@
       word-break: break-word;
     }
 
-    .profile-form-grid {
+    .profile-edit-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 12px 14px;
       margin-top: 10px;
     }
 
-    .profile-form-grid .form-group-span-2 {
+    .profile-edit-grid .form-group {
+      margin-bottom: 0;
+    }
+
+    .profile-edit-grid .span-2 {
       grid-column: span 2;
     }
 
@@ -167,24 +171,6 @@
       font-size: 116%;
     }
 
-    .currency-input-wrap {
-      position: relative;
-    }
-
-    .currency-prefix {
-      position: absolute;
-      left: 12px;
-      top: 50%;
-      transform: translateY(-50%);
-      color: var(--muted);
-      font-weight: 700;
-      pointer-events: none;
-    }
-
-    .currency-input-wrap input {
-      padding-left: 42px !important;
-    }
-
     @media (max-width: 640px) {
       .modal-panel {
         width: 100%;
@@ -193,11 +179,11 @@
       }
 
       .profile-mini-grid,
-      .profile-form-grid {
+      .profile-edit-grid {
         grid-template-columns: 1fr;
       }
 
-      .profile-form-grid .form-group-span-2 {
+      .profile-edit-grid .span-2 {
         grid-column: span 1;
       }
 
@@ -594,12 +580,23 @@
 
               <div class="form-group">
                 <label for="reg-nama-kepala-keluarga">Nama Kepala Keluarga *</label>
-                <input id="reg-nama-kepala-keluarga" name="nama_kepala_keluarga" type="text" placeholder="Masukkan nama kepala keluarga" required />
+                <input
+                  id="reg-nama-kepala-keluarga"
+                  name="nama_kepala_keluarga"
+                  type="text"
+                  placeholder="Masukkan nama kepala keluarga"
+                  required
+                />
               </div>
 
               <div class="form-group hidden" id="group-reg-nama-ibu-kandung">
                 <label for="reg-nama-ibu-kandung">Nama Ibu Kandung *</label>
-                <input id="reg-nama-ibu-kandung" name="nama_ibu_kandung" type="text" placeholder="Masukkan nama ibu kandung" />
+                <input
+                  id="reg-nama-ibu-kandung"
+                  name="nama_ibu_kandung"
+                  type="text"
+                  placeholder="Masukkan nama ibu kandung"
+                />
               </div>
 
               <div class="form-group">
@@ -651,7 +648,7 @@
 
               <div class="form-group form-group-span-2">
                 <label for="reg-alamat">Alamat Lengkap</label>
-                <textarea id="reg-alamat" name="alamat" rows="3" placeholder="Alamat rinci sasaran"></textarea>
+                <textarea id="reg-alamat" name="alamat" rows="3" placeholder="Alamat lengkap sasaran"></textarea>
               </div>
             </div>
 
@@ -1005,17 +1002,10 @@
       </div>
 
       <div class="modal-body">
-        <section class="profile-group">
-          <div class="row-between">
-            <div>
-              <h4>Informasi Dasar</h4>
-            </div>
-            <div class="section-actions" style="margin-top:0;">
-              <button type="button" class="btn btn-secondary btn-sm" id="btn-profile-edit-toggle">Edit Profil</button>
-            </div>
-          </div>
-
-          <div id="profile-view-section">
+        <!-- VIEW MODE -->
+        <div id="profile-view-mode">
+          <section class="profile-group">
+            <h4>Informasi Dasar</h4>
             <div class="profile-mini-grid">
               <div>
                 <span class="label">Nama Pengguna</span>
@@ -1034,107 +1024,136 @@
                 <strong id="modal-profile-tim">-</strong>
               </div>
             </div>
+          </section>
+
+          <section class="profile-group">
+            <h4>Wilayah Tugas</h4>
+            <div class="profile-mini-grid">
+              <div>
+                <span class="label">Kecamatan</span>
+                <strong id="modal-profile-kecamatan">-</strong>
+              </div>
+              <div>
+                <span class="label">Desa/Kelurahan</span>
+                <strong id="modal-profile-desa">-</strong>
+              </div>
+              <div style="grid-column: 1 / -1;">
+                <span class="label">Dusun/RW</span>
+                <strong id="modal-profile-dusun">-</strong>
+              </div>
+            </div>
+          </section>
+
+          <section class="profile-group">
+            <h4>Informasi Tambahan</h4>
+            <div class="profile-mini-grid">
+              <div>
+                <span class="label">Status Kader</span>
+                <strong id="modal-profile-status-kader">-</strong>
+              </div>
+              <div>
+                <span class="label">Nomor WA</span>
+                <strong id="modal-profile-nomor-wa">-</strong>
+              </div>
+              <div>
+                <span class="label">Memiliki BPJSTK</span>
+                <strong id="modal-profile-bpjstk">-</strong>
+              </div>
+              <div>
+                <span class="label">Mengantar MBG 3B</span>
+                <strong id="modal-profile-mbg">-</strong>
+              </div>
+              <div>
+                <span class="label">Mendapat Insentif MBG 3B</span>
+                <strong id="modal-profile-mbg-insentif">-</strong>
+              </div>
+              <div>
+                <span class="label">Insentif per Sasaran</span>
+                <strong id="modal-profile-mbg-rupiah">-</strong>
+              </div>
+            </div>
+          </section>
+
+          <div class="modal-actions">
+            <button type="button" class="btn btn-primary" id="btn-profile-edit">Edit Profil</button>
+            <button type="button" class="btn btn-secondary" id="btn-close-profile-bottom">Tutup</button>
           </div>
+        </div>
 
-          <form id="profile-edit-form" class="hidden" novalidate>
-            <div class="profile-form-grid">
-              <div class="form-group">
-                <label for="profile-status-kader">Status Kader *</label>
-                <select id="profile-status-kader" name="status_kader_tpk" required>
-                  <option value="">Pilih status kader</option>
-                  <option value="BARU">Baru</option>
-                  <option value="LAMA">Lama</option>
-                </select>
-              </div>
+        <!-- EDIT MODE -->
+        <div id="profile-edit-mode" class="hidden">
+          <section class="profile-group">
+            <h4>Edit Profil Kader</h4>
+            <form id="profile-edit-form" novalidate>
+              <div class="profile-edit-grid">
+                <div class="form-group">
+                  <label for="profile-status-kader">Status Kader *</label>
+                  <select id="profile-status-kader" name="status_kader_tpk" required>
+                    <option value="">Pilih status kader</option>
+                    <option value="BARU">Baru</option>
+                    <option value="LAMA">Lama</option>
+                  </select>
+                </div>
 
-              <div class="form-group">
-                <label for="profile-nomor-wa">Nomor WA *</label>
-                <input
-                  id="profile-nomor-wa"
-                  name="nomor_wa"
-                  type="text"
-                  inputmode="numeric"
-                  placeholder="Contoh: 081234567890"
-                  required
-                />
-              </div>
-
-              <div class="form-group">
-                <label for="profile-memiliki-bpjstk">Memiliki BPJSTK *</label>
-                <select id="profile-memiliki-bpjstk" name="memiliki_bpjstk" required>
-                  <option value="">Pilih jawaban</option>
-                  <option value="YA">Ya</option>
-                  <option value="TIDAK">Tidak</option>
-                </select>
-              </div>
-
-              <div class="form-group">
-                <label for="profile-mengantar-mbg">Mengantar MBG 3B *</label>
-                <select id="profile-mengantar-mbg" name="mengantar_mbg_3b" required>
-                  <option value="">Pilih jawaban</option>
-                  <option value="YA">Ya</option>
-                  <option value="TIDAK">Tidak</option>
-                </select>
-              </div>
-
-              <div class="form-group hidden" id="group-profile-insentif-status">
-                <label for="profile-mendapat-insentif">Mendapat Insentif Pengantaran MBG 3B *</label>
-                <select id="profile-mendapat-insentif" name="mendapat_insentif_mbg_3b">
-                  <option value="">Pilih jawaban</option>
-                  <option value="YA">Ya</option>
-                  <option value="TIDAK">Tidak</option>
-                </select>
-              </div>
-
-              <div class="form-group hidden" id="group-profile-insentif-nilai">
-                <label for="profile-insentif-per-sasaran">Insentif MBG 3B per Sasaran dalam setiap Pengantaran *</label>
-                <div class="currency-input-wrap">
-                  <span class="currency-prefix">Rp</span>
+                <div class="form-group">
+                  <label for="profile-nomor-wa">Nomor WA *</label>
                   <input
-                    id="profile-insentif-per-sasaran"
+                    id="profile-nomor-wa"
+                    name="nomor_wa"
+                    type="text"
+                    inputmode="numeric"
+                    placeholder="Contoh: 081234567890"
+                    required
+                  />
+                </div>
+
+                <div class="form-group">
+                  <label for="profile-memiliki-bpjstk">Memiliki BPJSTK *</label>
+                  <select id="profile-memiliki-bpjstk" name="memiliki_bpjstk" required>
+                    <option value="">Pilih jawaban</option>
+                    <option value="YA">Ya</option>
+                    <option value="TIDAK">Tidak</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label for="profile-mengantar-mbg">Mengantar MBG 3B *</label>
+                  <select id="profile-mengantar-mbg" name="mengantar_mbg_3b" required>
+                    <option value="">Pilih jawaban</option>
+                    <option value="YA">Ya</option>
+                    <option value="TIDAK">Tidak</option>
+                  </select>
+                </div>
+
+                <div class="form-group span-2 hidden" id="group-profile-mbg-insentif">
+                  <label for="profile-mendapat-insentif-mbg">Mendapat Insentif pengantaran MBG 3B *</label>
+                  <select id="profile-mendapat-insentif-mbg" name="mendapat_insentif_mbg_3b">
+                    <option value="">Pilih jawaban</option>
+                    <option value="YA">Ya</option>
+                    <option value="TIDAK">Tidak</option>
+                  </select>
+                </div>
+
+                <div class="form-group span-2 hidden" id="group-profile-insentif-rupiah">
+                  <label for="profile-insentif-rupiah">Insentif MBG 3B per Sasaran dalam setiap Pengantaran *</label>
+                  <input
+                    id="profile-insentif-rupiah"
                     name="insentif_mbg_3b_per_sasaran"
                     type="text"
                     inputmode="numeric"
-                    placeholder="0"
+                    placeholder="Contoh: Rp 2.500"
                   />
                 </div>
               </div>
-            </div>
 
-            <div id="profile-edit-message" class="login-message hidden" role="alert" aria-live="polite"></div>
+              <div id="profile-edit-message" class="login-message hidden" role="alert" aria-live="polite"></div>
 
-            <div class="modal-actions">
-              <button type="button" class="btn btn-secondary" id="btn-profile-cancel-edit">Batal</button>
-              <button type="submit" class="btn btn-primary" id="btn-profile-save">Simpan Profil</button>
-            </div>
-          </form>
-        </section>
-
-        <section class="profile-group">
-          <h4>Wilayah Tugas</h4>
-          <div class="profile-mini-grid">
-            <div>
-              <span class="label">Kecamatan</span>
-              <strong id="modal-profile-kecamatan">-</strong>
-            </div>
-            <div>
-              <span class="label">Desa/Kelurahan</span>
-              <strong id="modal-profile-desa">-</strong>
-            </div>
-            <div style="grid-column: 1 / -1;">
-              <span class="label">Dusun/RW</span>
-              <strong id="modal-profile-dusun">-</strong>
-            </div>
-          </div>
-        </section>
-
-        <section class="profile-group">
-          <h4>Keamanan</h4>
-          <p>Ganti password saat ini tetap mengikuti modul backend dan layanan sesi yang sudah aktif.</p>
-        </section>
-
-        <div class="modal-actions">
-          <button type="button" class="btn btn-secondary" id="btn-close-profile-bottom">Tutup</button>
+              <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" id="btn-profile-cancel-edit">Batal</button>
+                <button type="submit" class="btn btn-primary" id="btn-profile-save">Simpan Perubahan</button>
+              </div>
+            </form>
+          </section>
         </div>
       </div>
     </div>
@@ -1265,12 +1284,12 @@
         ['settings-modal', 'profile-modal', 'help-modal'].forEach(closeModal);
       }
 
-      function getProfileValue(id) {
+      function getText(id) {
         var el = $(id);
         return el ? (el.textContent || '-').trim() : '-';
       }
 
-      function syncProfileModal() {
+      function syncProfileModalBasic() {
         var mappings = [
           ['modal-profile-nama', 'profile-nama'],
           ['modal-profile-id', 'profile-id'],
@@ -1283,7 +1302,7 @@
 
         mappings.forEach(function (pair) {
           var target = $(pair[0]);
-          var sourceValue = getProfileValue(pair[1]);
+          var sourceValue = getText(pair[1]);
           if (target) target.textContent = sourceValue;
         });
       }
@@ -1346,103 +1365,6 @@
           applyFontSize(select.value);
           showToast('Ukuran tampilan diperbarui.', 'success');
         });
-      }
-
-      function bindProfileModalState() {
-        var mbgSelect = $('profile-mengantar-mbg');
-        var insentifSelect = $('profile-mendapat-insentif');
-        var groupStatus = $('group-profile-insentif-status');
-        var groupNilai = $('group-profile-insentif-nilai');
-        var insentifInput = $('profile-insentif-per-sasaran');
-
-        function apply() {
-          var mengantar = (mbgSelect?.value || '').toUpperCase();
-          var mendapat = (insentifSelect?.value || '').toUpperCase();
-
-          if (groupStatus) {
-            groupStatus.classList.toggle('hidden', mengantar !== 'YA');
-          }
-
-          if (groupNilai) {
-            groupNilai.classList.toggle('hidden', !(mengantar === 'YA' && mendapat === 'YA'));
-          }
-
-          if (insentifSelect) {
-            insentifSelect.required = mengantar === 'YA';
-            if (mengantar !== 'YA') insentifSelect.value = '';
-          }
-
-          if (insentifInput) {
-            insentifInput.required = mengantar === 'YA' && mendapat === 'YA';
-            if (!(mengantar === 'YA' && mendapat === 'YA')) insentifInput.value = '';
-          }
-        }
-
-        if (mbgSelect && !mbgSelect.dataset.bound) {
-          mbgSelect.dataset.bound = '1';
-          mbgSelect.addEventListener('change', apply);
-        }
-
-        if (insentifSelect && !insentifSelect.dataset.bound) {
-          insentifSelect.dataset.bound = '1';
-          insentifSelect.addEventListener('change', apply);
-        }
-
-        if (insentifInput && !insentifInput.dataset.bound) {
-          insentifInput.dataset.bound = '1';
-          insentifInput.addEventListener('input', function () {
-            var clean = String(insentifInput.value || '').replace(/[^\d]/g, '');
-            insentifInput.value = clean;
-          });
-        }
-
-        apply();
-      }
-
-      function bindProfileEditButtons() {
-        var btnToggle = $('btn-profile-edit-toggle');
-        var btnCancel = $('btn-profile-cancel-edit');
-        var viewSection = $('profile-view-section');
-        var formSection = $('profile-edit-form');
-
-        function openEdit() {
-          viewSection?.classList.add('hidden');
-          formSection?.classList.remove('hidden');
-          btnToggle.textContent = 'Edit Profil';
-          bindProfileModalState();
-        }
-
-        function closeEdit() {
-          formSection?.classList.add('hidden');
-          viewSection?.classList.remove('hidden');
-          var msg = $('profile-edit-message');
-          if (msg) {
-            msg.classList.add('hidden');
-            msg.textContent = '';
-            msg.className = 'login-message hidden';
-          }
-        }
-
-        if (btnToggle) {
-          btnToggle.addEventListener('click', function () {
-            if (formSection?.classList.contains('hidden')) {
-              openEdit();
-            } else {
-              closeEdit();
-            }
-          });
-        }
-
-        if (btnCancel) {
-          btnCancel.addEventListener('click', function () {
-            closeEdit();
-          });
-        }
-
-        window.ProfileModalUI = {
-          openEdit: openEdit,
-          closeEdit: closeEdit
-        };
       }
 
       function bindModalButtons() {
@@ -1528,7 +1450,10 @@
         if (!window.App) window.App = {};
 
         window.App.openProfileDialog = function () {
-          syncProfileModal();
+          syncProfileModalBasic();
+          if (window.App.populateProfileForm) {
+            window.App.populateProfileForm();
+          }
           openModal('profile-modal');
         };
 
@@ -1546,13 +1471,11 @@
 
       document.addEventListener('DOMContentLoaded', function () {
         syncSettingsVersion();
-        syncProfileModal();
+        syncProfileModalBasic();
         bindFontSizeSetting();
         bindModalButtons();
         bindSettingsActions();
         bindKeyboardClose();
-        bindProfileModalState();
-        bindProfileEditButtons();
         exposeGlobalHooks();
       });
     })();
