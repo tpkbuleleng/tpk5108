@@ -11,6 +11,169 @@
   <link rel="icon" href="./assets/img/logo.png" />
   <link rel="stylesheet" href="./assets/css/theme.css" />
   <link rel="stylesheet" href="./assets/css/app.css" />
+
+  <style>
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 1200;
+      background: rgba(11, 24, 45, 0.46);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 18px 14px;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .modal-panel {
+      width: min(100%, 560px);
+      max-height: min(88vh, 820px);
+      overflow-y: auto;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      box-shadow: var(--shadow-lg, 0 14px 36px rgba(12, 38, 76, 0.12));
+      padding: 18px 18px 16px;
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .modal-title-wrap h3 {
+      margin: 0 0 4px;
+      font-size: 19px;
+      line-height: 1.25;
+      color: var(--text);
+    }
+
+    .modal-title-wrap p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    .modal-close {
+      width: 40px;
+      height: 40px;
+      min-width: 40px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: #fff;
+      cursor: pointer;
+      font-size: 18px;
+      color: var(--text);
+    }
+
+    .modal-body {
+      display: grid;
+      gap: 14px;
+    }
+
+    .setting-group,
+    .help-group,
+    .profile-group {
+      border: 1px solid var(--border);
+      background: var(--surface-soft);
+      border-radius: 16px;
+      padding: 14px;
+    }
+
+    .setting-group h4,
+    .help-group h4,
+    .profile-group h4 {
+      margin: 0 0 6px;
+      font-size: 16px;
+      color: var(--text);
+      line-height: 1.3;
+    }
+
+    .setting-group p,
+    .help-group p,
+    .profile-group p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .setting-actions,
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+
+    .setting-select {
+      margin-top: 10px;
+    }
+
+    .profile-mini-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px 14px;
+      margin-top: 10px;
+    }
+
+    .profile-mini-grid strong {
+      display: block;
+      font-size: 15px;
+      line-height: 1.35;
+      color: var(--text);
+      word-break: break-word;
+    }
+
+    .help-list {
+      margin: 10px 0 0;
+      padding-left: 18px;
+      color: var(--text-soft, #38507a);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .help-list li + li {
+      margin-top: 6px;
+    }
+
+    .app-size-standard {
+      font-size: 100%;
+    }
+
+    .app-size-large {
+      font-size: 108%;
+    }
+
+    .app-size-xlarge {
+      font-size: 116%;
+    }
+
+    @media (max-width: 640px) {
+      .modal-panel {
+        width: 100%;
+        padding: 16px 14px 14px;
+        border-radius: 18px;
+      }
+
+      .profile-mini-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .setting-actions,
+      .modal-actions {
+        display: grid;
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
 </head>
 <body>
   <div id="app-shell">
@@ -742,6 +905,164 @@
 
   <div id="toast-container" class="toast-container"></div>
 
+  <!-- MODAL PENGATURAN -->
+  <div id="settings-modal" class="modal-overlay hidden" aria-hidden="true">
+    <div class="modal-panel">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <h3>Pengaturan Aplikasi</h3>
+          <p>Atur tampilan dan pembaruan aplikasi</p>
+        </div>
+        <button type="button" class="modal-close" id="btn-close-settings" aria-label="Tutup pengaturan">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <section class="setting-group">
+          <h4>Perbarui Aplikasi</h4>
+          <p>Muat ulang aplikasi untuk mengambil tampilan dan file terbaru.</p>
+          <div class="setting-actions">
+            <button type="button" class="btn btn-primary" id="btn-refresh-app">Perbarui Aplikasi</button>
+          </div>
+        </section>
+
+        <section class="setting-group">
+          <h4>Ukuran Teks</h4>
+          <p>Pilih ukuran tampilan yang paling nyaman dibaca.</p>
+          <div class="setting-select">
+            <select id="setting-font-size">
+              <option value="standard">Standar</option>
+              <option value="large">Besar</option>
+              <option value="xlarge">Sangat Besar</option>
+            </select>
+          </div>
+        </section>
+
+        <section class="setting-group">
+          <h4>Reset Cache Ringan</h4>
+          <p>Bersihkan cache ringan tampilan aplikasi tanpa menghapus draft utama.</p>
+          <div class="setting-actions">
+            <button type="button" class="btn btn-secondary" id="btn-reset-light-cache">Reset Cache Ringan</button>
+          </div>
+        </section>
+
+        <section class="setting-group">
+          <h4>Informasi Aplikasi</h4>
+          <p>Versi aplikasi saat ini: <strong id="settings-app-version">-</strong></p>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL PROFIL -->
+  <div id="profile-modal" class="modal-overlay hidden" aria-hidden="true">
+    <div class="modal-panel">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <h3>Profil Pengguna</h3>
+          <p>Informasi akun dan wilayah tugas aktif</p>
+        </div>
+        <button type="button" class="modal-close" id="btn-close-profile" aria-label="Tutup profil">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <section class="profile-group">
+          <h4>Informasi Dasar</h4>
+          <div class="profile-mini-grid">
+            <div>
+              <span class="label">Nama Pengguna</span>
+              <strong id="modal-profile-nama">-</strong>
+            </div>
+            <div>
+              <span class="label">ID Pengguna</span>
+              <strong id="modal-profile-id">-</strong>
+            </div>
+            <div>
+              <span class="label">Unsur TPK</span>
+              <strong id="modal-profile-unsur">-</strong>
+            </div>
+            <div>
+              <span class="label">Nomor Tim</span>
+              <strong id="modal-profile-tim">-</strong>
+            </div>
+          </div>
+        </section>
+
+        <section class="profile-group">
+          <h4>Wilayah Tugas</h4>
+          <div class="profile-mini-grid">
+            <div>
+              <span class="label">Kecamatan</span>
+              <strong id="modal-profile-kecamatan">-</strong>
+            </div>
+            <div>
+              <span class="label">Desa/Kelurahan</span>
+              <strong id="modal-profile-desa">-</strong>
+            </div>
+            <div style="grid-column: 1 / -1;">
+              <span class="label">Dusun/RW</span>
+              <strong id="modal-profile-dusun">-</strong>
+            </div>
+          </div>
+        </section>
+
+        <section class="profile-group">
+          <h4>Keamanan</h4>
+          <p>Ganti password saat ini tetap mengikuti modul backend dan layanan sesi yang sudah aktif.</p>
+        </section>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" id="btn-close-profile-bottom">Tutup</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL BANTUAN -->
+  <div id="help-modal" class="modal-overlay hidden" aria-hidden="true">
+    <div class="modal-panel">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <h3>Bantuan Penggunaan</h3>
+          <p>Panduan singkat penggunaan aplikasi kader</p>
+        </div>
+        <button type="button" class="modal-close" id="btn-close-help" aria-label="Tutup bantuan">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <section class="help-group">
+          <h4>Langkah Dasar</h4>
+          <ul class="help-list">
+            <li>Gunakan <strong>Registrasi Sasaran</strong> untuk menambah sasaran baru.</li>
+            <li>Gunakan <strong>Daftar Sasaran</strong> untuk melihat dan memilih sasaran.</li>
+            <li>Gunakan <strong>Lapor Pendampingan</strong> setelah memilih sasaran.</li>
+            <li>Gunakan <strong>Draft & Sinkronisasi</strong> saat bekerja offline.</li>
+          </ul>
+        </section>
+
+        <section class="help-group">
+          <h4>Saat Internet Lemah</h4>
+          <ul class="help-list">
+            <li>Data dapat disimpan sebagai draft lebih dahulu.</li>
+            <li>Saat koneksi kembali stabil, tekan <strong>Sinkronkan</strong>.</li>
+            <li>Periksa halaman <strong>Draft Offline & Sinkronisasi</strong> bila ada data yang belum terkirim.</li>
+          </ul>
+        </section>
+
+        <section class="help-group">
+          <h4>Pembaruan Aplikasi</h4>
+          <ul class="help-list">
+            <li>Buka <strong>Pengaturan</strong> lalu tekan <strong>Perbarui Aplikasi</strong>.</li>
+            <li>Gunakan <strong>Reset Cache Ringan</strong> hanya bila tampilan terasa tidak ikut berubah.</li>
+          </ul>
+        </section>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" id="btn-close-help-bottom">Tutup</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="./assets/js/app-config.js"></script>
   <script src="./assets/js/storage.js"></script>
   <script src="./assets/js/session.js"></script>
@@ -778,6 +1099,242 @@
   <script src="./assets/js/dashboard-service.js"></script>
   <script src="./assets/js/rekap-kader-service.js"></script>
   <script src="./assets/js/rekap-kader-screen.js"></script>
+
+  <script>
+    (function () {
+      'use strict';
+
+      var STORAGE_FONT_KEY = 'tpk_app_font_size';
+
+      function $(id) {
+        return document.getElementById(id);
+      }
+
+      function showToast(message, type) {
+        if (window.Notifier && typeof window.Notifier.show === 'function') {
+          window.Notifier.show(message, type || 'info');
+          return;
+        }
+        if (window.UIHelpers && typeof window.UIHelpers.showToast === 'function') {
+          window.UIHelpers.showToast(message, type || 'info');
+          return;
+        }
+        alert(message);
+      }
+
+      function openModal(modalId) {
+        var modal = $(modalId);
+        if (!modal) return;
+        modal.classList.remove('hidden');
+        modal.classList.add('active');
+        modal.setAttribute('aria-hidden', 'false');
+      }
+
+      function closeModal(modalId) {
+        var modal = $(modalId);
+        if (!modal) return;
+        modal.classList.remove('active');
+        modal.classList.add('hidden');
+        modal.setAttribute('aria-hidden', 'true');
+      }
+
+      function closeAllModals() {
+        ['settings-modal', 'profile-modal', 'help-modal'].forEach(closeModal);
+      }
+
+      function getProfileValue(id) {
+        var el = $(id);
+        return el ? (el.textContent || '-').trim() : '-';
+      }
+
+      function syncProfileModal() {
+        var mappings = [
+          ['modal-profile-nama', 'profile-nama'],
+          ['modal-profile-id', 'profile-id'],
+          ['modal-profile-unsur', 'profile-unsur'],
+          ['modal-profile-tim', 'profile-tim'],
+          ['modal-profile-desa', 'profile-desa'],
+          ['modal-profile-dusun', 'profile-dusun'],
+          ['modal-profile-kecamatan', 'header-kecamatan']
+        ];
+
+        mappings.forEach(function (pair) {
+          var target = $(pair[0]);
+          var sourceValue = getProfileValue(pair[1]);
+          if (target) target.textContent = sourceValue;
+        });
+      }
+
+      function getAppVersionText() {
+        var footer = $('footer-app-version');
+        var splash = $('app-version');
+        if (footer && footer.textContent && footer.textContent.trim() !== '-') {
+          return footer.textContent.trim();
+        }
+        if (splash && splash.textContent && splash.textContent.trim() !== '-') {
+          return splash.textContent.trim();
+        }
+        if (window.APP_CONFIG && window.APP_CONFIG.APP_VERSION) {
+          return String(window.APP_CONFIG.APP_VERSION);
+        }
+        return '-';
+      }
+
+      function syncSettingsVersion() {
+        var versionEl = $('settings-app-version');
+        if (versionEl) versionEl.textContent = getAppVersionText();
+      }
+
+      function applyFontSize(size) {
+        var body = document.body;
+        body.classList.remove('app-size-standard', 'app-size-large', 'app-size-xlarge');
+
+        if (size === 'large') {
+          body.classList.add('app-size-large');
+        } else if (size === 'xlarge') {
+          body.classList.add('app-size-xlarge');
+        } else {
+          body.classList.add('app-size-standard');
+          size = 'standard';
+        }
+
+        try {
+          localStorage.setItem(STORAGE_FONT_KEY, size);
+        } catch (e) {}
+      }
+
+      function loadSavedFontSize() {
+        try {
+          return localStorage.getItem(STORAGE_FONT_KEY) || 'standard';
+        } catch (e) {
+          return 'standard';
+        }
+      }
+
+      function bindFontSizeSetting() {
+        var select = $('setting-font-size');
+        if (!select) return;
+
+        var saved = loadSavedFontSize();
+        select.value = saved;
+        applyFontSize(saved);
+
+        select.addEventListener('change', function () {
+          applyFontSize(select.value);
+          showToast('Ukuran tampilan diperbarui.', 'success');
+        });
+      }
+
+      function bindModalButtons() {
+        var btnSettings = $('btn-settings');
+        if (btnSettings) {
+          btnSettings.addEventListener('click', function () {
+            syncSettingsVersion();
+            openModal('settings-modal');
+          });
+        }
+
+        [
+          ['btn-close-settings', 'settings-modal'],
+          ['btn-close-profile', 'profile-modal'],
+          ['btn-close-profile-bottom', 'profile-modal'],
+          ['btn-close-help', 'help-modal'],
+          ['btn-close-help-bottom', 'help-modal']
+        ].forEach(function (pair) {
+          var btn = $(pair[0]);
+          if (btn) {
+            btn.addEventListener('click', function () {
+              closeModal(pair[1]);
+            });
+          }
+        });
+
+        ['settings-modal', 'profile-modal', 'help-modal'].forEach(function (id) {
+          var modal = $(id);
+          if (!modal) return;
+          modal.addEventListener('click', function (e) {
+            if (e.target === modal) closeModal(id);
+          });
+        });
+      }
+
+      function bindSettingsActions() {
+        var btnRefresh = $('btn-refresh-app');
+        if (btnRefresh) {
+          btnRefresh.addEventListener('click', function () {
+            showToast('Memuat ulang aplikasi...', 'info');
+            setTimeout(function () {
+              window.location.reload();
+            }, 250);
+          });
+        }
+
+        var btnResetCache = $('btn-reset-light-cache');
+        if (btnResetCache) {
+          btnResetCache.addEventListener('click', async function () {
+            try {
+              if ('caches' in window) {
+                var keys = await caches.keys();
+                await Promise.all(
+                  keys.map(function (key) {
+                    if (
+                      key.indexOf('workbox') !== -1 ||
+                      key.indexOf('app-shell') !== -1 ||
+                      key.indexOf('static') !== -1 ||
+                      key.indexOf('runtime') !== -1
+                    ) {
+                      return caches.delete(key);
+                    }
+                    return Promise.resolve(false);
+                  })
+                );
+              }
+
+              showToast('Cache ringan berhasil dibersihkan.', 'success');
+            } catch (err) {
+              showToast('Reset cache ringan tidak berhasil dijalankan.', 'warning');
+            }
+          });
+        }
+      }
+
+      function bindKeyboardClose() {
+        document.addEventListener('keydown', function (e) {
+          if (e.key === 'Escape') closeAllModals();
+        });
+      }
+
+      function exposeGlobalHooks() {
+        if (!window.App) window.App = {};
+
+        window.App.openProfileDialog = function () {
+          syncProfileModal();
+          openModal('profile-modal');
+        };
+
+        window.App.openHelpDialog = function () {
+          openModal('help-modal');
+        };
+
+        window.App.openSettingsDialog = function () {
+          syncSettingsVersion();
+          openModal('settings-modal');
+        };
+
+        window.App.closeAllModals = closeAllModals;
+      }
+
+      document.addEventListener('DOMContentLoaded', function () {
+        syncSettingsVersion();
+        syncProfileModal();
+        bindFontSizeSetting();
+        bindModalButtons();
+        bindSettingsActions();
+        bindKeyboardClose();
+        exposeGlobalHooks();
+      });
+    })();
+  </script>
 
   <script src="./assets/js/app.js"></script>
 </body>
