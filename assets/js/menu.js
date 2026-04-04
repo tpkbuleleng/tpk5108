@@ -22,56 +22,64 @@ window.MenuModule = (function () {
         title: 'Registrasi Sasaran',
         description: 'Tambah sasaran baru',
         screenId: 'registrasi-screen',
-        action: 'openRegistrasi'
+        action: 'openRegistrasi',
+        icon: '📝'
       },
       {
         key: 'daftar_sasaran',
         title: 'Daftar Sasaran',
         description: 'Lihat data sasaran tim',
         screenId: 'sasaran-list-screen',
-        action: 'openSasaranList'
+        action: 'openSasaranList',
+        icon: '👥'
       },
       {
         key: 'lapor_pendampingan',
         title: 'Lapor Pendampingan',
         description: 'Input laporan pendampingan',
         screenId: 'sasaran-list-screen',
-        action: 'openPendampinganEntry'
+        action: 'openPendampinganEntry',
+        icon: '📋'
       },
       {
         key: 'draft_sinkronisasi',
         title: 'Draft & Sinkronisasi',
         description: 'Kelola draft offline',
         screenId: 'sync-screen',
-        action: 'openSyncScreen'
+        action: 'openSyncScreen',
+        icon: '🗂️'
       },
       {
         key: 'sinkronisasi',
         title: 'Sinkronisasi',
         description: 'Sinkronkan data offline',
         screenId: 'sync-screen',
-        action: 'syncNow'
+        action: 'syncNow',
+        icon: '🔄'
       },
       {
         key: 'rekap_saya',
         title: 'Rekap Saya',
         description: 'Lihat statistik kader',
         screenId: 'rekap-kader-screen',
-        action: 'openRekapKader'
+        action: 'openRekapKader',
+        icon: '📊'
       },
       {
         key: 'profil',
         title: 'Profil',
-        description: 'Lihat akun dan ganti password',
+        description: 'Lihat akun dan ubah profil',
         screenId: 'dashboard-screen',
-        action: 'openProfile'
+        action: 'openProfile',
+        icon: '👤'
       },
       {
         key: 'bantuan',
         title: 'Bantuan',
         description: 'Panduan penggunaan aplikasi',
         screenId: 'dashboard-screen',
-        action: 'openHelp'
+        action: 'openHelp',
+        icon: '❓'
       }
     ],
 
@@ -81,42 +89,48 @@ window.MenuModule = (function () {
         title: 'Daftar Sasaran',
         description: 'Lihat data sasaran wilayah',
         screenId: 'sasaran-list-screen',
-        action: 'openSasaranList'
+        action: 'openSasaranList',
+        icon: '👥'
       },
       {
         key: 'draft_sinkronisasi',
         title: 'Draft & Sinkronisasi',
         description: 'Kelola draft offline',
         screenId: 'sync-screen',
-        action: 'openSyncScreen'
+        action: 'openSyncScreen',
+        icon: '🗂️'
       },
       {
         key: 'sinkronisasi',
         title: 'Sinkronisasi',
         description: 'Sinkronkan data offline',
         screenId: 'sync-screen',
-        action: 'syncNow'
+        action: 'syncNow',
+        icon: '🔄'
       },
       {
         key: 'rekap_saya',
         title: 'Rekap Saya',
         description: 'Lihat ringkasan aktivitas',
         screenId: 'rekap-kader-screen',
-        action: 'openRekapKader'
+        action: 'openRekapKader',
+        icon: '📊'
       },
       {
         key: 'profil',
         title: 'Profil',
-        description: 'Lihat akun dan ganti password',
+        description: 'Lihat akun dan ubah profil',
         screenId: 'dashboard-screen',
-        action: 'openProfile'
+        action: 'openProfile',
+        icon: '👤'
       },
       {
         key: 'bantuan',
         title: 'Bantuan',
         description: 'Panduan penggunaan aplikasi',
         screenId: 'dashboard-screen',
-        action: 'openHelp'
+        action: 'openHelp',
+        icon: '❓'
       }
     ],
 
@@ -126,42 +140,48 @@ window.MenuModule = (function () {
         title: 'Daftar Sasaran',
         description: 'Lihat data sasaran wilayah',
         screenId: 'sasaran-list-screen',
-        action: 'openSasaranList'
+        action: 'openSasaranList',
+        icon: '👥'
       },
       {
         key: 'draft_sinkronisasi',
         title: 'Draft & Sinkronisasi',
         description: 'Kelola draft offline',
         screenId: 'sync-screen',
-        action: 'openSyncScreen'
+        action: 'openSyncScreen',
+        icon: '🗂️'
       },
       {
         key: 'sinkronisasi',
         title: 'Sinkronisasi',
         description: 'Sinkronkan data offline',
         screenId: 'sync-screen',
-        action: 'syncNow'
+        action: 'syncNow',
+        icon: '🔄'
       },
       {
         key: 'rekap_saya',
         title: 'Rekap Saya',
         description: 'Lihat ringkasan aktivitas',
         screenId: 'rekap-kader-screen',
-        action: 'openRekapKader'
+        action: 'openRekapKader',
+        icon: '📊'
       },
       {
         key: 'profil',
         title: 'Profil',
-        description: 'Lihat akun dan ganti password',
+        description: 'Lihat akun dan ubah profil',
         screenId: 'dashboard-screen',
-        action: 'openProfile'
+        action: 'openProfile',
+        icon: '👤'
       },
       {
         key: 'bantuan',
         title: 'Bantuan',
         description: 'Panduan penggunaan aplikasi',
         screenId: 'dashboard-screen',
-        action: 'openHelp'
+        action: 'openHelp',
+        icon: '❓'
       }
     ],
 
@@ -171,42 +191,99 @@ window.MenuModule = (function () {
         title: 'Daftar Sasaran',
         description: 'Lihat data sasaran wilayah',
         screenId: 'sasaran-list-screen',
-        action: 'openSasaranList'
+        action: 'openSasaranList',
+        icon: '👥'
       },
       {
         key: 'draft_sinkronisasi',
         title: 'Draft & Sinkronisasi',
         description: 'Kelola draft offline',
         screenId: 'sync-screen',
-        action: 'openSyncScreen'
+        action: 'openSyncScreen',
+        icon: '🗂️'
       },
       {
         key: 'sinkronisasi',
         title: 'Sinkronisasi',
         description: 'Sinkronkan data offline',
         screenId: 'sync-screen',
-        action: 'syncNow'
+        action: 'syncNow',
+        icon: '🔄'
       },
       {
         key: 'rekap_saya',
         title: 'Rekap Saya',
         description: 'Lihat ringkasan aktivitas',
         screenId: 'rekap-kader-screen',
-        action: 'openRekapKader'
+        action: 'openRekapKader',
+        icon: '📊'
       },
       {
         key: 'profil',
         title: 'Profil',
-        description: 'Lihat akun dan ganti password',
+        description: 'Lihat akun dan ubah profil',
         screenId: 'dashboard-screen',
-        action: 'openProfile'
+        action: 'openProfile',
+        icon: '👤'
       },
       {
         key: 'bantuan',
         title: 'Bantuan',
         description: 'Panduan penggunaan aplikasi',
         screenId: 'dashboard-screen',
-        action: 'openHelp'
+        action: 'openHelp',
+        icon: '❓'
+      }
+    ],
+
+    SUPER_ADMIN: [
+      {
+        key: 'daftar_sasaran',
+        title: 'Daftar Sasaran',
+        description: 'Lihat data sasaran wilayah',
+        screenId: 'sasaran-list-screen',
+        action: 'openSasaranList',
+        icon: '👥'
+      },
+      {
+        key: 'draft_sinkronisasi',
+        title: 'Draft & Sinkronisasi',
+        description: 'Kelola draft offline',
+        screenId: 'sync-screen',
+        action: 'openSyncScreen',
+        icon: '🗂️'
+      },
+      {
+        key: 'sinkronisasi',
+        title: 'Sinkronisasi',
+        description: 'Sinkronkan data offline',
+        screenId: 'sync-screen',
+        action: 'syncNow',
+        icon: '🔄'
+      },
+      {
+        key: 'rekap_saya',
+        title: 'Rekap Saya',
+        description: 'Lihat ringkasan aktivitas',
+        screenId: 'rekap-kader-screen',
+        action: 'openRekapKader',
+        icon: '📊'
+      },
+      {
+        key: 'profil',
+        title: 'Profil',
+        description: 'Lihat akun dan ubah profil',
+        screenId: 'dashboard-screen',
+        action: 'openProfile',
+        icon: '👤'
+      },
+      {
+        key: 'bantuan',
+        title: 'Bantuan',
+        description: 'Panduan penggunaan aplikasi',
+        screenId: 'dashboard-screen',
+        action: 'openHelp',
+        icon: '❓'
       }
     ],
 
@@ -216,28 +293,32 @@ window.MenuModule = (function () {
         title: 'Daftar Sasaran',
         description: 'Lihat data sasaran wilayah',
         screenId: 'sasaran-list-screen',
-        action: 'openSasaranList'
+        action: 'openSasaranList',
+        icon: '👥'
       },
       {
         key: 'rekap_saya',
         title: 'Rekap Saya',
         description: 'Lihat ringkasan aktivitas',
         screenId: 'rekap-kader-screen',
-        action: 'openRekapKader'
+        action: 'openRekapKader',
+        icon: '📊'
       },
       {
         key: 'profil',
         title: 'Profil',
         description: 'Lihat akun',
         screenId: 'dashboard-screen',
-        action: 'openProfile'
+        action: 'openProfile',
+        icon: '👤'
       },
       {
         key: 'bantuan',
         title: 'Bantuan',
         description: 'Panduan penggunaan aplikasi',
         screenId: 'dashboard-screen',
-        action: 'openHelp'
+        action: 'openHelp',
+        icon: '❓'
       }
     ]
   };
@@ -313,17 +394,35 @@ window.MenuModule = (function () {
       .replace(/'/g, '&#39;');
   }
 
-  function createMenuCardHtml(item) {
+  function getMenuAccentClass(index) {
+    var classes = [
+      'menu-card-accent-1',
+      'menu-card-accent-2',
+      'menu-card-accent-3',
+      'menu-card-accent-4',
+      'menu-card-accent-5',
+      'menu-card-accent-6'
+    ];
+
+    return classes[index % classes.length];
+  }
+
+  function createMenuCardHtml(item, index) {
+    var accentClass = getMenuAccentClass(index);
+
     return [
       '<button',
       ' type="button"',
-      ' class="menu-card"',
+      ' class="menu-card ', accentClass, '"',
       ' data-menu-key="', escapeHtml(item.key), '"',
       ' data-menu-action="', escapeHtml(item.action || ''), '"',
       ' data-screen-id="', escapeHtml(item.screenId || ''), '"',
       '>',
-      '<h4>', escapeHtml(item.title || '-'), '</h4>',
-      '<p>', escapeHtml(item.description || ''), '</p>',
+        '<span class="menu-card-icon" aria-hidden="true">', escapeHtml(item.icon || '•'), '</span>',
+        '<span class="menu-card-content">',
+          '<h4>', escapeHtml(item.title || '-'), '</h4>',
+          '<p>', escapeHtml(item.description || ''), '</p>',
+        '</span>',
       '</button>'
     ].join('');
   }
@@ -333,13 +432,17 @@ window.MenuModule = (function () {
     if (!container) return;
 
     var items = getMenuForRole(role);
-    container.innerHTML = items.map(createMenuCardHtml).join('');
 
-    bindMenuActions(container, items);
+    container.innerHTML = items.map(function (item, index) {
+      return createMenuCardHtml(item, index);
+    }).join('');
+
+    bindMenuActions(container);
   }
 
-  function bindMenuActions(container, items) {
+  function bindMenuActions(container) {
     var buttons = container.querySelectorAll('.menu-card');
+
     buttons.forEach(function (btn) {
       btn.addEventListener('click', function () {
         var action = btn.getAttribute('data-menu-action') || '';
@@ -375,15 +478,14 @@ window.MenuModule = (function () {
 
     target.classList.remove('hidden');
     target.classList.add('active');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    return true;
-  }
 
-  function callIfExists(obj, fnName, args) {
-    if (obj && typeof obj[fnName] === 'function') {
-      return obj[fnName].apply(obj, args || []);
+    try {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (e) {
+      window.scrollTo(0, 0);
     }
-    return undefined;
+
+    return true;
   }
 
   function showToast(message, type) {
@@ -433,10 +535,6 @@ window.MenuModule = (function () {
   }
 
   function openPendampinganEntry() {
-    /**
-     * Pendampingan idealnya dipilih dari sasaran dulu.
-     * Jadi menu ini diarahkan ke daftar sasaran.
-     */
     openSasaranList();
     showToast('Pilih sasaran terlebih dahulu untuk membuat pendampingan.', 'info');
   }
@@ -503,7 +601,7 @@ window.MenuModule = (function () {
       return;
     }
 
-    showToast('Fitur profil akan ditampilkan pada modul pengaturan/profil.', 'info');
+    showToast('Fitur profil akan ditampilkan pada modul profil.', 'info');
   }
 
   function openHelp() {
@@ -525,27 +623,35 @@ window.MenuModule = (function () {
       case 'openRegistrasi':
         openRegistrasi();
         break;
+
       case 'openSasaranList':
         openSasaranList();
         break;
+
       case 'openPendampinganEntry':
         openPendampinganEntry();
         break;
+
       case 'openSyncScreen':
         openSyncScreen();
         break;
+
       case 'syncNow':
         syncNow();
         break;
+
       case 'openRekapKader':
         openRekapKader();
         break;
+
       case 'openProfile':
         openProfile();
         break;
+
       case 'openHelp':
         openHelp();
         break;
+
       default:
         if (!showScreen(screenId)) {
           showToast('Menu belum tersedia.', 'warning');
