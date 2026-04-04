@@ -264,11 +264,31 @@ window.RegistrasiForm = {
 
     try {
       if (!navigator.onLine) {
-        DraftManager.enqueueOfflineRegistrasi(payload);
-        DraftManager.saveRegistrasiDraft(payload);
-        Notifier.show('Sedang offline. Data disimpan ke draft sinkronisasi.');
-        return;
-      }
+  DraftManager.enqueueOfflineRegistrasi(payload);
+  DraftManager.saveRegistrasiDraft(payload);
+
+  if (window.OfflineSync?.renderSummary) {
+    OfflineSync.renderSummary();
+  }
+
+  Notifier.show(
+    'Sedang offline. Registrasi disimpan ke draft sinkronisasi.'
+  );
+
+  DraftManager.clearRegistrasiDraft();
+  this.resetForm();
+  this.prefillScope();
+  this.applyModeUI();
+  this.renderValidation();
+
+  if (window.SyncScreen?.open) {
+    SyncScreen.open();
+  } else {
+    Router.toSasaranList();
+  }
+
+  return;
+}
 
       const result = mode === 'edit'
         ? await RegistrasiService.updateSasaran(payload)
