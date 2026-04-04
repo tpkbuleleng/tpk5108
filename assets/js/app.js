@@ -28,7 +28,7 @@
         formData.append('token', token);
       }
 
-      Object.keys(payload).forEach((key) => {
+      Object.keys(payload || {}).forEach((key) => {
         const value = payload[key];
 
         if (value === undefined || value === null) {
@@ -112,6 +112,7 @@
     try {
       return JSON.parse(raw);
     } catch (err) {
+      console.warn('PROFILE_PARSE_FAILED', err);
       return null;
     }
   }
@@ -152,6 +153,18 @@
     }
   }
 
+  function syncProfileModal(profile) {
+    profile = profile || getProfileFromStorage() || {};
+
+    setText('modal-profile-nama', profile.nama || profile.nama_user);
+    setText('modal-profile-id', profile.id_user || profile.username);
+    setText('modal-profile-unsur', profile.unsur_tpk || '-');
+    setText('modal-profile-tim', profile.nomor_tim || profile.id_tim || '-');
+    setText('modal-profile-kecamatan', profile.kecamatan || profile.nama_kecamatan || '-');
+    setText('modal-profile-desa', profile.desa_kelurahan || profile.desa || profile.nama_desa || '-');
+    setText('modal-profile-dusun', profile.dusun_rw || profile.dusun || profile.nama_dusun || '-');
+  }
+
   function renderProfile(profile) {
     profile = profile || {};
 
@@ -160,23 +173,12 @@
     setText('profile-id', profile.id_user || profile.username);
     setText('profile-tim', profile.nomor_tim || profile.id_tim);
 
-    setText('profile-desa', profile.desa_kelurahan || profile.desa || '-');
-    setText('profile-dusun', profile.dusun_rw || profile.dusun || '-');
-    setText('header-kecamatan', profile.kecamatan || '-');
+    setText('profile-desa', profile.desa_kelurahan || profile.desa || profile.nama_desa || '-');
+    setText('profile-dusun', profile.dusun_rw || profile.dusun || profile.nama_dusun || '-');
+
+    setText('header-kecamatan', profile.kecamatan || profile.nama_kecamatan || '-');
 
     syncProfileModal(profile);
-  }
-
-  function syncProfileModal(profile) {
-    profile = profile || getProfileFromStorage() || {};
-
-    setText('modal-profile-nama', profile.nama || profile.nama_user);
-    setText('modal-profile-id', profile.id_user || profile.username);
-    setText('modal-profile-unsur', profile.unsur_tpk || '-');
-    setText('modal-profile-tim', profile.nomor_tim || profile.id_tim || '-');
-    setText('modal-profile-kecamatan', profile.kecamatan || '-');
-    setText('modal-profile-desa', profile.desa_kelurahan || profile.desa || '-');
-    setText('modal-profile-dusun', profile.dusun_rw || profile.dusun || '-');
   }
 
   function renderMenu(profile) {
@@ -243,10 +245,6 @@
       return;
     }
 
-    if (window.Menu && typeof window.Menu.renderMenu === 'function') {
-      // tidak perlu apa-apa, hanya fallback di bawah
-    }
-
     showScreen('sync-screen');
     showToast('Membuka halaman sinkronisasi.', 'info');
   }
@@ -266,6 +264,49 @@
     localStorage.removeItem(keys.PROFILE || 'tpk_profile');
     localStorage.removeItem('profile');
     window.location.href = 'index.html';
+  }
+
+  function bindBackButtons() {
+    const directMap = [
+      ['btn-back-dashboard-from-list', 'dashboard-screen'],
+      ['btn-back-list-from-detail', 'sasaran-list-screen'],
+      ['btn-back-from-sync', 'dashboard-screen'],
+      ['btn-back-from-rekap', 'dashboard-screen']
+    ];
+
+    directMap.forEach(([btnId, targetScreen]) => {
+      const btn = qs(btnId);
+      if (!btn) return;
+
+      btn.addEventListener('click', function () {
+        showScreen(targetScreen);
+      });
+    });
+
+    const btnBackRegistrasi = qs('btn-back-from-registrasi');
+    if (btnBackRegistrasi) {
+      btnBackRegistrasi.addEventListener('click', function () {
+        try {
+          const mode =
+            window.RegistrasiState?.getMode?.() || 'create';
+
+          if (mode === 'edit') {
+            showScreen('sasaran-detail-screen');
+          } else {
+            showScreen('dashboard-screen');
+          }
+        } catch (err) {
+          showScreen('dashboard-screen');
+        }
+      });
+    }
+
+    const btnBackPendampingan = qs('btn-back-from-pendampingan');
+    if (btnBackPendampingan) {
+      btnBackPendampingan.addEventListener('click', function () {
+        showScreen('sasaran-detail-screen');
+      });
+    }
   }
 
   function attachGlobalUIEvents() {
@@ -290,42 +331,7 @@
         openSettingsModal();
       });
     }
-  function bindBackButtons() {
-  const map = [
-    ['btn-back-dashboard-from-list', 'dashboard-screen'],
-    ['btn-back-list-from-detail', 'sasaran-list-screen'],
-    ['btn-back-from-sync', 'dashboard-screen'],
-    ['btn-back-from-rekap', 'dashboard-screen']
-  ];
-
-  map.forEach(([btnId, targetScreen]) => {
-    const btn = qs(btnId);
-    if (!btn) return;
-
-    btn.addEventListener('click', function () {
-      showScreen(targetScreen);
-    });
-  });
-
-  const btnBackRegistrasi = qs('btn-back-from-registrasi');
-  if (btnBackRegistrasi) {
-    btnBackRegistrasi.addEventListener('click', function () {
-      const mode = window.RegistrasiState?.getMode?.() || 'create';
-      if (mode === 'edit') {
-        showScreen('sasaran-detail-screen');
-      } else {
-        showScreen('dashboard-screen');
-      }
-    });
   }
-
-  const btnBackPendampingan = qs('btn-back-from-pendampingan');
-  if (btnBackPendampingan) {
-    btnBackPendampingan.addEventListener('click', function () {
-      showScreen('sasaran-detail-screen');
-    });
-  }
-}
 
   async function loadDashboardData() {
     let profile = getProfileFromStorage() || {};
@@ -357,6 +363,10 @@
       } catch (err) {
         console.warn('GET_DASHBOARD_SUMMARY_FAILED', err);
       }
+    }
+
+    if (window.OfflineSync && typeof window.OfflineSync.renderSummary === 'function') {
+      window.OfflineSync.renderSummary();
     }
   }
 
@@ -404,8 +414,17 @@
   }
 
   document.addEventListener('DOMContentLoaded', function () {
-    registerServiceWorker();
-    attachGlobalUIEvents();
-    bootstrapApp();
+    try {
+      registerServiceWorker();
+      attachGlobalUIEvents();
+      bindBackButtons();
+      bootstrapApp();
+    } catch (err) {
+      console.error('APP_INIT_ERROR', err);
+      setSplashStatus('Terjadi kendala saat memulai aplikasi');
+      setTimeout(function () {
+        showScreen('login-screen');
+      }, 500);
+    }
   });
 })();
