@@ -11,8 +11,7 @@
   <link rel="icon" href="./assets/img/logo.png" />
   <link rel="stylesheet" href="./assets/css/theme.css" />
   <link rel="stylesheet" href="./assets/css/app.css" />
-
-  <script type="text/javascript" src="https://ff.kis.v2.scr.kaspersky-labs.com/FD126C42-EBFA-4E12-B309-BB3FDD723AC1/main.js?attr=Q4CU952DynQ6uKW6GS3ksbBpfqIOaovVaWpO8LL4TvKw4AE7zbLT7YxdqoKi0lqENjFy4gc4HC6__Bb_38YcgZgCPMEm3tCKVm743nML432DIG9yPEcekDHJQmS0Tcy5I39124ZODfTzT8gNS6T0PL2-Zf6qSDWauJ1hFZdvOe2vfUf-lBGT-J7y-XaphrIPi9obKmQTlmdIwK0Z-DTfULvoSHFFakI2MPH9H5fwzRUpp8GtuPGUNUcnHStJZqE4d5VxFKU7LmjuGN9k1Wczzw" charset="UTF-8"></script><style>
+<script type="text/javascript" src="https://ff.kis.v2.scr.kaspersky-labs.com/FD126C42-EBFA-4E12-B309-BB3FDD723AC1/main.js?attr=mZDXuYnt6InEv-MmISMwUO7Hsg7Zw91LSER2JhKbeCGtgKNtAyi-OXn_A27f_mqeL8N0pbgVWZbm1qJFWvNNFHfY17Xkkb685g3eJ0f3Nwdvg3k2i7QzuId2gl2e8I4QsuAG5Fs6uf8mc0YZW7rjrz50VuzMD8aZykdA18wzk4zxaZ0WXwWeuy0SjfOZlzbTvAVV0inUXQudRqba5FYXkiSdWTxq8tLGN_Go001v_9zoFbOwur-t-aQqx70OsCkqsyABMmrpCU8PLIfU0zdaIA" charset="UTF-8"></script><style>
     .modal-overlay {
       position: fixed;
       inset: 0;
@@ -727,6 +726,89 @@
         grid-template-columns: 1fr;
       }
     }
+
+/* =========================
+   HEADER DASHBOARD FINAL
+   1 BARIS: Online - Sinkronkan - Pengaturan - Keluar
+   ========================= */
+.topbar-dashboard.topbar-dashboard-centered {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 18px !important;
+  padding: 28px 24px !important;
+}
+
+.topbar-dashboard .topbar-brand.topbar-brand-centered {
+  width: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 16px !important;
+  text-align: left !important;
+}
+
+.topbar-dashboard .topbar-brand-text {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+}
+
+.topbar-dashboard .topbar-dashboard-actions-inline {
+  width: auto !important;
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 14px !important;
+  margin: 0 auto !important;
+}
+
+.topbar-dashboard .topbar-dashboard-actions-inline > * {
+  flex: 0 0 auto !important;
+  white-space: nowrap !important;
+}
+
+.topbar-dashboard #network-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 112px !important;
+  height: 42px !important;
+  padding: 0 18px !important;
+  border-radius: 14px !important;
+  font-weight: 700 !important;
+}
+
+.topbar-dashboard #btn-sync-now-header,
+.topbar-dashboard #btn-settings,
+.topbar-dashboard #btn-logout {
+  min-width: 150px !important;
+  height: 42px !important;
+  padding: 0 22px !important;
+  border-radius: 14px !important;
+  white-space: nowrap !important;
+}
+
+@media (max-width: 900px) {
+  .topbar-dashboard .topbar-brand.topbar-brand-centered {
+    flex-direction: column !important;
+    text-align: center !important;
+  }
+
+  .topbar-dashboard .topbar-brand-text {
+    align-items: center !important;
+  }
+
+  .topbar-dashboard .topbar-dashboard-actions-inline {
+    flex-wrap: wrap !important;
+  }
+}
+
+
 
   </style>
 </head>
@@ -2027,83 +2109,3 @@
   <script src="./assets/js/app.js"></script>
 </body>
 </html>
-/* =========================
-   HEADER DASHBOARD FINAL
-   1 BARIS: Online - Sinkronkan - Pengaturan - Keluar
-   ========================= */
-.topbar-dashboard.topbar-dashboard-centered {
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 18px !important;
-  padding: 28px 24px !important;
-}
-
-.topbar-dashboard .topbar-brand.topbar-brand-centered {
-  width: 100% !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 16px !important;
-  text-align: left !important;
-}
-
-.topbar-dashboard .topbar-brand-text {
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: flex-start !important;
-  justify-content: center !important;
-}
-
-.topbar-dashboard .topbar-dashboard-actions-inline {
-  width: auto !important;
-  display: flex !important;
-  flex-direction: row !important;
-  flex-wrap: nowrap !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 14px !important;
-  margin: 0 auto !important;
-}
-
-.topbar-dashboard .topbar-dashboard-actions-inline > * {
-  flex: 0 0 auto !important;
-  white-space: nowrap !important;
-}
-
-.topbar-dashboard #network-badge {
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  min-width: 112px !important;
-  height: 42px !important;
-  padding: 0 18px !important;
-  border-radius: 14px !important;
-  font-weight: 700 !important;
-}
-
-.topbar-dashboard #btn-sync-now-header,
-.topbar-dashboard #btn-settings,
-.topbar-dashboard #btn-logout {
-  min-width: 150px !important;
-  height: 42px !important;
-  padding: 0 22px !important;
-  border-radius: 14px !important;
-  white-space: nowrap !important;
-}
-
-@media (max-width: 900px) {
-  .topbar-dashboard .topbar-brand.topbar-brand-centered {
-    flex-direction: column !important;
-    text-align: center !important;
-  }
-
-  .topbar-dashboard .topbar-brand-text {
-    align-items: center !important;
-  }
-
-  .topbar-dashboard .topbar-dashboard-actions-inline {
-    flex-wrap: wrap !important;
-  }
-}
