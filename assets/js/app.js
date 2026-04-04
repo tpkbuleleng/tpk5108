@@ -73,6 +73,27 @@
     el.textContent = safeValue;
   }
 
+  function setInputValue(id, value) {
+    const el = qs(id);
+    if (!el) return;
+    el.value = value == null ? '' : String(value);
+  }
+
+  function showMessage(id, message, type) {
+    const el = qs(id);
+    if (!el) return;
+
+    if (!message) {
+      el.className = 'login-message hidden';
+      el.textContent = '';
+      return;
+    }
+
+    el.className = `login-message ${type || 'success'}`;
+    el.textContent = message;
+    el.classList.remove('hidden');
+  }
+
   function showScreen(screenId) {
     const screens = document.querySelectorAll('.screen');
     screens.forEach((screen) => {
@@ -163,6 +184,20 @@
     setText('modal-profile-kecamatan', profile.kecamatan || profile.nama_kecamatan || '-');
     setText('modal-profile-desa', profile.desa_kelurahan || profile.desa || profile.nama_desa || '-');
     setText('modal-profile-dusun', profile.dusun_rw || profile.dusun || profile.nama_dusun || '-');
+
+    setInputValue('profile-status-kader', profile.status_kader_tpk || '');
+    setInputValue('profile-nomor-wa', profile.nomor_wa || '');
+    setInputValue('profile-memiliki-bpjstk', profile.memiliki_bpjstk || '');
+    setInputValue('profile-mengantar-mbg', profile.mengantar_mbg_3b || '');
+    setInputValue('profile-mendapat-insentif', profile.mendapat_insentif_mbg_3b || '');
+    setInputValue(
+      'profile-insentif-per-sasaran',
+      profile.insentif_mbg_3b_per_sasaran != null
+        ? profile.insentif_mbg_3b_per_sasaran
+        : ''
+    );
+
+    showMessage('profile-edit-message', '', '');
   }
 
   function renderProfile(profile) {
@@ -333,6 +368,132 @@
     }
   }
 
+  function normalizeYesNo(value) {
+    const v = String(value || '').trim().toUpperCase();
+    if (v === 'YA' || v === 'Y' || v === 'TRUE' || v === '1') return 'YA';
+    if (v === 'TIDAK' || v === 'N' || v === 'FALSE' || v === '0') return 'TIDAK';
+    return '';
+  }
+
+  function getProfileEditPayload() {
+    const statusKader = String(qs('profile-status-kader')?.value || '').trim().toUpperCase();
+    const nomorWa = String(qs('profile-nomor-wa')?.value || '').replace(/[^\d]/g, '');
+    const memilikiBpjstk = normalizeYesNo(qs('profile-memiliki-bpjstk')?.value || '');
+    const mengantarMbg = normalizeYesNo(qs('profile-mengantar-mbg')?.value || '');
+    const mendapatInsentif =
+      mengantarMbg === 'YA'
+        ? normalizeYesNo(qs('profile-mendapat-insentif')?.value || '')
+        : 'TIDAK';
+
+    const insentifRaw = String(qs('profile-insentif-per-sasaran')?.value || '').replace(/[^\d]/g, '');
+
+    return {
+      status_kader_tpk: statusKader,
+      nomor_wa: nomorWa,
+      memiliki_bpjstk: memilikiBpjstk,
+      mengantar_mbg_3b: mengantarMbg,
+      mendapat_insentif_mbg_3b: mendapatInsentif,
+      insentif_mbg_3b_per_sasaran:
+        mengantarMbg === 'YA' && mendapatInsentif === 'YA'
+          ? Number(insentifRaw || 0)
+          : 0
+    };
+  }
+
+  function validateProfileEditPayload(payload) {
+    const errors = [];
+
+    if (!payload.status_kader_tpk) {
+      errors.push('Status Kader wajib dipilih.');
+    }
+
+    if (!payload.nomor_wa) {
+      errors.push('Nomor WA wajib diisi.');
+    }
+
+    if (!payload.memiliki_bpjstk) {
+      errors.push('Pilihan Memiliki BPJSTK wajib diisi.');
+    }
+
+    if (!payload.mengantar_mbg_3b) {
+      errors.push('Pilihan Mengantar MBG 3B wajib diisi.');
+    }
+
+    if (payload.mengantar_mbg_3b === 'YA' && !payload.mendapat_insentif_mbg_3b) {
+      errors.push('Pilihan Mendapat Insentif MBG 3B wajib diisi.');
+    }
+
+    if (
+      payload.mengantar_mbg_3b === 'YA' &&
+      payload.mendapat_insentif_mbg_3b === 'YA' &&
+      Number(payload.insentif_mbg_3b_per_sasaran || 0) <= 0
+    ) {
+      errors.push('Insentif MBG 3B per sasaran wajib diisi.');
+    }
+
+    return errors;
+  }
+
+  async function saveProfileEdit() {
+    const payload = getProfileEditPayload();
+    const errors = validateProfileEditPayload(payload);
+
+    if (errors.length) {
+      showMessage('profile-edit-message', errors[0], 'error');
+      return;
+    }
+
+    const saveBtn = qs('btn-profile-save');
+    if (saveBtn && window.UI?.setLoading) {
+      UI.setLoading('btn-profile-save', true, 'Menyimpan...');
+    }
+
+    showMessage('profile-edit-message', '', '');
+
+    try {
+      let result = null;
+
+      if (window.DashboardService && typeof window.DashboardService.updateMyProfile === 'function') {
+        result = await window.DashboardService.updateMyProfile(payload);
+      } else {
+        result = await Api.post('updateMyProfile', payload);
+      }
+
+      if (!result?.ok) {
+        throw new Error(result?.message || 'Gagal menyimpan profil.');
+      }
+
+      const currentProfile = getProfileFromStorage() || {};
+      const updatedProfile = Object.assign({}, currentProfile, payload);
+
+      saveProfileToStorage(updatedProfile);
+      renderProfile(updatedProfile);
+
+      if (window.ProfileModalUI && typeof window.ProfileModalUI.closeEdit === 'function') {
+        window.ProfileModalUI.closeEdit();
+      }
+
+      showToast('Profil berhasil diperbarui.', 'success');
+    } catch (err) {
+      showMessage('profile-edit-message', err.message || 'Gagal menyimpan profil.', 'error');
+    } finally {
+      if (saveBtn && window.UI?.setLoading) {
+        UI.setLoading('btn-profile-save', false);
+      }
+    }
+  }
+
+  function bindProfileSaveHandler() {
+    const profileForm = qs('profile-edit-form');
+    if (profileForm && !profileForm.dataset.bound) {
+      profileForm.dataset.bound = '1';
+      profileForm.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        await saveProfileEdit();
+      });
+    }
+  }
+
   async function loadDashboardData() {
     let profile = getProfileFromStorage() || {};
 
@@ -381,50 +542,4 @@
 
       await delay(1200);
 
-      if (hasSessionToken()) {
-        setSplashStatus('Membuka dashboard...');
-        await delay(300);
-        showScreen('dashboard-screen');
-        await loadDashboardData();
-        return;
-      }
-
-      setSplashStatus('Membuka halaman login...');
-      await delay(250);
-      showScreen('login-screen');
-    } catch (error) {
-      console.error('BOOTSTRAP_ERROR', error);
-      setSplashStatus('Gagal memulai aplikasi');
-      await delay(800);
-      showScreen('login-screen');
-    }
-  }
-
-  function registerServiceWorker() {
-    if (!('serviceWorker' in navigator)) return;
-
-    window.addEventListener('load', async function () {
-      try {
-        await navigator.serviceWorker.register('./sw.js');
-        console.log('Service worker registered');
-      } catch (err) {
-        console.warn('Service worker gagal didaftarkan:', err);
-      }
-    });
-  }
-
-  document.addEventListener('DOMContentLoaded', function () {
-    try {
-      registerServiceWorker();
-      attachGlobalUIEvents();
-      bindBackButtons();
-      bootstrapApp();
-    } catch (err) {
-      console.error('APP_INIT_ERROR', err);
-      setSplashStatus('Terjadi kendala saat memulai aplikasi');
-      setTimeout(function () {
-        showScreen('login-screen');
-      }, 500);
-    }
-  });
-})();
+      if (hasSession
