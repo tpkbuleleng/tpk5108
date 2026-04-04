@@ -364,3 +364,21 @@ applyJenisRules() {
     }
   }
 }
+
+setSelectOptions(selectId, options, selectedValue = '') {
+  const el = document.getElementById(selectId);
+  if (!el) return;
+
+  const safeOptions = Array.isArray(options) ? options.filter(Boolean) : [];
+  el.innerHTML = safeOptions.map(opt => {
+    const selected = String(opt) === String(selectedValue) ? 'selected' : '';
+    return `<option value="${opt}" ${selected}>${opt}</option>`;
+  }).join('');
+}
+
+parseDusunOptions(value) {
+  return String(value || '')
+    .split('/')
+    .map(item => item.trim())
+    .filter(Boolean);
+}
