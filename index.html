@@ -2027,3 +2027,83 @@
   <script src="./assets/js/app.js"></script>
 </body>
 </html>
+/* =========================
+   HEADER DASHBOARD FINAL
+   1 BARIS: Online - Sinkronkan - Pengaturan - Keluar
+   ========================= */
+.topbar-dashboard.topbar-dashboard-centered {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 18px !important;
+  padding: 28px 24px !important;
+}
+
+.topbar-dashboard .topbar-brand.topbar-brand-centered {
+  width: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 16px !important;
+  text-align: left !important;
+}
+
+.topbar-dashboard .topbar-brand-text {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+}
+
+.topbar-dashboard .topbar-dashboard-actions-inline {
+  width: auto !important;
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 14px !important;
+  margin: 0 auto !important;
+}
+
+.topbar-dashboard .topbar-dashboard-actions-inline > * {
+  flex: 0 0 auto !important;
+  white-space: nowrap !important;
+}
+
+.topbar-dashboard #network-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 112px !important;
+  height: 42px !important;
+  padding: 0 18px !important;
+  border-radius: 14px !important;
+  font-weight: 700 !important;
+}
+
+.topbar-dashboard #btn-sync-now-header,
+.topbar-dashboard #btn-settings,
+.topbar-dashboard #btn-logout {
+  min-width: 150px !important;
+  height: 42px !important;
+  padding: 0 22px !important;
+  border-radius: 14px !important;
+  white-space: nowrap !important;
+}
+
+@media (max-width: 900px) {
+  .topbar-dashboard .topbar-brand.topbar-brand-centered {
+    flex-direction: column !important;
+    text-align: center !important;
+  }
+
+  .topbar-dashboard .topbar-brand-text {
+    align-items: center !important;
+  }
+
+  .topbar-dashboard .topbar-dashboard-actions-inline {
+    flex-wrap: wrap !important;
+  }
+}
