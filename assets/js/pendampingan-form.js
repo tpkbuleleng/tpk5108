@@ -500,11 +500,27 @@ window.PendampinganForm = {
       }
 
       if (!navigator.onLine && mode === 'create') {
-        PendampinganDraft.enqueueOffline(payload);
-        PendampinganDraft.saveLocal(payload);
-        Notifier.show('Sedang offline. Pendampingan disimpan ke antrean sinkronisasi.');
-        return;
-      }
+  PendampinganDraft.saveAndQueue(payload);
+
+  if (window.OfflineSync?.renderSummary) {
+    OfflineSync.renderSummary();
+  }
+
+  Notifier.show(
+    'Sedang offline. Pendampingan disimpan ke antrean sinkronisasi.'
+  );
+
+  PendampinganDraft.clearLocal();
+  PendampinganState.reset();
+
+  if (window.SyncScreen?.open) {
+    SyncScreen.open();
+  } else {
+    Router.toSasaranList();
+  }
+
+  return;
+}
 
       if (!navigator.onLine && mode === 'edit') {
         Notifier.show('Edit pendampingan hanya dapat dilakukan saat online.');
