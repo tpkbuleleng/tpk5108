@@ -100,7 +100,14 @@
       userAgent = navigator.userAgent || '';
     } catch (err) {}
 
-    var newId = 'DEV-' + generateRandomToken() + '-' + btoa(userAgent).replace(/[^a-zA-Z0-9]/g, '').slice(0, 16);
+    var uaPart = '';
+    try {
+      uaPart = btoa(userAgent).replace(/[^a-zA-Z0-9]/g, '').slice(0, 16);
+    } catch (err) {
+      uaPart = 'UA';
+    }
+
+    var newId = 'DEV-' + generateRandomToken() + '-' + uaPart;
     setStorageValue(key, newId);
     return newId;
   }
@@ -117,6 +124,11 @@
       return;
     }
     setStorageValue(config.STORAGE_KEYS.SESSION_TOKEN, String(token));
+  }
+
+  function clearSessionToken() {
+    var config = getConfig();
+    removeStorageValue(config.STORAGE_KEYS.SESSION_TOKEN);
   }
 
   function getApiBaseUrl() {
@@ -294,15 +306,16 @@
 
     try {
       var response = await fetch(getApiBaseUrl(), {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'text/plain;charset=utf-8'
-  },
-  body: JSON.stringify(body),
-  signal: abortState.controller ? abortState.controller.signal : undefined,
-  credentials: 'omit',
-  redirect: 'follow'
-});
+        method: 'POST',
+        headers: {
+          'Content-Type': 'text/plain;charset=utf-8'
+        },
+        body: JSON.stringify(body),
+        signal: abortState.controller ? abortState.controller.signal : undefined,
+        credentials: 'omit',
+        redirect: 'follow',
+        mode: 'cors'
+      });
 
       var parsed = await parseResponse(response);
       var normalized = normalizeResponse(parsed, response);
@@ -360,7 +373,8 @@
         method: 'GET',
         signal: abortState.controller ? abortState.controller.signal : undefined,
         credentials: 'omit',
-        redirect: 'follow'
+        redirect: 'follow',
+        mode: 'cors'
       });
 
       var parsed = await parseResponse(response);
@@ -416,7 +430,7 @@
       includeAuth: true
     });
 
-    removeStorageValue(config.STORAGE_KEYS.SESSION_TOKEN);
+    clearSessionToken();
     return result;
   }
 
@@ -436,12 +450,7 @@
     });
   }
 
-  function clearSessionToken() {
-    var config = getConfig();
-    removeStorageValue(config.STORAGE_KEYS.SESSION_TOKEN);
-  }
-
-  const Api = {
+  var Api = {
     getBaseUrl: getApiBaseUrl,
     getDeviceId: getOrCreateDeviceId,
     getSessionToken: getSessionToken,
