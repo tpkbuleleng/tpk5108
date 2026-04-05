@@ -61,14 +61,14 @@
   --btn-height-sm: 40px;
   --input-height: 46px;
 
-  --dashboard-header-height-desktop: 150px;
-  --dashboard-header-height-tablet: 148px;
-  --dashboard-header-height-mobile: 190px;
-  --dashboard-header-height-small: 228px;
+  --dashboard-offset-desktop: 154px;
+  --dashboard-offset-tablet: 150px;
+  --dashboard-offset-mobile: 194px;
+  --dashboard-offset-small: 232px;
 
-  --menu-header-height-desktop: 112px;
-  --menu-header-height-tablet: 106px;
-  --menu-header-height-mobile: 118px;
+  --menu-offset-desktop: 122px;
+  --menu-offset-tablet: 118px;
+  --menu-offset-mobile: 124px;
 }
 
 /* =========================================================
@@ -734,35 +734,35 @@ textarea:focus {
 }
 
 /* =========================================================
-   DASHBOARD HEADER FINAL - FIXED
+   DASHBOARD HEADER - FIXED
    ========================================================= */
 #dashboard-screen {
   position: relative;
 }
 
 #dashboard-screen .topbar.topbar-dashboard.topbar-dashboard-centered {
-  position: fixed;
-  top: 8px;
-  left: 12px;
-  right: 12px;
-  z-index: 9999;
+  position: fixed !important;
+  top: 8px !important;
+  left: 12px !important;
+  right: 12px !important;
+  z-index: 9999 !important;
 
-  margin: 0;
-  border: none;
-  border-radius: 24px;
-  padding: calc(env(safe-area-inset-top, 0px) + 10px) 16px 14px;
-  overflow: hidden;
+  margin: 0 !important;
+  border: none !important;
+  border-radius: 24px !important;
+  padding: calc(env(safe-area-inset-top, 0px) + 10px) 16px 14px !important;
+  overflow: hidden !important;
 
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 10px !important;
 
-  background: linear-gradient(135deg, #39c2f2 0%, #2563eb 58%, #1d43d8 100%);
-  box-shadow: 0 14px 34px rgba(37, 99, 235, 0.20);
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
+  background: linear-gradient(135deg, #39c2f2 0%, #2563eb 58%, #1d43d8 100%) !important;
+  box-shadow: 0 14px 34px rgba(37, 99, 235, 0.20) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
 #dashboard-screen .topbar.topbar-dashboard.topbar-dashboard-centered::before,
@@ -912,7 +912,7 @@ textarea:focus {
 }
 
 #dashboard-screen > .page-content {
-  padding-top: var(--dashboard-header-height-desktop);
+  padding-top: var(--dashboard-offset-desktop) !important;
 }
 
 #dashboard-screen .app-footer {
@@ -927,7 +927,7 @@ textarea:focus {
 }
 
 /* =========================================================
-   HEADER MENU NON-DASHBOARD - FIXED BIRU + LOGO TENGAH
+   MENU HEADER - FIXED / LOGO LEFT / TITLE CENTER
    ========================================================= */
 :is(
   #sasaran-list-screen,
@@ -948,51 +948,28 @@ textarea:focus {
   #sync-screen,
   #rekap-kader-screen
 ) > .topbar {
-  position: fixed;
-  top: 8px;
-  left: 12px;
-  right: 12px;
-  z-index: 9500;
+  position: fixed !important;
+  top: 8px !important;
+  left: 12px !important;
+  right: 12px !important;
+  z-index: 9500 !important;
 
-  margin: 0;
-  border: none;
-  border-radius: 22px;
-  min-height: 90px;
-  padding: calc(env(safe-area-inset-top, 0px) + 10px) 16px 12px 16px;
-  overflow: hidden;
+  margin: 0 !important;
+  border: none !important;
+  border-radius: 24px !important;
+  min-height: 92px !important;
+  padding: calc(env(safe-area-inset-top, 0px) + 10px) 16px 14px 16px !important;
+  overflow: hidden !important;
 
-  background: linear-gradient(135deg, #39c2f2 0%, #2563eb 58%, #1d43d8 100%);
-  box-shadow: 0 12px 28px rgba(37, 99, 235, 0.16);
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
+  background: linear-gradient(135deg, #39c2f2 0%, #2563eb 58%, #1d43d8 100%) !important;
+  box-shadow: 0 12px 28px rgba(37, 99, 235, 0.16) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 
-  display: flex;
-  justify-content: flex-end;
-  align-items: flex-start;
-  gap: 16px;
-}
-
-:is(
-  #sasaran-list-screen,
-  #sasaran-detail-screen,
-  #registrasi-screen,
-  #pendampingan-screen,
-  #sync-screen,
-  #rekap-kader-screen
-) > .topbar::before,
-:is(
-  #sasaran-list-screen,
-  #sasaran-detail-screen,
-  #registrasi-screen,
-  #pendampingan-screen,
-  #sync-screen,
-  #rekap-kader-screen
-) > .topbar::after {
-  content: "";
-  position: absolute;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.10);
-  pointer-events: none;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0 !important;
 }
 
 :is(
@@ -1003,10 +980,19 @@ textarea:focus {
   #sync-screen,
   #rekap-kader-screen
 ) > .topbar::before {
-  width: 84px;
-  height: 84px;
-  top: -20px;
-  right: 10px;
+  content: "";
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 34px;
+  height: 34px;
+  background: url("../img/logo.png") center center / contain no-repeat;
+  z-index: 2;
+  filter:
+    drop-shadow(0 1px 0 rgba(255, 255, 255, 0.35))
+    drop-shadow(0 4px 8px rgba(11, 41, 97, 0.18))
+    drop-shadow(0 8px 18px rgba(9, 30, 66, 0.20));
 }
 
 :is(
@@ -1017,13 +1003,18 @@ textarea:focus {
   #sync-screen,
   #rekap-kader-screen
 ) > .topbar::after {
-  width: 68px;
-  height: 68px;
-  left: 30%;
-  bottom: -34px;
+  content: "";
+  position: absolute;
+  right: 10px;
+  top: -20px;
+  width: 84px;
+  height: 84px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.10);
+  pointer-events: none;
 }
 
-/* logo tengah */
+/* judul tetap center */
 :is(
   #sasaran-list-screen,
   #sasaran-detail-screen,
@@ -1034,32 +1025,9 @@ textarea:focus {
 ) > .topbar > div:first-child {
   position: relative;
   z-index: 1;
-  width: min(100%, 540px);
-  margin: 0 auto;
+  width: 100%;
   text-align: center;
-  padding-top: 34px;
-}
-
-:is(
-  #sasaran-list-screen,
-  #sasaran-detail-screen,
-  #registrasi-screen,
-  #pendampingan-screen,
-  #sync-screen,
-  #rekap-kader-screen
-) > .topbar > div:first-child::before {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: 0;
-  transform: translateX(-50%);
-  width: 30px;
-  height: 30px;
-  background: url("../img/logo.png") center center / contain no-repeat;
-  filter:
-    drop-shadow(0 1px 0 rgba(255, 255, 255, 0.35))
-    drop-shadow(0 4px 8px rgba(11, 41, 97, 0.18))
-    drop-shadow(0 8px 18px rgba(9, 30, 66, 0.20));
+  padding: 0 108px 0 56px;
 }
 
 :is(
@@ -1091,6 +1059,7 @@ textarea:focus {
   line-height: 1.3;
 }
 
+/* tombol kanan */
 :is(
   #sasaran-list-screen,
   #sasaran-detail-screen,
@@ -1099,15 +1068,17 @@ textarea:focus {
   #sync-screen,
   #rekap-kader-screen
 ) .topbar-actions {
-  position: absolute;
-  right: 16px;
-  top: calc(env(safe-area-inset-top, 0px) + 10px);
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-  flex-wrap: wrap;
+  position: absolute !important;
+  right: 16px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  z-index: 2 !important;
+
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 10px !important;
+  flex-wrap: nowrap !important;
 }
 
 :is(
@@ -1118,13 +1089,15 @@ textarea:focus {
   #sync-screen,
   #rekap-kader-screen
 ) .topbar-actions .btn {
-  min-height: 38px;
-  padding: 8px 14px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.16);
-  color: #ffffff;
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.10);
+  width: auto !important;
+  min-width: 86px !important;
+  min-height: 38px !important;
+  padding: 8px 14px !important;
+  border-radius: 12px !important;
+  background: rgba(255, 255, 255, 0.16) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.22) !important;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.10) !important;
 }
 
 :is(
@@ -1136,10 +1109,9 @@ textarea:focus {
   #rekap-kader-screen
 ) .topbar-actions .btn:hover {
   transform: translateY(-1px);
-  background: rgba(255, 255, 255, 0.20);
+  background: rgba(255, 255, 255, 0.20) !important;
 }
 
-/* ruang agar konten tidak ketutup */
 :is(
   #sasaran-list-screen,
   #sasaran-detail-screen,
@@ -1148,7 +1120,7 @@ textarea:focus {
   #sync-screen,
   #rekap-kader-screen
 ) > .page-content {
-  padding-top: var(--menu-header-height-desktop);
+  padding-top: var(--menu-offset-desktop) !important;
 }
 
 /* =========================================================
@@ -1535,7 +1507,7 @@ textarea:focus {
   }
 
   #dashboard-screen > .page-content {
-    padding-top: var(--dashboard-header-height-tablet);
+    padding-top: var(--dashboard-offset-tablet) !important;
   }
 }
 
@@ -1582,10 +1554,10 @@ textarea:focus {
   }
 
   #dashboard-screen .topbar.topbar-dashboard.topbar-dashboard-centered {
-    left: 10px;
-    right: 10px;
-    padding: calc(env(safe-area-inset-top, 0px) + 9px) 14px 13px;
-    border-radius: 22px;
+    left: 10px !important;
+    right: 10px !important;
+    padding: calc(env(safe-area-inset-top, 0px) + 9px) 14px 13px !important;
+    border-radius: 22px !important;
   }
 
   #dashboard-screen .topbar-logo {
@@ -1602,7 +1574,7 @@ textarea:focus {
   }
 
   #dashboard-screen > .page-content {
-    padding-top: var(--dashboard-header-height-tablet);
+    padding-top: var(--dashboard-offset-tablet) !important;
   }
 
   :is(
@@ -1613,10 +1585,24 @@ textarea:focus {
     #sync-screen,
     #rekap-kader-screen
   ) > .topbar {
-    left: 10px;
-    right: 10px;
-    padding: calc(env(safe-area-inset-top, 0px) + 9px) 14px 11px;
-    border-radius: 20px;
+    left: 10px !important;
+    right: 10px !important;
+    min-height: 90px !important;
+    padding: calc(env(safe-area-inset-top, 0px) + 9px) 14px 12px 14px !important;
+    border-radius: 22px !important;
+  }
+
+  :is(
+    #sasaran-list-screen,
+    #sasaran-detail-screen,
+    #registrasi-screen,
+    #pendampingan-screen,
+    #sync-screen,
+    #rekap-kader-screen
+  ) > .topbar::before {
+    left: 14px;
+    width: 32px;
+    height: 32px;
   }
 
   :is(
@@ -1627,7 +1613,7 @@ textarea:focus {
     #sync-screen,
     #rekap-kader-screen
   ) > .topbar > div:first-child {
-    width: min(100%, 480px);
+    padding: 0 102px 0 52px;
   }
 
   :is(
@@ -1649,7 +1635,7 @@ textarea:focus {
     #sync-screen,
     #rekap-kader-screen
   ) > .page-content {
-    padding-top: var(--menu-header-height-tablet);
+    padding-top: var(--menu-offset-tablet) !important;
   }
 
   .wilayah-grid-2 {
@@ -1790,12 +1776,12 @@ textarea:focus {
   }
 
   #dashboard-screen .topbar.topbar-dashboard.topbar-dashboard-centered {
-    left: 8px;
-    right: 8px;
-    top: 8px;
-    padding: calc(env(safe-area-inset-top, 0px) + 8px) 12px 12px;
-    gap: 9px;
-    border-radius: 20px;
+    left: 8px !important;
+    right: 8px !important;
+    top: 8px !important;
+    padding: calc(env(safe-area-inset-top, 0px) + 8px) 12px 12px !important;
+    gap: 9px !important;
+    border-radius: 20px !important;
   }
 
   #dashboard-screen .topbar-brand.topbar-brand-centered {
@@ -1841,7 +1827,7 @@ textarea:focus {
   }
 
   #dashboard-screen > .page-content {
-    padding-top: var(--dashboard-header-height-mobile);
+    padding-top: var(--dashboard-offset-mobile) !important;
   }
 
   :is(
@@ -1852,13 +1838,25 @@ textarea:focus {
     #sync-screen,
     #rekap-kader-screen
   ) > .topbar {
-    left: 8px;
-    right: 8px;
-    top: 8px;
-    min-height: 94px;
-    padding: calc(env(safe-area-inset-top, 0px) + 8px) 12px 10px;
-    border-radius: 18px;
-    gap: 10px;
+    left: 8px !important;
+    right: 8px !important;
+    top: 8px !important;
+    min-height: 88px !important;
+    padding: calc(env(safe-area-inset-top, 0px) + 8px) 12px 12px 12px !important;
+    border-radius: 20px !important;
+  }
+
+  :is(
+    #sasaran-list-screen,
+    #sasaran-detail-screen,
+    #registrasi-screen,
+    #pendampingan-screen,
+    #sync-screen,
+    #rekap-kader-screen
+  ) > .topbar::before {
+    left: 12px;
+    width: 30px;
+    height: 30px;
   }
 
   :is(
@@ -1869,9 +1867,7 @@ textarea:focus {
     #sync-screen,
     #rekap-kader-screen
   ) > .topbar > div:first-child {
-    width: calc(100% - 96px);
-    margin: 0 auto;
-    padding-top: 34px;
+    padding: 0 92px 0 48px;
   }
 
   :is(
@@ -1881,9 +1877,19 @@ textarea:focus {
     #pendampingan-screen,
     #sync-screen,
     #rekap-kader-screen
-  ) > .topbar > div:first-child::before {
-    width: 28px;
-    height: 28px;
+  ) .topbar-title {
+    font-size: 16px;
+  }
+
+  :is(
+    #sasaran-list-screen,
+    #sasaran-detail-screen,
+    #registrasi-screen,
+    #pendampingan-screen,
+    #sync-screen,
+    #rekap-kader-screen
+  ) .topbar-subtitle {
+    font-size: 11px;
   }
 
   :is(
@@ -1894,8 +1900,7 @@ textarea:focus {
     #sync-screen,
     #rekap-kader-screen
   ) .topbar-actions {
-    right: 12px;
-    top: calc(env(safe-area-inset-top, 0px) + 8px);
+    right: 12px !important;
   }
 
   :is(
@@ -1906,9 +1911,10 @@ textarea:focus {
     #sync-screen,
     #rekap-kader-screen
   ) .topbar-actions .btn {
-    min-height: 36px;
-    font-size: 12px;
-    padding: 8px 12px;
+    min-width: 78px !important;
+    min-height: 36px !important;
+    font-size: 12px !important;
+    padding: 8px 12px !important;
   }
 
   :is(
@@ -1919,7 +1925,7 @@ textarea:focus {
     #sync-screen,
     #rekap-kader-screen
   ) > .page-content {
-    padding-top: var(--menu-header-height-mobile);
+    padding-top: var(--menu-offset-mobile) !important;
   }
 
   #dashboard-screen .app-footer {
@@ -1972,7 +1978,7 @@ textarea:focus {
   }
 
   #dashboard-screen > .page-content {
-    padding-top: var(--dashboard-header-height-small);
+    padding-top: var(--dashboard-offset-small) !important;
   }
 
   :is(
@@ -1983,7 +1989,7 @@ textarea:focus {
     #sync-screen,
     #rekap-kader-screen
   ) > .topbar {
-    min-height: 96px;
+    min-height: 86px !important;
   }
 
   :is(
@@ -1994,7 +2000,7 @@ textarea:focus {
     #sync-screen,
     #rekap-kader-screen
   ) > .topbar > div:first-child {
-    width: calc(100% - 88px);
+    padding: 0 82px 0 46px;
   }
 
   :is(
@@ -2005,7 +2011,7 @@ textarea:focus {
     #sync-screen,
     #rekap-kader-screen
   ) > .page-content {
-    padding-top: 124px;
+    padding-top: 120px !important;
   }
 }
 
