@@ -1,82 +1,306 @@
 (function (window, document) {
   'use strict';
 
-  function syncVersionText(version) {
-    var text = version || (window.AppConfig && window.AppConfig.APP_VERSION) || '-';
-    ['app-version', 'footer-app-version', 'settings-app-version'].forEach(function (id) {
-      var el = document.getElementById(id);
-      if (el) el.textContent = text;
-    });
-  }
+  const AppBootstrap = {
+    async init() {
+      this.showSplashStatus('Menyiapkan aplikasi...');
 
-  function syncAppName(name) {
-    var nextName = name || (window.AppConfig && window.AppConfig.APP_NAME) || document.title;
-    document.title = nextName;
-  }
+      this.applyStaticBranding();
 
-  function renderNetworkBadge() {
-    var badge = document.getElementById('network-badge');
-    if (!badge) return;
-    var online = navigator.onLine;
-    badge.textContent = online ? 'Online' : 'Offline';
-    badge.classList.toggle('topbar-dashboard__status-badge--offline', !online);
-    window.AppState.patch({ isOnline: online, syncQueue: window.AppStorage.getQueue() });
-  }
+      const bootstrapResult = await this.loadInitialRefs(false);
+      if (bootstrapResult && bootstrapResult.ok) {
+        this.applyBootstrapToUi(bootstrapResult.data || {});
+      }
 
-  function bindNetworkIndicator() {
-    window.addEventListener('online', renderNetworkBadge);
-    window.addEventListener('offline', renderNetworkBadge);
-    renderNetworkBadge();
-  }
+      this.showSplashStatus('Memeriksa sesi pengguna...');
 
-  function registerServiceWorker() {
-    if (!('serviceWorker' in navigator)) return;
-    navigator.serviceWorker.register('./sw.js').catch(function () {
-      // diamkan pada tahap transisi
-    });
-  }
+      const sessionOk = await this.restoreSessionAndRoute();
 
-  function setSplashStatus(message) {
-    var node = document.getElementById('splash-status');
-    if (node) node.textContent = message || 'Menyiapkan aplikasi...';
-  }
+      if (!sessionOk) {
+        this.openScreen('login-screen');
+      }
+    },
 
-  async function loadReferenceBootstrap() {
-    var keys = ((window.AppConfig || {}).STORAGE_KEYS || {});
-    var action = ((window.AppConfig || {}).API_ACTIONS || {}).GET_REFERENCE_BOOTSTRAP;
+    async loadInitialRefs(forceRefresh = false) {
+      try {
+        if (!forceRefresh) {
+          const cached = this.getCachedBootstrap();
+          if (cached && Object.keys(cached).length) {
+            return {
+              ok: true,
+              data: cached,
+              source: 'cache'
+            };
+          }
+        }
 
-    if (!action) return null;
-    try {
-      var result = await window.Api.post(action, {});
-      if (!(result && result.ok)) return null;
+        if (!window.Api || typeof window.Api.post !== 'function') {
+          throw new Error('Api.post belum tersedia');
+        }
 
-      var data = window.Api.getData(result);
-      window.AppStorage.set(keys.APP_BOOTSTRAP, data || {});
-      window.AppState.patch({ appBootstrap: data || {} });
+        const action = window.APP_CONFIG.API_ACTIONS.GET_APP_BOOTSTRAP_REF;
+        const result = await window.Api.post(action, {}, {
+          includeAuth: false
+        });
 
-      if (data.app_name) syncAppName(data.app_name);
-      if (data.app_version) syncVersionText(data.app_version);
+        if (result && result.ok) {
+          const normalized = this.normalizeBootstrapData(result.data || {});
+          this.setCachedBootstrap(normalized);
 
-      return data;
-    } catch (err) {
-      return null;
+          return {
+            ok: true,
+            data: normalized,
+            source: 'api'
+          };
+        }
+
+        const cached = this.getCachedBootstrap();
+        if (cached && Object.keys(cached).length) {
+          return {
+            ok: true,
+            data: cached,
+            source: 'cache_fallback'
+          };
+        }
+
+        return {
+          ok: false,
+          message: (result && result.message) || 'Bootstrap refs gagal diambil.',
+          data: {}
+        };
+      } catch (err) {
+        const cached = this.getCachedBootstrap();
+        if (cached && Object.keys(cached).length) {
+          console.warn('Bootstrap refs gagal diambil dari API, memakai cache lokal:', err && err.message ? err.message : err);
+
+          return {
+            ok: true,
+            data: cached,
+            source: 'cache_fallback'
+          };
+        }
+
+        console.warn('Bootstrap refs gagal diambil:', err && err.message ? err.message : err);
+
+        return {
+          ok: false,
+          message: err && err.message ? err.message : 'Bootstrap refs gagal diambil.',
+          data: {}
+        };
+      }
+    },
+
+    normalizeBootstrapData(data) {
+      const refs = data || {};
+
+      return {
+        app_name: refs.app_name || window.APP_CONFIG.APP_NAME || 'TPK KABUPATEN BULELENG',
+        app_version: refs.app_version || window.APP_CONFIG.APP_VERSION || '1.0.0',
+        jenis_sasaran: Array.isArray(refs.jenis_sasaran) ? refs.jenis_sasaran : [],
+        form_refs: Array.isArray(refs.form_refs) ? refs.form_refs : [],
+        status_sasaran: Array.isArray(refs.status_sasaran) ? refs.status_sasaran : [],
+        status_kunjungan: Array.isArray(refs.status_kunjungan) ? refs.status_kunjungan : [],
+        wilayah_tim: refs.wilayah_tim && typeof refs.wilayah_tim === 'object' ? refs.wilayah_tim : {},
+        raw: refs
+      };
+    },
+
+    getCachedBootstrap() {
+      if (!window.Storage || typeof window.Storage.get !== 'function') {
+        return {};
+      }
+
+      return window.Storage.get(window.APP_CONFIG.STORAGE_KEYS.APP_BOOTSTRAP, {});
+    },
+
+    setCachedBootstrap(data) {
+      if (!window.Storage || typeof window.Storage.set !== 'function') {
+        return;
+      }
+
+      window.Storage.set(window.APP_CONFIG.STORAGE_KEYS.APP_BOOTSTRAP, data || {});
+    },
+
+    clearCachedBootstrap() {
+      if (!window.Storage || typeof window.Storage.remove !== 'function') {
+        return;
+      }
+
+      window.Storage.remove(window.APP_CONFIG.STORAGE_KEYS.APP_BOOTSTRAP);
+    },
+
+    getJenisSasaranOptions() {
+      const data = this.getCachedBootstrap();
+      return Array.isArray(data.jenis_sasaran) ? data.jenis_sasaran : [];
+    },
+
+    getStatusSasaranOptions() {
+      const data = this.getCachedBootstrap();
+      return Array.isArray(data.status_sasaran) ? data.status_sasaran : [];
+    },
+
+    getStatusKunjunganOptions() {
+      const data = this.getCachedBootstrap();
+      return Array.isArray(data.status_kunjungan) ? data.status_kunjungan : [];
+    },
+
+    getAppInfo() {
+      const data = this.getCachedBootstrap();
+      return {
+        app_name: data.app_name || window.APP_CONFIG.APP_NAME || 'TPK KABUPATEN BULELENG',
+        app_version: data.app_version || window.APP_CONFIG.APP_VERSION || '1.0.0'
+      };
+    },
+
+    applyStaticBranding() {
+      const logoUrl = window.APP_CONFIG.ASSETS.LOGO_URL;
+
+      const loginLogo = document.getElementById('loginLogo');
+      const splashLogo = document.querySelector('.splash-logo');
+      const topbarLogo = document.querySelector('.topbar-logo');
+
+      if (loginLogo) loginLogo.src = logoUrl;
+      if (splashLogo) splashLogo.src = logoUrl;
+      if (topbarLogo) topbarLogo.src = logoUrl;
+
+      const appName = window.APP_CONFIG.APP_NAME || 'TPK KABUPATEN BULELENG';
+      const appVersion = window.APP_CONFIG.APP_VERSION || '1.0.0';
+
+      const appVersionEl = document.getElementById('app-version');
+      const footerVersionEl = document.getElementById('footer-app-version');
+      const settingsVersionEl = document.getElementById('settings-app-version');
+
+      if (document.title !== appName) {
+        document.title = appName;
+      }
+
+      if (appVersionEl) appVersionEl.textContent = appVersion;
+      if (footerVersionEl) footerVersionEl.textContent = appVersion;
+      if (settingsVersionEl) settingsVersionEl.textContent = appVersion;
+    },
+
+    applyBootstrapToUi(data) {
+      const info = data || {};
+      const appName = info.app_name || window.APP_CONFIG.APP_NAME || 'TPK KABUPATEN BULELENG';
+      const appVersion = info.app_version || window.APP_CONFIG.APP_VERSION || '1.0.0';
+
+      document.title = appName;
+
+      const splashVersion = document.getElementById('app-version');
+      const footerVersion = document.getElementById('footer-app-version');
+      const settingsVersion = document.getElementById('settings-app-version');
+
+      if (splashVersion) splashVersion.textContent = appVersion;
+      if (footerVersion) footerVersion.textContent = appVersion;
+      if (settingsVersion) settingsVersion.textContent = appVersion;
+    },
+
+    async restoreSessionAndRoute() {
+      try {
+        if (!window.Storage || !window.Api) {
+          return false;
+        }
+
+        const token = window.Storage.get(window.APP_CONFIG.STORAGE_KEYS.SESSION_TOKEN, '');
+        if (!token) {
+          return false;
+        }
+
+        const validateAction = window.APP_CONFIG.API_ACTIONS.VALIDATE_SESSION;
+        const validateResult = await window.Api.post(validateAction, {}, {
+          includeAuth: true
+        });
+
+        if (!validateResult || !validateResult.ok) {
+          this.clearSession();
+          return false;
+        }
+
+        const bootstrapSessionAction = window.APP_CONFIG.API_ACTIONS.BOOTSTRAP_SESSION;
+        const sessionResult = await window.Api.post(bootstrapSessionAction, {}, {
+          includeAuth: true
+        });
+
+        if (!sessionResult || !sessionResult.ok) {
+          this.clearSession();
+          return false;
+        }
+
+        const sessionData = sessionResult.data || {};
+        const profile = sessionData.profile || sessionData.session || {};
+
+        if (window.Storage && typeof window.Storage.set === 'function') {
+          window.Storage.set(window.APP_CONFIG.STORAGE_KEYS.PROFILE, profile || {});
+        }
+
+        if (window.AppState && typeof window.AppState.setProfile === 'function') {
+          window.AppState.setProfile(profile || {});
+        }
+
+        this.applyProfileToUi(profile || {});
+        this.openScreen('dashboard-screen');
+
+        if (window.Router && typeof window.Router.go === 'function') {
+          window.Router.go('dashboard');
+        }
+
+        return true;
+      } catch (err) {
+        console.warn('Gagal memulihkan sesi:', err && err.message ? err.message : err);
+        this.clearSession();
+        return false;
+      }
+    },
+
+    applyProfileToUi(profile) {
+      const data = profile || {};
+
+      this.setText('profile-nama', data.nama_kader || data.nama_user || data.nama || '-');
+      this.setText('profile-unsur', data.unsur_tpk || data.unsur || '-');
+      this.setText('profile-id', data.id_user || '-');
+      this.setText('profile-tim', data.nama_tim || data.id_tim || '-');
+      this.setText('profile-desa', data.desa_kelurahan || data.nama_desa || '-');
+      this.setText('profile-dusun', data.dusun_rw || data.nama_dusun || '-');
+      this.setText('header-kecamatan', data.nama_kecamatan || data.kecamatan || '-');
+    },
+
+    clearSession() {
+      if (!window.Storage || typeof window.Storage.remove !== 'function') {
+        return;
+      }
+
+      window.Storage.remove(window.APP_CONFIG.STORAGE_KEYS.SESSION_TOKEN);
+      window.Storage.remove(window.APP_CONFIG.STORAGE_KEYS.PROFILE);
+    },
+
+    showSplashStatus(message) {
+      const el = document.getElementById('splash-status');
+      if (el) {
+        el.textContent = message || 'Menyiapkan aplikasi...';
+      }
+    },
+
+    setText(id, value) {
+      const el = document.getElementById(id);
+      if (el) {
+        el.textContent = (value === undefined || value === null || value === '') ? '-' : String(value);
+      }
+    },
+
+    openScreen(screenId) {
+      const screens = document.querySelectorAll('.screen');
+      screens.forEach(function (screen) {
+        screen.classList.remove('active');
+        screen.classList.add('hidden');
+      });
+
+      const target = document.getElementById(screenId);
+      if (target) {
+        target.classList.remove('hidden');
+        target.classList.add('active');
+      }
     }
-  }
-
-  async function init() {
-    syncVersionText();
-    syncAppName();
-    bindNetworkIndicator();
-    registerServiceWorker();
-    setSplashStatus('Memuat konfigurasi dan referensi aplikasi...');
-    await loadReferenceBootstrap();
-  }
-
-  window.AppBootstrap = {
-    init: init,
-    syncVersionText: syncVersionText,
-    syncAppName: syncAppName,
-    setSplashStatus: setSplashStatus,
-    loadReferenceBootstrap: loadReferenceBootstrap
   };
+
+  window.AppBootstrap = AppBootstrap;
 })(window, document);
