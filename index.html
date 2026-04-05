@@ -907,6 +907,280 @@
       }
     }
 
+    /* =========================
+   FIX STICKY HEADER DASHBOARD FINAL
+   ========================= */
+
+html,
+body {
+  overflow-x: hidden !important;
+}
+
+body,
+#app-shell {
+  overflow: visible !important;
+}
+
+/* penting: jangan biarkan parent dashboard jadi scroll container/transform container */
+#dashboard-screen,
+#dashboard-screen.screen,
+#dashboard-screen.screen.active {
+  overflow: visible !important;
+  transform: none !important;
+  position: relative !important;
+}
+
+#dashboard-screen > .page-content,
+#dashboard-screen > main.page-content {
+  overflow: visible !important;
+}
+
+/* HEADER STICKY */
+.topbar-dashboard {
+  position: -webkit-sticky !important;
+  position: sticky !important;
+  top: calc(env(safe-area-inset-top, 0px) + 6px) !important;
+  z-index: 1200 !important;
+
+  margin: 8px 12px 14px !important;
+  overflow: hidden !important;
+
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 12px !important;
+
+  padding: 16px 18px !important;
+  border-radius: 22px !important;
+  background: linear-gradient(135deg, #39c2f2 0%, #2563eb 58%, #1d43d8 100%) !important;
+  box-shadow: 0 12px 28px rgba(37, 99, 235, 0.16) !important;
+}
+
+.topbar-dashboard::before,
+.topbar-dashboard::after {
+  content: "";
+  position: absolute;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.10);
+  pointer-events: none;
+}
+
+.topbar-dashboard::before {
+  width: 88px;
+  height: 88px;
+  right: 14px;
+  top: -18px;
+}
+
+.topbar-dashboard::after {
+  width: 76px;
+  height: 76px;
+  left: 34%;
+  bottom: -34px;
+}
+
+/* BRAND */
+.topbar-dashboard__brand {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 12px !important;
+  text-align: left;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.topbar-dashboard .topbar-logo {
+  width: 42px !important;
+  height: 42px !important;
+  object-fit: contain !important;
+  flex: 0 0 auto !important;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  outline: none !important;
+  transform: translateY(-1px) !important;
+  filter:
+    drop-shadow(0 1px 0 rgba(255, 255, 255, 0.35))
+    drop-shadow(0 4px 8px rgba(11, 41, 97, 0.18))
+    drop-shadow(0 8px 18px rgba(9, 30, 66, 0.22)) !important;
+}
+
+.topbar-dashboard__brand-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.topbar-dashboard .topbar-title {
+  margin: 0 !important;
+  color: #ffffff !important;
+  font-size: 22px !important;
+  line-height: 1.1 !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.02em !important;
+}
+
+.topbar-dashboard .topbar-subtitle {
+  margin: 4px 0 0 !important;
+  color: rgba(255, 255, 255, 0.92) !important;
+  font-size: 13px !important;
+  line-height: 1.35 !important;
+  font-weight: 500 !important;
+}
+
+/* ACTIONS */
+.topbar-dashboard__actions {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  display: grid !important;
+  grid-template-columns: 0.72fr 1fr 1fr 0.82fr !important;
+  gap: 10px !important;
+  align-items: stretch !important;
+}
+
+.topbar-dashboard__actions > * {
+  min-width: 0 !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.topbar-dashboard__status-badge,
+.topbar-dashboard__btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  height: 38px !important;
+  padding: 0 10px !important;
+  border-radius: 12px !important;
+  font-size: 13px !important;
+  line-height: 1 !important;
+  font-weight: 800 !important;
+  white-space: nowrap !important;
+  text-align: center !important;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.10) !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+/* ONLINE */
+.topbar-dashboard__status-badge {
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+}
+
+/* SINKRONKAN */
+.topbar-dashboard__btn--sync {
+  background: linear-gradient(135deg, #38bdf8 0%, #2563eb 100%) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+}
+
+/* PENGATURAN */
+.topbar-dashboard__btn--settings {
+  background: linear-gradient(135deg, #64748b 0%, #475569 100%) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+}
+
+/* KELUAR */
+.topbar-dashboard__btn--logout {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+}
+
+.topbar-dashboard__btn:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.03);
+}
+
+.topbar-dashboard__btn:active {
+  transform: translateY(0);
+}
+
+/* agar card pertama tidak terlalu menempel */
+#dashboard-screen > .page-content {
+  padding-top: 2px !important;
+}
+
+@media (max-width: 900px) {
+  .topbar-dashboard {
+    margin: 8px 10px 12px !important;
+    padding: 14px 14px !important;
+    gap: 10px !important;
+    border-radius: 20px !important;
+  }
+
+  .topbar-dashboard__brand {
+    gap: 10px !important;
+  }
+
+  .topbar-dashboard .topbar-logo {
+    width: 38px !important;
+    height: 38px !important;
+  }
+
+  .topbar-dashboard .topbar-title {
+    font-size: 19px !important;
+  }
+
+  .topbar-dashboard .topbar-subtitle {
+    font-size: 12px !important;
+  }
+
+  .topbar-dashboard__actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 560px) {
+  .topbar-dashboard {
+    top: calc(env(safe-area-inset-top, 0px) + 6px) !important;
+  }
+
+  .topbar-dashboard__brand {
+    flex-direction: column !important;
+    text-align: center !important;
+  }
+
+  .topbar-dashboard__brand-text {
+    align-items: center !important;
+  }
+
+  .topbar-dashboard .topbar-title {
+    font-size: 18px !important;
+  }
+
+  .topbar-dashboard .topbar-subtitle {
+    font-size: 12px !important;
+  }
+
+  .topbar-dashboard__actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+  }
+
+  .topbar-dashboard__status-badge,
+  .topbar-dashboard__btn {
+    height: 36px !important;
+    font-size: 12px !important;
+    border-radius: 11px !important;
+  }
+}
+
   </style>
 </head>
 <body>
@@ -1009,47 +1283,47 @@
     <!-- DASHBOARD -->
     <section id="dashboard-screen" class="screen hidden">
       <header class="topbar topbar-dashboard">
-        <div class="topbar-dashboard__brand">
-          <img src="./assets/img/logo.png" alt="Logo TPK" class="topbar-logo" />
+  <div class="topbar-dashboard__brand">
+    <img src="./assets/img/logo.png" alt="Logo TPK" class="topbar-logo" />
 
-          <div class="topbar-dashboard__brand-text">
-            <h1 class="topbar-title">TPK Kabupaten Buleleng</h1>
-            <p class="topbar-subtitle">
-              Dashboard Kecamatan <span id="header-kecamatan">-</span>
-            </p>
-          </div>
-        </div>
+    <div class="topbar-dashboard__brand-text">
+      <h1 class="topbar-title">TPK Kabupaten Buleleng</h1>
+      <p class="topbar-subtitle">
+        Dashboard Kecamatan <span id="header-kecamatan">-</span>
+      </p>
+    </div>
+  </div>
 
-        <div class="topbar-dashboard__actions">
-          <span id="network-badge" class="badge topbar-dashboard__status-badge">
-            Online
-          </span>
+  <div class="topbar-dashboard__actions">
+    <span id="network-badge" class="badge topbar-dashboard__status-badge">
+      Online
+    </span>
 
-          <button
-            id="btn-sync-now-header"
-            class="btn btn-sm topbar-dashboard__btn topbar-dashboard__btn--sync"
-            type="button"
-          >
-            Sinkronkan
-          </button>
+    <button
+      id="btn-sync-now-header"
+      class="btn btn-sm topbar-dashboard__btn topbar-dashboard__btn--sync"
+      type="button"
+    >
+      Sinkronkan
+    </button>
 
-          <button
-            id="btn-settings"
-            class="btn btn-sm topbar-dashboard__btn topbar-dashboard__btn--settings"
-            type="button"
-          >
-            Pengaturan
-          </button>
+    <button
+      id="btn-settings"
+      class="btn btn-sm topbar-dashboard__btn topbar-dashboard__btn--settings"
+      type="button"
+    >
+      Pengaturan
+    </button>
 
-          <button
-            id="btn-logout"
-            class="btn btn-sm topbar-dashboard__btn topbar-dashboard__btn--logout"
-            type="button"
-          >
-            Keluar
-          </button>
-        </div>
-      </header>
+    <button
+      id="btn-logout"
+      class="btn btn-sm topbar-dashboard__btn topbar-dashboard__btn--logout"
+      type="button"
+    >
+      Keluar
+    </button>
+  </div>
+</header>
 
       <main class="page-content">
         <section class="card card-compact">
