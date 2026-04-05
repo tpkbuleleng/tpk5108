@@ -1,47 +1,139 @@
-(function () {
+(function (window, document) {
   'use strict';
 
-  var STORAGE_FONT_KEY = 'tpk_app_font_size';
-
-  function $(id) {
+  function byId(id) {
     return document.getElementById(id);
   }
 
-  function showToast(message, type) {
-    if (window.Notifier && typeof window.Notifier.show === 'function') {
-      window.Notifier.show(message, type || 'info');
-      return;
+  function normalizeText(value, fallback) {
+    if (value === undefined || value === null || value === '') {
+      return fallback !== undefined ? fallback : '-';
     }
-    if (window.UIHelpers && typeof window.UIHelpers.showToast === 'function') {
-      window.UIHelpers.showToast(message, type || 'info');
-      return;
+    return String(value);
+  }
+
+  function showScreen(screenId) {
+    document.querySelectorAll('.screen').forEach(function (el) {
+      el.classList.add('hidden');
+      el.classList.remove('active');
+    });
+
+    var target = byId(screenId);
+    if (target) {
+      target.classList.remove('hidden');
+      target.classList.add('active');
+      return true;
     }
-    alert(message);
+
+    return false;
+  }
+
+  function setText(id, value, fallback) {
+    var el = byId(id);
+    if (!el) return;
+    el.textContent = normalizeText(value, fallback);
+  }
+
+  function setHTML(id, html) {
+    var el = byId(id);
+    if (!el) return;
+    el.innerHTML = html || '';
+  }
+
+  function setValue(id, value) {
+    var el = byId(id);
+    if (!el) return;
+    el.value = value !== undefined && value !== null ? value : '';
+  }
+
+  function toggleHidden(id, shouldHide) {
+    var el = byId(id);
+    if (!el) return;
+    el.classList.toggle('hidden', shouldHide !== false);
+  }
+
+  function setLoading(buttonId, isLoading, loadingText) {
+    var btn = byId(buttonId);
+    if (!btn) return;
+
+    var nextLoadingText = loadingText || 'Memproses...';
+
+    if (isLoading) {
+      if (!btn.dataset.originalText) {
+        btn.dataset.originalText = btn.textContent;
+      }
+      btn.disabled = true;
+      btn.textContent = nextLoadingText;
+    } else {
+      btn.disabled = false;
+      btn.textContent = btn.dataset.originalText || btn.textContent;
+      delete btn.dataset.originalText;
+    }
+  }
+
+  function qs(selector, root) {
+    return (root || document).querySelector(selector);
+  }
+
+  function qsa(selector, root) {
+    return Array.from((root || document).querySelectorAll(selector));
   }
 
   function openModal(modalId) {
-    var modal = $(modalId);
-    if (!modal) return;
+    var modal = byId(modalId);
+    if (!modal) return false;
+
     modal.classList.remove('hidden');
     modal.classList.add('active');
     modal.setAttribute('aria-hidden', 'false');
+    return true;
   }
 
   function closeModal(modalId) {
-    var modal = $(modalId);
-    if (!modal) return;
+    var modal = byId(modalId);
+    if (!modal) return false;
+
     modal.classList.remove('active');
     modal.classList.add('hidden');
     modal.setAttribute('aria-hidden', 'true');
+    return true;
   }
 
   function closeAllModals() {
     ['settings-modal', 'profile-modal', 'help-modal'].forEach(closeModal);
   }
 
-  function getText(id) {
-    var el = $(id);
-    return el ? (el.textContent || '-').trim() : '-';
+  function getText(id, fallback) {
+    var el = byId(id);
+    if (!el) return fallback !== undefined ? fallback : '-';
+    return normalizeText((el.textContent || '').trim(), fallback !== undefined ? fallback : '-');
+  }
+
+  function showToast(message, type) {
+    var toastContainer = byId('toast-container');
+    var toastType = type || 'info';
+
+    if (!toastContainer) {
+      try {
+        window.alert(message);
+      } catch (err) {}
+      return;
+    }
+
+    var toast = document.createElement('div');
+    toast.className = 'toast toast-' + toastType;
+    toast.textContent = normalizeText(message, '');
+
+    toastContainer.appendChild(toast);
+
+    window.setTimeout(function () {
+      toast.classList.add('hidden');
+      window.setTimeout(function () {
+        if (toast.parentNode) {
+          toast.parentNode.removeChild(toast);
+        }
+      }, 220);
+    }, 2600);
   }
 
   function syncProfileModalBasic() {
@@ -56,15 +148,13 @@
     ];
 
     mappings.forEach(function (pair) {
-      var target = $(pair[0]);
-      var sourceValue = getText(pair[1]);
-      if (target) target.textContent = sourceValue;
+      setText(pair[0], getText(pair[1], '-'));
     });
   }
 
   function getAppVersionText() {
-    var footer = $('footer-app-version');
-    var splash = $('app-version');
+    var footer = byId('footer-app-version');
+    var splash = byId('app-version');
 
     if (footer && footer.textContent && footer.textContent.trim() !== '-') {
       return footer.textContent.trim();
@@ -74,61 +164,21 @@
       return splash.textContent.trim();
     }
 
-    if (window.AppConfig && window.AppConfig.APP_VERSION) {
-      return String(window.AppConfig.APP_VERSION);
+    if (window.APP_CONFIG && window.APP_CONFIG.APP_VERSION) {
+      return String(window.APP_CONFIG.APP_VERSION);
     }
 
     return '-';
   }
 
   function syncSettingsVersion() {
-    var versionEl = $('settings-app-version');
-    if (versionEl) versionEl.textContent = getAppVersionText();
-  }
-
-  function applyFontSize(size) {
-    var body = document.body;
-    body.classList.remove('app-size-standard', 'app-size-large', 'app-size-xlarge');
-
-    if (size === 'large') {
-      body.classList.add('app-size-large');
-    } else if (size === 'xlarge') {
-      body.classList.add('app-size-xlarge');
-    } else {
-      body.classList.add('app-size-standard');
-      size = 'standard';
-    }
-
-    try {
-      localStorage.setItem(STORAGE_FONT_KEY, size);
-    } catch (e) {}
-  }
-
-  function loadSavedFontSize() {
-    try {
-      return localStorage.getItem(STORAGE_FONT_KEY) || 'standard';
-    } catch (e) {
-      return 'standard';
-    }
-  }
-
-  function bindFontSizeSetting() {
-    var select = $('setting-font-size');
-    if (!select) return;
-
-    var saved = loadSavedFontSize();
-    select.value = saved;
-    applyFontSize(saved);
-
-    select.addEventListener('change', function () {
-      applyFontSize(select.value);
-      showToast('Ukuran tampilan diperbarui.', 'success');
-    });
+    setText('settings-app-version', getAppVersionText(), '-');
   }
 
   function bindModalButtons() {
-    var btnSettings = $('btn-settings');
-    if (btnSettings) {
+    var btnSettings = byId('btn-settings');
+    if (btnSettings && btnSettings.dataset.bound !== '1') {
+      btnSettings.dataset.bound = '1';
       btnSettings.addEventListener('click', function () {
         syncSettingsVersion();
         openModal('settings-modal');
@@ -142,111 +192,67 @@
       ['btn-close-help', 'help-modal'],
       ['btn-close-help-bottom', 'help-modal']
     ].forEach(function (pair) {
-      var btn = $(pair[0]);
-      if (btn) {
-        btn.addEventListener('click', function () {
-          closeModal(pair[1]);
-        });
-      }
+      var btn = byId(pair[0]);
+      if (!btn || btn.dataset.bound === '1') return;
+
+      btn.dataset.bound = '1';
+      btn.addEventListener('click', function () {
+        closeModal(pair[1]);
+      });
     });
 
     ['settings-modal', 'profile-modal', 'help-modal'].forEach(function (id) {
-      var modal = $(id);
-      if (!modal) return;
+      var modal = byId(id);
+      if (!modal || modal.dataset.bound === '1') return;
+
+      modal.dataset.bound = '1';
       modal.addEventListener('click', function (e) {
-        if (e.target === modal) closeModal(id);
-      });
-    });
-  }
-
-  function bindSettingsActions() {
-    var btnRefresh = $('btn-refresh-app');
-    if (btnRefresh) {
-      btnRefresh.addEventListener('click', function () {
-        showToast('Memuat ulang aplikasi...', 'info');
-        setTimeout(function () {
-          window.location.reload();
-        }, 250);
-      });
-    }
-
-    var btnResetCache = $('btn-reset-light-cache');
-    if (btnResetCache) {
-      btnResetCache.addEventListener('click', async function () {
-        try {
-          if ('caches' in window) {
-            var keys = await caches.keys();
-            await Promise.all(
-              keys.map(function (key) {
-                if (
-                  key.indexOf('workbox') !== -1 ||
-                  key.indexOf('app-shell') !== -1 ||
-                  key.indexOf('static') !== -1 ||
-                  key.indexOf('runtime') !== -1
-                ) {
-                  return caches.delete(key);
-                }
-                return Promise.resolve(false);
-              })
-            );
-          }
-
-          showToast('Cache ringan berhasil dibersihkan.', 'success');
-        } catch (err) {
-          showToast('Reset cache ringan tidak berhasil dijalankan.', 'warning');
+        if (e.target === modal) {
+          closeModal(id);
         }
       });
-    }
-  }
-
-  function bindKeyboardClose() {
-    document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape') closeAllModals();
     });
   }
 
-  function exposeGlobalHooks() {
-    if (!window.App) window.App = {};
+  function bindEscapeClose() {
+    if (document.body.dataset.uiEscapeBound === '1') return;
+    document.body.dataset.uiEscapeBound = '1';
 
-    window.App.openProfileDialog = function () {
-      syncProfileModalBasic();
-      if (window.App.populateProfileForm) {
-        window.App.populateProfileForm();
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') {
+        closeAllModals();
       }
-      openModal('profile-modal');
-    };
-
-    window.App.openHelpDialog = function () {
-      openModal('help-modal');
-    };
-
-    window.App.openSettingsDialog = function () {
-      syncSettingsVersion();
-      openModal('settings-modal');
-    };
-
-    window.App.closeAllModals = closeAllModals;
+    });
   }
 
-  function initUi() {
+  function init() {
     syncSettingsVersion();
     syncProfileModalBasic();
-    bindFontSizeSetting();
     bindModalButtons();
-    bindSettingsActions();
-    bindKeyboardClose();
-    exposeGlobalHooks();
+    bindEscapeClose();
   }
 
-  document.addEventListener('DOMContentLoaded', initUi);
-
-  window.UI = {
-    init: initUi,
+  var UI = {
+    init: init,
+    byId: byId,
+    qs: qs,
+    qsa: qsa,
+    showScreen: showScreen,
+    setText: setText,
+    setHTML: setHTML,
+    setValue: setValue,
+    getText: getText,
+    toggleHidden: toggleHidden,
+    setLoading: setLoading,
+    showToast: showToast,
     openModal: openModal,
     closeModal: closeModal,
     closeAllModals: closeAllModals,
-    syncSettingsVersion: syncSettingsVersion,
     syncProfileModalBasic: syncProfileModalBasic,
-    showToast: showToast
+    syncSettingsVersion: syncSettingsVersion
   };
-})();
+
+  window.UI = UI;
+
+  document.addEventListener('DOMContentLoaded', init);
+})(window, document);
