@@ -296,9 +296,9 @@
       var response = await fetch(getApiBaseUrl(), {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json;charset=utf-8'
-        },
-        body: JSON.stringify(body),
+  'Content-Type': 'text/plain;charset=utf-8'
+},
+body: JSON.stringify(body),
         signal: abortState.controller ? abortState.controller.signal : undefined,
         credentials: 'omit',
         redirect: 'follow'
