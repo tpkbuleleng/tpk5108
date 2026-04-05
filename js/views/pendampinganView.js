@@ -1,205 +1,1094 @@
 (function (window, document) {
   'use strict';
 
-  function getSelected() {
-    return (window.AppState && window.AppState.getState().selectedSasaran) ||
-      window.AppStorage.get((window.AppConfig.STORAGE_KEYS || {}).SELECTED_SASARAN, null);
+  var PENDAMPINGAN_DRAFT_KEY = 'tpk_pendampingan_draft';
+  var currentMode = 'create';
+  var currentEditItem = {};
+  var currentDynamicFields = [];
+
+  function byId(id) {
+    return document.getElementById(id);
   }
 
-  function getBootstrapRef() {
-    return (window.AppState && window.AppState.getState().appBootstrap) ||
-      window.AppStorage.get((window.AppConfig.STORAGE_KEYS || {}).APP_BOOTSTRAP, {});
+  function getUI() {
+    return window.UI || null;
   }
 
-  function getFormIdByJenis(jenis) {
-    var ref = getBootstrapRef();
-    var list = (ref && ref.jenis_sasaran) || [];
-    var found = (list || []).find(function (row) {
-      return String(row.code || row.label || '').toUpperCase() === String(jenis || '').toUpperCase();
-    });
-    if (found && found.form_id) return found.form_id;
-    var fallback = { CATIN: 'FRM0002', BUMIL: 'FRM0003', BUFAS: 'FRM0004', BADUTA: 'FRM0005' };
-    return fallback[String(jenis || '').toUpperCase()] || 'FRM0001';
+  function getApi() {
+    return window.Api || null;
   }
 
-  function renderSelectedInfo(item) {
-    item = item || {};
-    var profile = (window.AppState && window.AppState.getState().profile) || {};
-
-    window.AppUtils.setText('pendampingan-nama-sasaran', item.nama_sasaran);
-    window.AppUtils.setText('pendampingan-id-sasaran', 'ID Sasaran: ' + (item.id_sasaran || '-'), 'ID Sasaran: -');
-    window.AppUtils.setText('pendampingan-status-badge', item.status_sasaran || '-');
-    window.AppUtils.setText('pendampingan-jenis', item.jenis_sasaran);
-    window.AppUtils.setText('pendampingan-wilayah', item.wilayah || item.alamat);
-    window.AppUtils.setText('pendampingan-kader', profile.nama_user || profile.nama_kader);
-    window.AppUtils.setText('pendampingan-tim', profile.nama_tim || profile.id_tim);
+  function getState() {
+    return window.AppState || null;
   }
 
-  async function loadFormDefinition(jenis) {
-    var dynamicBox = document.getElementById('pendampingan-dynamic-fields');
-    if (!dynamicBox) return null;
-    if (!jenis) {
-      dynamicBox.innerHTML = '<p class="muted-text">Field pendampingan akan dimuat otomatis.</p>';
-      return null;
+  function getStorage() {
+    return window.Storage || null;
+  }
+
+  function getConfig() {
+    return window.APP_CONFIG || {};
+  }
+
+  function getActions() {
+    return getConfig().API_ACTIONS || {};
+  }
+
+  function getStorageKeys() {
+    return getConfig().STORAGE_KEYS || {};
+  }
+
+  function showToast(message, type) {
+    var ui = getUI();
+    if (ui && typeof ui.showToast === 'function') {
+      ui.showToast(message, type || 'info');
+      return;
     }
+
     try {
-      var action = (window.AppConfig.API_ACTIONS || {}).GET_FORM_DEFINITION || 'getFormDefinition';
-      var result = await window.Api.post(action, { jenis_sasaran: jenis, form_id: getFormIdByJenis(jenis) });
-      if (!(result && result.ok)) throw new Error(window.Api.getMessage(result, 'Definisi form pendampingan gagal dimuat.'));
-      var data = window.Api.getData(result);
-      var fields = data.fields || [];
-      if (!fields.length) {
-        dynamicBox.innerHTML = '<div class="dynamic-field-card"><strong>' + window.AppUtils.escapeHtml(jenis) + '</strong><p class="muted-text">Definisi form belum tersedia atau masih kosong.</p></div>';
-      } else {
-        dynamicBox.innerHTML = fields.map(function (field) {
-          return '<div class="dynamic-field-card"><strong>' + window.AppUtils.escapeHtml(field.label || field.key || 'Field') + '</strong><p class="muted-text">Tipe: ' + window.AppUtils.escapeHtml(field.type || 'text') + '</p></div>';
-        }).join('');
-      }
-      return data;
-    } catch (err) {
-      dynamicBox.innerHTML = '<div class="dynamic-field-card"><strong>' + window.AppUtils.escapeHtml(jenis) + '</strong><p class="muted-text">Field dinamis belum tersedia.</p></div>';
-      return null;
+      window.alert(message);
+    } catch (err) {}
+  }
+
+  function setText(id, value) {
+    var ui = getUI();
+    if (ui && typeof ui.setText === 'function') {
+      ui.setText(id, value);
+      return;
+    }
+
+    var el = byId(id);
+    if (el) {
+      el.textContent = (value === undefined || value === null || value === '') ? '-' : String(value);
     }
   }
 
-  function buildPayload() {
-    var selected = getSelected() || {};
-    var profile = (window.AppState && window.AppState.getState().profile) || {};
-    var dateValue = (document.getElementById('pen-tanggal') || {}).value || '';
-    var parts = dateValue ? dateValue.split('-') : [];
+  function setHTML(id, html) {
+    var ui = getUI();
+    if (ui && typeof ui.setHTML === 'function') {
+      ui.setHTML(id, html);
+      return;
+    }
+
+    var el = byId(id);
+    if (el) {
+      el.innerHTML = html || '';
+    }
+  }
+
+  function setValue(id, value) {
+    var ui = getUI();
+    if (ui && typeof ui.setValue === 'function') {
+      ui.setValue(id, value);
+      return;
+    }
+
+    var el = byId(id);
+    if (el) {
+      el.value = value !== undefined && value !== null ? value : '';
+    }
+  }
+
+  function toggleHidden(id, shouldHide) {
+    var ui = getUI();
+    if (ui && typeof ui.toggleHidden === 'function') {
+      ui.toggleHidden(id, shouldHide);
+      return;
+    }
+
+    var el = byId(id);
+    if (!el) return;
+    el.classList.toggle('hidden', !!shouldHide);
+  }
+
+  function setLoading(buttonId, isLoading, loadingText) {
+    var ui = getUI();
+    if (ui && typeof ui.setLoading === 'function') {
+      ui.setLoading(buttonId, isLoading, loadingText || 'Memproses...');
+      return;
+    }
+
+    var btn = byId(buttonId);
+    if (!btn) return;
+
+    if (isLoading) {
+      if (!btn.dataset.originalText) {
+        btn.dataset.originalText = btn.textContent;
+      }
+      btn.disabled = true;
+      btn.textContent = loadingText || 'Memproses...';
+    } else {
+      btn.disabled = false;
+      btn.textContent = btn.dataset.originalText || btn.textContent;
+      delete btn.dataset.originalText;
+    }
+  }
+
+  function escapeHtml(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function parseJsonSafely(raw, fallback) {
+    if (!raw) return fallback;
+    if (typeof raw === 'object') return raw;
+
+    try {
+      return JSON.parse(raw);
+    } catch (err) {
+      return fallback;
+    }
+  }
+
+  function isRequired(value) {
+    return String(value || '').trim() !== '';
+  }
+
+  function todayIso() {
+    var today = new Date();
+    var yyyy = today.getFullYear();
+    var mm = String(today.getMonth() + 1).padStart(2, '0');
+    var dd = String(today.getDate()).padStart(2, '0');
+    return yyyy + '-' + mm + '-' + dd;
+  }
+
+  function generateClientSubmitId(prefix) {
+    var safePrefix = prefix || 'SUB';
+
+    try {
+      if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+        return safePrefix + '-' + window.crypto.randomUUID();
+      }
+    } catch (err) {}
+
+    return safePrefix + '-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8).toUpperCase();
+  }
+
+  function getProfile() {
+    var state = getState();
+    if (state && typeof state.getProfile === 'function') {
+      return state.getProfile() || {};
+    }
+
+    var storage = getStorage();
+    var keys = getStorageKeys();
+    if (storage && typeof storage.get === 'function' && keys.PROFILE) {
+      return storage.get(keys.PROFILE, {}) || {};
+    }
+
+    return {};
+  }
+
+  function getSelectedSasaran() {
+    var state = getState();
+    if (state && typeof state.getSelectedSasaran === 'function') {
+      return state.getSelectedSasaran() || {};
+    }
+    return {};
+  }
+
+  function setSelectedSasaran(item) {
+    var state = getState();
+    if (state && typeof state.setSelectedSasaran === 'function') {
+      state.setSelectedSasaran(item || {});
+    }
+  }
+
+  function setMode(mode) {
+    currentMode = String(mode || 'create').toLowerCase() === 'edit' ? 'edit' : 'create';
+
+    var state = getState();
+    if (state && typeof state.setPendampinganMode === 'function') {
+      state.setPendampinganMode(currentMode);
+    }
+  }
+
+  function getMode() {
+    return currentMode || 'create';
+  }
+
+  function setEditItem(item) {
+    currentEditItem = item && typeof item === 'object' ? item : {};
+  }
+
+  function getEditItem() {
+    return currentEditItem || {};
+  }
+
+  function clearEditItem() {
+    currentEditItem = {};
+  }
+
+  function getLocalDraft() {
+    var storage = getStorage();
+    if (!storage || typeof storage.get !== 'function') return null;
+    return storage.get(PENDAMPINGAN_DRAFT_KEY, null);
+  }
+
+  function saveLocalDraft(data) {
+    var storage = getStorage();
+    if (!storage || typeof storage.set !== 'function') return;
+    storage.set(PENDAMPINGAN_DRAFT_KEY, {
+      saved_at: new Date().toISOString(),
+      data: data || {}
+    });
+  }
+
+  function clearLocalDraft() {
+    var storage = getStorage();
+    if (!storage || typeof storage.remove !== 'function') return;
+    storage.remove(PENDAMPINGAN_DRAFT_KEY);
+  }
+
+  function getSyncQueue() {
+    var storage = getStorage();
+    var keys = getStorageKeys();
+
+    if (!storage || typeof storage.get !== 'function' || !keys.SYNC_QUEUE) {
+      return [];
+    }
+
+    var queue = storage.get(keys.SYNC_QUEUE, []);
+    return Array.isArray(queue) ? queue : [];
+  }
+
+  function saveSyncQueue(queue) {
+    var storage = getStorage();
+    var keys = getStorageKeys();
+    var state = getState();
+
+    if (!storage || typeof storage.set !== 'function' || !keys.SYNC_QUEUE) return;
+
+    var safeQueue = Array.isArray(queue) ? queue : [];
+    storage.set(keys.SYNC_QUEUE, safeQueue);
+
+    if (state && typeof state.setSyncQueue === 'function') {
+      state.setSyncQueue(safeQueue);
+    }
+  }
+
+  function enqueueOffline(action, payload) {
+    var queue = getSyncQueue();
+
+    var item = {
+      id: payload.client_submit_id || generateClientSubmitId('QUEUE'),
+      action: action,
+      payload: Object.assign({}, payload, {
+        sync_source: 'OFFLINE'
+      }),
+      status: 'PENDING',
+      created_at: new Date().toISOString()
+    };
+
+    queue.push(item);
+    saveSyncQueue(queue);
+    return item;
+  }
+
+  function getFormIdByJenis(jenisSasaran) {
+    var config = getConfig();
+    var formIds = config.FORM_IDS || {};
+    var key = String(jenisSasaran || '').toUpperCase();
+
+    return formIds[key] || formIds.UMUM || 'FRM0001';
+  }
+
+  function normalizeDynamicField(field, index) {
+    var raw = field || {};
+    var id = raw.id || raw.question_code || raw.key || raw.name || raw.field_id || ('field_' + index);
+    var type = String(raw.type || raw.input_type || raw.component || 'text').toLowerCase();
+
+    if (type === 'string') type = 'text';
+    if (type === 'dropdown') type = 'select';
+
     return {
-      client_submit_id: window.AppUtils.randomId('PEN'),
-      sync_source: navigator.onLine ? 'ONLINE' : 'OFFLINE_DRAFT',
-      id_sasaran: selected.id_sasaran || '',
-      nama_sasaran: selected.nama_sasaran || '',
-      jenis_sasaran: selected.jenis_sasaran || '',
-      id_user: profile.id_user || '',
-      id_tim: profile.id_tim || '',
-      tanggal_pendampingan: dateValue,
-      periode_tahun: parts[0] || '',
-      periode_bulan: parts[1] || '',
-      status_kunjungan: (document.getElementById('pen-status-kunjungan') || {}).value || '',
-      catatan_umum: (document.getElementById('pen-catatan-umum') || {}).value || '',
-      form_id: getFormIdByJenis(selected.jenis_sasaran || '')
+      id: String(id),
+      label: String(raw.label || raw.question || raw.title || id),
+      type: type,
+      required: raw.required === true || raw.is_required === true,
+      placeholder: String(raw.placeholder || ''),
+      options: Array.isArray(raw.options)
+        ? raw.options
+        : (typeof raw.options === 'string'
+            ? raw.options.split(',').map(function (v) { return v.trim(); }).filter(Boolean)
+            : []),
+      rows: raw.rows || 3
     };
   }
 
-  function renderValidation(messages, type) {
-    var box = document.getElementById('pendampingan-validation-box');
-    if (!box) return;
-    if (!messages || !messages.length) {
-      box.innerHTML = '<p class="muted-text">Validasi pendampingan akan tampil di sini.</p>';
+  function normalizeDynamicFieldsResponse(data, jenisSasaran) {
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data && data.fields)) return data.fields;
+    if (Array.isArray(data && data.questions)) return data.questions;
+    return getFallbackFields(jenisSasaran);
+  }
+
+  function getFallbackFields(jenisSasaran) {
+    var key = String(jenisSasaran || '').toUpperCase();
+
+    var map = {
+      CATIN: [
+        { question_code: 'kunjungan_persiapan_nikah', label: 'Kunjungan Persiapan Nikah', type: 'select', required: false, options: ['SUDAH', 'BELUM'] },
+        { question_code: 'edukasi_gizi', label: 'Edukasi Gizi', type: 'select', required: false, options: ['YA', 'TIDAK'] },
+        { question_code: 'catatan_catin', label: 'Catatan CATIN', type: 'textarea', required: false }
+      ],
+      BUMIL: [
+        { question_code: 'kontrol_kehamilan', label: 'Kontrol Kehamilan', type: 'select', required: false, options: ['RUTIN', 'TIDAK_RUTIN'] },
+        { question_code: 'tablet_tambah_darah', label: 'Tablet Tambah Darah', type: 'select', required: false, options: ['YA', 'TIDAK'] },
+        { question_code: 'catatan_bumil', label: 'Catatan BUMIL', type: 'textarea', required: false }
+      ],
+      BUFAS: [
+        { question_code: 'kunjungan_nifas', label: 'Kunjungan Nifas', type: 'select', required: false, options: ['YA', 'TIDAK'] },
+        { question_code: 'kondisi_ibu', label: 'Kondisi Ibu', type: 'text', required: false },
+        { question_code: 'catatan_bufas', label: 'Catatan BUFAS', type: 'textarea', required: false }
+      ],
+      BADUTA: [
+        { question_code: 'berat_badan', label: 'Berat Badan', type: 'text', required: false },
+        { question_code: 'asi_eksklusif', label: 'ASI Eksklusif', type: 'select', required: false, options: ['YA', 'TIDAK'] },
+        { question_code: 'catatan_baduta', label: 'Catatan BADUTA', type: 'textarea', required: false }
+      ]
+    };
+
+    return map[key] || [];
+  }
+
+  function renderDynamicFields(fields, values) {
+    var safeFields = Array.isArray(fields) ? fields.map(normalizeDynamicField) : [];
+    currentDynamicFields = safeFields;
+
+    if (!safeFields.length) {
+      setHTML(
+        'pendampingan-dynamic-fields',
+        '<p class="muted-text">Tidak ada pertanyaan khusus untuk jenis sasaran ini.</p>'
+      );
       return;
     }
-    box.innerHTML = '<ul class="validation-list">' +
-      messages.map(function (message) {
-        return '<li class="validation-item-' + (type || 'warn') + '">' + window.AppUtils.escapeHtml(message) + '</li>';
-      }).join('') +
-      '</ul>';
+
+    var safeValues = values && typeof values === 'object' ? values : {};
+
+    var html = safeFields.map(function (field) {
+      var value = safeValues[field.id];
+      var requiredMark = field.required ? ' *' : '';
+      var inputHtml = '';
+
+      if (field.type === 'textarea') {
+        inputHtml = [
+          '<textarea',
+          ' id="dyn-pen-' + escapeHtml(field.id) + '"',
+          ' data-dynamic-field="' + escapeHtml(field.id) + '"',
+          ' rows="' + escapeHtml(field.rows) + '"',
+          field.required ? ' required' : '',
+          field.placeholder ? ' placeholder="' + escapeHtml(field.placeholder) + '"' : '',
+          '>',
+          escapeHtml(value || ''),
+          '</textarea>'
+        ].join('');
+      } else if (field.type === 'select') {
+        inputHtml = [
+          '<select',
+          ' id="dyn-pen-' + escapeHtml(field.id) + '"',
+          ' data-dynamic-field="' + escapeHtml(field.id) + '"',
+          field.required ? ' required' : '',
+          '>',
+          '<option value="">Pilih</option>',
+          (field.options || []).map(function (opt) {
+            var optionValue = typeof opt === 'object'
+              ? String(opt.value || opt.code || opt.id || opt.label || '')
+              : String(opt);
+            var optionLabel = typeof opt === 'object'
+              ? String(opt.label || opt.name || opt.text || optionValue)
+              : optionValue;
+            var selected = String(value || '') === optionValue ? ' selected' : '';
+            return '<option value="' + escapeHtml(optionValue) + '"' + selected + '>' + escapeHtml(optionLabel) + '</option>';
+          }).join(''),
+          '</select>'
+        ].join('');
+      } else if (field.type === 'checkbox') {
+        inputHtml = [
+          '<label style="display:flex;align-items:center;gap:8px;min-height:46px;">',
+          '<input',
+          ' type="checkbox"',
+          ' id="dyn-pen-' + escapeHtml(field.id) + '"',
+          ' data-dynamic-field="' + escapeHtml(field.id) + '"',
+          value ? ' checked' : '',
+          ' />',
+          '<span>Pilih</span>',
+          '</label>'
+        ].join('');
+      } else {
+        var inputType = 'text';
+        if (field.type === 'number') inputType = 'number';
+        if (field.type === 'date') inputType = 'date';
+
+        inputHtml = [
+          '<input',
+          ' id="dyn-pen-' + escapeHtml(field.id) + '"',
+          ' data-dynamic-field="' + escapeHtml(field.id) + '"',
+          ' type="' + escapeHtml(inputType) + '"',
+          field.required ? ' required' : '',
+          field.placeholder ? ' placeholder="' + escapeHtml(field.placeholder) + '"' : '',
+          ' value="' + escapeHtml(value || '') + '"',
+          ' />'
+        ].join('');
+      }
+
+      return [
+        '<div class="form-group">',
+        '<label for="dyn-pen-' + escapeHtml(field.id) + '">' + escapeHtml(field.label) + requiredMark + '</label>',
+        inputHtml,
+        '</div>'
+      ].join('');
+    }).join('');
+
+    setHTML('pendampingan-dynamic-fields', '<div class="filters-grid">' + html + '</div>');
   }
 
-  function validate(payload) {
-    var errors = [];
-    if (!payload.id_sasaran) errors.push('Pilih sasaran terlebih dahulu dari daftar sasaran.');
-    if (!payload.tanggal_pendampingan) errors.push('Tanggal pendampingan wajib diisi.');
-    return errors;
+  function collectDynamicFields() {
+    var values = {};
+
+    currentDynamicFields.forEach(function (field) {
+      var el = byId('dyn-pen-' + field.id);
+      if (!el) return;
+
+      if (field.type === 'checkbox') {
+        values[field.id] = !!el.checked;
+      } else {
+        values[field.id] = String(el.value || '').trim();
+      }
+    });
+
+    return values;
   }
 
-  function resetForm() {
-    var form = document.getElementById('pendampingan-form');
-    if (form) form.reset();
-    document.getElementById('pendampingan-mode-badge').textContent = 'CREATE';
-    document.getElementById('pendampingan-mode-info').textContent = 'Mode input baru';
-    renderValidation([]);
+  function fillDynamicFields(extra) {
+    var safeExtra = extra && typeof extra === 'object' ? extra : {};
+
+    currentDynamicFields.forEach(function (field) {
+      var el = byId('dyn-pen-' + field.id);
+      if (!el) return;
+
+      var value = safeExtra[field.id];
+
+      if (field.type === 'checkbox') {
+        el.checked = !!value;
+      } else {
+        el.value = value !== undefined && value !== null ? value : '';
+      }
+    });
   }
 
-  function bindActions() {
-    var backBtn = document.getElementById('btn-back-from-pendampingan');
-    if (backBtn && !backBtn.dataset.bound) {
-      backBtn.dataset.bound = '1';
-      backBtn.addEventListener('click', function () {
-        window.AppRouter.goTo((window.AppConfig.SCREENS || {}).SASARAN_DETAIL || 'sasaran-detail-screen');
-      });
-    }
+  function normalizePendampinganDetailResponse(result) {
+    var data = (result && result.data) || {};
 
-    var draftBtn = document.getElementById('btn-save-pen-draft');
-    if (draftBtn && !draftBtn.dataset.bound) {
-      draftBtn.dataset.bound = '1';
-      draftBtn.addEventListener('click', function () {
-        var payload = buildPayload();
-        window.AppStorage.pushQueue({
-          client_submit_id: payload.client_submit_id,
-          action: (window.AppConfig.API_ACTIONS || {}).SUBMIT_PENDAMPINGAN || 'submitPendampingan',
-          entity: 'pendampingan',
-          status: 'PENDING',
-          created_at: new Date().toISOString(),
-          payload: payload
+    if (data.item && typeof data.item === 'object') return data.item;
+    if (data.detail && typeof data.detail === 'object') return data.detail;
+    if (typeof data === 'object' && !Array.isArray(data)) return data;
+
+    return {};
+  }
+
+  function normalizePendampinganDetail(item) {
+    var raw = item || {};
+
+    return {
+      id_pendampingan: raw.id_pendampingan || raw.id || '',
+      id_sasaran: raw.id_sasaran || '',
+      nama_sasaran: raw.nama_sasaran || '',
+      jenis_sasaran: raw.jenis_sasaran || '',
+      status_sasaran: raw.status_sasaran || raw.status || 'AKTIF',
+      nama_wilayah: raw.nama_wilayah || '',
+      nama_kecamatan: raw.nama_kecamatan || raw.kecamatan || '',
+      nama_desa: raw.nama_desa || raw.desa_kelurahan || raw.desa || '',
+      nama_dusun: raw.nama_dusun || raw.dusun_rw || raw.dusun || '',
+      tanggal_pendampingan: raw.tanggal_pendampingan || raw.submit_at || '',
+      status_kunjungan: raw.status_kunjungan || '',
+      catatan_umum: raw.catatan_umum || '',
+      extra_fields: raw.extra_fields || parseJsonSafely(raw.extra_fields_json, {}),
+      extra_fields_json: raw.extra_fields_json || '',
+      revision_no: raw.revision_no || 1,
+      raw: raw
+    };
+  }
+
+  var PendampinganView = {
+    init: function () {
+      this.bindEvents();
+      this.bindAutosave();
+    },
+
+    openCreate: async function (selectedItem) {
+      this.init();
+
+      var selected = selectedItem || getSelectedSasaran();
+
+      if (!selected || !(selected.id_sasaran || selected.id)) {
+        showToast('Pilih sasaran terlebih dahulu.', 'warning');
+
+        if (window.Router && typeof window.Router.go === 'function') {
+          window.Router.go('sasaranList');
+        }
+        return;
+      }
+
+      setSelectedSasaran(selected);
+      setMode('create');
+      clearEditItem();
+
+      if (window.Router && typeof window.Router.go === 'function') {
+        window.Router.go('pendampingan');
+      }
+
+      this.resetForm();
+      this.applyModeUI();
+      this.renderHeader(selected);
+      this.prefillIdentity();
+
+      await this.loadDynamicFields(selected.jenis_sasaran || '');
+      this.tryLoadDraftForSelected();
+      this.renderValidation();
+    },
+
+    openEditById: async function (idPendampingan) {
+      this.init();
+
+      if (!idPendampingan) {
+        showToast('ID pendampingan tidak ditemukan.', 'warning');
+        return;
+      }
+
+      var api = getApi();
+      var actions = getActions();
+
+      try {
+        if (!api || typeof api.post !== 'function') {
+          throw new Error('Api.post belum tersedia.');
+        }
+
+        var result = await api.post(actions.GET_PENDAMPINGAN_BY_ID, {
+          id_pendampingan: idPendampingan
+        }, {
+          includeAuth: true
         });
-        window.AppState.patch({ syncQueue: window.AppStorage.getQueue() });
-        renderValidation(['Draft pendampingan berhasil disimpan offline.'], 'ok');
-        if (window.UI) window.UI.showToast('Draft pendampingan tersimpan.', 'success');
+
+        if (!result || result.ok === false) {
+          throw new Error((result && result.message) || 'Gagal memuat detail pendampingan.');
+        }
+
+        var item = normalizePendampinganDetail(normalizePendampinganDetailResponse(result));
+
+        if (!item.id_pendampingan) {
+          throw new Error('Data detail pendampingan tidak valid.');
+        }
+
+        setMode('edit');
+        setEditItem(item);
+
+        var selected = getSelectedSasaran() || {};
+        var headerItem = {
+          id_sasaran: item.id_sasaran || '',
+          id: item.id_sasaran || '',
+          nama_sasaran: item.nama_sasaran || '',
+          jenis_sasaran: item.jenis_sasaran || '',
+          status_sasaran: item.status_sasaran || 'AKTIF',
+          nama_wilayah:
+            item.nama_wilayah ||
+            selected.nama_wilayah ||
+            [selected.nama_dusun, selected.nama_desa, selected.nama_kecamatan].filter(Boolean).join(' / '),
+          nama_kecamatan: item.nama_kecamatan || selected.nama_kecamatan || '',
+          nama_desa: item.nama_desa || selected.nama_desa || '',
+          nama_dusun: item.nama_dusun || selected.nama_dusun || ''
+        };
+
+        setSelectedSasaran(headerItem);
+
+        if (window.Router && typeof window.Router.go === 'function') {
+          window.Router.go('pendampingan');
+        }
+
+        this.resetForm();
+        this.applyModeUI();
+        this.renderHeader(headerItem);
+        await this.loadDynamicFields(item.jenis_sasaran || '');
+        this.fillForm(item);
+        this.fillDynamicFields(item.extra_fields || parseJsonSafely(item.extra_fields_json, {}));
+        this.renderValidation();
+      } catch (err) {
+        showToast((err && err.message) || 'Gagal membuka mode edit pendampingan.', 'error');
+      }
+    },
+
+    openEdit: async function (idPendampingan) {
+      return this.openEditById(idPendampingan);
+    },
+
+    applyModeUI: function () {
+      var isEdit = getMode() === 'edit';
+
+      setText(
+        'pendampingan-mode-info',
+        isEdit ? 'Mode edit laporan pendampingan' : 'Mode input baru'
+      );
+
+      var submitBtn = byId('btn-submit-pendampingan');
+      if (submitBtn) {
+        submitBtn.textContent = isEdit ? 'Simpan Perubahan' : 'Submit Pendampingan';
+      }
+
+      var badge = byId('pendampingan-mode-badge');
+      if (badge) {
+        badge.textContent = isEdit ? 'EDIT' : 'CREATE';
+        badge.className = 'badge ' + (isEdit ? 'badge-warning' : 'badge-success-soft');
+      }
+
+      toggleHidden('edit-reason-group', !isEdit);
+    },
+
+    renderHeader: function (item) {
+      var profile = getProfile();
+      var safeItem = item || {};
+      var status = safeItem.status_sasaran || safeItem.status || '-';
+
+      var wilayah =
+        safeItem.nama_wilayah ||
+        safeItem.wilayah ||
+        [safeItem.nama_dusun, safeItem.nama_desa, safeItem.nama_kecamatan].filter(Boolean).join(' / ') ||
+        '-';
+
+      setText('pendampingan-nama-sasaran', safeItem.nama_sasaran || safeItem.nama || '-');
+      setText('pendampingan-id-sasaran', 'ID Sasaran: ' + (safeItem.id_sasaran || safeItem.id || '-'));
+      setText('pendampingan-jenis', safeItem.jenis_sasaran || '-');
+      setText('pendampingan-wilayah', wilayah);
+      setText('pendampingan-kader', profile.nama_kader || profile.nama || '-');
+      setText('pendampingan-tim', profile.nama_tim || profile.id_tim || '-');
+
+      var badge = byId('pendampingan-status-badge');
+      if (badge) {
+        badge.textContent = status;
+        badge.className = 'badge ' + this.getStatusBadgeClass(status);
+      }
+    },
+
+    prefillIdentity: function () {
+      var el = byId('pen-tanggal');
+      if (el && !el.value) {
+        el.value = todayIso();
+      }
+    },
+
+    async loadDynamicFields(jenisSasaran) {
+      if (!jenisSasaran) {
+        currentDynamicFields = [];
+        setHTML(
+          'pendampingan-dynamic-fields',
+          '<p class="muted-text">Jenis sasaran tidak tersedia.</p>'
+        );
+        return;
+      }
+
+      var api = getApi();
+      var actions = getActions();
+
+      try {
+        if (!api || typeof api.post !== 'function') {
+          throw new Error('Api.post belum tersedia.');
+        }
+
+        var result = await api.post(actions.GET_FORM_DEFINITION, {
+          jenis_sasaran: jenisSasaran,
+          form_id: getFormIdByJenis(jenisSasaran)
+        }, {
+          includeAuth: true
+        });
+
+        var fields = normalizeDynamicFieldsResponse(result && result.data, jenisSasaran);
+        renderDynamicFields(fields, {});
+      } catch (err) {
+        renderDynamicFields(getFallbackFields(jenisSasaran), {});
+      }
+    },
+
+    fillForm: function (item) {
+      var safeItem = item || {};
+
+      var map = {
+        'pen-tanggal': safeItem.tanggal_pendampingan || '',
+        'pen-status-kunjungan': safeItem.status_kunjungan || '',
+        'pen-catatan-umum': safeItem.catatan_umum || '',
+        'pen-edit-reason': ''
+      };
+
+      Object.keys(map).forEach(function (id) {
+        setValue(id, map[id]);
       });
-    }
+    },
 
-    var resetBtn = document.getElementById('btn-reset-pendampingan');
-    if (resetBtn && !resetBtn.dataset.bound) {
-      resetBtn.dataset.bound = '1';
-      resetBtn.addEventListener('click', resetForm);
-    }
+    fillDynamicFields: function (itemOrExtra) {
+      var extra = itemOrExtra && itemOrExtra.extra_fields ? itemOrExtra.extra_fields : itemOrExtra;
+      if ((!extra || typeof extra !== 'object') && itemOrExtra && itemOrExtra.extra_fields_json) {
+        extra = parseJsonSafely(itemOrExtra.extra_fields_json, {});
+      }
+      fillDynamicFields(extra || {});
+    },
 
-    var form = document.getElementById('pendampingan-form');
-    if (form && !form.dataset.bound) {
-      form.dataset.bound = '1';
-      form.addEventListener('submit', async function (event) {
-        event.preventDefault();
-        var payload = buildPayload();
-        var errors = validate(payload);
-        if (errors.length) {
-          renderValidation(errors, 'error');
-          if (window.UI) window.UI.showToast('Periksa validasi pendampingan.', 'warning');
+    collectFormData: function () {
+      var selected = getSelectedSasaran() || {};
+      var profile = getProfile() || {};
+      var editItem = getEditItem() || {};
+      var mode = getMode();
+      var localDraft = (getLocalDraft() && getLocalDraft().data) || {};
+
+      var stableClientSubmitId = mode === 'create'
+        ? (localDraft.client_submit_id || generateClientSubmitId('SUB'))
+        : '';
+
+      return {
+        mode: mode,
+        id_pendampingan: mode === 'edit' ? (editItem.id_pendampingan || '') : '',
+        id_sasaran: selected.id_sasaran || selected.id || editItem.id_sasaran || '',
+        jenis_sasaran: selected.jenis_sasaran || editItem.jenis_sasaran || '',
+        form_id: getFormIdByJenis(selected.jenis_sasaran || editItem.jenis_sasaran || ''),
+        nama_sasaran: selected.nama_sasaran || selected.nama || editItem.nama_sasaran || '',
+        tanggal_pendampingan: (byId('pen-tanggal') && byId('pen-tanggal').value) || '',
+        status_kunjungan: (byId('pen-status-kunjungan') && byId('pen-status-kunjungan').value) || '',
+        catatan_umum: ((byId('pen-catatan-umum') && byId('pen-catatan-umum').value) || '').trim(),
+        edit_reason: ((byId('pen-edit-reason') && byId('pen-edit-reason').value) || '').trim(),
+        id_user: profile.id_user || '',
+        id_kader: profile.id_kader || '',
+        nama_kader: profile.nama_kader || profile.nama || '',
+        id_tim: profile.id_tim || selected.id_tim || '',
+        nama_tim: profile.nama_tim || selected.nama_tim || '',
+        nama_kecamatan: selected.nama_kecamatan || '',
+        nama_desa: selected.nama_desa || '',
+        nama_dusun: selected.nama_dusun || '',
+        client_submit_id: stableClientSubmitId,
+        sync_source: 'ONLINE',
+        extra_fields: collectDynamicFields()
+      };
+    },
+
+    validate: function (data) {
+      var issues = [];
+      var mode = getMode();
+
+      if (!isRequired(data.id_sasaran)) {
+        issues.push({ type: 'error', text: 'ID sasaran tidak ditemukan. Pilih sasaran kembali.' });
+      }
+
+      if (!isRequired(data.jenis_sasaran)) {
+        issues.push({ type: 'error', text: 'Jenis sasaran tidak tersedia.' });
+      }
+
+      if (!isRequired(data.tanggal_pendampingan)) {
+        issues.push({ type: 'error', text: 'Tanggal pendampingan wajib diisi.' });
+      }
+
+      if (!isRequired(data.id_tim)) {
+        issues.push({ type: 'error', text: 'ID tim tidak tersedia pada sesi login/data sasaran.' });
+      }
+
+      if (!isRequired(data.id_user) && !isRequired(data.id_kader) && mode === 'create') {
+        issues.push({ type: 'error', text: 'ID pengguna login tidak tersedia.' });
+      }
+
+      if (!data.status_kunjungan) {
+        issues.push({ type: 'warn', text: 'Status kunjungan belum dipilih.' });
+      }
+
+      if (mode === 'edit') {
+        if (!isRequired(data.id_pendampingan)) {
+          issues.push({ type: 'error', text: 'ID pendampingan tidak ditemukan.' });
+        }
+
+        if (!isRequired(data.edit_reason)) {
+          issues.push({ type: 'error', text: 'Alasan edit wajib diisi.' });
+        }
+      }
+
+      currentDynamicFields.forEach(function (field) {
+        if (field.required) {
+          var value = data.extra_fields && data.extra_fields[field.id];
+          var missing = field.type === 'checkbox' ? value !== true : !isRequired(value);
+          if (missing) {
+            issues.push({ type: 'error', text: field.label + ' wajib diisi.' });
+          }
+        }
+      });
+
+      if (!issues.some(function (item) { return item.type === 'error'; })) {
+        issues.push({ type: 'ok', text: 'Validasi dasar pendampingan lolos.' });
+      }
+
+      return issues;
+    },
+
+    renderValidation: function () {
+      var data = this.collectFormData();
+      var issues = this.validate(data);
+
+      var html = '<ul class="validation-list">' + issues.map(function (issue) {
+        return '<li class="validation-item-' + escapeHtml(issue.type) + '">' + escapeHtml(issue.text) + '</li>';
+      }).join('') + '</ul>';
+
+      setHTML('pendampingan-validation-box', html);
+    },
+
+    resetForm: function () {
+      var form = byId('pendampingan-form');
+      if (form) form.reset();
+
+      currentDynamicFields = [];
+
+      setHTML(
+        'pendampingan-dynamic-fields',
+        '<p class="muted-text">Field pendampingan akan dimuat otomatis.</p>'
+      );
+
+      setValue('pen-edit-reason', '');
+    },
+
+    tryLoadDraftForSelected: function () {
+      if (getMode() !== 'create') return;
+
+      var draft = getLocalDraft();
+      var selected = getSelectedSasaran() || {};
+      if (!draft || !draft.data) return;
+
+      var sameTarget = String(draft.data.id_sasaran || '') === String(selected.id_sasaran || selected.id || '');
+      if (!sameTarget) return;
+
+      setValue('pen-tanggal', draft.data.tanggal_pendampingan || '');
+      setValue('pen-status-kunjungan', draft.data.status_kunjungan || '');
+      setValue('pen-catatan-umum', draft.data.catatan_umum || '');
+
+      fillDynamicFields(draft.data.extra_fields || {});
+    },
+
+    autosaveDraft: function () {
+      if (getMode() !== 'create') return;
+      saveLocalDraft(this.collectFormData());
+    },
+
+    bindAutosave: function () {
+      var self = this;
+      var form = byId('pendampingan-form');
+      if (!form || form.dataset.autosaveBound === '1') return;
+
+      form.dataset.autosaveBound = '1';
+
+      form.addEventListener('input', function () {
+        self.renderValidation();
+        self.autosaveDraft();
+      });
+
+      form.addEventListener('change', function () {
+        self.renderValidation();
+        self.autosaveDraft();
+      });
+    },
+
+    bindEvents: function () {
+      var self = this;
+
+      [
+        ['btn-back-from-pendampingan', function () {
+          var selected = getSelectedSasaran();
+          if (selected && (selected.id_sasaran || selected.id) && window.SasaranDetailView && typeof window.SasaranDetailView.open === 'function') {
+            window.SasaranDetailView.open(selected.id_sasaran || selected.id);
+            return;
+          }
+
+          if (window.Router && typeof window.Router.go === 'function') {
+            window.Router.go('sasaranList');
+          }
+        }],
+        ['btn-save-pen-draft', function () {
+          self.autosaveDraft();
+          showToast('Draft pendampingan disimpan.', 'success');
+        }],
+        ['btn-reset-pendampingan', function () {
+          clearLocalDraft();
+          self.resetForm();
+          self.applyModeUI();
+          self.prefillIdentity();
+          self.renderValidation();
+        }]
+      ].forEach(function (entry) {
+        var btn = byId(entry[0]);
+        if (!btn || btn.dataset.bound === '1') return;
+
+        btn.dataset.bound = '1';
+        btn.addEventListener('click', entry[1]);
+      });
+
+      var form = byId('pendampingan-form');
+      if (form && form.dataset.submitBound !== '1') {
+        form.dataset.submitBound = '1';
+        form.addEventListener('submit', function (event) {
+          event.preventDefault();
+          self.submit();
+        });
+      }
+    },
+
+    submit: async function () {
+      var api = getApi();
+      var actions = getActions();
+
+      if (!api || typeof api.post !== 'function') {
+        showToast('Api.post belum tersedia.', 'error');
+        return;
+      }
+
+      var mode = getMode();
+      var editItem = getEditItem() || {};
+      var data = this.collectFormData();
+      var issues = this.validate(data);
+      var hasError = issues.some(function (item) { return item.type === 'error'; });
+
+      this.renderValidation();
+
+      if (hasError) {
+        showToast('Periksa kembali form pendampingan.', 'warning');
+        return;
+      }
+
+      setLoading(
+        'btn-submit-pendampingan',
+        true,
+        mode === 'edit' ? 'Menyimpan...' : 'Mengirim...'
+      );
+
+      try {
+        var payload;
+        var action;
+
+        if (mode === 'edit') {
+          action = actions.EDIT_PENDAMPINGAN;
+          payload = {
+            id_pendampingan: editItem.id_pendampingan || data.id_pendampingan,
+            tanggal_pendampingan: data.tanggal_pendampingan,
+            status_kunjungan: data.status_kunjungan,
+            catatan_umum: data.catatan_umum,
+            extra_fields: data.extra_fields,
+            extra_fields_json: JSON.stringify(data.extra_fields || {}),
+            edit_reason: data.edit_reason,
+            sync_source: 'ONLINE'
+          };
+        } else {
+          action = actions.SUBMIT_PENDAMPINGAN;
+          payload = {
+            id_sasaran: data.id_sasaran,
+            jenis_sasaran: data.jenis_sasaran,
+            form_id: data.form_id,
+            nama_sasaran: data.nama_sasaran,
+            tanggal_pendampingan: data.tanggal_pendampingan,
+            status_kunjungan: data.status_kunjungan,
+            catatan_umum: data.catatan_umum,
+            id_user: data.id_user,
+            id_kader: data.id_kader,
+            nama_kader: data.nama_kader,
+            id_tim: data.id_tim,
+            nama_tim: data.nama_tim,
+            nama_kecamatan: data.nama_kecamatan,
+            nama_desa: data.nama_desa,
+            nama_dusun: data.nama_dusun,
+            client_submit_id: data.client_submit_id,
+            sync_source: 'ONLINE',
+            extra_fields: data.extra_fields,
+            extra_fields_json: JSON.stringify(data.extra_fields || {})
+          };
+        }
+
+        if (!navigator.onLine && mode === 'create') {
+          enqueueOffline(action, payload);
+          saveLocalDraft(payload);
+
+          showToast(
+            'Sedang offline. Pendampingan disimpan ke antrean sinkronisasi.',
+            'warning'
+          );
+
+          clearLocalDraft();
+          clearEditItem();
+          setMode('create');
+
+          if (window.Router && typeof window.Router.go === 'function') {
+            window.Router.go('sync');
+          }
+
           return;
         }
 
-        try {
-          var action = (window.AppConfig.API_ACTIONS || {}).SUBMIT_PENDAMPINGAN || 'submitPendampingan';
-          var result = await window.Api.post(action, payload, { clientSubmitId: payload.client_submit_id, syncSource: 'ONLINE' });
-          if (!(result && result.ok)) throw new Error((result && result.message) || 'Pendampingan gagal diproses.');
-
-          renderValidation(['Pendampingan berhasil diproses.'], 'ok');
-          if (window.UI) window.UI.showToast('Pendampingan berhasil.', 'success');
-          resetForm();
-          window.AppRouter.goTo((window.AppConfig.SCREENS || {}).SASARAN_DETAIL || 'sasaran-detail-screen');
-        } catch (err) {
-          window.AppStorage.pushQueue({
-            client_submit_id: payload.client_submit_id,
-            action: (window.AppConfig.API_ACTIONS || {}).SUBMIT_PENDAMPINGAN || 'submitPendampingan',
-            entity: 'pendampingan',
-            status: 'FAILED',
-            created_at: new Date().toISOString(),
-            error_message: err.message,
-            payload: payload
-          });
-          window.AppState.patch({ syncQueue: window.AppStorage.getQueue() });
-          renderValidation([err.message || 'Pendampingan gagal dikirim; draft disimpan untuk sinkronisasi.'], 'warn');
-          if (window.UI) window.UI.showToast('Pendampingan dialihkan ke draft sinkronisasi.', 'warning');
+        if (!navigator.onLine && mode === 'edit') {
+          showToast('Edit pendampingan hanya dapat dilakukan saat online.', 'warning');
+          return;
         }
-      });
+
+        var result = await api.post(action, payload, {
+          includeAuth: true,
+          clientSubmitId: payload.client_submit_id || '',
+          syncSource: 'ONLINE'
+        });
+
+        if (!result || result.ok === false) {
+          throw new Error((result && result.message) || 'Gagal menyimpan pendampingan.');
+        }
+
+        clearLocalDraft();
+        clearEditItem();
+        setMode('create');
+
+        var currentSelected = getSelectedSasaran() || {};
+        var selectedId = currentSelected.id_sasaran || currentSelected.id || data.id_sasaran;
+
+        if (selectedId && window.SasaranDetailView && typeof window.SasaranDetailView.open === 'function') {
+          await window.SasaranDetailView.open(selectedId);
+        } else if (window.Router && typeof window.Router.go === 'function') {
+          window.Router.go('sasaranList');
+        }
+
+        if (result && result.data && result.data.duplicate) {
+          showToast('Pendampingan sudah pernah tersimpan sebelumnya.', 'warning');
+        } else {
+          showToast(
+            mode === 'edit'
+              ? 'Pendampingan berhasil diperbarui.'
+              : 'Pendampingan berhasil dikirim.',
+            'success'
+          );
+        }
+      } catch (err) {
+        if (mode === 'create') {
+          saveLocalDraft(data);
+        }
+        showToast((err && err.message) || 'Terjadi kesalahan saat menyimpan pendampingan.', 'error');
+      } finally {
+        setLoading('btn-submit-pendampingan', false);
+      }
+    },
+
+    getStatusBadgeClass: function (status) {
+      var value = String(status || '').toUpperCase();
+      if (value === 'AKTIF') return 'badge-success-soft';
+      if (value === 'NONAKTIF') return 'badge-danger-soft';
+      if (value === 'SELESAI') return 'badge-success';
+      if (value === 'PERLU_REVIEW') return 'badge-warning';
+      return 'badge-neutral';
     }
-  }
-
-  function init() {
-    bindActions();
-  }
-
-  async function onEnter() {
-    resetForm();
-    var selected = getSelected() || {};
-    renderSelectedInfo(selected);
-    await loadFormDefinition(selected.jenis_sasaran || '');
-  }
-
-  window.PendampinganView = {
-    init: init,
-    onEnter: onEnter
   };
+
+  window.PendampinganView = PendampinganView;
+
+  // Alias sementara agar referensi lama tidak langsung patah
+  window.PendampinganForm = PendampinganView;
+
+  document.addEventListener('DOMContentLoaded', function () {
+    if (window.PendampinganView && typeof window.PendampinganView.init === 'function') {
+      window.PendampinganView.init();
+    }
+  });
 })(window, document);
