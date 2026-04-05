@@ -3,18 +3,6 @@ window.MenuModule = (function () {
 
   var MENU_CONTAINER_ID = 'menu-grid';
 
-  /**
-   * Definisi menu utama final
-   * Urutan kader:
-   * 1 Registrasi Sasaran
-   * 2 Daftar Sasaran
-   * 3 Lapor Pendampingan
-   * 4 Draft & Sinkronisasi
-   * 5 Sinkronisasi
-   * 6 Rekap Saya
-   * 7 Profil
-   * 8 Bantuan
-   */
   var MENU_DEFINITIONS = {
     KADER: [
       {
@@ -447,7 +435,7 @@ window.MenuModule = (function () {
       btn.addEventListener('click', function () {
         var action = btn.getAttribute('data-menu-action') || '';
         var screenId = btn.getAttribute('data-screen-id') || '';
-        handleMenuAction(action, screenId, btn);
+        handleMenuAction(action, screenId);
       });
     });
   }
@@ -623,35 +611,27 @@ window.MenuModule = (function () {
       case 'openRegistrasi':
         openRegistrasi();
         break;
-
       case 'openSasaranList':
         openSasaranList();
         break;
-
       case 'openPendampinganEntry':
         openPendampinganEntry();
         break;
-
       case 'openSyncScreen':
         openSyncScreen();
         break;
-
       case 'syncNow':
         syncNow();
         break;
-
       case 'openRekapKader':
         openRekapKader();
         break;
-
       case 'openProfile':
         openProfile();
         break;
-
       case 'openHelp':
         openHelp();
         break;
-
       default:
         if (!showScreen(screenId)) {
           showToast('Menu belum tersedia.', 'warning');
