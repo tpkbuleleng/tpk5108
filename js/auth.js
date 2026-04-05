@@ -1,193 +1,348 @@
-(function (window) {
+(function (window, document) {
   'use strict';
 
-  function getKeys() {
-    return (window.AppConfig && window.AppConfig.STORAGE_KEYS) || {};
+  function qs(id) {
+    return document.getElementById(id);
   }
 
-  function normalizeProfile(profile) {
-    var source = profile || {};
-    if (!window.AppUtils.isPlainObject(source)) {
-      return Object.assign({}, (window.AppConfig && window.AppConfig.DEFAULT_PROFILE) || {});
-    }
+  function getConfig() {
+    return window.APP_CONFIG || {};
+  }
 
-    return Object.assign({}, (window.AppConfig && window.AppConfig.DEFAULT_PROFILE) || {}, source, {
-      id_user: source.id_user || source.username_login || source.username || '',
-      nama_user: source.nama_user || source.nama_kader || source.name || '',
-      nama_kader: source.nama_kader || source.nama_user || source.name || '',
-      role: source.role || source.role_akses || source.role_user || source.role_name || source.unsur_tpk || '',
-      role_akses: source.role_akses || source.role || source.unsur_tpk || '',
-      unsur_tpk: source.unsur_tpk || source.role_akses || source.role || source.role_user || '',
-      id_tim: source.id_tim || source.tim_id || '',
-      nama_tim: source.nama_tim || source.tim || source.tim_label || source.id_tim || '',
-      kecamatan: source.kecamatan || source.nama_kecamatan || '',
-      desa_kelurahan: source.desa_kelurahan || source.nama_desa || source.desa || '',
-      dusun_rw: source.dusun_rw || source.nama_dusun || source.dusun || ''
+  function getStorageKeys() {
+    return getConfig().STORAGE_KEYS || {};
+  }
+
+  function getActions() {
+    return getConfig().API_ACTIONS || {};
+  }
+
+  function getStorage() {
+    return window.Storage || null;
+  }
+
+  function getAppState() {
+    return window.AppState || null;
+  }
+
+  function setText(id, value) {
+    var el = qs(id);
+    if (!el) return;
+    el.textContent = (value === undefined || value === null || value === '') ? '-' : String(value);
+  }
+
+  function showMessage(message, type) {
+    var box = qs('loginMessage');
+    if (!box) return;
+
+    box.textContent = message || '';
+    box.classList.remove('hidden', 'error', 'success');
+    box.classList.add(type === 'success' ? 'success' : 'error');
+  }
+
+  function clearMessage() {
+    var box = qs('loginMessage');
+    if (!box) return;
+
+    box.textContent = '';
+    box.classList.add('hidden');
+    box.classList.remove('error', 'success');
+  }
+
+  function setLoading(isLoading) {
+    var btn = qs('loginSubmitBtn');
+    if (!btn) return;
+
+    btn.disabled = !!isLoading;
+    btn.textContent = isLoading ? 'Memproses...' : 'Masuk';
+  }
+
+  function normalizeIdUser(value) {
+    return String(value || '').trim().toUpperCase();
+  }
+
+  function normalizePassword(value) {
+    return String(value || '').trim();
+  }
+
+  function validateLoginForm(idUser, password) {
+    if (!idUser) return 'ID Kader wajib diisi.';
+    if (!password) return 'Password wajib diisi.';
+    return '';
+  }
+
+  function setupLogo() {
+    var logo = qs('loginLogo');
+    if (!logo) return;
+
+    var config = getConfig();
+    var logoUrl = config.ASSETS && config.ASSETS.LOGO_URL
+      ? config.ASSETS.LOGO_URL
+      : './assets/img/logo.png';
+
+    logo.src = logoUrl;
+  }
+
+  function setupPasswordToggle() {
+    var passwordInput = qs('loginPassword');
+    var toggleBtn = qs('togglePasswordBtn');
+
+    if (!passwordInput || !toggleBtn || toggleBtn.dataset.bound === '1') return;
+
+    toggleBtn.dataset.bound = '1';
+
+    toggleBtn.addEventListener('click', function () {
+      var isPassword = passwordInput.getAttribute('type') === 'password';
+
+      passwordInput.setAttribute('type', isPassword ? 'text' : 'password');
+      toggleBtn.setAttribute(
+        'aria-label',
+        isPassword ? 'Sembunyikan password' : 'Lihat password'
+      );
+      toggleBtn.setAttribute(
+        'title',
+        isPassword ? 'Sembunyikan password' : 'Lihat password'
+      );
     });
   }
 
-  function persistSession(token, profile) {
-    var keys = getKeys();
-    var safeProfile = normalizeProfile(profile);
+  function saveProfile(profile) {
+    var storage = getStorage();
+    var appState = getAppState();
+    var keys = getStorageKeys();
+    var data = profile || {};
 
-    if (token) window.AppStorage.set(keys.SESSION_TOKEN, token);
-    if (safeProfile) window.AppStorage.set(keys.PROFILE, safeProfile);
-
-    window.AppState.patch({
-      sessionToken: token || '',
-      profile: safeProfile || null
-    });
-
-    return safeProfile;
-  }
-
-  async function login(payload) {
-    if (!window.Api) throw new Error('Api belum siap.');
-
-    var rawId = window.AppUtils.normalizeUpper((payload || {}).id_user || (payload || {}).username_login || '');
-    var cleaned = {
-      id_user: rawId,
-      username_login: rawId,
-      username: rawId,
-      password: (payload || {}).password || '',
-      device_id: window.Api.buildDeviceId ? window.Api.buildDeviceId() : ('WEB-' + navigator.userAgent.slice(0, 24)),
-      perangkat: window.Api.buildDeviceId ? window.Api.buildDeviceId() : ('WEB-' + navigator.userAgent.slice(0, 24)),
-      app_version: (window.AppConfig && window.AppConfig.APP_VERSION) || ''
-    };
-
-    var result = await window.Api.post((window.AppConfig.API_ACTIONS || {}).LOGIN || 'login', cleaned);
-    if (result && result.ok) {
-      return {
-        ok: true,
-        message: window.Api.getMessage(result, 'Login berhasil.'),
-        token: window.Api.getToken(result),
-        data: normalizeProfile(window.Api.getProfile(result))
-      };
+    if (storage && typeof storage.set === 'function' && keys.PROFILE) {
+      storage.set(keys.PROFILE, data);
     }
 
-    return {
-      ok: false,
-      message: window.Api.getMessage(result, 'Login gagal.')
-    };
+    if (appState && typeof appState.setProfile === 'function') {
+      appState.setProfile(data);
+    }
   }
 
-  function restoreSession() {
-    var keys = getKeys();
-    var token = window.AppStorage.get(keys.SESSION_TOKEN, '');
-    var profile = window.AppStorage.get(keys.PROFILE, null);
-    var selectedSasaran = window.AppStorage.get(keys.SELECTED_SASARAN, null);
-    var dashboardSummary = window.AppStorage.get(keys.DASHBOARD_SUMMARY, null);
-    var bootstrapData = window.AppStorage.get(keys.APP_BOOTSTRAP, null);
+  function clearLocalSession() {
+    var storage = getStorage();
+    var keys = getStorageKeys();
 
-    window.AppState.patch({
-      sessionToken: token,
-      profile: profile,
-      selectedSasaran: selectedSasaran,
-      dashboardSummary: dashboardSummary,
-      appBootstrap: bootstrapData,
-      syncQueue: window.AppStorage.getQueue()
-    });
-
-    return { token: token, profile: profile };
-  }
-
-  async function resumeSession() {
-    var state = (window.AppState && window.AppState.getState()) || {};
-    var token = state.sessionToken || '';
-    if (!token) {
-      return { ok: false, message: 'Sesi belum tersedia.' };
+    if (window.Api && typeof window.Api.clearSessionToken === 'function') {
+      window.Api.clearSessionToken();
     }
 
-    var actions = (window.AppConfig && window.AppConfig.API_ACTIONS) || {};
-    var attempts = [
-      actions.VALIDATE_SESSION,
-      actions.BOOTSTRAP_SESSION,
-      actions.GET_MY_PROFILE
-    ].filter(Boolean);
+    if (storage && typeof storage.remove === 'function') {
+      if (keys.SESSION_TOKEN) storage.remove(keys.SESSION_TOKEN);
+      if (keys.PROFILE) storage.remove(keys.PROFILE);
+    }
+  }
 
-    for (var i = 0; i < attempts.length; i += 1) {
-      try {
-        var result = await window.Api.post(attempts[i], {});
-        if (result && result.ok) {
-          var nextToken = window.Api.getToken(result) || token;
-          var nextProfile = normalizeProfile(window.Api.getProfile(result));
-          persistSession(nextToken, nextProfile);
-          return {
-            ok: true,
-            token: nextToken,
-            data: nextProfile,
-            message: window.Api.getMessage(result, 'Sesi dipulihkan.')
-          };
+  async function resolveProfileAfterLogin(loginResult) {
+    var data = (loginResult && loginResult.data) || {};
+    var actions = getActions();
+
+    if (data.profile && typeof data.profile === 'object') {
+      return data.profile;
+    }
+
+    if (data.session && typeof data.session === 'object') {
+      return data.session;
+    }
+
+    if (window.Api && actions.BOOTSTRAP_SESSION) {
+      var sessionResult = await window.Api.post(actions.BOOTSTRAP_SESSION, {}, {
+        includeAuth: true
+      });
+
+      if (sessionResult && sessionResult.ok) {
+        var sessionData = sessionResult.data || {};
+        if (sessionData.profile && typeof sessionData.profile === 'object') {
+          return sessionData.profile;
         }
-      } catch (err) {
-        if (i === attempts.length - 1) {
-          return { ok: false, message: err.message || 'Validasi sesi gagal.' };
+        if (sessionData.session && typeof sessionData.session === 'object') {
+          return sessionData.session;
         }
       }
     }
 
-    return { ok: false, message: 'Validasi sesi gagal.' };
+    if (window.Api && actions.GET_MY_PROFILE) {
+      var profileResult = await window.Api.post(actions.GET_MY_PROFILE, {}, {
+        includeAuth: true
+      });
+
+      if (profileResult && profileResult.ok && profileResult.data) {
+        return profileResult.data;
+      }
+    }
+
+    return {};
   }
 
-  async function enrichSessionAfterLogin(token, profile) {
-    persistSession(token, profile);
-    return resumeSession();
-  }
+  function applyProfileToUi(profile) {
+    var data = profile || {};
 
-  function saveSelectedSasaran(item) {
-    var keys = getKeys();
-    window.AppStorage.set(keys.SELECTED_SASARAN, item || null);
-    window.AppState.patch({ selectedSasaran: item || null });
-  }
+    setText('profile-nama', data.nama_kader || data.nama_user || data.nama || '-');
+    setText('profile-unsur', data.unsur_tpk || data.unsur || '-');
+    setText('profile-id', data.id_user || '-');
+    setText('profile-tim', data.nama_tim || data.id_tim || '-');
+    setText('profile-desa', data.desa_kelurahan || data.nama_desa || '-');
+    setText('profile-dusun', data.dusun_rw || data.nama_dusun || '-');
+    setText('header-kecamatan', data.nama_kecamatan || data.kecamatan || '-');
 
-  async function logoutRemote() {
-    var action = ((window.AppConfig || {}).API_ACTIONS || {}).LOGOUT_CURRENT_SESSION;
-    if (!action) return;
-    try {
-      await window.Api.post(action, {});
-    } catch (err) {
-      // logout lokal tetap harus jalan
+    if (window.AppBootstrap && typeof window.AppBootstrap.applyProfileToUi === 'function') {
+      window.AppBootstrap.applyProfileToUi(data);
     }
   }
 
-  function logoutLocal() {
-    var keys = getKeys();
-    window.AppStorage.clearKeys([
-      keys.SESSION_TOKEN,
-      keys.PROFILE,
-      keys.LAST_SCREEN,
-      keys.SELECTED_SASARAN,
-      keys.DASHBOARD_SUMMARY,
-      keys.SASARAN_CACHE,
-      keys.REKAP_CACHE,
-      keys.APP_BOOTSTRAP
-    ]);
+  function openDashboard() {
+    if (window.Router && typeof window.Router.go === 'function') {
+      window.Router.go('dashboard');
+      return;
+    }
 
-    window.AppState.patch({
-      sessionToken: '',
-      profile: null,
-      selectedSasaran: null,
-      dashboardSummary: null,
-      sasaranList: [],
-      rekapData: null,
-      appBootstrap: null
+    if (window.AppBootstrap && typeof window.AppBootstrap.openScreen === 'function') {
+      window.AppBootstrap.openScreen('dashboard-screen');
+      return;
+    }
+
+    var screens = document.querySelectorAll('.screen');
+    screens.forEach(function (screen) {
+      screen.classList.remove('active');
+      screen.classList.add('hidden');
+    });
+
+    var dashboard = qs('dashboard-screen');
+    if (dashboard) {
+      dashboard.classList.remove('hidden');
+      dashboard.classList.add('active');
+    }
+  }
+
+  async function submitLogin(idUser, password) {
+    if (!window.Api || typeof window.Api.login !== 'function') {
+      throw new Error('Api.login belum tersedia.');
+    }
+
+    return window.Api.login({
+      id_user: idUser,
+      password: password
     });
   }
 
-  async function logout() {
-    await logoutRemote();
-    logoutLocal();
+  async function handleLoginSubmit(event) {
+    event.preventDefault();
+
+    clearMessage();
+
+    var idUser = normalizeIdUser(qs('loginIdUser') && qs('loginIdUser').value);
+    var password = normalizePassword(qs('loginPassword') && qs('loginPassword').value);
+
+    var validationMessage = validateLoginForm(idUser, password);
+    if (validationMessage) {
+      showMessage(validationMessage, 'error');
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      var result = await submitLogin(idUser, password);
+
+      if (!result || result.ok === false) {
+        showMessage(
+          (result && result.message) || 'Login gagal. Periksa kembali ID dan password.',
+          'error'
+        );
+        return;
+      }
+
+      var wajibGantiPassword = !!(result.data && result.data.wajib_ganti_password);
+      var profile = await resolveProfileAfterLogin(result);
+
+      saveProfile(profile);
+      applyProfileToUi(profile);
+
+      showMessage('Login berhasil.', 'success');
+
+      if (wajibGantiPassword) {
+        setTimeout(function () {
+          showMessage(
+            'Login berhasil, tetapi fitur ganti password belum dipetakan ke struktur baru.',
+            'error'
+          );
+        }, 700);
+      }
+
+      setTimeout(function () {
+        openDashboard();
+      }, 450);
+    } catch (error) {
+      console.error('LOGIN_ERROR', error);
+
+      showMessage(
+        'Koneksi ke backend gagal atau respons tidak valid.',
+        'error'
+      );
+
+      if (window.Api && typeof window.Api.reportClientError === 'function') {
+        window.Api.reportClientError('LOGIN_ERROR', {
+          source: 'auth.js',
+          detail: error && error.message ? error.message : String(error)
+        });
+      }
+    } finally {
+      setLoading(false);
+    }
   }
 
-  window.Auth = {
-    login: login,
-    persistSession: persistSession,
-    restoreSession: restoreSession,
-    resumeSession: resumeSession,
-    enrichSessionAfterLogin: enrichSessionAfterLogin,
-    saveSelectedSasaran: saveSelectedSasaran,
+  async function logout() {
+    try {
+      if (window.Api && typeof window.Api.logout === 'function') {
+        await window.Api.logout({});
+      }
+    } catch (err) {
+      console.warn('Logout backend gagal:', err && err.message ? err.message : err);
+    } finally {
+      clearLocalSession();
+
+      if (window.AppBootstrap && typeof window.AppBootstrap.openScreen === 'function') {
+        window.AppBootstrap.openScreen('login-screen');
+      } else if (window.Router && typeof window.Router.go === 'function') {
+        window.Router.go('login');
+      }
+    }
+  }
+
+  function bindLogoutButtons() {
+    ['btn-logout'].forEach(function (id) {
+      var btn = qs(id);
+      if (!btn || btn.dataset.bound === '1') return;
+
+      btn.dataset.bound = '1';
+      btn.addEventListener('click', function () {
+        logout();
+      });
+    });
+  }
+
+  function initLoginPage() {
+    var form = qs('loginForm');
+    setupLogo();
+    setupPasswordToggle();
+    bindLogoutButtons();
+
+    if (!form || form.dataset.bound === '1') return;
+
+    form.dataset.bound = '1';
+    form.addEventListener('submit', handleLoginSubmit);
+  }
+
+  var Auth = {
+    init: initLoginPage,
+    login: submitLogin,
     logout: logout,
-    logoutLocal: logoutLocal,
-    normalizeProfile: normalizeProfile
+    clearLocalSession: clearLocalSession
   };
-})(window);
+
+  window.Auth = Auth;
+
+  document.addEventListener('DOMContentLoaded', initLoginPage);
+})(window, document);
