@@ -690,9 +690,6 @@ window.MenuModule = (function () {
 
 window.Menu = window.MenuModule;
 
-/**
- * Auto init
- */
 document.addEventListener('DOMContentLoaded', function () {
   if (window.MenuModule && typeof window.MenuModule.init === 'function') {
     window.MenuModule.init();
