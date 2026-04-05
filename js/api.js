@@ -294,15 +294,15 @@
 
     try {
       var response = await fetch(getApiBaseUrl(), {
-        method: 'POST',
-        headers: {
-  'Content-Type': 'text/plain;charset=utf-8'
-},
-body: JSON.stringify(body),
-        signal: abortState.controller ? abortState.controller.signal : undefined,
-        credentials: 'omit',
-        redirect: 'follow'
-      });
+  method: 'POST',
+  headers: {
+    'Content-Type': 'text/plain;charset=utf-8'
+  },
+  body: JSON.stringify(body),
+  signal: abortState.controller ? abortState.controller.signal : undefined,
+  credentials: 'omit',
+  redirect: 'follow'
+});
 
       var parsed = await parseResponse(response);
       var normalized = normalizeResponse(parsed, response);
