@@ -927,7 +927,8 @@ textarea:focus {
 }
 
 /* =========================================================
-   MENU HEADER - FIXED / LOGO LEFT / TITLE CENTER
+   MENU HEADER - FINAL
+   FIXED / LOGO LEFT DINAMIS / TITLE CENTER / ACTION RIGHT
    ========================================================= */
 :is(
   #sasaran-list-screen,
@@ -938,8 +939,13 @@ textarea:focus {
   #rekap-kader-screen
 ) {
   position: relative;
+  --menu-logo-size: clamp(44px, 2.8vw, 60px);
+  --menu-logo-left: 16px;
+  --menu-actions-width: 110px;
+  --menu-left-space: calc(var(--menu-logo-size) + 26px);
 }
 
+/* HEADER UTAMA */
 :is(
   #sasaran-list-screen,
   #sasaran-detail-screen,
@@ -972,6 +978,7 @@ textarea:focus {
   gap: 0 !important;
 }
 
+/* ORNAMEN */
 :is(
   #sasaran-list-screen,
   #sasaran-detail-screen,
@@ -991,7 +998,7 @@ textarea:focus {
   pointer-events: none;
 }
 
-/* BLOK JUDUL */
+/* LOGO KIRI */
 :is(
   #sasaran-list-screen,
   #sasaran-detail-screen,
@@ -999,35 +1006,14 @@ textarea:focus {
   #pendampingan-screen,
   #sync-screen,
   #rekap-kader-screen
-) > .topbar > div:first-child {
-  position: relative;
-  z-index: 2;
-  width: 100%;
-  text-align: center;
-  padding: 0 108px 0 62px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-
-/* LOGO DI KIRI BLOK JUDUL */
-:is(
-  #sasaran-list-screen,
-  #sasaran-detail-screen,
-  #registrasi-screen,
-  #pendampingan-screen,
-  #sync-screen,
-  #rekap-kader-screen
-) > .topbar > div:first-child::before {
+) > .topbar::before {
   content: "";
-  display: block;
   position: absolute;
-  left: 0;
+  left: var(--menu-logo-left);
   top: 50%;
   transform: translateY(-50%);
-  width: 34px;
-  height: 34px;
+  width: var(--menu-logo-size);
+  height: var(--menu-logo-size);
   background-image: url("../img/logo.png");
   background-repeat: no-repeat;
   background-position: center;
@@ -1038,6 +1024,22 @@ textarea:focus {
     drop-shadow(0 1px 0 rgba(255, 255, 255, 0.35))
     drop-shadow(0 4px 8px rgba(11, 41, 97, 0.18))
     drop-shadow(0 8px 18px rgba(9, 30, 66, 0.20));
+}
+
+/* BLOK JUDUL TETAP DI TENGAH */
+:is(
+  #sasaran-list-screen,
+  #sasaran-detail-screen,
+  #registrasi-screen,
+  #pendampingan-screen,
+  #sync-screen,
+  #rekap-kader-screen
+) > .topbar > div:first-child {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  text-align: center;
+  padding: 0 var(--menu-actions-width) 0 var(--menu-left-space);
 }
 
 :is(
@@ -1100,7 +1102,7 @@ textarea:focus {
   #rekap-kader-screen
 ) .topbar-actions .btn {
   width: auto !important;
-  min-width: 86px !important;
+  min-width: 88px !important;
   min-height: 38px !important;
   padding: 8px 14px !important;
   border-radius: 12px !important;
@@ -1122,6 +1124,7 @@ textarea:focus {
   background: rgba(255, 255, 255, 0.20) !important;
 }
 
+/* RUANG KONTEN AGAR TIDAK TERTUTUP HEADER */
 :is(
   #sasaran-list-screen,
   #sasaran-detail-screen,
@@ -1130,7 +1133,7 @@ textarea:focus {
   #sync-screen,
   #rekap-kader-screen
 ) > .page-content {
-  padding-top: var(--menu-offset-desktop) !important;
+  padding-top: 122px !important;
 }
 
 /* =========================================================
@@ -1144,35 +1147,26 @@ textarea:focus {
     #pendampingan-screen,
     #sync-screen,
     #rekap-kader-screen
+  ) {
+    --menu-logo-size: clamp(40px, 2.6vw, 50px);
+    --menu-logo-left: 14px;
+    --menu-actions-width: 102px;
+    --menu-left-space: calc(var(--menu-logo-size) + 22px);
+  }
+
+  :is(
+    #sasaran-list-screen,
+    #sasaran-detail-screen,
+    #registrasi-screen,
+    #pendampingan-screen,
+    #sync-screen,
+    #rekap-kader-screen
   ) > .topbar {
     left: 10px !important;
     right: 10px !important;
-    min-height: 90px !important;
+    min-height: 92px !important;
     padding: calc(env(safe-area-inset-top, 0px) + 9px) 14px 12px 14px !important;
     border-radius: 22px !important;
-  }
-
-  :is(
-    #sasaran-list-screen,
-    #sasaran-detail-screen,
-    #registrasi-screen,
-    #pendampingan-screen,
-    #sync-screen,
-    #rekap-kader-screen
-  ) > .topbar > div:first-child {
-    padding: 0 102px 0 56px;
-  }
-
-  :is(
-    #sasaran-list-screen,
-    #sasaran-detail-screen,
-    #registrasi-screen,
-    #pendampingan-screen,
-    #sync-screen,
-    #rekap-kader-screen
-  ) > .topbar > div:first-child::before {
-    width: 32px;
-    height: 32px;
   }
 
   :is(
@@ -1194,7 +1188,7 @@ textarea:focus {
     #sync-screen,
     #rekap-kader-screen
   ) > .page-content {
-    padding-top: var(--menu-offset-tablet) !important;
+    padding-top: 118px !important;
   }
 }
 
@@ -1209,11 +1203,25 @@ textarea:focus {
     #pendampingan-screen,
     #sync-screen,
     #rekap-kader-screen
+  ) {
+    --menu-logo-size: 40px;
+    --menu-logo-left: 12px;
+    --menu-actions-width: 92px;
+    --menu-left-space: calc(var(--menu-logo-size) + 18px);
+  }
+
+  :is(
+    #sasaran-list-screen,
+    #sasaran-detail-screen,
+    #registrasi-screen,
+    #pendampingan-screen,
+    #sync-screen,
+    #rekap-kader-screen
   ) > .topbar {
     left: 8px !important;
     right: 8px !important;
     top: 8px !important;
-    min-height: 88px !important;
+    min-height: 90px !important;
     padding: calc(env(safe-area-inset-top, 0px) + 8px) 12px 12px 12px !important;
     border-radius: 20px !important;
   }
@@ -1226,19 +1234,7 @@ textarea:focus {
     #sync-screen,
     #rekap-kader-screen
   ) > .topbar > div:first-child {
-    padding: 0 92px 0 50px;
-  }
-
-  :is(
-    #sasaran-list-screen,
-    #sasaran-detail-screen,
-    #registrasi-screen,
-    #pendampingan-screen,
-    #sync-screen,
-    #rekap-kader-screen
-  ) > .topbar > div:first-child::before {
-    width: 30px;
-    height: 30px;
+    padding: 0 var(--menu-actions-width) 0 var(--menu-left-space);
   }
 
   :is(
@@ -1296,7 +1292,7 @@ textarea:focus {
     #sync-screen,
     #rekap-kader-screen
   ) > .page-content {
-    padding-top: var(--menu-offset-mobile) !important;
+    padding-top: 124px !important;
   }
 }
 
@@ -1311,8 +1307,10 @@ textarea:focus {
     #pendampingan-screen,
     #sync-screen,
     #rekap-kader-screen
-  ) > .topbar {
-    min-height: 86px !important;
+  ) {
+    --menu-logo-size: 36px;
+    --menu-actions-width: 84px;
+    --menu-left-space: calc(var(--menu-logo-size) + 16px);
   }
 
   :is(
@@ -1322,8 +1320,8 @@ textarea:focus {
     #pendampingan-screen,
     #sync-screen,
     #rekap-kader-screen
-  ) > .topbar > div:first-child {
-    padding: 0 82px 0 46px;
+  ) > .topbar {
+    min-height: 88px !important;
   }
 
   :is(
