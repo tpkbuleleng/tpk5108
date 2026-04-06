@@ -1,6 +1,8 @@
 (function (window, document) {
   'use strict';
 
+  var hasInitialized = false;
+
   function log() {
     try {
       console.log.apply(console, arguments);
@@ -54,14 +56,22 @@
   }
 
   async function init() {
+    if (hasInitialized) return;
+    hasInitialized = true;
+
     log('app.js loaded');
 
-    await registerServiceWorker();
-    await startApplication();
+    // Jalankan aplikasi dulu agar splash/login tidak menunggu SW
+    startApplication();
+
+    // Service worker didaftarkan di belakang layar
+    Promise.resolve().then(function () {
+      return registerServiceWorker();
+    });
   }
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
+    document.addEventListener('DOMContentLoaded', init, { once: true });
   } else {
     init();
   }
