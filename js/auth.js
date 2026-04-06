@@ -54,6 +54,46 @@
     return data.id_tim || '-';
   }
 
+
+  function getStoredProfile() {
+    var appState = getAppState();
+    if (appState && typeof appState.getProfile === 'function') {
+      var profileFromState = appState.getProfile();
+      if (profileFromState && typeof profileFromState === 'object' && Object.keys(profileFromState).length) {
+        return profileFromState;
+      }
+    }
+
+    var storage = getStorage();
+    var keys = getStorageKeys();
+    if (storage && typeof storage.get === 'function' && keys.PROFILE) {
+      return storage.get(keys.PROFILE, {}) || {};
+    }
+
+    return {};
+  }
+
+  function mergeProfileData(existingProfile, incomingProfile) {
+    var existing = existingProfile && typeof existingProfile === 'object' ? existingProfile : {};
+    var incoming = incomingProfile && typeof incomingProfile === 'object' ? incomingProfile : {};
+    var merged = Object.assign({}, existing);
+
+    Object.keys(incoming).forEach(function (key) {
+      var value = incoming[key];
+
+      if (value === undefined || value === null) return;
+
+      if (typeof value === 'string') {
+        var clean = value.trim();
+        if (!clean || clean === '-') return;
+      }
+
+      merged[key] = value;
+    });
+
+    return merged;
+  }
+
   function showMessage(message, type) {
     var box = qs('loginMessage');
     if (!box) return;
@@ -322,8 +362,9 @@
         var resolvedProfile = await resolveProfileAfterLogin(loginResult);
 
         if (resolvedProfile && Object.keys(resolvedProfile).length) {
-          saveProfile(resolvedProfile);
-          applyProfileToUi(resolvedProfile);
+          var mergedProfile = mergeProfileData(getStoredProfile(), resolvedProfile);
+          saveProfile(mergedProfile);
+          applyProfileToUi(mergedProfile);
 
           if (window.DashboardView && typeof window.DashboardView.refresh === 'function') {
             window.DashboardView.refresh();
@@ -366,10 +407,11 @@
 
       var wajibGantiPassword = !!(result.data && result.data.wajib_ganti_password);
       var immediateProfile = extractImmediateProfile(result);
+      var mergedImmediateProfile = mergeProfileData(getStoredProfile(), immediateProfile);
 
-      if (immediateProfile && Object.keys(immediateProfile).length) {
-        saveProfile(immediateProfile);
-        applyProfileToUi(immediateProfile);
+      if (mergedImmediateProfile && Object.keys(mergedImmediateProfile).length) {
+        saveProfile(mergedImmediateProfile);
+        applyProfileToUi(mergedImmediateProfile);
       }
 
       openDashboard();
