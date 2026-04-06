@@ -974,11 +974,13 @@
     var closeBtn = byId('btn-close-settings');
     var refreshBtn = byId('btn-refresh-app');
     var resetBtn = byId('btn-reset-light-cache');
-    var fontSelect = byId('setting-font-size');
-    var darkModeToggle = byId('setting-dark-mode');
 
     ensureFontSizeControl();
     bindOverlayClose('settings-modal');
+
+    var fontSelect = byId('setting-font-size');
+    var darkModeToggle = byId('setting-dark-mode');
+    var fontButtons = document.querySelectorAll('.font-scale-btn');
 
     if (closeBtn && closeBtn.dataset.bound !== '1') {
       closeBtn.dataset.bound = '1';
@@ -1004,14 +1006,17 @@
       });
     }
 
-    if (darkModeToggle && darkModeToggle.dataset.bound !== '1') {
-      darkModeToggle.dataset.bound = '1';
-      darkModeToggle.addEventListener('change', function () {
-        applyTheme(darkModeToggle.checked ? 'dark' : 'light');
-      });
+    if (darkModeToggle) {
+      darkModeToggle.checked = getThemeValue() === 'dark';
+      if (darkModeToggle.dataset.bound !== '1') {
+        darkModeToggle.dataset.bound = '1';
+        darkModeToggle.addEventListener('change', function () {
+          applyTheme(darkModeToggle.checked ? 'dark' : 'light');
+        });
+      }
     }
 
-    Array.prototype.forEach.call(document.querySelectorAll('.font-scale-btn'), function (btn) {
+    Array.prototype.forEach.call(fontButtons, function (btn) {
       if (!btn || btn.dataset.bound === '1') return;
       btn.dataset.bound = '1';
       btn.addEventListener('click', function () {
