@@ -336,7 +336,6 @@
         '</span>',
         '<h4>', escapeHtml(item.title || '-'), '</h4>',
         '<p>', escapeHtml(item.description || ''), '</p>',
-        '<span class="menu-card__cta">Buka Menu →</span>',
       '</button>'
     ].join('');
   }
@@ -643,6 +642,43 @@
     }
   }
 
+  function ensureFontSizeControl() {
+    var fontSelect = byId('setting-font-size');
+    if (!fontSelect || !fontSelect.parentElement) return;
+
+    var wrapper = fontSelect.parentElement;
+    if (!byId('font-scale-control')) {
+      wrapper.insertAdjacentHTML('beforeend', [
+        '<div id="font-scale-control" class="font-scale-control" role="group" aria-label="Pilihan ukuran teks">',
+          '<button type="button" class="font-scale-btn" data-font-size="standard" aria-pressed="false">A-<small>Standar</small></button>',
+          '<button type="button" class="font-scale-btn" data-font-size="large" aria-pressed="false">A<small>Besar</small></button>',
+          '<button type="button" class="font-scale-btn" data-font-size="xlarge" aria-pressed="false">A+<small>Sangat Besar</small></button>',
+        '</div>',
+        '<div id="font-scale-preview" class="font-scale-preview" data-size="standard" aria-live="polite">',
+          '<span class="font-scale-preview__label">Pratinjau</span>',
+          '<p class="font-scale-preview__sample">Contoh tampilan teks aplikasi kader TPK Kabupaten Buleleng.</p>',
+        '</div>'
+      ].join(''));
+    }
+
+    fontSelect.classList.add('hidden');
+    fontSelect.setAttribute('aria-hidden', 'true');
+  }
+
+  function updateFontSizeButtons(value) {
+    var buttons = document.querySelectorAll('.font-scale-btn');
+    Array.prototype.forEach.call(buttons, function (btn) {
+      var isActive = (btn.getAttribute('data-font-size') || '') === value;
+      btn.classList.toggle('is-active', isActive);
+      btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+    });
+
+    var preview = byId('font-scale-preview');
+    if (preview) {
+      preview.setAttribute('data-size', value || 'standard');
+    }
+  }
+
   function applyFontSize(value) {
     var allowed = ['standard', 'large', 'xlarge'];
     var safeValue = allowed.indexOf(value) >= 0 ? value : 'standard';
@@ -650,6 +686,7 @@
     document.body.classList.remove('app-size-standard', 'app-size-large', 'app-size-xlarge');
     document.body.classList.add('app-size-' + safeValue);
     setValue('setting-font-size', safeValue);
+    updateFontSizeButtons(safeValue);
 
     try {
       localStorage.setItem(FONT_SIZE_KEY, safeValue);
@@ -680,8 +717,19 @@
     setText('footer-app-version', version);
   }
 
+  function cleanupDashboardText() {
+    var texts = document.querySelectorAll('#dashboard-screen .section-header .muted-text');
+    Array.prototype.forEach.call(texts, function (node) {
+      var content = String(node.textContent || '').toLowerCase();
+      if (content.indexOf('menyesuaikan hak akses pengguna') >= 0) {
+        node.remove();
+      }
+    });
+  }
+
   function openSettings() {
     setVersionText();
+    ensureFontSizeControl();
     applyFontSize(getFontSizeValue());
     openModal('settings-modal');
   }
@@ -857,6 +905,7 @@
     var resetBtn = byId('btn-reset-light-cache');
     var fontSelect = byId('setting-font-size');
 
+    ensureFontSizeControl();
     bindOverlayClose('settings-modal');
 
     if (closeBtn && closeBtn.dataset.bound !== '1') {
@@ -882,6 +931,14 @@
         applyFontSize(fontSelect.value || 'standard');
       });
     }
+
+    Array.prototype.forEach.call(document.querySelectorAll('.font-scale-btn'), function (btn) {
+      if (!btn || btn.dataset.bound === '1') return;
+      btn.dataset.bound = '1';
+      btn.addEventListener('click', function () {
+        applyFontSize(btn.getAttribute('data-font-size') || 'standard');
+      });
+    });
   }
 
   function bindHelpModal() {
@@ -965,6 +1022,7 @@
     var profile = getProfile();
     var role = profile.role_akses || profile.role || 'KADER';
 
+    cleanupDashboardText();
     applyDashboardProfile(profile);
     renderMenu(role);
     setVersionText();
