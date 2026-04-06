@@ -21,6 +21,28 @@
     return data.id_tim || '-';
   }
 
+
+  function mergeProfileData(existingProfile, incomingProfile) {
+    var existing = existingProfile && typeof existingProfile === 'object' ? existingProfile : {};
+    var incoming = incomingProfile && typeof incomingProfile === 'object' ? incomingProfile : {};
+    var merged = Object.assign({}, existing);
+
+    Object.keys(incoming).forEach(function (key) {
+      var value = incoming[key];
+
+      if (value === undefined || value === null) return;
+
+      if (typeof value === 'string') {
+        var clean = value.trim();
+        if (!clean || clean === '-') return;
+      }
+
+      merged[key] = value;
+    });
+
+    return merged;
+  }
+
   const AppBootstrap = {
     async init() {
       this.showSplashStatus('Menyiapkan aplikasi...');
@@ -293,16 +315,18 @@
 
         const sessionData = sessionResult.data || {};
         const profile = sessionData.profile || sessionData.session || {};
+        const cachedProfile = this.getCachedProfile();
+        const mergedProfile = mergeProfileData(cachedProfile, profile || {});
 
         if (window.Storage && typeof window.Storage.set === 'function') {
-          window.Storage.set(window.APP_CONFIG.STORAGE_KEYS.PROFILE, profile || {});
+          window.Storage.set(window.APP_CONFIG.STORAGE_KEYS.PROFILE, mergedProfile || {});
         }
 
         if (window.AppState && typeof window.AppState.setProfile === 'function') {
-          window.AppState.setProfile(profile || {});
+          window.AppState.setProfile(mergedProfile || {});
         }
 
-        this.applyProfileToUi(profile || {});
+        this.applyProfileToUi(mergedProfile || {});
 
         if (!options.preferCachedUi) {
           this.openScreen('dashboard-screen');
