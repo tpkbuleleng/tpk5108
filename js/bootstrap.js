@@ -4,20 +4,55 @@
   const AppBootstrap = {
     async init() {
       this.showSplashStatus('Menyiapkan aplikasi...');
-
       this.applyStaticBranding();
 
-      const bootstrapResult = await this.loadInitialRefs(false);
-      if (bootstrapResult && bootstrapResult.ok) {
-        this.applyBootstrapToUi(bootstrapResult.data || {});
+      // Terapkan cache bootstrap lebih dulu bila ada
+      const cachedBootstrap = this.getCachedBootstrap();
+      if (cachedBootstrap && Object.keys(cachedBootstrap).length) {
+        this.applyBootstrapToUi(cachedBootstrap);
       }
 
-      this.showSplashStatus('Memeriksa sesi pengguna...');
+      // Terapkan profile cache lebih dulu agar dashboard tidak kosong
+      const cachedProfile = this.getCachedProfile();
+      const token = this.getSessionToken();
 
-      const sessionOk = await this.restoreSessionAndRoute();
+      if (cachedProfile && Object.keys(cachedProfile).length) {
+        if (window.AppState && typeof window.AppState.setProfile === 'function') {
+          window.AppState.setProfile(cachedProfile);
+        }
+        this.applyProfileToUi(cachedProfile);
+      }
 
-      if (!sessionOk) {
+      // Tentukan layar awal secepat mungkin
+      if (token && cachedProfile && Object.keys(cachedProfile).length) {
+        this.openScreen('dashboard-screen');
+
+        if (window.Router && typeof window.Router.go === 'function') {
+          window.Router.go('dashboard');
+        }
+      } else {
         this.openScreen('login-screen');
+      }
+
+      // Jalankan refs di belakang layar
+      Promise.resolve().then(async () => {
+        const bootstrapResult = await this.loadInitialRefs(false);
+        if (bootstrapResult && bootstrapResult.ok) {
+          this.applyBootstrapToUi(bootstrapResult.data || {});
+        }
+      });
+
+      // Validasi sesi di belakang layar
+      if (token) {
+        this.showSplashStatus('Memeriksa sesi pengguna...');
+
+        const sessionOk = await this.restoreSessionAndRoute({
+          preferCachedUi: true
+        });
+
+        if (!sessionOk) {
+          this.openScreen('login-screen');
+        }
       }
     },
 
@@ -72,7 +107,6 @@
         const cached = this.getCachedBootstrap();
         if (cached && Object.keys(cached).length) {
           console.warn('Bootstrap refs gagal diambil dari API, memakai cache lokal:', err && err.message ? err.message : err);
-
           return {
             ok: true,
             data: cached,
@@ -103,6 +137,22 @@
         wilayah_tim: refs.wilayah_tim && typeof refs.wilayah_tim === 'object' ? refs.wilayah_tim : {},
         raw: refs
       };
+    },
+
+    getSessionToken() {
+      if (!window.Storage || typeof window.Storage.get !== 'function') {
+        return '';
+      }
+
+      return window.Storage.get(window.APP_CONFIG.STORAGE_KEYS.SESSION_TOKEN, '');
+    },
+
+    getCachedProfile() {
+      if (!window.Storage || typeof window.Storage.get !== 'function') {
+        return {};
+      }
+
+      return window.Storage.get(window.APP_CONFIG.STORAGE_KEYS.PROFILE, {});
     },
 
     getCachedBootstrap() {
@@ -195,13 +245,13 @@
       if (settingsVersion) settingsVersion.textContent = appVersion;
     },
 
-    async restoreSessionAndRoute() {
+    async restoreSessionAndRoute(options = {}) {
       try {
         if (!window.Storage || !window.Api) {
           return false;
         }
 
-        const token = window.Storage.get(window.APP_CONFIG.STORAGE_KEYS.SESSION_TOKEN, '');
+        const token = this.getSessionToken();
         if (!token) {
           return false;
         }
@@ -238,7 +288,14 @@
         }
 
         this.applyProfileToUi(profile || {});
-        this.openScreen('dashboard-screen');
+
+        if (!options.preferCachedUi) {
+          this.openScreen('dashboard-screen');
+        }
+
+        if (window.DashboardView && typeof window.DashboardView.refresh === 'function') {
+          window.DashboardView.refresh();
+        }
 
         if (window.Router && typeof window.Router.go === 'function') {
           window.Router.go('dashboard');
@@ -271,6 +328,10 @@
 
       window.Storage.remove(window.APP_CONFIG.STORAGE_KEYS.SESSION_TOKEN);
       window.Storage.remove(window.APP_CONFIG.STORAGE_KEYS.PROFILE);
+
+      if (window.AppState && typeof window.AppState.setProfile === 'function') {
+        window.AppState.setProfile({});
+      }
     },
 
     showSplashStatus(message) {
