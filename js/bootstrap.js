@@ -1,18 +1,36 @@
 (function (window, document) {
   'use strict';
 
+  function getDisplayNomorTim(data) {
+    data = data || {};
+
+    var explicitNomor = data.nomor_tim || data.nomor_tim_display || data.nomor_tim_lokal || '';
+    if (explicitNomor !== undefined && explicitNomor !== null && String(explicitNomor).trim() !== '') {
+      return String(explicitNomor).trim();
+    }
+
+    var namaTim = String(data.nama_tim || '').trim();
+    if (namaTim) {
+      var match = namaTim.match(/(\d+)\s*$/);
+      if (match && match[1]) {
+        return match[1];
+      }
+      return namaTim;
+    }
+
+    return data.id_tim || '-';
+  }
+
   const AppBootstrap = {
     async init() {
       this.showSplashStatus('Menyiapkan aplikasi...');
       this.applyStaticBranding();
 
-      // Terapkan cache bootstrap lebih dulu bila ada
       const cachedBootstrap = this.getCachedBootstrap();
       if (cachedBootstrap && Object.keys(cachedBootstrap).length) {
         this.applyBootstrapToUi(cachedBootstrap);
       }
 
-      // Terapkan profile cache lebih dulu agar dashboard tidak kosong
       const cachedProfile = this.getCachedProfile();
       const token = this.getSessionToken();
 
@@ -23,7 +41,6 @@
         this.applyProfileToUi(cachedProfile);
       }
 
-      // Tentukan layar awal secepat mungkin
       if (token && cachedProfile && Object.keys(cachedProfile).length) {
         this.openScreen('dashboard-screen');
 
@@ -34,7 +51,6 @@
         this.openScreen('login-screen');
       }
 
-      // Jalankan refs di belakang layar
       Promise.resolve().then(async () => {
         const bootstrapResult = await this.loadInitialRefs(false);
         if (bootstrapResult && bootstrapResult.ok) {
@@ -42,7 +58,6 @@
         }
       });
 
-      // Validasi sesi di belakang layar
       if (token) {
         this.showSplashStatus('Memeriksa sesi pengguna...');
 
@@ -315,7 +330,7 @@
       this.setText('profile-nama', data.nama_kader || data.nama_user || data.nama || '-');
       this.setText('profile-unsur', data.unsur_tpk || data.unsur || '-');
       this.setText('profile-id', data.id_user || '-');
-      this.setText('profile-tim', data.nama_tim || data.id_tim || '-');
+      this.setText('profile-tim', getDisplayNomorTim(data));
       this.setText('profile-desa', data.desa_kelurahan || data.nama_desa || '-');
       this.setText('profile-dusun', data.dusun_rw || data.nama_dusun || '-');
       this.setText('header-kecamatan', data.nama_kecamatan || data.kecamatan || '-');
