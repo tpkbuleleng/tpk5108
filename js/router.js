@@ -147,17 +147,13 @@
     }
 
     if (typeof opts.onAfterRoute === 'function') {
-      opts.onAfterRoute({
-        route: routeName,
-        screenId: screenId
-      });
+      opts.onAfterRoute({ route: routeName, screenId: screenId });
     }
   }
 
   var Router = {
     currentRoute: '',
     currentScreenId: '',
-
     routes: Object.freeze(Object.assign({}, ROUTE_MAP)),
 
     go: function (routeName, options) {
@@ -177,7 +173,6 @@
 
       updateCurrentRoute(normalizedRoute, screenId);
       afterRouteChange(normalizedRoute, screenId, options);
-
       return true;
     },
 
@@ -189,41 +184,15 @@
       return this.currentScreenId || '';
     },
 
-    toSplash: function (options) {
-      return this.go('splash', options);
-    },
-
-    toLogin: function (options) {
-      return this.go('login', options);
-    },
-
-    toDashboard: function (options) {
-      return this.go('dashboard', options);
-    },
-
-    toSasaranList: function (options) {
-      return this.go('sasaranList', options);
-    },
-
-    toSasaranDetail: function (options) {
-      return this.go('sasaranDetail', options);
-    },
-
-    toRegistrasi: function (options) {
-      return this.go('registrasi', options);
-    },
-
-    toPendampingan: function (options) {
-      return this.go('pendampingan', options);
-    },
-
-    toSyncScreen: function (options) {
-      return this.go('sync', options);
-    },
-
-    toRekapKader: function (options) {
-      return this.go('rekapKader', options);
-    }
+    toSplash: function (options) { return this.go('splash', options); },
+    toLogin: function (options) { return this.go('login', options); },
+    toDashboard: function (options) { return this.go('dashboard', options); },
+    toSasaranList: function (options) { return this.go('sasaranList', options); },
+    toSasaranDetail: function (options) { return this.go('sasaranDetail', options); },
+    toRegistrasi: function (options) { return this.go('registrasi', options); },
+    toPendampingan: function (options) { return this.go('pendampingan', options); },
+    toSyncScreen: function (options) { return this.go('sync', options); },
+    toRekapKader: function (options) { return this.go('rekapKader', options); }
   };
 
   window.Router = Router;
