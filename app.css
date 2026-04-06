@@ -771,12 +771,16 @@ textarea:focus {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  z-index: 1200;
+  z-index: 15000;
   background: rgba(11, 24, 45, 0.46);
   display: none;
   align-items: center;
   justify-content: center;
-  padding: 18px 14px;
+  padding: calc(env(safe-area-inset-top, 0px) + 14px) 14px 18px;
+}
+
+body.modal-open {
+  overflow: hidden !important;
 }
 
 .modal-overlay.active {
@@ -870,6 +874,87 @@ textarea:focus {
 
 .setting-select {
   margin-top: 10px;
+}
+
+.setting-select select.hidden {
+  display: none !important;
+}
+
+.font-scale-control {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 2px;
+}
+
+.font-scale-btn {
+  min-height: 48px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #ffffff;
+  color: var(--text);
+  font-weight: 800;
+  font-size: 18px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, color 0.15s ease, transform 0.12s ease;
+}
+
+.font-scale-btn:hover {
+  transform: translateY(-1px);
+  border-color: var(--primary-border);
+}
+
+.font-scale-btn.is-active {
+  background: var(--primary-soft);
+  border-color: var(--primary);
+  color: var(--primary-dark);
+  box-shadow: var(--shadow-focus);
+}
+
+.font-scale-btn small {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.font-scale-btn.is-active small {
+  color: var(--primary-dark);
+}
+
+.font-scale-preview {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: #ffffff;
+}
+
+.font-scale-preview__label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.font-scale-preview__sample {
+  margin: 0;
+  color: var(--text);
+  line-height: 1.45;
+}
+
+.font-scale-preview[data-size="standard"] .font-scale-preview__sample {
+  font-size: 14px;
+}
+
+.font-scale-preview[data-size="large"] .font-scale-preview__sample {
+  font-size: 16px;
+}
+
+.font-scale-preview[data-size="xlarge"] .font-scale-preview__sample {
+  font-size: 18px;
 }
 
 .profile-mini-grid {
@@ -1529,11 +1614,11 @@ textarea:focus {
   position: relative;
   overflow: hidden;
   width: 100%;
-  min-height: 116px;
+  min-height: 0;
   border: 1px solid #d9e6fb;
   border-radius: 20px;
   background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
-  padding: 14px 16px 14px;
+  padding: 14px 16px;
   text-align: left;
   cursor: pointer;
   transition:
@@ -1572,7 +1657,7 @@ textarea:focus {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
 .menu-card__icon,
@@ -1628,15 +1713,7 @@ textarea:focus {
 }
 
 .menu-card__cta {
-  position: relative;
-  z-index: 1;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 12px;
-  color: #245be7;
-  font-size: 13px;
-  font-weight: 700;
+  display: none;
 }
 
 .menu-card-accent-1 .menu-card__icon,
@@ -1909,7 +1986,7 @@ textarea:focus {
   }
 
   .menu-card {
-    min-height: 108px;
+    min-height: 0;
   }
 
   .setting-actions,
@@ -2077,8 +2154,8 @@ textarea:focus {
   }
 
   .menu-card {
-    min-height: 102px;
-    padding: 13px 13px 12px;
+    min-height: 0;
+    padding: 13px 13px;
     text-align: left;
   }
 
@@ -2413,5 +2490,19 @@ textarea:focus {
 
   .login-title {
     font-size: 20px;
+  }
+}
+@media (max-width: 640px) {
+  .font-scale-control {
+    gap: 8px;
+  }
+
+  .font-scale-btn {
+    min-height: 44px;
+    font-size: 16px;
+  }
+
+  .font-scale-preview {
+    padding: 11px 12px;
   }
 }
