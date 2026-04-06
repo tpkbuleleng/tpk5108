@@ -1,24 +1,21 @@
 (function (window, document) {
   'use strict';
 
-  const QUEUE_KEY = 'syncQueue';
-  const DEVICE_KEY = 'deviceId';
-  const APP_VERSION_KEY = 'appVersion';
-  const NIK_PLACEHOLDER = '9999999999999999';
-  const KK_PLACEHOLDER = '9999999999999999';
-  const ALLOWED_JENIS = ['CATIN', 'BUMIL', 'BUFAS', 'BADUTA'];
-  const FIELD_TO_DOM = {
-    jenis_sasaran: 'rsv-jenis-sasaran',
-    nama_sasaran: 'rsv-nama-sasaran',
-    jenis_kelamin: 'rsv-jenis-kelamin',
-    tanggal_lahir: 'rsv-tanggal-lahir',
-    nik_sasaran: 'rsv-nik-sasaran',
-    nomor_kk: 'rsv-nomor-kk',
-    alamat: 'rsv-alamat'
-  };
+  var QUEUE_KEY = 'syncQueue';
+  var NIK_PLACEHOLDER = '9999999999999999';
+  var KK_PLACEHOLDER = '9999999999999999';
+  var ALLOWED_JENIS = ['CATIN', 'BUMIL', 'BUFAS', 'BADUTA'];
 
   function $(id, root) {
     return (root || document).getElementById(id);
+  }
+
+  function normalizeSpaces(value) {
+    return String(value == null ? '' : value).replace(/\s+/g, ' ').trim();
+  }
+
+  function digitsOnly(value) {
+    return String(value == null ? '' : value).replace(/\D+/g, '');
   }
 
   function escapeHtml(value) {
@@ -30,40 +27,30 @@
       .replace(/'/g, '&#039;');
   }
 
-  function normalizeSpaces(value) {
-    return String(value == null ? '' : value).replace(/\s+/g, ' ').trim();
-  }
-
-  function digitsOnly(value) {
-    return String(value == null ? '' : value).replace(/\D+/g, '');
-  }
-
   function getTodayLocal() {
-    const d = new Date();
+    var d = new Date();
     d.setHours(0, 0, 0, 0);
     return d;
   }
 
   function parseIsoDate(dateStr) {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(dateStr || ''))) return null;
-    const parts = String(dateStr).split('-').map(Number);
-    const y = parts[0];
-    const m = parts[1];
-    const d = parts[2];
-    const date = new Date(y, m - 1, d);
+    var s = String(dateStr || '');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+
+    var parts = s.split('-').map(Number);
+    var date = new Date(parts[0], parts[1] - 1, parts[2]);
     if (
-      date.getFullYear() !== y ||
-      date.getMonth() !== m - 1 ||
-      date.getDate() !== d
-    ) {
-      return null;
-    }
+      date.getFullYear() !== parts[0] ||
+      date.getMonth() !== parts[1] - 1 ||
+      date.getDate() !== parts[2]
+    ) return null;
+
     date.setHours(0, 0, 0, 0);
     return date;
   }
 
   function calculateAge(dateStr) {
-    const dob = parseIsoDate(dateStr);
+    var dob = parseIsoDate(dateStr);
     if (!dob) {
       return {
         valid: false,
@@ -74,7 +61,7 @@
       };
     }
 
-    const today = getTodayLocal();
+    var today = getTodayLocal();
     if (dob > today) {
       return {
         valid: false,
@@ -85,9 +72,9 @@
       };
     }
 
-    let years = today.getFullYear() - dob.getFullYear();
-    let months = today.getMonth() - dob.getMonth();
-    const days = today.getDate() - dob.getDate();
+    var years = today.getFullYear() - dob.getFullYear();
+    var months = today.getMonth() - dob.getMonth();
+    var days = today.getDate() - dob.getDate();
 
     if (days < 0) months -= 1;
     if (months < 0) {
@@ -95,15 +82,12 @@
       months += 12;
     }
 
-    const totalMonths = (years * 12) + months;
-    const label = `${years} tahun ${months} bulan`;
-
     return {
       valid: true,
       umur_tahun: years,
       umur_bulan: months,
-      total_bulan: totalMonths,
-      label
+      total_bulan: (years * 12) + months,
+      label: years + ' tahun ' + months + ' bulan'
     };
   }
 
@@ -113,7 +97,7 @@
 
   function getStorageObject(key, fallback) {
     try {
-      const raw = window.localStorage.getItem(key);
+      var raw = window.localStorage.getItem(key);
       if (!raw) return fallback;
       return JSON.parse(raw);
     } catch (err) {
@@ -123,39 +107,6 @@
 
   function setStorageObject(key, value) {
     window.localStorage.setItem(key, JSON.stringify(value));
-  }
-
-  function ensureDeviceId() {
-    let deviceId = window.localStorage.getItem(DEVICE_KEY);
-    if (!deviceId) {
-      deviceId = 'dev-' + Math.random().toString(36).slice(2, 10) + '-' + Date.now();
-      window.localStorage.setItem(DEVICE_KEY, deviceId);
-    }
-    return deviceId;
-  }
-
-  function getAppVersion() {
-    return (
-      window.localStorage.getItem(APP_VERSION_KEY) ||
-      window.APP_VERSION ||
-      '2.1.1'
-    );
-  }
-
-  function generateClientSubmitId() {
-    const d = new Date();
-    const pad = (n) => String(n).padStart(2, '0');
-    const stamp = [
-      d.getFullYear(),
-      pad(d.getMonth() + 1),
-      pad(d.getDate())
-    ].join('') + '-' + [
-      pad(d.getHours()),
-      pad(d.getMinutes()),
-      pad(d.getSeconds())
-    ].join('');
-    const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
-    return `REG-${stamp}-${rand}`;
   }
 
   function getProfile() {
@@ -176,699 +127,610 @@
     return getStorageObject('session', null);
   }
 
-  function getScope(profile, session) {
-    const p = profile || {};
-    const s = session || {};
-
-    return {
-      id_tim: p.id_tim || s.id_tim || '',
-      nomor_tim:
-        p.nomor_tim ||
-        p.nomor_tim_display ||
-        p.nomor_tim_lokal ||
-        s.nomor_tim ||
-        s.nomor_tim_display ||
-        p.nama_tim ||
-        s.nama_tim ||
-        '-',
-      nama_tim: p.nama_tim || s.nama_tim || '',
-      unsur_tpk: p.unsur_tpk || s.unsur_tpk || p.role || s.role || '-',
-      id_wilayah: p.id_wilayah || s.id_wilayah || '',
-      desa_kelurahan:
-        p.desa_kelurahan ||
-        p.wilayah_tugas_desa_kelurahan ||
-        s.desa_kelurahan ||
-        s.wilayah_tugas_desa_kelurahan ||
-        '-',
-      dusun_rw:
-        p.dusun_rw ||
-        p.wilayah_tugas_dusun_rw ||
-        s.dusun_rw ||
-        s.wilayah_tugas_dusun_rw ||
-        '-',
-      nama_user:
-        p.nama_kader ||
-        p.nama_user ||
-        p.nama ||
-        s.nama_user ||
-        s.nama ||
-        s.username ||
-        '-'
-    };
+  function ensureDeviceId() {
+    var key = 'deviceId';
+    var deviceId = window.localStorage.getItem(key);
+    if (!deviceId) {
+      deviceId = 'dev-' + Math.random().toString(36).slice(2, 10) + '-' + Date.now();
+      window.localStorage.setItem(key, deviceId);
+    }
+    return deviceId;
   }
 
-  async function loadJenisSasaranRefs() {
-    try {
-      if (window.ReferenceService && typeof window.ReferenceService.getJenisSasaranRef === 'function') {
-        const res = await window.ReferenceService.getJenisSasaranRef();
-        if (res && res.ok && Array.isArray(res.data) && res.data.length) {
-          return res.data
-            .filter(item => item && item.is_active !== false)
-            .map(item => ({
-              code: String(item.code || '').toUpperCase(),
-              label: item.label || item.code || ''
-            }))
-            .filter(item => ALLOWED_JENIS.includes(item.code));
-        }
-      }
-    } catch (err) {}
+  function getAppVersion() {
+    return (
+      window.localStorage.getItem('appVersion') ||
+      window.APP_VERSION ||
+      '2.1.1'
+    );
+  }
 
-    return [
-      { code: 'CATIN', label: 'CATIN' },
-      { code: 'BUMIL', label: 'BUMIL' },
-      { code: 'BUFAS', label: 'BUFAS' },
-      { code: 'BADUTA', label: 'BADUTA' }
-    ];
+  function generateClientSubmitId() {
+    var d = new Date();
+    function pad(n) { return String(n).padStart(2, '0'); }
+    var stamp = ''
+      + d.getFullYear()
+      + pad(d.getMonth() + 1)
+      + pad(d.getDate())
+      + '-'
+      + pad(d.getHours())
+      + pad(d.getMinutes())
+      + pad(d.getSeconds());
+    return 'REG-' + stamp + '-' + Math.random().toString(36).slice(2, 6).toUpperCase();
+  }
+
+  function createOption(value, label) {
+    var opt = document.createElement('option');
+    opt.value = value == null ? '' : String(value);
+    opt.textContent = label == null ? '-' : String(label);
+    return opt;
+  }
+
+  function setSelectOptions(selectEl, items, selectedValue, placeholderText) {
+    if (!selectEl) return;
+    selectEl.innerHTML = '';
+    selectEl.appendChild(createOption('', placeholderText || 'Pilih data'));
+    (items || []).forEach(function (item) {
+      selectEl.appendChild(createOption(item.value, item.label));
+    });
+
+    if (selectedValue) {
+      selectEl.value = String(selectedValue);
+      if (!selectEl.value) {
+        selectEl.appendChild(createOption(selectedValue, selectedValue));
+        selectEl.value = String(selectedValue);
+      }
+    }
   }
 
   function queueOfflineItem(item) {
-    const queue = getStorageObject(QUEUE_KEY, []);
+    var queue = getStorageObject(QUEUE_KEY, []);
     queue.push(item);
     setStorageObject(QUEUE_KEY, queue);
   }
 
-  function fieldErrorHtml(fieldName) {
-    return `<div class="form-error" id="${FIELD_TO_DOM[fieldName]}-error"></div>`;
+  function showToast(message, type) {
+    try {
+      if (window.UI && typeof window.UI.toast === 'function') {
+        window.UI.toast(message, type || 'info');
+        return;
+      }
+    } catch (err) {}
+    if (type === 'error') {
+      console.error(message);
+    } else {
+      console.log(message);
+    }
   }
 
-  function collectFieldErrors(errors) {
-    const lines = [];
-    Object.keys(errors || {}).forEach((key) => {
-      if (errors[key]) lines.push(errors[key]);
-    });
-    return lines;
+  function getSafeString(obj, keys, fallback) {
+    var i;
+    for (i = 0; i < keys.length; i += 1) {
+      if (obj && obj[keys[i]] != null && String(obj[keys[i]]).trim() !== '') {
+        return String(obj[keys[i]]);
+      }
+    }
+    return fallback || '';
   }
 
-  const RegistrasiSasaranView = {
+  function getCurrentProfileScope() {
+    var profile = getProfile() || {};
+    var session = getSession() || {};
+
+    return {
+      nama_kecamatan: getSafeString(profile, ['nama_kecamatan', 'kecamatan'], getSafeString(session, ['nama_kecamatan', 'kecamatan'], '')),
+      nama_desa: getSafeString(profile, ['desa_kelurahan', 'wilayah_tugas_desa_kelurahan', 'nama_desa'], getSafeString(session, ['desa_kelurahan', 'wilayah_tugas_desa_kelurahan', 'nama_desa'], '')),
+      nama_dusun: getSafeString(profile, ['dusun_rw', 'wilayah_tugas_dusun_rw', 'nama_dusun'], getSafeString(session, ['dusun_rw', 'wilayah_tugas_dusun_rw', 'nama_dusun'], '')),
+      nomor_tim: getSafeString(profile, ['nomor_tim', 'nomor_tim_display', 'nama_tim'], getSafeString(session, ['nomor_tim', 'nomor_tim_display', 'nama_tim'], '-')),
+      nama_user: getSafeString(profile, ['nama_kader', 'nama_user', 'nama'], getSafeString(session, ['nama_user', 'nama', 'username'], '-'))
+    };
+  }
+
+  window.RegistrasiView = {
+    initialized: false,
     state: {
       container: null,
-      isSubmitting: false,
-      refs: {
-        jenis_sasaran: []
-      },
-      profile: null,
-      session: null,
-      scope: null,
       errors: {},
       warnings: [],
-      derived: {
-        umur_tahun: null,
-        umur_bulan: null,
-        total_bulan: null,
-        label: '-',
-        nik_is_placeholder: false,
-        kk_is_placeholder: false
+      refs: {
+        kecamatan: [],
+        desa: [],
+        dusun: []
       }
     },
 
-    async init(container) {
-      this.state.container =
-        typeof container === 'string'
-          ? document.querySelector(container)
-          : container;
+    init: function (container) {
+      this.state.container = container || $('registrasi-screen');
+      if (!this.state.container) return;
 
-      if (!this.state.container) {
-        throw new Error('Container RegistrasiSasaranView tidak ditemukan.');
-      }
-
-      this.state.profile = getProfile();
-      this.state.session = getSession();
-      this.state.scope = getScope(this.state.profile, this.state.session);
-      this.state.refs.jenis_sasaran = await loadJenisSasaranRefs();
-
-      this.render();
+      this.cacheElements();
       this.bindEvents();
-      this.updateAgePreview();
-      this.renderScope();
-      this.renderStatusBanner();
+      this.renderModeInfo();
+      this.hydrateWilayahFromScope();
+      this.renderDynamicFields();
+      this.renderValidation([]);
+      this.initialized = true;
     },
 
-    render() {
-      const jenisOptions = this.state.refs.jenis_sasaran
-        .map(item => `<option value="${escapeHtml(item.code)}">${escapeHtml(item.label)}</option>`)
-        .join('');
-
-      this.state.container.innerHTML = `
-        <section id="registrasi-sasaran-view" class="screen registrasi-sasaran-view">
-          <div class="card">
-            <div class="card-body">
-              <h2 style="margin:0 0 6px;">Registrasi Sasaran</h2>
-              <p style="margin:0; opacity:.8;">Pendaftaran sasaran baru dalam tim Anda.</p>
-            </div>
-          </div>
-
-          <div class="card" id="rsv-status-card" style="display:none;">
-            <div class="card-body">
-              <div id="rsv-status-banner"></div>
-            </div>
-          </div>
-
-          <form id="rsv-form" class="card">
-            <div class="card-body">
-              <h3 style="margin-top:0;">Tim & Wilayah Tugas</h3>
-              <div class="form-group">
-                <label>Nomor Tim</label>
-                <div id="rsv-nomor-tim" class="readonly-value">-</div>
-              </div>
-              <div class="form-group">
-                <label>Unsur TPK</label>
-                <div id="rsv-unsur-tpk" class="readonly-value">-</div>
-              </div>
-              <div class="form-group">
-                <label>Desa/Kelurahan Tugas</label>
-                <div id="rsv-desa" class="readonly-value">-</div>
-              </div>
-              <div class="form-group">
-                <label>Dusun/RW Tugas</label>
-                <div id="rsv-dusun" class="readonly-value">-</div>
-              </div>
-              <div class="form-group">
-                <label>Nama Kader</label>
-                <div id="rsv-nama-user" class="readonly-value">-</div>
-              </div>
-            </div>
-
-            <div class="card-body">
-              <h3 style="margin-top:0;">Identitas Sasaran</h3>
-
-              <div class="form-group">
-                <label for="rsv-jenis-sasaran">Jenis Sasaran</label>
-                <select id="rsv-jenis-sasaran">
-                  <option value="">Pilih jenis sasaran</option>
-                  ${jenisOptions}
-                </select>
-                ${fieldErrorHtml('jenis_sasaran')}
-              </div>
-
-              <div class="form-group">
-                <label for="rsv-nama-sasaran">Nama Sasaran</label>
-                <input id="rsv-nama-sasaran" type="text" maxlength="120" placeholder="Masukkan nama sasaran">
-                ${fieldErrorHtml('nama_sasaran')}
-              </div>
-
-              <div class="form-group">
-                <label for="rsv-jenis-kelamin">Jenis Kelamin</label>
-                <select id="rsv-jenis-kelamin">
-                  <option value="">Pilih jenis kelamin</option>
-                  <option value="L">Laki-laki</option>
-                  <option value="P">Perempuan</option>
-                </select>
-                ${fieldErrorHtml('jenis_kelamin')}
-              </div>
-
-              <div class="form-group">
-                <label for="rsv-tanggal-lahir">Tanggal Lahir</label>
-                <input id="rsv-tanggal-lahir" type="date">
-                <div class="field-hint">Umur: <strong id="rsv-umur-preview">-</strong></div>
-                ${fieldErrorHtml('tanggal_lahir')}
-              </div>
-            </div>
-
-            <div class="card-body">
-              <h3 style="margin-top:0;">Identitas Kependudukan</h3>
-
-              <div class="form-group">
-                <label for="rsv-nik-sasaran">NIK Sasaran</label>
-                <input id="rsv-nik-sasaran" type="text" inputmode="numeric" maxlength="16" placeholder="16 digit NIK">
-                <div class="field-hint">Gunakan 16 digit. Jika belum diketahui, boleh pakai standar 9999999999999999 sesuai kebijakan.</div>
-                ${fieldErrorHtml('nik_sasaran')}
-              </div>
-
-              <div class="form-group">
-                <label for="rsv-nomor-kk">Nomor KK</label>
-                <input id="rsv-nomor-kk" type="text" inputmode="numeric" maxlength="16" placeholder="16 digit nomor KK">
-                <div class="field-hint">Gunakan 16 digit. Jika belum diketahui, boleh pakai standar 9999999999999999 sesuai kebijakan.</div>
-                ${fieldErrorHtml('nomor_kk')}
-              </div>
-
-              <div class="form-group">
-                <label for="rsv-alamat">Alamat</label>
-                <textarea id="rsv-alamat" rows="3" maxlength="255" placeholder="Masukkan alamat sasaran"></textarea>
-                ${fieldErrorHtml('alamat')}
-              </div>
-            </div>
-
-            <div class="card-body">
-              <h3 style="margin-top:0;">Pemeriksaan</h3>
-              <div id="rsv-error-summary" class="alert alert-danger" style="display:none;"></div>
-              <div id="rsv-warning-box" class="alert alert-warning" style="display:none;"></div>
-
-              <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:14px;">
-                <button type="submit" id="rsv-submit-btn" class="btn btn-primary">Simpan Registrasi</button>
-                <button type="button" id="rsv-reset-btn" class="btn btn-secondary">Bersihkan Form</button>
-              </div>
-            </div>
-          </form>
-        </section>
-      `;
-    },
-
-    bindEvents() {
-      const form = $('rsv-form', this.state.container);
-      const dobEl = $('rsv-tanggal-lahir', this.state.container);
-      const jenisEl = $('rsv-jenis-sasaran', this.state.container);
-      const genderEl = $('rsv-jenis-kelamin', this.state.container);
-      const nikEl = $('rsv-nik-sasaran', this.state.container);
-      const kkEl = $('rsv-nomor-kk', this.state.container);
-      const resetBtn = $('rsv-reset-btn', this.state.container);
-
-      form.addEventListener('submit', (e) => {
-        e.preventDefault();
-        this.submit();
-      });
-
-      dobEl.addEventListener('change', () => {
-        this.updateAgePreview();
-        this.runLiveValidation();
-      });
-
-      jenisEl.addEventListener('change', () => {
-        this.runLiveValidation();
-      });
-
-      genderEl.addEventListener('change', () => {
-        this.runLiveValidation();
-      });
-
-      nikEl.addEventListener('input', (e) => {
-        e.target.value = digitsOnly(e.target.value).slice(0, 16);
-      });
-
-      kkEl.addEventListener('input', (e) => {
-        e.target.value = digitsOnly(e.target.value).slice(0, 16);
-      });
-
-      resetBtn.addEventListener('click', () => {
-        this.resetForm();
-      });
-
-      window.addEventListener('online', () => this.renderStatusBanner());
-      window.addEventListener('offline', () => this.renderStatusBanner());
-    },
-
-    renderScope() {
-      const scope = this.state.scope || {};
-      $('rsv-nomor-tim', this.state.container).textContent = scope.nomor_tim || '-';
-      $('rsv-unsur-tpk', this.state.container).textContent = scope.unsur_tpk || '-';
-      $('rsv-desa', this.state.container).textContent = scope.desa_kelurahan || '-';
-      $('rsv-dusun', this.state.container).textContent = scope.dusun_rw || '-';
-      $('rsv-nama-user', this.state.container).textContent = scope.nama_user || '-';
-    },
-
-    renderStatusBanner() {
-      const card = $('rsv-status-card', this.state.container);
-      const banner = $('rsv-status-banner', this.state.container);
-      const online = navigator.onLine;
-
-      card.style.display = '';
-      if (online) {
-        banner.innerHTML = '<div class="alert alert-success">Perangkat online. Registrasi akan langsung dikirim ke server.</div>';
-      } else {
-        banner.innerHTML = '<div class="alert alert-warning">Perangkat sedang offline. Registrasi akan disimpan ke antrean sinkronisasi.</div>';
-      }
-    },
-
-    updateAgePreview() {
-      const dob = $('rsv-tanggal-lahir', this.state.container).value;
-      const age = calculateAge(dob);
-      this.state.derived.umur_tahun = age.umur_tahun;
-      this.state.derived.umur_bulan = age.umur_bulan;
-      this.state.derived.total_bulan = age.total_bulan;
-      this.state.derived.label = age.label;
-      $('rsv-umur-preview', this.state.container).textContent = age.label;
-    },
-
-    collectFormData() {
-      return {
-        jenis_sasaran: $('rsv-jenis-sasaran', this.state.container).value,
-        nama_sasaran: $('rsv-nama-sasaran', this.state.container).value,
-        jenis_kelamin: $('rsv-jenis-kelamin', this.state.container).value,
-        tanggal_lahir: $('rsv-tanggal-lahir', this.state.container).value,
-        nik_sasaran: $('rsv-nik-sasaran', this.state.container).value,
-        nomor_kk: $('rsv-nomor-kk', this.state.container).value,
-        alamat: $('rsv-alamat', this.state.container).value
+    cacheElements: function () {
+      this.els = {
+        title: $('registrasi-screen-title'),
+        subtitle: $('registrasi-screen-subtitle'),
+        modeInfo: $('registrasi-mode-info'),
+        modeBadge: $('registrasi-mode-badge'),
+        form: $('registrasi-form'),
+        jenis: $('reg-jenis-sasaran'),
+        nama: $('reg-nama-sasaran'),
+        kepalaKeluarga: $('reg-nama-kepala-keluarga'),
+        groupIbuKandung: $('group-reg-nama-ibu-kandung'),
+        ibuKandung: $('reg-nama-ibu-kandung'),
+        nik: $('reg-nik'),
+        kk: $('reg-no-kk'),
+        gender: $('reg-jenis-kelamin'),
+        tanggalLahir: $('reg-tanggal-lahir'),
+        kecamatan: $('reg-kecamatan'),
+        desa: $('reg-desa'),
+        dusun: $('reg-dusun'),
+        alamat: $('reg-alamat'),
+        dynamicFields: $('registrasi-dynamic-fields'),
+        validationBox: $('registrasi-validation-box'),
+        btnDraft: $('btn-save-reg-draft'),
+        btnReset: $('btn-reset-registrasi'),
+        btnBack: $('btn-back-from-registrasi'),
+        btnSubmit: $('btn-submit-registrasi')
       };
     },
 
-    normalizeFormData(data) {
-      const normalized = {
+    bindEvents: function () {
+      var self = this;
+      if (!this.els || !this.els.form || this.els.form.dataset.bound === '1') return;
+
+      this.els.form.addEventListener('submit', function (event) {
+        event.preventDefault();
+        self.submit();
+      });
+
+      this.els.jenis.addEventListener('change', function () {
+        self.toggleConditionalFields();
+        self.renderDynamicFields();
+        self.runLiveValidation();
+      });
+
+      this.els.gender.addEventListener('change', function () {
+        self.runLiveValidation();
+      });
+
+      this.els.tanggalLahir.addEventListener('change', function () {
+        self.runLiveValidation();
+      });
+
+      this.els.nik.addEventListener('input', function (event) {
+        event.target.value = digitsOnly(event.target.value).slice(0, 16);
+      });
+
+      this.els.kk.addEventListener('input', function (event) {
+        event.target.value = digitsOnly(event.target.value).slice(0, 16);
+      });
+
+      this.els.btnReset.addEventListener('click', function () {
+        self.resetForm();
+      });
+
+      this.els.btnDraft.addEventListener('click', function () {
+        self.saveDraft();
+      });
+
+      this.els.btnBack.addEventListener('click', function () {
+        if (window.Router && typeof window.Router.toDashboard === 'function') {
+          window.Router.toDashboard();
+        }
+      });
+
+      this.els.form.dataset.bound = '1';
+    },
+
+    renderModeInfo: function () {
+      if (this.els.title) this.els.title.textContent = 'Registrasi Sasaran';
+      if (this.els.subtitle) this.els.subtitle.textContent = 'Input data sasaran baru';
+      if (this.els.modeInfo) this.els.modeInfo.textContent = 'Mode registrasi baru';
+      if (this.els.modeBadge) this.els.modeBadge.textContent = 'CREATE';
+    },
+
+    hydrateWilayahFromScope: function () {
+      var scope = getCurrentProfileScope();
+
+      setSelectOptions(this.els.kecamatan, scope.nama_kecamatan ? [{ value: scope.nama_kecamatan, label: scope.nama_kecamatan }] : [], scope.nama_kecamatan, 'Pilih kecamatan');
+      setSelectOptions(this.els.desa, scope.nama_desa ? [{ value: scope.nama_desa, label: scope.nama_desa }] : [], scope.nama_desa, 'Pilih desa/kelurahan');
+      setSelectOptions(this.els.dusun, scope.nama_dusun ? [{ value: scope.nama_dusun, label: scope.nama_dusun }] : [], scope.nama_dusun, 'Pilih dusun/RW');
+
+      this.els.kecamatan.disabled = !!scope.nama_kecamatan;
+      this.els.desa.disabled = !!scope.nama_desa;
+      this.els.dusun.disabled = !!scope.nama_dusun;
+    },
+
+    toggleConditionalFields: function () {
+      var jenis = String(this.els.jenis.value || '').toUpperCase();
+      var showIbu = jenis === 'BADUTA';
+
+      if (this.els.groupIbuKandung) {
+        this.els.groupIbuKandung.classList.toggle('hidden', !showIbu);
+      }
+
+      if (!showIbu && this.els.ibuKandung) {
+        this.els.ibuKandung.value = '';
+      }
+
+      if (jenis === 'BUMIL' || jenis === 'BUFAS') {
+        this.els.gender.value = 'P';
+      }
+    },
+
+    renderDynamicFields: function () {
+      if (!this.els.dynamicFields) return;
+
+      var jenis = String(this.els.jenis.value || '').toUpperCase();
+      var html = '';
+
+      if (!jenis) {
+        html = '<p class="muted-text">Pilih jenis sasaran untuk memuat pertanyaan khusus.</p>';
+      } else if (jenis === 'BADUTA') {
+        html = ''
+          + '<div class="info-note">'
+          +   '<strong>BADUTA</strong><br>'
+          +   'Nama ibu kandung wajib diisi. Usia sasaran harus 0 sampai 24 bulan.'
+          + '</div>';
+      } else if (jenis === 'BUMIL') {
+        html = ''
+          + '<div class="info-note">'
+          +   '<strong>BUMIL</strong><br>'
+          +   'Jenis kelamin wajib perempuan. Pastikan usia tidak anomali dan tidak lebih dari 55 tahun.'
+          + '</div>';
+      } else if (jenis === 'BUFAS') {
+        html = ''
+          + '<div class="info-note">'
+          +   '<strong>BUFAS</strong><br>'
+          +   'Jenis kelamin wajib perempuan. Pastikan usia tidak anomali dan tidak lebih dari 55 tahun.'
+          + '</div>';
+      } else {
+        html = ''
+          + '<div class="info-note">'
+          +   '<strong>CATIN</strong><br>'
+          +   'Pastikan usia sasaran tidak anomali terlalu rendah.'
+          + '</div>';
+      }
+
+      this.els.dynamicFields.innerHTML = html;
+    },
+
+    collectFormData: function () {
+      return {
+        jenis_sasaran: this.els.jenis.value,
+        nama_sasaran: this.els.nama.value,
+        nama_kepala_keluarga: this.els.kepalaKeluarga.value,
+        nama_ibu_kandung: this.els.ibuKandung.value,
+        nik_sasaran: this.els.nik.value,
+        nomor_kk: this.els.kk.value,
+        jenis_kelamin: this.els.gender.value,
+        tanggal_lahir: this.els.tanggalLahir.value,
+        nama_kecamatan: this.els.kecamatan.value,
+        nama_desa: this.els.desa.value,
+        nama_dusun: this.els.dusun.value,
+        alamat: this.els.alamat.value
+      };
+    },
+
+    normalizeFormData: function (data) {
+      return {
         jenis_sasaran: String(data.jenis_sasaran || '').trim().toUpperCase(),
         nama_sasaran: normalizeSpaces(data.nama_sasaran),
-        jenis_kelamin: String(data.jenis_kelamin || '').trim().toUpperCase(),
-        tanggal_lahir: String(data.tanggal_lahir || '').trim(),
+        nama_kepala_keluarga: normalizeSpaces(data.nama_kepala_keluarga),
+        nama_ibu_kandung: normalizeSpaces(data.nama_ibu_kandung),
         nik_sasaran: digitsOnly(data.nik_sasaran).slice(0, 16),
         nomor_kk: digitsOnly(data.nomor_kk).slice(0, 16),
+        jenis_kelamin: String(data.jenis_kelamin || '').trim().toUpperCase(),
+        tanggal_lahir: String(data.tanggal_lahir || '').trim(),
+        nama_kecamatan: normalizeSpaces(data.nama_kecamatan),
+        nama_desa: normalizeSpaces(data.nama_desa),
+        nama_dusun: normalizeSpaces(data.nama_dusun),
         alamat: normalizeSpaces(data.alamat),
         lokasi_gps: null
       };
-
-      return normalized;
     },
 
-    validateForm(data) {
-      const errors = {};
-      const warnings = [];
-      const age = calculateAge(data.tanggal_lahir);
+    validateForm: function (data) {
+      var errors = [];
+      var warnings = [];
+      var age = calculateAge(data.tanggal_lahir);
 
-      const hasLetter = /\p{L}/u.test(data.nama_sasaran || '');
+      function pushError(field, message) {
+        errors.push({ field: field, message: message });
+      }
 
       if (!data.jenis_sasaran) {
-        errors.jenis_sasaran = 'Jenis sasaran wajib dipilih.';
-      } else if (!ALLOWED_JENIS.includes(data.jenis_sasaran)) {
-        errors.jenis_sasaran = 'Jenis sasaran tidak valid.';
+        pushError('jenis_sasaran', 'Jenis sasaran wajib dipilih.');
+      } else if (ALLOWED_JENIS.indexOf(data.jenis_sasaran) === -1) {
+        pushError('jenis_sasaran', 'Jenis sasaran tidak valid.');
       }
 
       if (!data.nama_sasaran) {
-        errors.nama_sasaran = 'Nama sasaran wajib diisi.';
+        pushError('nama_sasaran', 'Nama sasaran wajib diisi.');
       } else if (data.nama_sasaran.length < 3) {
-        errors.nama_sasaran = 'Nama sasaran terlalu pendek.';
-      } else if (!hasLetter) {
-        errors.nama_sasaran = 'Nama sasaran tidak valid.';
+        pushError('nama_sasaran', 'Nama sasaran terlalu pendek.');
       }
 
-      if (!data.jenis_kelamin) {
-        errors.jenis_kelamin = 'Jenis kelamin wajib dipilih.';
-      } else if (!['L', 'P'].includes(data.jenis_kelamin)) {
-        errors.jenis_kelamin = 'Jenis kelamin tidak valid.';
+      if (!data.nama_kepala_keluarga) {
+        pushError('nama_kepala_keluarga', 'Nama kepala keluarga wajib diisi.');
+      } else if (data.nama_kepala_keluarga.length < 3) {
+        pushError('nama_kepala_keluarga', 'Nama kepala keluarga terlalu pendek.');
       }
 
-      if (!data.tanggal_lahir) {
-        errors.tanggal_lahir = 'Tanggal lahir wajib diisi.';
-      } else if (!parseIsoDate(data.tanggal_lahir)) {
-        errors.tanggal_lahir = 'Format tanggal lahir tidak valid.';
-      } else if (!age.valid) {
-        errors.tanggal_lahir = 'Tanggal lahir tidak boleh melebihi hari ini.';
+      if (data.jenis_sasaran === 'BADUTA') {
+        if (!data.nama_ibu_kandung) {
+          pushError('nama_ibu_kandung', 'Nama ibu kandung wajib diisi untuk BADUTA.');
+        } else if (data.nama_ibu_kandung.length < 3) {
+          pushError('nama_ibu_kandung', 'Nama ibu kandung terlalu pendek.');
+        }
       }
 
       if (!data.nik_sasaran) {
-        errors.nik_sasaran = 'NIK sasaran wajib diisi.';
+        pushError('nik_sasaran', 'NIK wajib diisi.');
       } else if (data.nik_sasaran.length !== 16) {
-        errors.nik_sasaran = 'NIK harus 16 digit.';
+        pushError('nik_sasaran', 'NIK harus 16 digit.');
       } else if (data.nik_sasaran === NIK_PLACEHOLDER) {
-        warnings.push('NIK menggunakan nilai standar 9 karena belum diketahui.');
-        this.state.derived.nik_is_placeholder = true;
-      } else {
-        this.state.derived.nik_is_placeholder = false;
+        warnings.push('NIK menggunakan 16 digit angka 9 karena belum diketahui.');
       }
 
       if (!data.nomor_kk) {
-        errors.nomor_kk = 'Nomor KK wajib diisi.';
+        pushError('nomor_kk', 'Nomor KK wajib diisi.');
       } else if (data.nomor_kk.length !== 16) {
-        errors.nomor_kk = 'Nomor KK harus 16 digit.';
+        pushError('nomor_kk', 'Nomor KK harus 16 digit.');
       } else if (data.nomor_kk === KK_PLACEHOLDER) {
-        warnings.push('Nomor KK menggunakan nilai standar 9 karena belum diketahui.');
-        this.state.derived.kk_is_placeholder = true;
-      } else {
-        this.state.derived.kk_is_placeholder = false;
+        warnings.push('Nomor KK menggunakan 16 digit angka 9 karena belum diketahui.');
       }
 
+      if (!data.jenis_kelamin) {
+        pushError('jenis_kelamin', 'Jenis kelamin wajib dipilih.');
+      } else if (['L', 'P'].indexOf(data.jenis_kelamin) === -1) {
+        pushError('jenis_kelamin', 'Jenis kelamin tidak valid.');
+      }
+
+      if (!data.tanggal_lahir) {
+        pushError('tanggal_lahir', 'Tanggal lahir wajib diisi.');
+      } else if (!parseIsoDate(data.tanggal_lahir)) {
+        pushError('tanggal_lahir', 'Format tanggal lahir tidak valid.');
+      } else if (!age.valid) {
+        pushError('tanggal_lahir', 'Tanggal lahir tidak boleh melebihi hari ini.');
+      }
+
+      if (!data.nama_kecamatan) pushError('nama_kecamatan', 'Kecamatan wajib dipilih.');
+      if (!data.nama_desa) pushError('nama_desa', 'Desa/Kelurahan wajib dipilih.');
+      if (!data.nama_dusun) pushError('nama_dusun', 'Dusun/RW wajib dipilih.');
+
       if (!data.alamat) {
-        errors.alamat = 'Alamat wajib diisi.';
+        pushError('alamat', 'Alamat wajib diisi.');
       } else if (data.alamat.length < 5) {
-        errors.alamat = 'Alamat terlalu pendek.';
+        pushError('alamat', 'Alamat terlalu pendek.');
       }
 
       if (age.valid && data.jenis_sasaran) {
-        const totalMonths = age.total_bulan;
-        const years = age.umur_tahun;
-
         if (data.jenis_sasaran === 'BADUTA') {
-          if (totalMonths < 0 || totalMonths > 24) {
-            errors.tanggal_lahir = 'Untuk BADUTA, usia harus 0 sampai 24 bulan.';
+          if (age.total_bulan < 0 || age.total_bulan > 24) {
+            pushError('tanggal_lahir', 'Untuk BADUTA, usia harus 0 sampai 24 bulan.');
           }
         }
 
         if (data.jenis_sasaran === 'BUMIL') {
-          if (data.jenis_kelamin && data.jenis_kelamin !== 'P') {
-            errors.jenis_kelamin = 'BUMIL wajib berjenis kelamin perempuan.';
+          if (data.jenis_kelamin !== 'P') {
+            pushError('jenis_kelamin', 'BUMIL wajib berjenis kelamin perempuan.');
           }
-          if (years < 10 || years > 55) {
-            errors.tanggal_lahir = 'Untuk BUMIL, usia harus masuk akal dan tidak lebih dari 55 tahun.';
+          if (age.umur_tahun < 10 || age.umur_tahun > 55) {
+            pushError('tanggal_lahir', 'Untuk BUMIL, usia harus masuk akal dan tidak lebih dari 55 tahun.');
           }
         }
 
         if (data.jenis_sasaran === 'BUFAS') {
-          if (data.jenis_kelamin && data.jenis_kelamin !== 'P') {
-            errors.jenis_kelamin = 'BUFAS wajib berjenis kelamin perempuan.';
+          if (data.jenis_kelamin !== 'P') {
+            pushError('jenis_kelamin', 'BUFAS wajib berjenis kelamin perempuan.');
           }
-          if (years < 10 || years > 55) {
-            errors.tanggal_lahir = 'Untuk BUFAS, usia harus masuk akal dan tidak lebih dari 55 tahun.';
+          if (age.umur_tahun < 10 || age.umur_tahun > 55) {
+            pushError('tanggal_lahir', 'Untuk BUFAS, usia harus masuk akal dan tidak lebih dari 55 tahun.');
           }
         }
 
-        if (data.jenis_sasaran === 'CATIN') {
-          if (totalMonths < 120) {
-            errors.tanggal_lahir = 'Untuk CATIN, usia tidak boleh anomali terlalu rendah.';
-          }
+        if (data.jenis_sasaran === 'CATIN' && age.total_bulan < 120) {
+          pushError('tanggal_lahir', 'Untuk CATIN, usia tidak boleh anomali terlalu rendah.');
         }
       }
 
       return {
-        isValid: Object.keys(errors).length === 0,
-        errors,
-        warnings,
-        derived: {
-          umur_tahun: age.umur_tahun,
-          umur_bulan: age.umur_bulan,
-          total_bulan: age.total_bulan,
-          label: age.label,
-          nik_is_placeholder: data.nik_sasaran === NIK_PLACEHOLDER,
-          kk_is_placeholder: data.nomor_kk === KK_PLACEHOLDER
-        }
+        ok: errors.length === 0,
+        errors: errors,
+        warnings: warnings,
+        age: age
       };
     },
 
-    renderValidation(validation) {
-      this.state.errors = validation.errors || {};
-      this.state.warnings = validation.warnings || [];
-      this.state.derived = Object.assign({}, this.state.derived, validation.derived || {});
+    renderValidation: function (validation) {
+      if (!this.els.validationBox) return;
 
-      Object.keys(FIELD_TO_DOM).forEach((field) => {
-        const errEl = $(`${FIELD_TO_DOM[field]}-error`, this.state.container);
-        const fieldEl = $(FIELD_TO_DOM[field], this.state.container);
-        const message = this.state.errors[field] || '';
-
-        if (errEl) errEl.textContent = message;
-        if (fieldEl) {
-          if (message) fieldEl.classList.add('is-invalid');
-          else fieldEl.classList.remove('is-invalid');
-        }
-      });
-
-      const errorSummary = $('rsv-error-summary', this.state.container);
-      const warningBox = $('rsv-warning-box', this.state.container);
-
-      const errorLines = collectFieldErrors(this.state.errors);
-      if (errorLines.length) {
-        errorSummary.style.display = '';
-        errorSummary.innerHTML = `<ul style="margin:0; padding-left:18px;">${errorLines.map(v => `<li>${escapeHtml(v)}</li>`).join('')}</ul>`;
-      } else {
-        errorSummary.style.display = 'none';
-        errorSummary.innerHTML = '';
+      if (Array.isArray(validation)) {
+        this.els.validationBox.innerHTML = '<p class="muted-text">Validasi akan tampil di sini sebelum submit.</p>';
+        return;
       }
 
-      if (this.state.warnings.length) {
-        warningBox.style.display = '';
-        warningBox.innerHTML = `<ul style="margin:0; padding-left:18px;">${this.state.warnings.map(v => `<li>${escapeHtml(v)}</li>`).join('')}</ul>`;
-      } else {
-        warningBox.style.display = 'none';
-        warningBox.innerHTML = '';
+      var errors = validation.errors || [];
+      var warnings = validation.warnings || [];
+
+      if (!errors.length && !warnings.length) {
+        this.els.validationBox.innerHTML = '<p class="success-text">Form siap disubmit.</p>';
+        return;
       }
+
+      var html = '';
+
+      if (errors.length) {
+        html += '<div class="alert alert-danger"><strong>Perlu diperbaiki:</strong><ul>';
+        errors.forEach(function (err) {
+          html += '<li>' + escapeHtml(err.message) + '</li>';
+        });
+        html += '</ul></div>';
+      }
+
+      if (warnings.length) {
+        html += '<div class="alert alert-warning"><strong>Perhatian:</strong><ul>';
+        warnings.forEach(function (msg) {
+          html += '<li>' + escapeHtml(msg) + '</li>';
+        });
+        html += '</ul></div>';
+      }
+
+      if (validation.age && validation.age.valid) {
+        html += '<p class="muted-text">Umur terhitung: <strong>' + escapeHtml(validation.age.label) + '</strong></p>';
+      }
+
+      this.els.validationBox.innerHTML = html;
     },
 
-    runLiveValidation() {
-      const data = this.normalizeFormData(this.collectFormData());
-      const validation = this.validateForm(data);
+    runLiveValidation: function () {
+      var data = this.normalizeFormData(this.collectFormData());
+      var validation = this.validateForm(data);
       this.renderValidation(validation);
-      this.updateAgePreview();
+      return validation;
     },
 
-    buildPayload(data, syncSource) {
+    buildPayload: function (data, syncSource) {
       return {
         action: 'registerSasaran',
         client_submit_id: generateClientSubmitId(),
         sync_source: syncSource || 'ONLINE',
+        device_id: ensureDeviceId(),
+        app_version: getAppVersion(),
         data: {
           jenis_sasaran: data.jenis_sasaran,
           nama_sasaran: data.nama_sasaran,
-          jenis_kelamin: data.jenis_kelamin,
-          tanggal_lahir: data.tanggal_lahir,
+          nama_kepala_keluarga: data.nama_kepala_keluarga,
+          nama_ibu_kandung: data.nama_ibu_kandung,
           nik_sasaran: data.nik_sasaran,
           nomor_kk: data.nomor_kk,
+          jenis_kelamin: data.jenis_kelamin,
+          tanggal_lahir: data.tanggal_lahir,
+          nama_kecamatan: data.nama_kecamatan,
+          nama_desa: data.nama_desa,
+          nama_dusun: data.nama_dusun,
           alamat: data.alamat,
           lokasi_gps: null
-        },
-        device_id: ensureDeviceId(),
-        app_version: getAppVersion()
+        }
       };
     },
 
-    async submit() {
-      if (this.state.isSubmitting) return;
-
-      const data = this.normalizeFormData(this.collectFormData());
-      const validation = this.validateForm(data);
+    saveDraft: function () {
+      var data = this.normalizeFormData(this.collectFormData());
+      var validation = this.validateForm(data);
       this.renderValidation(validation);
 
-      if (!validation.isValid) return;
-
-      const payload = this.buildPayload(data, navigator.onLine ? 'ONLINE' : 'OFFLINE');
-
-      if (!navigator.onLine) {
-        this.saveOffline(payload);
+      if (!validation.ok) {
+        showToast('Draft belum disimpan karena masih ada input yang tidak valid.', 'error');
         return;
       }
 
-      await this.submitOnline(payload);
-    },
-
-    async submitOnline(payload) {
-      this.state.isSubmitting = true;
-      const submitBtn = $('rsv-submit-btn', this.state.container);
-      submitBtn.disabled = true;
-      submitBtn.textContent = 'Menyimpan...';
-
-      try {
-        if (!window.Api || typeof window.Api.post !== 'function') {
-          throw new Error('Api.post tidak tersedia.');
-        }
-
-        const res = await window.Api.post('registerSasaran', payload, {
-          clientSubmitId: payload.client_submit_id,
-          syncSource: payload.sync_source
-        });
-
-        if (res && res.ok) {
-          this.handleSubmitSuccess(res);
-          return;
-        }
-
-        this.handleSubmitFailure(res || { message: 'Registrasi gagal.' });
-      } catch (err) {
-        this.handleSubmitFailure({
-          message: err && err.message ? err.message : 'Registrasi gagal karena koneksi ke backend bermasalah.'
-        });
-      } finally {
-        this.state.isSubmitting = false;
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Simpan Registrasi';
-      }
-    },
-
-    saveOffline(payload) {
+      var payload = this.buildPayload(data, 'OFFLINE');
       queueOfflineItem({
         action: 'registerSasaran',
         payload: payload,
         created_at: nowIsoString(),
-        status: 'PENDING_SYNC'
+        status: 'PENDING'
       });
 
-      this.renderValidation({
-        isValid: true,
-        errors: {},
-        warnings: ['Perangkat sedang offline. Registrasi disimpan ke antrean sinkronisasi.'],
-        derived: this.state.derived
-      });
-
-      if (window.UI && typeof window.UI.toast === 'function') {
-        window.UI.toast('Registrasi disimpan ke antrean sinkronisasi.', 'warning');
-      }
-
-      this.resetForm(false);
+      showToast('Draft registrasi disimpan ke antrean offline.', 'success');
+      this.resetForm();
     },
 
-    handleSubmitSuccess(res) {
-      this.renderValidation({
-        isValid: true,
-        errors: {},
-        warnings: [],
-        derived: {
-          umur_tahun: null,
-          umur_bulan: null,
-          total_bulan: null,
-          label: '-',
-          nik_is_placeholder: false,
-          kk_is_placeholder: false
+    submit: async function () {
+      var data = this.normalizeFormData(this.collectFormData());
+      var validation = this.validateForm(data);
+      this.renderValidation(validation);
+
+      if (!validation.ok) {
+        showToast('Registrasi belum dapat dikirim. Periksa validasi ringkas.', 'error');
+        return;
+      }
+
+      var payload = this.buildPayload(data, navigator.onLine ? 'ONLINE' : 'OFFLINE');
+
+      if (!navigator.onLine) {
+        queueOfflineItem({
+          action: 'registerSasaran',
+          payload: payload,
+          created_at: nowIsoString(),
+          status: 'PENDING'
+        });
+        showToast('Perangkat offline. Registrasi disimpan ke antrean sinkronisasi.', 'warning');
+        this.resetForm();
+        return;
+      }
+
+      this.setSubmitting(true);
+
+      try {
+        var res;
+        if (!window.Api || typeof window.Api.post !== 'function') {
+          throw new Error('Api.post tidak tersedia.');
         }
-      });
 
-      if (window.UI && typeof window.UI.toast === 'function') {
-        window.UI.toast(res.message || 'Registrasi sasaran berhasil.', 'success');
-      } else {
-        alert(res.message || 'Registrasi sasaran berhasil.');
-      }
+        try {
+          res = await window.Api.post('registerSasaran', payload, {
+            clientSubmitId: payload.client_submit_id,
+            syncSource: payload.sync_source
+          });
+        } catch (err) {
+          res = await window.Api.post(payload);
+        }
 
-      this.resetForm(false);
-    },
+        if (res && res.ok) {
+          this.renderValidation({
+            errors: [],
+            warnings: [],
+            age: validation.age
+          });
+          showToast(res.message || 'Registrasi sasaran berhasil.', 'success');
+          this.resetForm();
+          return;
+        }
 
-    handleSubmitFailure(res) {
-      const serverErrors = {};
-      const warnings = [];
-
-      if (Array.isArray(res.errors)) {
-        res.errors.forEach((item) => {
-          if (item && item.field) {
-            serverErrors[item.field] = item.message || 'Input tidak valid.';
-          } else if (item && item.message) {
-            warnings.push(item.message);
-          }
-        });
-      }
-
-      if (res.data && res.data.duplicate_level) {
-        warnings.push(`Data terindikasi duplikat (${res.data.duplicate_level}).`);
-      }
-
-      if (!Object.keys(serverErrors).length && res.message) {
-        warnings.unshift(res.message);
-      }
-
-      this.renderValidation({
-        isValid: false,
-        errors: serverErrors,
-        warnings: warnings,
-        derived: this.state.derived
-      });
-
-      if (window.UI && typeof window.UI.toast === 'function') {
-        window.UI.toast(res.message || 'Registrasi sasaran gagal.', 'error');
-      }
-    },
-
-    resetForm(keepMessages) {
-      $('rsv-jenis-sasaran', this.state.container).value = '';
-      $('rsv-nama-sasaran', this.state.container).value = '';
-      $('rsv-jenis-kelamin', this.state.container).value = '';
-      $('rsv-tanggal-lahir', this.state.container).value = '';
-      $('rsv-nik-sasaran', this.state.container).value = '';
-      $('rsv-nomor-kk', this.state.container).value = '';
-      $('rsv-alamat', this.state.container).value = '';
-
-      this.updateAgePreview();
-
-      if (keepMessages !== false) {
         this.renderValidation({
-          isValid: true,
-          errors: {},
-          warnings: [],
-          derived: {
-            umur_tahun: null,
-            umur_bulan: null,
-            total_bulan: null,
-            label: '-',
-            nik_is_placeholder: false,
-            kk_is_placeholder: false
-          }
+          errors: Array.isArray(res && res.errors) ? res.errors : [],
+          warnings: [res && res.message ? res.message : 'Registrasi gagal.'],
+          age: validation.age
         });
+        showToast(res && res.message ? res.message : 'Registrasi gagal.', 'error');
+      } catch (err) {
+        this.renderValidation({
+          errors: [],
+          warnings: [err && err.message ? err.message : 'Registrasi gagal karena koneksi ke backend bermasalah.'],
+          age: validation.age
+        });
+        showToast(err && err.message ? err.message : 'Registrasi gagal.', 'error');
+      } finally {
+        this.setSubmitting(false);
       }
     },
 
-    destroy() {
-      if (this.state.container) {
-        this.state.container.innerHTML = '';
-      }
-    }
-  };
+    setSubmitting: function (isSubmitting) {
+      if (!this.els.btnSubmit) return;
+      this.els.btnSubmit.disabled = !!isSubmitting;
+      this.els.btnSubmit.textContent = isSubmitting ? 'Mengirim...' : 'Submit Registrasi';
+    },
 
-  window.RegistrasiSasaranView = RegistrasiSasaranView;
+    resetForm: function () {
+      if (!this.els.form) return;
+
+      this.els.form.reset();
+      this.hydrateWilayahFromScope();
+      this.toggleConditionalFields();
+      this.renderDynamicFields();
+      this.renderValidation([]);
+    },
+
+    destroy: function () {}
+  };
 })(window, document);
