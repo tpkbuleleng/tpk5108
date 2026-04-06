@@ -2506,3 +2506,229 @@ body.modal-open {
     padding: 11px 12px;
   }
 }
+
+
+/* =========================================================
+   SETTINGS CONTROL REFINEMENT + DARK MODE
+   ========================================================= */
+.setting-inline-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.setting-inline-label {
+  min-width: 0;
+}
+
+.setting-inline-label strong {
+  display: block;
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.35;
+  color: var(--text);
+}
+
+.setting-inline-label span {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.darkmode-toggle {
+  width: 22px;
+  height: 22px;
+  margin-top: 2px;
+  flex: 0 0 auto;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+.font-scale-control {
+  margin-top: 0;
+}
+
+.font-scale-btn {
+  padding: 0 8px;
+  font-size: 22px;
+}
+
+.font-scale-preview {
+  margin-top: 10px;
+  padding: 10px 12px;
+}
+
+.font-scale-preview__sample {
+  font-size: 14px;
+}
+
+body.app-theme-dark {
+  --bg: #0b1220;
+  --surface: #111b2e;
+  --surface-soft: #142238;
+  --surface-muted: #0f1a2c;
+  --text: #e8eefc;
+  --text-soft: #c3d0ee;
+  --muted: #9eb0d4;
+  --muted-soft: #7f91b6;
+  --primary-soft: #102a58;
+  --primary-border: #31538e;
+  --success-soft: #123120;
+  --success-border: #2a6b45;
+  --warning-soft: #3a2b12;
+  --warning-border: #8e6a1e;
+  --danger-soft: #3d1920;
+  --danger-border: #8e3647;
+  --info-soft: #102a58;
+  --info-border: #31538e;
+  --border: #24344f;
+  --border-strong: #344866;
+  --shadow-xs: 0 2px 8px rgba(0, 0, 0, 0.24);
+  --shadow-sm: 0 6px 16px rgba(0, 0, 0, 0.28);
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.34);
+  --shadow-lg: 0 14px 36px rgba(0, 0, 0, 0.42);
+  --shadow-focus: 0 0 0 3px rgba(59, 130, 246, 0.28);
+  --tpk-card-shadow: 0 16px 34px rgba(0, 0, 0, 0.34);
+  background: var(--bg);
+  color: var(--text);
+}
+
+body.app-theme-dark,
+body.app-theme-dark #app-shell,
+body.app-theme-dark .page-content {
+  background: var(--bg);
+  color: var(--text);
+}
+
+body.app-theme-dark .login-page {
+  background: linear-gradient(180deg, #0b1220 0%, #10192c 100%);
+}
+
+body.app-theme-dark .topbar {
+  background: rgba(11, 18, 32, 0.94);
+  border-bottom-color: var(--border);
+}
+
+body.app-theme-dark .card,
+body.app-theme-dark .login-card,
+body.app-theme-dark .auth-card,
+body.app-theme-dark .modal-panel,
+body.app-theme-dark .stat-card,
+body.app-theme-dark .menu-card,
+body.app-theme-dark .setting-group,
+body.app-theme-dark .help-group,
+body.app-theme-dark .profile-group,
+body.app-theme-dark .sasaran-card,
+body.app-theme-dark .queue-card,
+body.app-theme-dark .riwayat-item,
+body.app-theme-dark .dynamic-field-card,
+body.app-theme-dark .validation-box {
+  background: linear-gradient(180deg, #111b2e 0%, #0f1a2c 100%) !important;
+  border-color: var(--border) !important;
+  color: var(--text);
+}
+
+body.app-theme-dark .modal-overlay {
+  background: rgba(2, 6, 23, 0.76);
+}
+
+body.app-theme-dark input,
+body.app-theme-dark select,
+body.app-theme-dark textarea,
+body.app-theme-dark .password-toggle-btn,
+body.app-theme-dark .btn-icon,
+body.app-theme-dark .modal-close {
+  background: #0d1728 !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}
+
+body.app-theme-dark input::placeholder,
+body.app-theme-dark textarea::placeholder {
+  color: var(--muted-soft);
+}
+
+body.app-theme-dark .btn-secondary,
+body.app-theme-dark .btn-danger,
+body.app-theme-dark .btn-header-settings,
+body.app-theme-dark .font-scale-btn {
+  background: #172338 !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}
+
+body.app-theme-dark .btn-secondary:hover,
+body.app-theme-dark .btn-danger:hover,
+body.app-theme-dark .btn-header-settings:hover,
+body.app-theme-dark .font-scale-btn:hover {
+  background: #1b2a43 !important;
+  border-color: var(--border-strong) !important;
+}
+
+body.app-theme-dark .font-scale-btn.is-active {
+  background: var(--primary) !important;
+  border-color: var(--primary) !important;
+  color: #ffffff !important;
+  box-shadow: none;
+}
+
+body.app-theme-dark .font-scale-preview {
+  background: #0d1728;
+  border-color: var(--border);
+}
+
+body.app-theme-dark .badge-neutral,
+body.app-theme-dark .badge-info-soft {
+  background: #102a58;
+  border-color: #31538e;
+  color: #dce9ff;
+}
+
+body.app-theme-dark .badge-warning {
+  background: #3a2b12;
+  border-color: #8e6a1e;
+  color: #ffd98a;
+}
+
+body.app-theme-dark .badge-success-soft {
+  background: #123120;
+  border-color: #2a6b45;
+  color: #b9f0ca;
+}
+
+body.app-theme-dark .badge-danger-soft {
+  background: #3d1920;
+  border-color: #8e3647;
+  color: #ffb5c0;
+}
+
+body.app-theme-dark .sticky-submit-bar {
+  background: rgba(11, 18, 32, 0.96);
+  border-top-color: var(--border);
+}
+
+body.app-theme-dark .app-footer,
+body.app-theme-dark .version-text,
+body.app-theme-dark .input-hint,
+body.app-theme-dark .field-hint,
+body.app-theme-dark .muted-text,
+body.app-theme-dark .label {
+  color: var(--muted) !important;
+}
+
+@media (max-width: 640px) {
+  .setting-inline-row {
+    gap: 12px;
+  }
+
+  .font-scale-btn {
+    min-height: 46px;
+    font-size: 20px;
+  }
+}
