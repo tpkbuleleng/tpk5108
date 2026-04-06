@@ -1,6 +1,9 @@
 (function (window, document) {
   'use strict';
 
+  var isLoginSubmitting = false;
+  var isLogoutInProgress = false;
+
   function qs(id) {
     return document.getElementById(id);
   }
@@ -49,12 +52,30 @@
     box.classList.remove('error', 'success');
   }
 
+  function showToast(message, type) {
+    if (window.UI && typeof window.UI.showToast === 'function') {
+      window.UI.showToast(message, type || 'info');
+      return;
+    }
+    try {
+      console.log('[TOAST]', type || 'info', message);
+    } catch (err) {}
+  }
+
   function setLoading(isLoading) {
     var btn = qs('loginSubmitBtn');
     if (!btn) return;
 
     btn.disabled = !!isLoading;
     btn.textContent = isLoading ? 'Memproses...' : 'Masuk';
+  }
+
+  function setLogoutLoading(isLoading) {
+    var btn = qs('btn-logout');
+    if (!btn) return;
+
+    btn.disabled = !!isLoading;
+    btn.textContent = isLoading ? 'Keluar...' : 'Keluar';
   }
 
   function normalizeIdUser(value) {
@@ -121,9 +142,20 @@
     }
   }
 
+  function resetProfileUi() {
+    setText('profile-nama', '-');
+    setText('profile-unsur', '-');
+    setText('profile-id', '-');
+    setText('profile-tim', '-');
+    setText('profile-desa', '-');
+    setText('profile-dusun', '-');
+    setText('header-kecamatan', '-');
+  }
+
   function clearLocalSession() {
     var storage = getStorage();
     var keys = getStorageKeys();
+    var appState = getAppState();
 
     if (window.Api && typeof window.Api.clearSessionToken === 'function') {
       window.Api.clearSessionToken();
@@ -133,6 +165,19 @@
       if (keys.SESSION_TOKEN) storage.remove(keys.SESSION_TOKEN);
       if (keys.PROFILE) storage.remove(keys.PROFILE);
     }
+
+    if (appState && typeof appState.setProfile === 'function') {
+      appState.setProfile({});
+    }
+  }
+
+  function extractImmediateProfile(loginResult) {
+    var data = (loginResult && loginResult.data) || {};
+
+    if (data.profile && typeof data.profile === 'object') return data.profile;
+    if (data.session && typeof data.session === 'object') return data.session;
+
+    return {};
   }
 
   async function resolveProfileAfterLogin(loginResult) {
@@ -216,6 +261,30 @@
     }
   }
 
+  function openLoginScreen() {
+    if (window.Router && typeof window.Router.go === 'function') {
+      window.Router.go('login');
+      return;
+    }
+
+    if (window.AppBootstrap && typeof window.AppBootstrap.openScreen === 'function') {
+      window.AppBootstrap.openScreen('login-screen');
+      return;
+    }
+
+    var screens = document.querySelectorAll('.screen');
+    screens.forEach(function (screen) {
+      screen.classList.remove('active');
+      screen.classList.add('hidden');
+    });
+
+    var login = qs('login-screen');
+    if (login) {
+      login.classList.remove('hidden');
+      login.classList.add('active');
+    }
+  }
+
   async function submitLogin(idUser, password) {
     if (!window.Api || typeof window.Api.login !== 'function') {
       throw new Error('Api.login belum tersedia.');
@@ -227,8 +296,28 @@
     });
   }
 
+  function hydrateDashboardAfterLogin(loginResult) {
+    Promise.resolve().then(async function () {
+      try {
+        var resolvedProfile = await resolveProfileAfterLogin(loginResult);
+
+        if (resolvedProfile && Object.keys(resolvedProfile).length) {
+          saveProfile(resolvedProfile);
+          applyProfileToUi(resolvedProfile);
+
+          if (window.DashboardView && typeof window.DashboardView.refresh === 'function') {
+            window.DashboardView.refresh();
+          }
+        }
+      } catch (err) {
+        console.warn('Gagal memuat profil lanjutan setelah login:', err && err.message ? err.message : err);
+      }
+    });
+  }
+
   async function handleLoginSubmit(event) {
     event.preventDefault();
+    if (isLoginSubmitting) return;
 
     clearMessage();
 
@@ -242,6 +331,7 @@
     }
 
     try {
+      isLoginSubmitting = true;
       setLoading(true);
 
       var result = await submitLogin(idUser, password);
@@ -255,25 +345,22 @@
       }
 
       var wajibGantiPassword = !!(result.data && result.data.wajib_ganti_password);
-      var profile = await resolveProfileAfterLogin(result);
+      var immediateProfile = extractImmediateProfile(result);
 
-      saveProfile(profile);
-      applyProfileToUi(profile);
-
-      showMessage('Login berhasil.', 'success');
-
-      if (wajibGantiPassword) {
-        setTimeout(function () {
-          showMessage(
-            'Login berhasil, tetapi fitur ganti password belum dipetakan ke struktur baru.',
-            'error'
-          );
-        }, 700);
+      if (immediateProfile && Object.keys(immediateProfile).length) {
+        saveProfile(immediateProfile);
+        applyProfileToUi(immediateProfile);
       }
 
+      openDashboard();
+
       setTimeout(function () {
-        openDashboard();
-      }, 450);
+        hydrateDashboardAfterLogin(result);
+      }, 0);
+
+      if (wajibGantiPassword) {
+        showToast('Login berhasil. Akun ini masih perlu ganti password.', 'warning');
+      }
     } catch (error) {
       console.error('LOGIN_ERROR', error);
 
@@ -290,24 +377,44 @@
       }
     } finally {
       setLoading(false);
+      isLoginSubmitting = false;
     }
   }
 
   async function logout() {
+    if (isLogoutInProgress) return;
+
+    isLogoutInProgress = true;
+    setLogoutLoading(true);
+
+    var logoutPromise = Promise.resolve();
+
     try {
       if (window.Api && typeof window.Api.logout === 'function') {
-        await window.Api.logout({});
+        logoutPromise = window.Api.logout({});
       }
     } catch (err) {
-      console.warn('Logout backend gagal:', err && err.message ? err.message : err);
-    } finally {
-      clearLocalSession();
+      console.warn('Logout backend gagal dipicu:', err && err.message ? err.message : err);
+    }
 
-      if (window.AppBootstrap && typeof window.AppBootstrap.openScreen === 'function') {
-        window.AppBootstrap.openScreen('login-screen');
-      } else if (window.Router && typeof window.Router.go === 'function') {
-        window.Router.go('login');
-      }
+    try {
+      clearLocalSession();
+      resetProfileUi();
+      clearMessage();
+
+      var passwordInput = qs('loginPassword');
+      if (passwordInput) passwordInput.value = '';
+
+      openLoginScreen();
+    } finally {
+      Promise.resolve(logoutPromise)
+        .catch(function (err) {
+          console.warn('Logout backend gagal:', err && err.message ? err.message : err);
+        })
+        .finally(function () {
+          setLogoutLoading(false);
+          isLogoutInProgress = false;
+        });
     }
   }
 
@@ -317,7 +424,8 @@
       if (!btn || btn.dataset.bound === '1') return;
 
       btn.dataset.bound = '1';
-      btn.addEventListener('click', function () {
+      btn.addEventListener('click', function (event) {
+        event.preventDefault();
         logout();
       });
     });
