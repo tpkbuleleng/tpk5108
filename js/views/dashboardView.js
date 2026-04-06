@@ -769,15 +769,41 @@
     }, 120);
   }
 
+  function rehydrateProfileAfterLightReset(profileSnapshot) {
+    var profile = profileSnapshot && Object.keys(profileSnapshot).length
+      ? profileSnapshot
+      : getProfile();
+
+    if (profile && Object.keys(profile).length) {
+      persistProfile(profile);
+      applyDashboardProfile(profile);
+      fillProfileForm(profile);
+
+      var role = profile.role_akses || profile.role || 'KADER';
+      renderMenu(role);
+    } else {
+      applyDashboardProfile({});
+      fillProfileForm({});
+    }
+  }
+
   function resetLightCache() {
+    var storage = getStorage();
+    var profileSnapshot = deepClone(getProfile());
+
     LIGHT_CACHE_KEYS.forEach(function (key) {
       try {
         localStorage.removeItem(key);
       } catch (err) {}
     });
 
+    if (storage && typeof storage.clearRuntimeCache === 'function') {
+      storage.clearRuntimeCache();
+    }
+
     applyFontSize('standard');
     applyTheme('light');
+    rehydrateProfileAfterLightReset(profileSnapshot);
     showToast('Cache ringan berhasil dibersihkan.', 'success');
   }
 
