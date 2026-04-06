@@ -3,8 +3,10 @@
 
   var MENU_CONTAINER_ID = 'menu-grid';
   var FONT_SIZE_KEY = 'tpk_app_font_size';
+  var THEME_KEY = 'tpk_app_theme';
   var LIGHT_CACHE_KEYS = [
     FONT_SIZE_KEY,
+    THEME_KEY,
     'tpk_last_screen',
     'tpk_last_filter_sasaran',
     'tpk_last_filter_sync',
@@ -350,6 +352,7 @@
     }).join('');
 
     bindMenuActions(container);
+    applyFontSize(getFontSizeValue());
   }
 
   function showToast(message, type) {
@@ -642,20 +645,68 @@
     }
   }
 
+  function getThemeValue() {
+    try {
+      return localStorage.getItem(THEME_KEY) || 'light';
+    } catch (err) {
+      return 'light';
+    }
+  }
+
+  function getFontScaleMultiplier(value) {
+    if (value === 'large') return 1.08;
+    if (value === 'xlarge') return 1.16;
+    return 1;
+  }
+
+  function applyGlobalFontScale(multiplier) {
+    var nodes = document.querySelectorAll(
+      '#app-shell h1, #app-shell h2, #app-shell h3, #app-shell h4, #app-shell p, #app-shell span, #app-shell strong, #app-shell label, #app-shell small, #app-shell li, #app-shell a, #app-shell button, #app-shell input, #app-shell select, #app-shell textarea, #toast-container .toast'
+    );
+
+    Array.prototype.forEach.call(nodes, function (node) {
+      if (!node) return;
+      var tag = (node.tagName || '').toUpperCase();
+      if (tag === 'OPTION') return;
+
+      if (!node.dataset.baseFontSize) {
+        var computed = window.getComputedStyle(node).fontSize || '';
+        var parsed = parseFloat(computed);
+        if (!parsed || Number.isNaN(parsed)) return;
+        node.dataset.baseFontSize = String(parsed);
+      }
+
+      var base = parseFloat(node.dataset.baseFontSize || '0');
+      if (!base || Number.isNaN(base)) return;
+      node.style.fontSize = (base * multiplier).toFixed(2) + 'px';
+    });
+  }
+
   function ensureFontSizeControl() {
     var fontSelect = byId('setting-font-size');
     if (!fontSelect || !fontSelect.parentElement) return;
 
     var wrapper = fontSelect.parentElement;
+    if (!byId('theme-toggle-row')) {
+      wrapper.insertAdjacentHTML('afterbegin', [
+        '<div id="theme-toggle-row" class="setting-inline-row">',
+          '<div class="setting-inline-label">',
+            '<strong>Mode Gelap</strong>',
+            '<span>Aktifkan tampilan malam yang lebih nyaman di mata.</span>',
+          '</div>',
+          '<input type="checkbox" id="setting-dark-mode" class="darkmode-toggle" aria-label="Mode gelap" />',
+        '</div>'
+      ].join(''));
+    }
+
     if (!byId('font-scale-control')) {
       wrapper.insertAdjacentHTML('beforeend', [
         '<div id="font-scale-control" class="font-scale-control" role="group" aria-label="Pilihan ukuran teks">',
-          '<button type="button" class="font-scale-btn" data-font-size="standard" aria-pressed="false">A-<small>Standar</small></button>',
-          '<button type="button" class="font-scale-btn" data-font-size="large" aria-pressed="false">A<small>Besar</small></button>',
-          '<button type="button" class="font-scale-btn" data-font-size="xlarge" aria-pressed="false">A+<small>Sangat Besar</small></button>',
+          '<button type="button" class="font-scale-btn" data-font-size="standard" aria-pressed="false">A-</button>',
+          '<button type="button" class="font-scale-btn" data-font-size="large" aria-pressed="false">A0</button>',
+          '<button type="button" class="font-scale-btn" data-font-size="xlarge" aria-pressed="false">A+</button>',
         '</div>',
         '<div id="font-scale-preview" class="font-scale-preview" data-size="standard" aria-live="polite">',
-          '<span class="font-scale-preview__label">Pratinjau</span>',
           '<p class="font-scale-preview__sample">Contoh tampilan teks aplikasi kader TPK Kabupaten Buleleng.</p>',
         '</div>'
       ].join(''));
@@ -682,14 +733,32 @@
   function applyFontSize(value) {
     var allowed = ['standard', 'large', 'xlarge'];
     var safeValue = allowed.indexOf(value) >= 0 ? value : 'standard';
+    var multiplier = getFontScaleMultiplier(safeValue);
 
     document.body.classList.remove('app-size-standard', 'app-size-large', 'app-size-xlarge');
     document.body.classList.add('app-size-' + safeValue);
     setValue('setting-font-size', safeValue);
     updateFontSizeButtons(safeValue);
+    applyGlobalFontScale(multiplier);
 
     try {
       localStorage.setItem(FONT_SIZE_KEY, safeValue);
+    } catch (err) {}
+  }
+
+  function applyTheme(value) {
+    var safeValue = value === 'dark' ? 'dark' : 'light';
+
+    document.body.classList.toggle('app-theme-dark', safeValue === 'dark');
+    document.body.classList.toggle('app-theme-light', safeValue !== 'dark');
+
+    var toggle = byId('setting-dark-mode');
+    if (toggle) {
+      toggle.checked = safeValue === 'dark';
+    }
+
+    try {
+      localStorage.setItem(THEME_KEY, safeValue);
     } catch (err) {}
   }
 
@@ -708,6 +777,7 @@
     });
 
     applyFontSize('standard');
+    applyTheme('light');
     showToast('Cache ringan berhasil dibersihkan.', 'success');
   }
 
@@ -730,6 +800,7 @@
   function openSettings() {
     setVersionText();
     ensureFontSizeControl();
+    applyTheme(getThemeValue());
     applyFontSize(getFontSizeValue());
     openModal('settings-modal');
   }
@@ -904,6 +975,7 @@
     var refreshBtn = byId('btn-refresh-app');
     var resetBtn = byId('btn-reset-light-cache');
     var fontSelect = byId('setting-font-size');
+    var darkModeToggle = byId('setting-dark-mode');
 
     ensureFontSizeControl();
     bindOverlayClose('settings-modal');
@@ -929,6 +1001,13 @@
       fontSelect.dataset.bound = '1';
       fontSelect.addEventListener('change', function () {
         applyFontSize(fontSelect.value || 'standard');
+      });
+    }
+
+    if (darkModeToggle && darkModeToggle.dataset.bound !== '1') {
+      darkModeToggle.dataset.bound = '1';
+      darkModeToggle.addEventListener('change', function () {
+        applyTheme(darkModeToggle.checked ? 'dark' : 'light');
       });
     }
 
@@ -1022,6 +1101,7 @@
     var profile = getProfile();
     var role = profile.role_akses || profile.role || 'KADER';
 
+    applyTheme(getThemeValue());
     cleanupDashboardText();
     applyDashboardProfile(profile);
     renderMenu(role);
@@ -1041,6 +1121,7 @@
 
   function setRole(role) {
     renderMenu(role || 'KADER');
+    applyFontSize(getFontSizeValue());
   }
 
   function getDefinitions() {
@@ -1069,7 +1150,9 @@
     syncNow: syncNow,
     logoutCurrentUser: logoutCurrentUser,
     fillProfileForm: fillProfileForm,
-    saveProfileUpdate: saveProfileUpdate
+    saveProfileUpdate: saveProfileUpdate,
+    applyFontSize: applyFontSize,
+    applyTheme: applyTheme
   };
 
   window.DashboardView = DashboardView;
