@@ -34,6 +34,9 @@
       sasaran_detail: 'sasaranDetail',
 
       registrasi: 'registrasi',
+      'registrasi-sasaran': 'registrasi',
+      registrasiSasaran: 'registrasi',
+      registrasi_sasaran: 'registrasi',
 
       pendampingan: 'pendampingan',
 
@@ -82,8 +85,58 @@
     }
   }
 
+  function tryInitView(routeName, screenId) {
+    try {
+      var target = document.getElementById(screenId);
+      if (!target) return;
+
+      if (routeName === 'login' && window.LoginView && typeof window.LoginView.init === 'function') {
+        window.LoginView.init(target, { route: routeName, screenId: screenId });
+        return;
+      }
+
+      if (routeName === 'dashboard' && window.DashboardView && typeof window.DashboardView.init === 'function') {
+        window.DashboardView.init(target, { route: routeName, screenId: screenId });
+        return;
+      }
+
+      if (routeName === 'sasaranList' && window.SasaranListView && typeof window.SasaranListView.init === 'function') {
+        window.SasaranListView.init(target, { route: routeName, screenId: screenId });
+        return;
+      }
+
+      if (routeName === 'sasaranDetail' && window.SasaranDetailView && typeof window.SasaranDetailView.init === 'function') {
+        window.SasaranDetailView.init(target, { route: routeName, screenId: screenId });
+        return;
+      }
+
+      if (routeName === 'registrasi' && window.RegistrasiView && typeof window.RegistrasiView.init === 'function') {
+        window.RegistrasiView.init(target, { route: routeName, screenId: screenId });
+        return;
+      }
+
+      if (routeName === 'pendampingan' && window.PendampinganView && typeof window.PendampinganView.init === 'function') {
+        window.PendampinganView.init(target, { route: routeName, screenId: screenId });
+        return;
+      }
+
+      if (routeName === 'sync' && window.SyncView && typeof window.SyncView.init === 'function') {
+        window.SyncView.init(target, { route: routeName, screenId: screenId });
+        return;
+      }
+
+      if (routeName === 'rekapKader' && window.RekapKaderView && typeof window.RekapKaderView.init === 'function') {
+        window.RekapKaderView.init(target, { route: routeName, screenId: screenId });
+      }
+    } catch (err) {
+      console.error('Gagal init view untuk route:', routeName, err);
+    }
+  }
+
   function afterRouteChange(routeName, screenId, options) {
     var opts = options || {};
+
+    tryInitView(routeName, screenId);
 
     if (opts.scrollToTop !== false) {
       try {
