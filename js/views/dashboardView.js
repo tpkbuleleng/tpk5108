@@ -262,6 +262,26 @@
     return value ? String(value) : '-';
   }
 
+  function getDisplayNomorTim(data) {
+    data = data || {};
+
+    var explicitNomor = data.nomor_tim || data.nomor_tim_display || data.nomor_tim_lokal || '';
+    if (explicitNomor !== undefined && explicitNomor !== null && String(explicitNomor).trim() !== '') {
+      return String(explicitNomor).trim();
+    }
+
+    var namaTim = String(data.nama_tim || '').trim();
+    if (namaTim) {
+      var match = namaTim.match(/(\d+)\s*$/);
+      if (match && match[1]) {
+        return match[1];
+      }
+      return namaTim;
+    }
+
+    return data.id_tim || '-';
+  }
+
   function getProfile() {
     var state = getState();
     if (state && typeof state.getProfile === 'function') {
@@ -429,7 +449,7 @@
     setText('profile-nama', data.nama_kader || data.nama_user || data.nama || '-');
     setText('profile-unsur', data.unsur_tpk || data.unsur || '-');
     setText('profile-id', data.id_user || '-');
-    setText('profile-tim', data.nama_tim || data.id_tim || '-');
+    setText('profile-tim', getDisplayNomorTim(data));
     setText('profile-desa', data.desa_kelurahan || data.nama_desa || '-');
     setText('profile-dusun', data.dusun_rw || data.nama_dusun || '-');
     setText('header-kecamatan', data.nama_kecamatan || data.kecamatan || '-');
@@ -437,7 +457,7 @@
     setText('modal-profile-nama', data.nama_kader || data.nama_user || data.nama || '-');
     setText('modal-profile-id', data.id_user || '-');
     setText('modal-profile-unsur', data.unsur_tpk || data.unsur || '-');
-    setText('modal-profile-tim', data.nama_tim || data.id_tim || '-');
+    setText('modal-profile-tim', getDisplayNomorTim(data));
     setText('modal-profile-kecamatan', data.nama_kecamatan || data.kecamatan || '-');
     setText('modal-profile-desa', data.desa_kelurahan || data.nama_desa || '-');
     setText('modal-profile-dusun', data.dusun_rw || data.nama_dusun || '-');
