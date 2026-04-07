@@ -861,6 +861,14 @@
   }
 
   async function openCreate() {
+    if (!isScreenActive()) {
+      var router = getRouter();
+      if (router && typeof router.go === 'function') {
+        router.go('registrasi');
+        return;
+      }
+    }
+
     setText('registrasi-screen-title', 'Registrasi Sasaran');
     setText('registrasi-screen-subtitle', 'Input data sasaran baru');
     setText('registrasi-mode-info', 'Mode registrasi baru');
