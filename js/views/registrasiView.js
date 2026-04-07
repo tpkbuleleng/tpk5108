@@ -691,32 +691,33 @@
       ''
     );
 
-    return {
+    var payload = {
       action: 'registerSasaran',
       token: getSessionToken(),
       perangkat: 'PWA',
       app_version: getConfig().APP_VERSION || '',
-      data: {
-        client_submit_id: 'REG-' + Date.now(),
-        sync_source: navigator.onLine === false ? 'OFFLINE' : 'ONLINE',
-        id_tim: resolvedIdTim,
-        book_key: resolvedBookKey,
-        jenis_sasaran: data.jenis_sasaran,
-        nama_sasaran: data.nama_sasaran,
-        nama_kepala_keluarga: data.nama_kepala_keluarga,
-        nama_ibu_kandung: data.nama_ibu_kandung,
-        nik_sasaran: data.nik_sasaran,
-        nomor_kk: data.nomor_kk,
-        jenis_kelamin: data.jenis_kelamin,
-        tanggal_lahir: data.tanggal_lahir,
-        nama_kecamatan: data.nama_kecamatan,
-        nama_desa: data.nama_desa,
-        nama_dusun: data.nama_dusun,
-        id_wilayah: selectedMap.id_wilayah || profile.id_wilayah || '',
-        alamat: data.alamat,
-        data_laporan: data.keterangan_tambahan || ''
-      }
+      client_submit_id: 'REG-' + Date.now(),
+      sync_source: navigator.onLine === false ? 'OFFLINE' : 'ONLINE',
+      id_tim: resolvedIdTim,
+      book_key: resolvedBookKey,
+      jenis_sasaran: data.jenis_sasaran,
+      nama_sasaran: data.nama_sasaran,
+      nama_kepala_keluarga: data.nama_kepala_keluarga,
+      nama_ibu_kandung: data.nama_ibu_kandung,
+      nik_sasaran: data.nik_sasaran,
+      nik: data.nik_sasaran,
+      nomor_kk: data.nomor_kk,
+      jenis_kelamin: data.jenis_kelamin,
+      tanggal_lahir: data.tanggal_lahir,
+      nama_kecamatan: data.nama_kecamatan,
+      nama_desa: data.nama_desa,
+      nama_dusun: data.nama_dusun,
+      id_wilayah: selectedMap.id_wilayah || profile.id_wilayah || '',
+      alamat: data.alamat,
+      data_laporan: data.keterangan_tambahan || ''
     };
+
+    return payload;
   }
 
   async function submitRegistrasi(event) {
