@@ -670,11 +670,26 @@
 
   function buildRequestPayload() {
     var data = normalizeData(collectFormData());
+    var profile = getProfile();
     var selectedMap = (state.mappings || []).find(function (row) {
       return normalizeTextUpper(row.kecamatan) === normalizeTextUpper(data.nama_kecamatan) &&
              normalizeTextUpper(row.desa_kelurahan) === normalizeTextUpper(data.nama_desa) &&
              normalizeTextUpper(row.dusun_rw) === normalizeTextUpper(data.nama_dusun);
     }) || {};
+
+    var resolvedIdTim = normalizeSpaces(
+      selectedMap.id_tim ||
+      profile.id_tim ||
+      (profile.session && profile.session.id_tim) ||
+      ''
+    );
+
+    var resolvedBookKey = normalizeTextUpper(
+      profile.book_key ||
+      profile.kode_kecamatan ||
+      (profile.session && (profile.session.book_key || profile.session.kode_kecamatan)) ||
+      ''
+    );
 
     return {
       action: 'registerSasaran',
@@ -684,6 +699,8 @@
       data: {
         client_submit_id: 'REG-' + Date.now(),
         sync_source: navigator.onLine === false ? 'OFFLINE' : 'ONLINE',
+        id_tim: resolvedIdTim,
+        book_key: resolvedBookKey,
         jenis_sasaran: data.jenis_sasaran,
         nama_sasaran: data.nama_sasaran,
         nama_kepala_keluarga: data.nama_kepala_keluarga,
@@ -695,7 +712,7 @@
         nama_kecamatan: data.nama_kecamatan,
         nama_desa: data.nama_desa,
         nama_dusun: data.nama_dusun,
-        id_wilayah: selectedMap.id_wilayah || '',
+        id_wilayah: selectedMap.id_wilayah || profile.id_wilayah || '',
         alamat: data.alamat,
         data_laporan: data.keterangan_tambahan || ''
       }
