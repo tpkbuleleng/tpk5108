@@ -1,4 +1,6 @@
-(function (window, document) {
+from pathlib import Path
+
+code = r"""(function (window, document) {
   'use strict';
 
   var SCREEN_ID = 'registrasi-screen';
@@ -22,6 +24,23 @@
     alamat: 'reg-alamat'
   };
 
+  var QUESTION_CODE_TO_STATIC_ID = {
+    JENIS_SASARAN: FIELD_IDS.jenis_sasaran,
+    NAMA_SASARAN: FIELD_IDS.nama_sasaran,
+    NAMA_KEPALA_KELUARGA: FIELD_IDS.nama_kepala_keluarga,
+    NAMA_IBU_KANDUNG: FIELD_IDS.nama_ibu_kandung,
+    NIK_SASARAN: FIELD_IDS.nik_sasaran,
+    NOMOR_KK: FIELD_IDS.nomor_kk,
+    JENIS_KELAMIN: FIELD_IDS.jenis_kelamin,
+    TANGGAL_LAHIR: FIELD_IDS.tanggal_lahir,
+    KECAMATAN: FIELD_IDS.nama_kecamatan,
+    DESA_KELURAHAN: FIELD_IDS.nama_desa,
+    DUSUN_RW: FIELD_IDS.nama_dusun,
+    ALAMAT: FIELD_IDS.alamat
+  };
+
+  var DYNAMIC_RENDER_CONTAINER_ID = 'registrasi-dynamic-fields';
+
   var state = {
     screen: null,
     form: null,
@@ -29,11 +48,23 @@
     autoValidationTimer: null,
     lastValidationSignature: '',
     isBound: false,
-    initCount: 0
+    initCount: 0,
+    formDefinition: null,
+    formQuestionsByCode: {},
+    currentFormId: '',
+    isLoadingDefinition: false
   };
 
   function byId(id) {
     return document.getElementById(id);
+  }
+
+  function qs(selector, root) {
+    return (root || document).querySelector(selector);
+  }
+
+  function qsa(selector, root) {
+    return Array.prototype.slice.call((root || document).querySelectorAll(selector));
   }
 
   function getRouter() {
@@ -100,6 +131,16 @@
     });
   }
 
+  function isTruthy(value) {
+    var s = normalizeTextUpper(value);
+    return s === 'TRUE' || s === '1' || s === 'YA' || s === 'YES' || s === 'Y';
+  }
+
+  function isScreenActive() {
+    var screen = state.screen || byId(SCREEN_ID);
+    return !!(screen && !screen.classList.contains('hidden'));
+  }
+
   function setValue(id, value) {
     var el = byId(id);
     if (!el) return;
@@ -118,6 +159,12 @@
     el.classList.toggle('hidden', !!hidden);
   }
 
+  function setDisabled(id, disabled) {
+    var el = byId(id);
+    if (!el) return;
+    el.disabled = !!disabled;
+  }
+
   function toast(message, type) {
     var ui = getUI();
     if (ui && typeof ui.showToast === 'function') {
@@ -131,11 +178,6 @@
     try {
       window.alert(message);
     } catch (err) {}
-  }
-
-  function isScreenActive() {
-    var screen = state.screen || byId(SCREEN_ID);
-    return !!(screen && !screen.classList.contains('hidden'));
   }
 
   function getProfile() {
@@ -185,29 +227,22 @@
   function parseIsoDate(value) {
     var s = String(value || '').trim();
     if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
-
     var parts = s.split('-');
     var y = Number(parts[0]);
     var m = Number(parts[1]);
     var d = Number(parts[2]);
     var date = new Date(y, m - 1, d);
-    if (date.getFullYear() !== y || date.getMonth() !== m - 1 || date.getDate() !== d) {
-      return null;
-    }
+    if (date.getFullYear() !== y || date.getMonth() !== m - 1 || date.getDate() !== d) return null;
     date.setHours(0, 0, 0, 0);
     return date;
   }
 
   function calculateAge(dateStr) {
     var dob = parseIsoDate(dateStr);
-    if (!dob) {
-      return { valid: false, years: null, months: null, totalMonths: null, label: '-' };
-    }
+    if (!dob) return { valid: false, years: null, months: null, totalMonths: null, label: '-' };
 
     var today = parseIsoDate(getTodayIso());
-    if (!today || dob > today) {
-      return { valid: false, years: null, months: null, totalMonths: null, label: '-' };
-    }
+    if (!today || dob > today) return { valid: false, years: null, months: null, totalMonths: null, label: '-' };
 
     var years = today.getFullYear() - dob.getFullYear();
     var months = today.getMonth() - dob.getMonth();
@@ -231,12 +266,10 @@
   function splitFlexible(rawValue) {
     var text = normalizeSpaces(rawValue);
     if (!text) return [];
-
     return uniqByKey(
-      text
-        .split(/\s*\/\s*|\s*;\s*|\s*\|\s*|\n+/)
-        .map(function (item) { return normalizeSpaces(item); })
-        .filter(Boolean),
+      text.split(/\s*\/\s*|\s*;\s*|\s*\|\s*|\n+/).map(function (item) {
+        return normalizeSpaces(item);
+      }).filter(Boolean),
       function (item) { return item; }
     );
   }
@@ -261,39 +294,284 @@
     });
 
     select.innerHTML = html.join('');
-    if (selectedValue) {
-      select.value = String(selectedValue);
+    if (selectedValue) select.value = String(selectedValue);
+  }
+
+  function getJenisSasaranValue() {
+    return normalizeTextUpper(byId(FIELD_IDS.jenis_sasaran) ? byId(FIELD_IDS.jenis_sasaran).value : '');
+  }
+
+  function getQuestionByCode(code) {
+    return state.formQuestionsByCode[normalizeTextUpper(code)] || null;
+  }
+
+  function getQuestionValueByCode(code) {
+    var q = getQuestionByCode(code);
+    if (!q) return '';
+    if (q.isStatic && q.domId) {
+      var el = byId(q.domId);
+      return el ? String(el.value || '') : '';
+    }
+    var dynId = getDynamicFieldId(q.question_code);
+    var dynEl = byId(dynId);
+    return dynEl ? String(dynEl.value || '') : '';
+  }
+
+  function getDynamicFieldId(questionCode) {
+    return 'reg-dyn-' + String(questionCode || '').toLowerCase().replace(/[^a-z0-9_]+/g, '-');
+  }
+
+  function normalizeFormDefinitionResponse(response) {
+    var data = response && response.data ? response.data : response;
+    if (!data) return null;
+
+    var questions = [];
+    if (Array.isArray(data.questions)) questions = data.questions;
+    if (!questions.length && Array.isArray(data.sections)) {
+      data.sections.forEach(function (section) {
+        (section.questions || []).forEach(function (q) {
+          questions.push(q);
+        });
+      });
+    }
+
+    var rules = Array.isArray(data.rules) ? data.rules : [];
+    var form = data.form || {};
+    return {
+      form: form,
+      questions: questions,
+      sections: Array.isArray(data.sections) ? data.sections : [],
+      rules: rules,
+      scope: data.scope || {},
+      defaults: data.defaults || {}
+    };
+  }
+
+  async function fetchFormDefinition(jenisSasaran) {
+    var jenis = normalizeTextUpper(jenisSasaran);
+    if (!jenis) return null;
+
+    var api = getApi();
+    if (!api || typeof api.post !== 'function') return null;
+
+    try {
+      var response = await api.post('getFormDefinition', {
+        jenis_sasaran: jenis,
+        form_type: 'REGISTRASI'
+      });
+      if (response && response.ok === false) throw new Error(response.message || 'Gagal mengambil definisi form');
+      return normalizeFormDefinitionResponse(response);
+    } catch (err) {
+      toast('Gagal membaca definisi form registrasi: ' + (err && err.message ? err.message : err), 'warning');
+      return null;
     }
   }
 
-  function renderDynamicFields(jenis) {
-    var container = byId('registrasi-dynamic-fields');
+  function applyStaticQuestionDefinition(question, contextDefaults) {
+    if (!question) return;
+
+    var code = normalizeTextUpper(question.question_code);
+    var domId = QUESTION_CODE_TO_STATIC_ID[code];
+    if (!domId) return;
+
+    var el = byId(domId);
+    if (!el) return;
+
+    question.isStatic = true;
+    question.domId = domId;
+
+    if (question.placeholder && !el.dataset.placeholderLocked) {
+      el.placeholder = question.placeholder;
+    }
+
+    if (code === 'JENIS_KELAMIN' && Array.isArray(question.options) && question.options.length) {
+      fillSelect(domId, question.options.map(function (opt) {
+        return { value: opt.value, label: opt.label };
+      }), 'Pilih jenis kelamin', el.value || question.default_value_runtime || question.default_value);
+    }
+
+    if (code === 'KECAMATAN' || code === 'DESA_KELURAHAN' || code === 'DUSUN_RW') {
+      var value = question.default_value_runtime || question.default_value || '';
+      if (value && !el.value) el.value = value;
+    }
+
+    if (code === 'JENIS_SASARAN') {
+      var jenisValue = getJenisSasaranValue();
+      if (!jenisValue) setValue(domId, question.default_value_runtime || question.default_value || '');
+    }
+
+    if (code === 'NAMA_IBU_KANDUNG') {
+      setHidden('group-reg-nama-ibu-kandung', getJenisSasaranValue() !== 'BADUTA');
+    }
+
+    setDisabled(domId, !!question.readonly_runtime);
+  }
+
+  function buildQuestionIndex(formDefinition) {
+    state.formQuestionsByCode = {};
+    (formDefinition && formDefinition.questions || []).forEach(function (question) {
+      var code = normalizeTextUpper(question.question_code);
+      if (!code) return;
+      state.formQuestionsByCode[code] = question;
+    });
+  }
+
+  function getDynamicQuestions() {
+    return Object.keys(state.formQuestionsByCode).map(function (code) {
+      return state.formQuestionsByCode[code];
+    }).filter(function (q) {
+      return !q.isStatic && String(q.field_type || '').toLowerCase() !== 'hidden';
+    }).sort(function (a, b) {
+      return Number(a.question_order || 0) - Number(b.question_order || 0);
+    });
+  }
+
+  function getAllCurrentValues() {
+    var data = normalizeData(collectFormData());
+    qsa('.reg-dynamic-field').forEach(function (el) {
+      var code = normalizeTextUpper(el.getAttribute('data-question-code') || '');
+      if (code) data[normalizeStoreKey(code)] = normalizeSpaces(el.value);
+    });
+    return data;
+  }
+
+  function normalizeStoreKey(code) {
+    return String(code || '').trim().toLowerCase();
+  }
+
+  function getValueForRuleField(triggerField, values) {
+    var mapKey = normalizeStoreKey(triggerField);
+    return values[mapKey] || values[triggerField] || values[normalizeStoreKey(triggerField)] || '';
+  }
+
+  function evaluateRule(rule, values) {
+    var operator = normalizeTextUpper(rule.operator);
+    var actual = normalizeTextUpper(getValueForRuleField(rule.trigger_field, values));
+    var expected = normalizeTextUpper(rule.trigger_value);
+
+    if (operator === 'EQ' || operator === 'EQ_ANY') return actual === expected;
+    if (operator === 'IN') {
+      return expected.split('|').some(function (part) {
+        return normalizeTextUpper(part) === actual;
+      });
+    }
+    if (operator === 'ANY_EQ') {
+      var fields = String(rule.trigger_field || '').split('|');
+      return fields.some(function (f) {
+        return normalizeTextUpper(getValueForRuleField(f, values)) === expected;
+      });
+    }
+    return false;
+  }
+
+  function getQuestionRules(questionCode, type) {
+    var q = getQuestionByCode(questionCode);
+    if (!q || !Array.isArray(q.rules)) return [];
+    return q.rules.filter(function (r) {
+      return normalizeTextUpper(r.rule_type) === normalizeTextUpper(type);
+    });
+  }
+
+  function isQuestionVisible(question, values) {
+    var rules = getQuestionRules(question.question_code, 'visibility');
+    if (!rules.length) return true;
+    return rules.some(function (rule) {
+      return normalizeTextUpper(rule.action) === 'SHOW' && evaluateRule(rule, values);
+    });
+  }
+
+  function isQuestionRequiredRuntime(question, values) {
+    if (isTruthy(question.is_required) || isTruthy(question.required_runtime)) return true;
+    var rules = getQuestionRules(question.question_code, 'requirement');
+    if (!rules.length) return false;
+    return rules.some(function (rule) {
+      return normalizeTextUpper(rule.action) === 'REQUIRE' && evaluateRule(rule, values);
+    });
+  }
+
+  function renderDynamicFields() {
+    var container = byId(DYNAMIC_RENDER_CONTAINER_ID);
     if (!container) return;
 
-    var currentValue = byId('reg-keterangan-tambahan') ? byId('reg-keterangan-tambahan').value : '';
-    var normalizedJenis = String(jenis || '').trim().toUpperCase();
-    var hints = {
-      CATIN: 'Contoh: Catin baru terdaftar',
-      BUMIL: 'Contoh: Bumil trimester 2',
-      BUFAS: 'Contoh: Bufas minggu ke-2',
-      BADUTA: 'Contoh: Baduta usia 11 bulan'
-    };
+    var previousValues = {};
+    qsa('.reg-dynamic-field', container).forEach(function (el) {
+      previousValues[normalizeTextUpper(el.getAttribute('data-question-code') || '')] = el.value || '';
+    });
 
-    container.innerHTML = [
-      '<div class="filters-grid">',
-        '<div class="form-group form-group-span-2">',
-          '<label for="reg-keterangan-tambahan">Keterangan Tambahan</label>',
-          '<input id="reg-keterangan-tambahan" name="keterangan_tambahan" type="text" placeholder="', escapeHtml(hints[normalizedJenis] || 'Tambahkan keterangan seperlunya'), '" />',
-        '</div>',
-      '</div>'
-    ].join('');
+    var values = getAllCurrentValues();
+    var questions = getDynamicQuestions();
+    var html = ['<div class="filters-grid">'];
 
-    setValue('reg-keterangan-tambahan', currentValue);
-    bindCommonChange('reg-keterangan-tambahan');
+    questions.forEach(function (q) {
+      var code = normalizeTextUpper(q.question_code);
+      var visible = isQuestionVisible(q, values);
+      var requiredRuntime = isQuestionRequiredRuntime(q, values);
+      if (!visible) return;
+
+      var fieldId = getDynamicFieldId(code);
+      var label = escapeHtml(q.question_label || code);
+      var placeholder = escapeHtml(q.placeholder || '');
+      var value = previousValues[code];
+      if (!value) {
+        value = q.default_value_runtime || q.default_value || '';
+      }
+
+      html.push('<div class="form-group form-group-span-2" id="group-' + escapeHtml(fieldId) + '">');
+      html.push('<label for="' + escapeHtml(fieldId) + '">' + label + (requiredRuntime ? ' <span style="color:#c62828;">*</span>' : '') + '</label>');
+
+      var type = String(q.field_type || '').toLowerCase();
+      if (type === 'select') {
+        html.push('<select id="' + escapeHtml(fieldId) + '" class="reg-dynamic-field" data-question-code="' + escapeHtml(code) + '">');
+        html.push('<option value="">Pilih</option>');
+        (q.options || []).forEach(function (opt) {
+          var selected = String(opt.value || '') === String(value || '') ? ' selected' : '';
+          html.push('<option value="' + escapeHtml(opt.value) + '"' + selected + '>' + escapeHtml(opt.label || opt.value) + '</option>');
+        });
+        html.push('</select>');
+      } else if (type === 'textarea') {
+        html.push('<textarea id="' + escapeHtml(fieldId) + '" class="reg-dynamic-field" data-question-code="' + escapeHtml(code) + '" placeholder="' + placeholder + '">' + escapeHtml(value) + '</textarea>');
+      } else {
+        html.push('<input id="' + escapeHtml(fieldId) + '" class="reg-dynamic-field" data-question-code="' + escapeHtml(code) + '" type="text" placeholder="' + placeholder + '" value="' + escapeHtml(value) + '" />');
+      }
+
+      if (q.help_text) {
+        html.push('<small class="muted-text">' + escapeHtml(q.help_text) + '</small>');
+      }
+      html.push('</div>');
+    });
+
+    html.push('</div>');
+    container.innerHTML = html.join('');
+
+    qsa('.reg-dynamic-field', container).forEach(function (el) {
+      bindDynamicField(el);
+    });
+  }
+
+  function bindDynamicField(el) {
+    if (!el || el.dataset.boundDynamic === '1') return;
+    el.dataset.boundDynamic = '1';
+
+    ['input', 'change', 'blur', 'keyup'].forEach(function (evt) {
+      el.addEventListener(evt, function () {
+        renderDynamicFields();
+        refreshValidation(true);
+      });
+    });
+  }
+
+  function collectDynamicData() {
+    var output = {};
+    qsa('.reg-dynamic-field').forEach(function (el) {
+      var code = normalizeTextUpper(el.getAttribute('data-question-code') || '');
+      if (!code) return;
+      output[normalizeStoreKey(code)] = normalizeSpaces(el.value);
+    });
+    return output;
   }
 
   function collectFormData() {
-    return {
+    var base = {
       jenis_sasaran: byId(FIELD_IDS.jenis_sasaran) ? byId(FIELD_IDS.jenis_sasaran).value : '',
       nama_sasaran: byId(FIELD_IDS.nama_sasaran) ? byId(FIELD_IDS.nama_sasaran).value : '',
       nama_kepala_keluarga: byId(FIELD_IDS.nama_kepala_keluarga) ? byId(FIELD_IDS.nama_kepala_keluarga).value : '',
@@ -305,12 +583,17 @@
       nama_kecamatan: byId(FIELD_IDS.nama_kecamatan) ? byId(FIELD_IDS.nama_kecamatan).value : '',
       nama_desa: byId(FIELD_IDS.nama_desa) ? byId(FIELD_IDS.nama_desa).value : '',
       nama_dusun: byId(FIELD_IDS.nama_dusun) ? byId(FIELD_IDS.nama_dusun).value : '',
-      alamat: byId(FIELD_IDS.alamat) ? byId(FIELD_IDS.alamat).value : '',
-      keterangan_tambahan: byId('reg-keterangan-tambahan') ? byId('reg-keterangan-tambahan').value : ''
+      alamat: byId(FIELD_IDS.alamat) ? byId(FIELD_IDS.alamat).value : ''
     };
+
+    var dyn = collectDynamicData();
+    Object.keys(dyn).forEach(function (k) { base[k] = dyn[k]; });
+
+    return base;
   }
 
   function normalizeData(raw) {
+    raw = raw || {};
     return {
       jenis_sasaran: String(raw.jenis_sasaran || '').trim().toUpperCase(),
       nama_sasaran: normalizeSpaces(raw.nama_sasaran),
@@ -324,7 +607,11 @@
       nama_desa: normalizeSpaces(raw.nama_desa),
       nama_dusun: normalizeSpaces(raw.nama_dusun),
       alamat: normalizeSpaces(raw.alamat),
-      keterangan_tambahan: normalizeSpaces(raw.keterangan_tambahan)
+      sumber_air_minum_utama: normalizeSpaces(raw.sumber_air_minum_utama),
+      sumber_air_minum_utama_lainnya: normalizeSpaces(raw.sumber_air_minum_utama_lainnya),
+      fasilitas_bab: normalizeSpaces(raw.fasilitas_bab),
+      fasilitas_bab_lainnya: normalizeSpaces(raw.fasilitas_bab_lainnya),
+      keterangan_tambahan: normalizeSpaces(raw.keterangan_tambahan || raw.keterangan_tambahan_awal)
     };
   }
 
@@ -353,6 +640,16 @@
 
     if (!data.jenis_kelamin) warnings.push('Jenis kelamin belum dipilih.');
     if (!data.tanggal_lahir) warnings.push('Tanggal lahir belum diisi.');
+
+    if (!data.sumber_air_minum_utama) errors.push('Sumber Air Minum Utama wajib dipilih.');
+    if (normalizeTextUpper(data.sumber_air_minum_utama) === 'LAINNYA' && !data.sumber_air_minum_utama_lainnya) {
+      errors.push('Sumber Air Minum Utama Lainnya wajib diisi jika memilih Lainnya.');
+    }
+
+    if (!data.fasilitas_bab) errors.push('Fasilitas BAB wajib dipilih.');
+    if (normalizeTextUpper(data.fasilitas_bab) === 'YA_LAINNYA' && !data.fasilitas_bab_lainnya) {
+      errors.push('Fasilitas BAB Lainnya wajib diisi jika memilih Ya Lainnya.');
+    }
 
     if (data.nik_sasaran === PLACEHOLDER_16) warnings.push('NIK memakai nilai standar 16 digit angka 9.');
     if (data.nomor_kk === PLACEHOLDER_16) warnings.push('Nomor KK memakai nilai standar 16 digit angka 9.');
@@ -403,25 +700,15 @@
     var html = [];
 
     if (result.errors && result.errors.length) {
-      html.push('<div class="validation-block validation-block-error">');
-      html.push('<h4>Perlu diperbaiki:</h4>');
-      html.push('<ul>');
-      result.errors.forEach(function (item) {
-        html.push('<li>' + escapeHtml(item) + '</li>');
-      });
-      html.push('</ul>');
-      html.push('</div>');
+      html.push('<div class="validation-block validation-block-error"><h4>Perlu diperbaiki:</h4><ul>');
+      result.errors.forEach(function (item) { html.push('<li>' + escapeHtml(item) + '</li>'); });
+      html.push('</ul></div>');
     }
 
     if (result.warnings && result.warnings.length) {
-      html.push('<div class="validation-block validation-block-warning">');
-      html.push('<h4>Perhatian:</h4>');
-      html.push('<ul>');
-      result.warnings.forEach(function (item) {
-        html.push('<li>' + escapeHtml(item) + '</li>');
-      });
-      html.push('</ul>');
-      html.push('</div>');
+      html.push('<div class="validation-block validation-block-warning"><h4>Perhatian:</h4><ul>');
+      result.warnings.forEach(function (item) { html.push('<li>' + escapeHtml(item) + '</li>'); });
+      html.push('</ul></div>');
     }
 
     if ((!result.errors || !result.errors.length) && (!result.warnings || !result.warnings.length)) {
@@ -444,10 +731,9 @@
   }
 
   function getDraftPayload() {
-    var data = normalizeData(collectFormData());
     return {
       saved_at: new Date().toISOString(),
-      data: data
+      data: normalizeData(collectFormData())
     };
   }
 
@@ -471,42 +757,22 @@
   }
 
   function clearDraft() {
-    try {
-      localStorage.removeItem(DRAFT_KEY);
-    } catch (err) {}
-  }
-
-  function applyDraft(draft) {
-    if (!draft || !draft.data) return;
-    var data = draft.data;
-
-    Object.keys(FIELD_IDS).forEach(function (key) {
-      if (Object.prototype.hasOwnProperty.call(data, key)) {
-        setValue(FIELD_IDS[key], data[key]);
-      }
-    });
-
-    syncDependentFields();
-    setValue('reg-keterangan-tambahan', data.keterangan_tambahan || '');
-    refreshValidation(true);
+    try { localStorage.removeItem(DRAFT_KEY); } catch (err) {}
   }
 
   function getProfileScopeFallback() {
     var profile = getProfile();
-    return [
-      {
-        id_tim: profile.id_tim || '',
-        id_wilayah: profile.id_wilayah || '',
-        kecamatan: profile.nama_kecamatan || profile.kecamatan || '',
-        desa_kelurahan: profile.desa_kelurahan || profile.nama_desa || '',
-        dusun_rw: profile.dusun_rw || profile.nama_dusun || ''
-      }
-    ];
+    return [{
+      id_tim: profile.id_tim || '',
+      id_wilayah: profile.id_wilayah || '',
+      kecamatan: profile.nama_kecamatan || profile.kecamatan || '',
+      desa_kelurahan: profile.desa_kelurahan || profile.nama_desa || '',
+      dusun_rw: profile.dusun_rw || profile.nama_dusun || ''
+    }];
   }
 
   function normalizeTimRefResponse(response) {
     if (!response) return [];
-
     var source = [];
     if (Array.isArray(response)) source = response;
     else if (response.data && Array.isArray(response.data.items)) source = response.data.items;
@@ -533,9 +799,7 @@
     var idTim = normalizeSpaces(profile.id_tim);
     var api = getApi();
 
-    if (!idTim || !api || typeof api.post !== 'function') {
-      return getProfileScopeFallback();
-    }
+    if (!idTim || !api || typeof api.post !== 'function') return getProfileScopeFallback();
 
     try {
       var response = await api.post('getTimRef', { id_tim: idTim });
@@ -612,13 +876,8 @@
 
   async function hydrateWilayahOptions() {
     var mappings = await fetchTimWilayahMappings();
+    if (!mappings || !mappings.length) mappings = getProfileScopeFallback();
 
-    // fallback final jika tim_ref tidak tersedia atau hanya text gabungan
-    if (!mappings || !mappings.length) {
-      mappings = getProfileScopeFallback();
-    }
-
-    // pecah nilai gabungan bila masih tersisa dari profil lama
     var expanded = [];
     mappings.forEach(function (row) {
       var kecamatanList = splitFlexible(row.kecamatan || '');
@@ -651,8 +910,54 @@
     applyScopeOptions();
   }
 
-  function syncDependentFields() {
-    var jenis = byId(FIELD_IDS.jenis_sasaran) ? byId(FIELD_IDS.jenis_sasaran).value : '';
+  async function loadDefinitionForJenis(jenis, preserveDynamicValues) {
+    var normalizedJenis = normalizeTextUpper(jenis);
+    if (!normalizedJenis) {
+      state.formDefinition = null;
+      state.formQuestionsByCode = {};
+      state.currentFormId = '';
+      renderDynamicFields();
+      return;
+    }
+
+    if (state.isLoadingDefinition) return;
+    state.isLoadingDefinition = true;
+
+    try {
+      var previousDynamic = preserveDynamicValues ? collectDynamicData() : {};
+      var formDefinition = await fetchFormDefinition(normalizedJenis);
+      if (!formDefinition) return;
+
+      state.formDefinition = formDefinition;
+      state.currentFormId = normalizeSpaces(formDefinition.form && formDefinition.form.form_id || '');
+      buildQuestionIndex(formDefinition);
+
+      Object.keys(state.formQuestionsByCode).forEach(function (code) {
+        var q = state.formQuestionsByCode[code];
+        q.isStatic = !!QUESTION_CODE_TO_STATIC_ID[normalizeTextUpper(code)];
+        q.domId = QUESTION_CODE_TO_STATIC_ID[normalizeTextUpper(code)] || '';
+        applyStaticQuestionDefinition(q, formDefinition.defaults || {});
+      });
+
+      if (previousDynamic && Object.keys(previousDynamic).length) {
+        renderDynamicFields();
+        Object.keys(previousDynamic).forEach(function (k) {
+          var qCode = normalizeTextUpper(k);
+          var q = getQuestionByCode(qCode);
+          if (!q || q.isStatic) return;
+          var el = byId(getDynamicFieldId(q.question_code));
+          if (el) el.value = previousDynamic[k] || '';
+        });
+      }
+      renderDynamicFields();
+      refreshValidation(true);
+    } finally {
+      state.isLoadingDefinition = false;
+    }
+  }
+
+  async function syncDependentFields() {
+    var jenis = getJenisSasaranValue();
     var selectedKecamatan = byId(FIELD_IDS.nama_kecamatan) ? byId(FIELD_IDS.nama_kecamatan).value : '';
     var selectedDesa = byId(FIELD_IDS.nama_desa) ? byId(FIELD_IDS.nama_desa).value : '';
     var selectedDusun = byId(FIELD_IDS.nama_dusun) ? byId(FIELD_IDS.nama_dusun).value : '';
@@ -660,12 +965,13 @@
     setHidden('group-reg-nama-ibu-kandung', jenis !== 'BADUTA');
     if (jenis !== 'BADUTA') setValue(FIELD_IDS.nama_ibu_kandung, '');
 
-    renderDynamicFields(jenis);
+    await loadDefinitionForJenis(jenis, true);
     applyScopeOptions({
       kecamatan: selectedKecamatan,
       desa: selectedDesa,
       dusun: selectedDusun
     });
+    renderDynamicFields();
   }
 
   function buildRequestPayload() {
@@ -691,13 +997,14 @@
       ''
     );
 
-    var payload = {
+    return {
       action: 'registerSasaran',
       token: getSessionToken(),
       perangkat: 'PWA',
       app_version: getConfig().APP_VERSION || '',
       client_submit_id: 'REG-' + Date.now(),
       sync_source: navigator.onLine === false ? 'OFFLINE' : 'ONLINE',
+      form_id: state.currentFormId || '',
       id_tim: resolvedIdTim,
       book_key: resolvedBookKey,
       jenis_sasaran: data.jenis_sasaran,
@@ -714,10 +1021,19 @@
       nama_dusun: data.nama_dusun,
       id_wilayah: selectedMap.id_wilayah || profile.id_wilayah || '',
       alamat: data.alamat,
-      data_laporan: data.keterangan_tambahan || ''
+      sumber_air_minum_utama: data.sumber_air_minum_utama,
+      sumber_air_minum_utama_lainnya: data.sumber_air_minum_utama_lainnya,
+      fasilitas_bab: data.fasilitas_bab,
+      fasilitas_bab_lainnya: data.fasilitas_bab_lainnya,
+      data_laporan: data.keterangan_tambahan || '',
+      form_answers: {
+        sumber_air_minum_utama: data.sumber_air_minum_utama,
+        sumber_air_minum_utama_lainnya: data.sumber_air_minum_utama_lainnya,
+        fasilitas_bab: data.fasilitas_bab,
+        fasilitas_bab_lainnya: data.fasilitas_bab_lainnya,
+        keterangan_tambahan: data.keterangan_tambahan
+      }
     };
-
-    return payload;
   }
 
   async function submitRegistrasi(event) {
@@ -744,22 +1060,16 @@
 
     try {
       var api = getApi();
-      if (!api || typeof api.post !== 'function') {
-        throw new Error('Api.post belum tersedia.');
-      }
+      if (!api || typeof api.post !== 'function') throw new Error('Api.post belum tersedia.');
 
       var result = await api.post('registerSasaran', buildRequestPayload());
-      if (result && result.ok === false) {
-        throw new Error(result.message || 'Registrasi gagal disimpan.');
-      }
+      if (result && result.ok === false) throw new Error(result.message || 'Registrasi gagal disimpan.');
 
       clearDraft();
       toast((result && result.message) || 'Registrasi sasaran berhasil disimpan.', 'success');
-      resetForm();
+      await resetForm();
       var router = getRouter();
-      if (router && typeof router.go === 'function') {
-        router.go('sasaranList');
-      }
+      if (router && typeof router.go === 'function') router.go('sasaranList');
     } catch (err) {
       toast(err && err.message ? err.message : 'Registrasi sasaran gagal.', 'error');
     } finally {
@@ -791,8 +1101,9 @@
     el.dataset.boundCommon = '1';
 
     var handler = function () {
-      syncDependentFields();
-      refreshValidation(true);
+      syncDependentFields().then(function () {
+        refreshValidation(true);
+      });
     };
 
     ['input', 'change', 'blur', 'keyup'].forEach(function (evt) {
@@ -815,14 +1126,58 @@
     }
   }
 
-  function resetForm() {
+  async function resetForm() {
     var form = state.form || byId(FORM_ID);
     if (form) form.reset();
     state.lastValidationSignature = '';
+    state.formDefinition = null;
+    state.formQuestionsByCode = {};
+    state.currentFormId = '';
+
     setHidden('group-reg-nama-ibu-kandung', true);
-    renderDynamicFields('');
-    hydrateWilayahOptions().then(function () {
-      refreshValidation(true);
+    var container = byId(DYNAMIC_RENDER_CONTAINER_ID);
+    if (container) container.innerHTML = '';
+
+    await hydrateWilayahOptions();
+    await syncDependentFields();
+    refreshValidation(true);
+  }
+
+  async function applyDraft(draft) {
+    if (!draft || !draft.data) return;
+    var data = draft.data;
+
+    Object.keys(FIELD_IDS).forEach(function (key) {
+      if (Object.prototype.hasOwnProperty.call(data, key)) setValue(FIELD_IDS[key], data[key]);
+    });
+
+    await syncDependentFields();
+
+    var dynMap = {
+      sumber_air_minum_utama: 'SUMBER_AIR_MINUM_UTAMA',
+      sumber_air_minum_utama_lainnya: 'SUMBER_AIR_MINUM_UTAMA_LAINNYA',
+      fasilitas_bab: 'FASILITAS_BAB',
+      fasilitas_bab_lainnya: 'FASILITAS_BAB_LAINNYA',
+      keterangan_tambahan: 'KETERANGAN_TAMBAHAN'
+    };
+
+    Object.keys(dynMap).forEach(function (key) {
+      if (!Object.prototype.hasOwnProperty.call(data, key)) return;
+      var q = getQuestionByCode(dynMap[key]);
+      if (!q || q.isStatic) return;
+      var el = byId(getDynamicFieldId(q.question_code));
+      if (el) el.value = data[key] || '';
+    });
+
+    renderDynamicFields();
+    refreshValidation(true);
+  }
+
+  function scheduleInitialValidationBursts() {
+    [50, 200, 600, 1200].forEach(function (delay) {
+      window.setTimeout(function () {
+        if (isScreenActive()) refreshValidation(true);
+      }, delay);
     });
   }
 
@@ -836,30 +1191,17 @@
     var draftBtn = byId('btn-save-reg-draft');
     var resetBtn = byId('btn-reset-registrasi');
 
-    if (form) {
-      form.addEventListener('submit', submitRegistrasi);
-    }
+    if (form) form.addEventListener('submit', submitRegistrasi);
 
     if (backBtn) {
       backBtn.addEventListener('click', function () {
         var router = getRouter();
-        if (router && typeof router.go === 'function') {
-          router.go('dashboard');
-        }
+        if (router && typeof router.go === 'function') router.go('dashboard');
       });
     }
 
-    if (draftBtn) {
-      draftBtn.addEventListener('click', function () {
-        saveDraft();
-      });
-    }
-
-    if (resetBtn) {
-      resetBtn.addEventListener('click', function () {
-        resetForm();
-      });
-    }
+    if (draftBtn) draftBtn.addEventListener('click', saveDraft);
+    if (resetBtn) resetBtn.addEventListener('click', function () { resetForm(); });
 
     Object.keys(FIELD_IDS).forEach(function (key) {
       if (key === 'nik_sasaran' || key === 'nomor_kk') return;
@@ -868,14 +1210,6 @@
 
     bindDigitOnly(FIELD_IDS.nik_sasaran);
     bindDigitOnly(FIELD_IDS.nomor_kk);
-  }
-
-  function scheduleInitialValidationBursts() {
-    [50, 200, 600, 1200].forEach(function (delay) {
-      window.setTimeout(function () {
-        if (isScreenActive()) refreshValidation(true);
-      }, delay);
-    });
   }
 
   async function openCreate() {
@@ -893,13 +1227,12 @@
     setText('registrasi-mode-badge', 'CREATE');
 
     await hydrateWilayahOptions();
-    syncDependentFields();
+    await syncDependentFields();
 
     var draft = loadDraft();
     if (draft && draft.data) {
-      applyDraft(draft);
+      await applyDraft(draft);
     } else {
-      renderDynamicFields('');
       refreshValidation(true);
     }
 
@@ -926,3 +1259,7 @@
     stopAutoValidation: stopAutoValidation
   };
 })(window, document);
+"""
+path = Path('/mnt/data/registrasiView.js')
+path.write_text(code, encoding='utf-8')
+print(path)
