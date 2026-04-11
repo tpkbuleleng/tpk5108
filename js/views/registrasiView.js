@@ -1,7 +1,8 @@
-from pathlib import Path
-
-code = r"""(function (window, document) {
+(function (window, document) {
   'use strict';
+
+  window.__REG_VIEW_BUILD = '20260411-02';
+  console.log('RegistrasiView build aktif:', window.__REG_VIEW_BUILD);
 
   var SCREEN_ID = 'registrasi-screen';
   var FORM_ID = 'registrasi-form';
@@ -57,10 +58,6 @@ code = r"""(function (window, document) {
 
   function byId(id) {
     return document.getElementById(id);
-  }
-
-  function qs(selector, root) {
-    return (root || document).querySelector(selector);
   }
 
   function qsa(selector, root) {
@@ -217,6 +214,23 @@ code = r"""(function (window, document) {
     }
   }
 
+  function getCurrentUserIdTim() {
+    var auth = getAuth();
+    if (auth && typeof auth.getSession === 'function') {
+      try {
+        var session = auth.getSession() || {};
+        if (session.id_tim) return normalizeSpaces(session.id_tim);
+      } catch (err) {}
+    }
+
+    var profile = getProfile();
+    return normalizeSpaces(
+      profile.id_tim ||
+      (profile.session && profile.session.id_tim) ||
+      ''
+    );
+  }
+
   function getTodayIso() {
     var d = new Date();
     var mm = String(d.getMonth() + 1).padStart(2, '0');
@@ -294,7 +308,7 @@ code = r"""(function (window, document) {
     });
 
     select.innerHTML = html.join('');
-    if (selectedValue) select.value = String(selectedValue);
+    if (selectedValue != null) select.value = String(selectedValue);
   }
 
   function getJenisSasaranValue() {
@@ -303,18 +317,6 @@ code = r"""(function (window, document) {
 
   function getQuestionByCode(code) {
     return state.formQuestionsByCode[normalizeTextUpper(code)] || null;
-  }
-
-  function getQuestionValueByCode(code) {
-    var q = getQuestionByCode(code);
-    if (!q) return '';
-    if (q.isStatic && q.domId) {
-      var el = byId(q.domId);
-      return el ? String(el.value || '') : '';
-    }
-    var dynId = getDynamicFieldId(q.question_code);
-    var dynEl = byId(dynId);
-    return dynEl ? String(dynEl.value || '') : '';
   }
 
   function getDynamicFieldId(questionCode) {
@@ -354,20 +356,48 @@ code = r"""(function (window, document) {
     var api = getApi();
     if (!api || typeof api.post !== 'function') return null;
 
-    try {
-      var response = await api.post('getFormDefinition', {
-        jenis_sasaran: jenis,
-        form_type: 'REGISTRASI'
-      });
-      if (response && response.ok === false) throw new Error(response.message || 'Gagal mengambil definisi form');
-      return normalizeFormDefinitionResponse(response);
-    } catch (err) {
-      toast('Gagal membaca definisi form registrasi: ' + (err && err.message ? err.message : err), 'warning');
-      return null;
+    var response = await api.post('getFormDefinition', {
+      jenis_sasaran: jenis,
+      form_type: 'REGISTRASI'
+    });
+
+    if (response && response.ok === false) {
+      throw new Error(response.message || 'Gagal mengambil definisi form');
     }
+
+    return normalizeFormDefinitionResponse(response);
   }
 
-  function applyStaticQuestionDefinition(question, contextDefaults) {
+  function buildQuestionIndex(formDefinition) {
+    state.formQuestionsByCode = {};
+    (formDefinition && formDefinition.questions || []).forEach(function (question) {
+      var code = normalizeTextUpper(question.question_code);
+      if (!code) return;
+      state.formQuestionsByCode[code] = question;
+    });
+  }
+
+  function applyJenisKelaminBehavior() {
+    var jenis = getJenisSasaranValue();
+    var el = byId(FIELD_IDS.jenis_kelamin);
+    if (!el) return;
+
+    if (jenis === 'BUMIL' || jenis === 'BUFAS') {
+      el.value = 'P';
+      el.disabled = true;
+      return;
+    }
+
+    var q = getQuestionByCode('JENIS_KELAMIN');
+    if (q && q.readonly_runtime) {
+      el.disabled = true;
+      return;
+    }
+
+    el.disabled = false;
+  }
+
+  function applyStaticQuestionDefinition(question) {
     if (!question) return;
 
     var code = normalizeTextUpper(question.question_code);
@@ -404,16 +434,14 @@ code = r"""(function (window, document) {
       setHidden('group-reg-nama-ibu-kandung', getJenisSasaranValue() !== 'BADUTA');
     }
 
-    setDisabled(domId, !!question.readonly_runtime);
-  }
+    if (code === 'KECAMATAN' || code === 'DESA_KELURAHAN' || code === 'DUSUN_RW') {
+      setDisabled(domId, !!question.readonly_runtime);
+      return;
+    }
 
-  function buildQuestionIndex(formDefinition) {
-    state.formQuestionsByCode = {};
-    (formDefinition && formDefinition.questions || []).forEach(function (question) {
-      var code = normalizeTextUpper(question.question_code);
-      if (!code) return;
-      state.formQuestionsByCode[code] = question;
-    });
+    if (code !== 'JENIS_KELAMIN') {
+      setDisabled(domId, !!question.readonly_runtime);
+    }
   }
 
   function getDynamicQuestions() {
@@ -426,138 +454,8 @@ code = r"""(function (window, document) {
     });
   }
 
-  function getAllCurrentValues() {
-    var data = normalizeData(collectFormData());
-    qsa('.reg-dynamic-field').forEach(function (el) {
-      var code = normalizeTextUpper(el.getAttribute('data-question-code') || '');
-      if (code) data[normalizeStoreKey(code)] = normalizeSpaces(el.value);
-    });
-    return data;
-  }
-
   function normalizeStoreKey(code) {
     return String(code || '').trim().toLowerCase();
-  }
-
-  function getValueForRuleField(triggerField, values) {
-    var mapKey = normalizeStoreKey(triggerField);
-    return values[mapKey] || values[triggerField] || values[normalizeStoreKey(triggerField)] || '';
-  }
-
-  function evaluateRule(rule, values) {
-    var operator = normalizeTextUpper(rule.operator);
-    var actual = normalizeTextUpper(getValueForRuleField(rule.trigger_field, values));
-    var expected = normalizeTextUpper(rule.trigger_value);
-
-    if (operator === 'EQ' || operator === 'EQ_ANY') return actual === expected;
-    if (operator === 'IN') {
-      return expected.split('|').some(function (part) {
-        return normalizeTextUpper(part) === actual;
-      });
-    }
-    if (operator === 'ANY_EQ') {
-      var fields = String(rule.trigger_field || '').split('|');
-      return fields.some(function (f) {
-        return normalizeTextUpper(getValueForRuleField(f, values)) === expected;
-      });
-    }
-    return false;
-  }
-
-  function getQuestionRules(questionCode, type) {
-    var q = getQuestionByCode(questionCode);
-    if (!q || !Array.isArray(q.rules)) return [];
-    return q.rules.filter(function (r) {
-      return normalizeTextUpper(r.rule_type) === normalizeTextUpper(type);
-    });
-  }
-
-  function isQuestionVisible(question, values) {
-    var rules = getQuestionRules(question.question_code, 'visibility');
-    if (!rules.length) return true;
-    return rules.some(function (rule) {
-      return normalizeTextUpper(rule.action) === 'SHOW' && evaluateRule(rule, values);
-    });
-  }
-
-  function isQuestionRequiredRuntime(question, values) {
-    if (isTruthy(question.is_required) || isTruthy(question.required_runtime)) return true;
-    var rules = getQuestionRules(question.question_code, 'requirement');
-    if (!rules.length) return false;
-    return rules.some(function (rule) {
-      return normalizeTextUpper(rule.action) === 'REQUIRE' && evaluateRule(rule, values);
-    });
-  }
-
-  function renderDynamicFields() {
-    var container = byId(DYNAMIC_RENDER_CONTAINER_ID);
-    if (!container) return;
-
-    var previousValues = {};
-    qsa('.reg-dynamic-field', container).forEach(function (el) {
-      previousValues[normalizeTextUpper(el.getAttribute('data-question-code') || '')] = el.value || '';
-    });
-
-    var values = getAllCurrentValues();
-    var questions = getDynamicQuestions();
-    var html = ['<div class="filters-grid">'];
-
-    questions.forEach(function (q) {
-      var code = normalizeTextUpper(q.question_code);
-      var visible = isQuestionVisible(q, values);
-      var requiredRuntime = isQuestionRequiredRuntime(q, values);
-      if (!visible) return;
-
-      var fieldId = getDynamicFieldId(code);
-      var label = escapeHtml(q.question_label || code);
-      var placeholder = escapeHtml(q.placeholder || '');
-      var value = previousValues[code];
-      if (!value) {
-        value = q.default_value_runtime || q.default_value || '';
-      }
-
-      html.push('<div class="form-group form-group-span-2" id="group-' + escapeHtml(fieldId) + '">');
-      html.push('<label for="' + escapeHtml(fieldId) + '">' + label + (requiredRuntime ? ' <span style="color:#c62828;">*</span>' : '') + '</label>');
-
-      var type = String(q.field_type || '').toLowerCase();
-      if (type === 'select') {
-        html.push('<select id="' + escapeHtml(fieldId) + '" class="reg-dynamic-field" data-question-code="' + escapeHtml(code) + '">');
-        html.push('<option value="">Pilih</option>');
-        (q.options || []).forEach(function (opt) {
-          var selected = String(opt.value || '') === String(value || '') ? ' selected' : '';
-          html.push('<option value="' + escapeHtml(opt.value) + '"' + selected + '>' + escapeHtml(opt.label || opt.value) + '</option>');
-        });
-        html.push('</select>');
-      } else if (type === 'textarea') {
-        html.push('<textarea id="' + escapeHtml(fieldId) + '" class="reg-dynamic-field" data-question-code="' + escapeHtml(code) + '" placeholder="' + placeholder + '">' + escapeHtml(value) + '</textarea>');
-      } else {
-        html.push('<input id="' + escapeHtml(fieldId) + '" class="reg-dynamic-field" data-question-code="' + escapeHtml(code) + '" type="text" placeholder="' + placeholder + '" value="' + escapeHtml(value) + '" />');
-      }
-
-      if (q.help_text) {
-        html.push('<small class="muted-text">' + escapeHtml(q.help_text) + '</small>');
-      }
-      html.push('</div>');
-    });
-
-    html.push('</div>');
-    container.innerHTML = html.join('');
-
-    qsa('.reg-dynamic-field', container).forEach(function (el) {
-      bindDynamicField(el);
-    });
-  }
-
-  function bindDynamicField(el) {
-    if (!el || el.dataset.boundDynamic === '1') return;
-    el.dataset.boundDynamic = '1';
-
-    ['input', 'change', 'blur', 'keyup'].forEach(function (evt) {
-      el.addEventListener(evt, function () {
-        renderDynamicFields();
-        refreshValidation(true);
-      });
-    });
   }
 
   function collectDynamicData() {
@@ -615,6 +513,143 @@ code = r"""(function (window, document) {
     };
   }
 
+  function getAllCurrentValues() {
+    var data = normalizeData(collectFormData());
+    qsa('.reg-dynamic-field').forEach(function (el) {
+      var code = normalizeTextUpper(el.getAttribute('data-question-code') || '');
+      if (code) data[normalizeStoreKey(code)] = normalizeSpaces(el.value);
+    });
+    return data;
+  }
+
+  function getValueForRuleField(triggerField, values) {
+    var mapKey = normalizeStoreKey(triggerField);
+    return values[mapKey] || values[triggerField] || values[normalizeStoreKey(triggerField)] || '';
+  }
+
+  function evaluateRule(rule, values) {
+    var operator = normalizeTextUpper(rule.operator);
+    var actual = normalizeTextUpper(getValueForRuleField(rule.trigger_field, values));
+    var expected = normalizeTextUpper(rule.trigger_value);
+
+    if (operator === 'EQ' || operator === 'EQ_ANY') return actual === expected;
+
+    if (operator === 'IN') {
+      return expected.split('|').some(function (part) {
+        return normalizeTextUpper(part) === actual;
+      });
+    }
+
+    if (operator === 'ANY_EQ') {
+      var fields = String(rule.trigger_field || '').split('|');
+      return fields.some(function (f) {
+        return normalizeTextUpper(getValueForRuleField(f, values)) === expected;
+      });
+    }
+
+    return false;
+  }
+
+  function getQuestionRules(questionCode, type) {
+    var q = getQuestionByCode(questionCode);
+    if (!q || !Array.isArray(q.rules)) return [];
+    return q.rules.filter(function (r) {
+      return normalizeTextUpper(r.rule_type) === normalizeTextUpper(type);
+    });
+  }
+
+  function isQuestionVisible(question, values) {
+    var rules = getQuestionRules(question.question_code, 'visibility');
+    if (!rules.length) return true;
+    return rules.some(function (rule) {
+      return normalizeTextUpper(rule.action) === 'SHOW' && evaluateRule(rule, values);
+    });
+  }
+
+  function isQuestionRequiredRuntime(question, values) {
+    if (isTruthy(question.is_required) || isTruthy(question.required_runtime)) return true;
+    var rules = getQuestionRules(question.question_code, 'requirement');
+    if (!rules.length) return false;
+    return rules.some(function (rule) {
+      return normalizeTextUpper(rule.action) === 'REQUIRE' && evaluateRule(rule, values);
+    });
+  }
+
+  function bindDynamicField(el) {
+    if (!el || el.dataset.boundDynamic === '1') return;
+    el.dataset.boundDynamic = '1';
+
+    ['input', 'change', 'blur', 'keyup'].forEach(function (evt) {
+      el.addEventListener(evt, function () {
+        renderDynamicFields();
+        refreshValidation(true);
+      });
+    });
+  }
+
+  function renderDynamicFields() {
+    var container = byId(DYNAMIC_RENDER_CONTAINER_ID);
+    if (!container) return;
+
+    var previousValues = {};
+    qsa('.reg-dynamic-field', container).forEach(function (el) {
+      previousValues[normalizeTextUpper(el.getAttribute('data-question-code') || '')] = el.value || '';
+    });
+
+    var values = getAllCurrentValues();
+    var questions = getDynamicQuestions();
+    var html = ['<div class="filters-grid">'];
+
+    questions.forEach(function (q) {
+      var code = normalizeTextUpper(q.question_code);
+      var visible = isQuestionVisible(q, values);
+      var requiredRuntime = isQuestionRequiredRuntime(q, values);
+      if (!visible) return;
+
+      var fieldId = getDynamicFieldId(code);
+      var label = escapeHtml(q.question_label || code);
+      var placeholder = escapeHtml(q.placeholder || '');
+      var value = previousValues[code];
+      if (!value) value = q.default_value_runtime || q.default_value || '';
+
+      html.push('<div class="form-group form-group-span-2" id="group-' + escapeHtml(fieldId) + '">');
+      html.push('<label for="' + escapeHtml(fieldId) + '">' + label + (requiredRuntime ? ' <span style="color:#c62828;">*</span>' : '') + '</label>');
+
+      var type = String(q.field_type || '').toLowerCase();
+
+      if (type === 'select') {
+        html.push('<select id="' + escapeHtml(fieldId) + '" class="reg-dynamic-field" data-question-code="' + escapeHtml(code) + '">');
+        html.push('<option value="">Pilih</option>');
+        (q.options || []).forEach(function (opt) {
+          var selected = String(opt.value || '') === String(value || '') ? ' selected' : '';
+          html.push('<option value="' + escapeHtml(opt.value) + '"' + selected + '>' + escapeHtml(opt.label || opt.value) + '</option>');
+        });
+        html.push('</select>');
+      } else if (type === 'textarea') {
+        html.push('<textarea id="' + escapeHtml(fieldId) + '" class="reg-dynamic-field" data-question-code="' + escapeHtml(code) + '" placeholder="' + placeholder + '">' + escapeHtml(value) + '</textarea>');
+      } else {
+        html.push('<input id="' + escapeHtml(fieldId) + '" class="reg-dynamic-field" data-question-code="' + escapeHtml(code) + '" type="text" placeholder="' + placeholder + '" value="' + escapeHtml(value) + '" />');
+      }
+
+      if (q.help_text) {
+        html.push('<small class="muted-text">' + escapeHtml(q.help_text) + '</small>');
+      }
+
+      html.push('</div>');
+    });
+
+    html.push('</div>');
+    container.innerHTML = html.join('');
+
+    qsa('.reg-dynamic-field', container).forEach(function (el) {
+      bindDynamicField(el);
+    });
+
+    if (!questions.length) {
+      container.innerHTML = '<p class="muted-text">Pilih jenis sasaran untuk memuat pertanyaan khusus.</p>';
+    }
+  }
+
   function validateData(data) {
     var errors = [];
     var warnings = [];
@@ -663,15 +698,19 @@ code = r"""(function (window, document) {
     if (data.jenis_sasaran === 'BADUTA' && age.valid && age.totalMonths > 24) {
       errors.push('Untuk BADUTA, usia harus 0 sampai 24 bulan.');
     }
+
     if (data.jenis_sasaran === 'BUMIL' && data.jenis_kelamin && data.jenis_kelamin !== 'P') {
       errors.push('BUMIL wajib berjenis kelamin perempuan.');
     }
+
     if (data.jenis_sasaran === 'BUFAS' && data.jenis_kelamin && data.jenis_kelamin !== 'P') {
       errors.push('BUFAS wajib berjenis kelamin perempuan.');
     }
+
     if ((data.jenis_sasaran === 'BUMIL' || data.jenis_sasaran === 'BUFAS') && age.valid && (age.years < 10 || age.years > 55)) {
       errors.push('Usia untuk ' + data.jenis_sasaran + ' harus masuk akal dan tidak lebih dari 55 tahun.');
     }
+
     if (data.jenis_sasaran === 'CATIN' && age.valid && age.totalMonths < 120) {
       errors.push('Untuk CATIN, usia tidak boleh anomali terlalu rendah.');
     }
@@ -763,7 +802,7 @@ code = r"""(function (window, document) {
   function getProfileScopeFallback() {
     var profile = getProfile();
     return [{
-      id_tim: profile.id_tim || '',
+      id_tim: getCurrentUserIdTim(),
       id_wilayah: profile.id_wilayah || '',
       kecamatan: profile.nama_kecamatan || profile.kecamatan || '',
       desa_kelurahan: profile.desa_kelurahan || profile.nama_desa || '',
@@ -774,6 +813,7 @@ code = r"""(function (window, document) {
   function normalizeTimRefResponse(response) {
     if (!response) return [];
     var source = [];
+
     if (Array.isArray(response)) source = response;
     else if (response.data && Array.isArray(response.data.items)) source = response.data.items;
     else if (response.data && Array.isArray(response.data)) source = response.data;
@@ -795,17 +835,20 @@ code = r"""(function (window, document) {
   }
 
   async function fetchTimWilayahMappings() {
-    var profile = getProfile();
-    var idTim = normalizeSpaces(profile.id_tim);
+    var idTim = getCurrentUserIdTim();
     var api = getApi();
 
-    if (!idTim || !api || typeof api.post !== 'function') return getProfileScopeFallback();
+    if (!idTim || !api || typeof api.post !== 'function') {
+      return getProfileScopeFallback();
+    }
 
     try {
       var response = await api.post('getTimRef', { id_tim: idTim });
       var rows = normalizeTimRefResponse(response);
       if (rows.length) return rows;
-    } catch (err) {}
+    } catch (err) {
+      console.warn('getTimRef gagal:', err);
+    }
 
     return getProfileScopeFallback();
   }
@@ -872,6 +915,14 @@ code = r"""(function (window, document) {
     }
     if (!selectedDusun && dusunItems.length === 1) selectedDusun = dusunItems[0].value;
     fillSelect(FIELD_IDS.nama_dusun, dusunItems, 'Pilih dusun/RW', selectedDusun);
+
+    var qKec = getQuestionByCode('KECAMATAN');
+    var qDesa = getQuestionByCode('DESA_KELURAHAN');
+    var qDusun = getQuestionByCode('DUSUN_RW');
+
+    setDisabled(FIELD_IDS.nama_kecamatan, !!(qKec && qKec.readonly_runtime));
+    setDisabled(FIELD_IDS.nama_desa, !!(qDesa && qDesa.readonly_runtime));
+    setDisabled(FIELD_IDS.nama_dusun, !!(qDusun && qDusun.readonly_runtime));
   }
 
   async function hydrateWilayahOptions() {
@@ -917,6 +968,7 @@ code = r"""(function (window, document) {
       state.formQuestionsByCode = {};
       state.currentFormId = '';
       renderDynamicFields();
+      applyJenisKelaminBehavior();
       return;
     }
 
@@ -926,7 +978,14 @@ code = r"""(function (window, document) {
     try {
       var previousDynamic = preserveDynamicValues ? collectDynamicData() : {};
       var formDefinition = await fetchFormDefinition(normalizedJenis);
-      if (!formDefinition) return;
+      if (!formDefinition) {
+        state.formDefinition = null;
+        state.formQuestionsByCode = {};
+        state.currentFormId = '';
+        renderDynamicFields();
+        applyJenisKelaminBehavior();
+        return;
+      }
 
       state.formDefinition = formDefinition;
       state.currentFormId = normalizeSpaces(formDefinition.form && formDefinition.form.form_id || '');
@@ -936,7 +995,7 @@ code = r"""(function (window, document) {
         var q = state.formQuestionsByCode[code];
         q.isStatic = !!QUESTION_CODE_TO_STATIC_ID[normalizeTextUpper(code)];
         q.domId = QUESTION_CODE_TO_STATIC_ID[normalizeTextUpper(code)] || '';
-        applyStaticQuestionDefinition(q, formDefinition.defaults || {});
+        applyStaticQuestionDefinition(q);
       });
 
       if (previousDynamic && Object.keys(previousDynamic).length) {
@@ -949,8 +1008,13 @@ code = r"""(function (window, document) {
           if (el) el.value = previousDynamic[k] || '';
         });
       }
+
+      applyJenisKelaminBehavior();
       renderDynamicFields();
       refreshValidation(true);
+    } catch (err) {
+      console.error('loadDefinitionForJenis error:', err);
+      toast('Gagal memuat pertanyaan registrasi.', 'error');
     } finally {
       state.isLoadingDefinition = false;
     }
@@ -971,6 +1035,7 @@ code = r"""(function (window, document) {
       desa: selectedDesa,
       dusun: selectedDusun
     });
+    applyJenisKelaminBehavior();
     renderDynamicFields();
   }
 
@@ -985,6 +1050,7 @@ code = r"""(function (window, document) {
 
     var resolvedIdTim = normalizeSpaces(
       selectedMap.id_tim ||
+      getCurrentUserIdTim() ||
       profile.id_tim ||
       (profile.session && profile.session.id_tim) ||
       ''
@@ -1068,9 +1134,11 @@ code = r"""(function (window, document) {
       clearDraft();
       toast((result && result.message) || 'Registrasi sasaran berhasil disimpan.', 'success');
       await resetForm();
+
       var router = getRouter();
       if (router && typeof router.go === 'function') router.go('sasaranList');
     } catch (err) {
+      console.error('submitRegistrasi error:', err);
       toast(err && err.message ? err.message : 'Registrasi sasaran gagal.', 'error');
     } finally {
       if (submitBtn) {
@@ -1129,14 +1197,18 @@ code = r"""(function (window, document) {
   async function resetForm() {
     var form = state.form || byId(FORM_ID);
     if (form) form.reset();
+
     state.lastValidationSignature = '';
     state.formDefinition = null;
     state.formQuestionsByCode = {};
     state.currentFormId = '';
 
     setHidden('group-reg-nama-ibu-kandung', true);
+
     var container = byId(DYNAMIC_RENDER_CONTAINER_ID);
-    if (container) container.innerHTML = '';
+    if (container) {
+      container.innerHTML = '<p class="muted-text">Pilih jenis sasaran untuk memuat pertanyaan khusus.</p>';
+    }
 
     await hydrateWilayahOptions();
     await syncDependentFields();
@@ -1148,7 +1220,9 @@ code = r"""(function (window, document) {
     var data = draft.data;
 
     Object.keys(FIELD_IDS).forEach(function (key) {
-      if (Object.prototype.hasOwnProperty.call(data, key)) setValue(FIELD_IDS[key], data[key]);
+      if (Object.prototype.hasOwnProperty.call(data, key)) {
+        setValue(FIELD_IDS[key], data[key]);
+      }
     });
 
     await syncDependentFields();
@@ -1195,13 +1269,20 @@ code = r"""(function (window, document) {
 
     if (backBtn) {
       backBtn.addEventListener('click', function () {
+        console.log('Klik tombol kembali registrasi');
         var router = getRouter();
-        if (router && typeof router.go === 'function') router.go('dashboard');
+        if (router && typeof router.go === 'function') {
+          router.go('dashboard');
+        }
       });
     }
 
     if (draftBtn) draftBtn.addEventListener('click', saveDraft);
-    if (resetBtn) resetBtn.addEventListener('click', function () { resetForm(); });
+    if (resetBtn) {
+      resetBtn.addEventListener('click', function () {
+        resetForm();
+      });
+    }
 
     Object.keys(FIELD_IDS).forEach(function (key) {
       if (key === 'nik_sasaran' || key === 'nomor_kk') return;
@@ -1245,6 +1326,8 @@ code = r"""(function (window, document) {
     state.form = byId(FORM_ID);
     state.initCount += 1;
 
+    console.log('RegistrasiView.init dipanggil, count =', state.initCount);
+
     bindEvents();
     await openCreate();
   }
@@ -1259,7 +1342,3 @@ code = r"""(function (window, document) {
     stopAutoValidation: stopAutoValidation
   };
 })(window, document);
-"""
-path = Path('/mnt/data/registrasiView.js')
-path.write_text(code, encoding='utf-8')
-print(path)
