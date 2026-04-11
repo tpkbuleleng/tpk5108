@@ -1,6 +1,9 @@
 (function (window, document) {
   'use strict';
 
+  window.__SASARAN_LIST_VIEW_BUILD = '20260412-01';
+  console.log('SasaranListView build aktif:', window.__SASARAN_LIST_VIEW_BUILD);
+
   var SCREEN_ID = 'sasaran-list-screen';
   var FILTER_KEYWORD_ID = 'filter-keyword-sasaran';
   var FILTER_JENIS_ID = 'filter-jenis-sasaran';
@@ -39,6 +42,25 @@
 
   function getStorageKeys() {
     return getConfig().STORAGE_KEYS || {};
+  }
+
+  function getUI() {
+    return window.UI || null;
+  }
+
+  function toast(message, type) {
+    var ui = getUI();
+    if (ui && typeof ui.showToast === 'function') {
+      ui.showToast(message, type || 'info');
+      return;
+    }
+    if (ui && typeof ui.toast === 'function') {
+      ui.toast(message, type || 'info');
+      return;
+    }
+    try {
+      window.alert(message);
+    } catch (err) {}
   }
 
   function escapeHtml(value) {
@@ -178,11 +200,7 @@
     }
 
     if (storage && typeof storage.set === 'function') {
-      if (keys.SELECTED_SASARAN) {
-        storage.set(keys.SELECTED_SASARAN, safeItem);
-      } else {
-        storage.set(LOCAL_SELECTED_KEY, safeItem);
-      }
+      storage.set(keys.SELECTED_SASARAN || LOCAL_SELECTED_KEY, safeItem);
     }
 
     try {
@@ -370,8 +388,13 @@
         this._lastItems = cached.slice();
         this.rebuildItemMap();
         this.renderLocal();
+
+        var self = this;
+        window.setTimeout(function () {
+          self.load(true);
+        }, 100);
       } else {
-        this.load(false);
+        this.load(true);
       }
     },
 
@@ -478,9 +501,7 @@
     openPendampingan: function (idSasaran) {
       var item = this.findItemById(idSasaran);
       if (!item) {
-        if (window.UI && typeof window.UI.showToast === 'function') {
-          window.UI.showToast('Data sasaran tidak ditemukan.', 'warning');
-        }
+        toast('Data sasaran tidak ditemukan.', 'warning');
         return;
       }
 
