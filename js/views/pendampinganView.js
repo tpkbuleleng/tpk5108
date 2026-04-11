@@ -1,10 +1,17 @@
 (function (window, document) {
   'use strict';
 
+  window.__PENDAMPINGAN_VIEW_BUILD = '20260412-01';
+  console.log('PendampinganView build aktif:', window.__PENDAMPINGAN_VIEW_BUILD);
+
   var PENDAMPINGAN_DRAFT_KEY = 'tpk_pendampingan_draft';
+  var LOCAL_SELECTED_SASARAN_KEY = 'tpk_selected_sasaran';
+  var PENDAMPINGAN_FORM_CACHE = {};
+
   var currentMode = 'create';
   var currentEditItem = {};
   var currentDynamicFields = [];
+  var isInitialized = false;
 
   function byId(id) {
     return document.getElementById(id);
@@ -38,10 +45,20 @@
     return getConfig().STORAGE_KEYS || {};
   }
 
+  function getActionName(key, fallback) {
+    var actions = getActions();
+    return actions[key] || fallback;
+  }
+
   function showToast(message, type) {
     var ui = getUI();
     if (ui && typeof ui.showToast === 'function') {
       ui.showToast(message, type || 'info');
+      return;
+    }
+
+    if (ui && typeof ui.toast === 'function') {
+      ui.toast(message, type || 'info');
       return;
     }
 
@@ -133,6 +150,14 @@
       .replace(/'/g, '&#39;');
   }
 
+  function normalizeSpaces(value) {
+    return String(value == null ? '' : value).replace(/\s+/g, ' ').trim();
+  }
+
+  function normalizeUpper(value) {
+    return normalizeSpaces(value).toUpperCase();
+  }
+
   function parseJsonSafely(raw, fallback) {
     if (!raw) return fallback;
     if (typeof raw === 'object') return raw;
@@ -145,7 +170,7 @@
   }
 
   function isRequired(value) {
-    return String(value || '').trim() !== '';
+    return normalizeSpaces(value) !== '';
   }
 
   function todayIso() {
@@ -180,22 +205,51 @@
       return storage.get(keys.PROFILE, {}) || {};
     }
 
-    return {};
+    try {
+      return JSON.parse(localStorage.getItem('tpk_profile') || '{}');
+    } catch (err) {
+      return {};
+    }
   }
 
   function getSelectedSasaran() {
     var state = getState();
     if (state && typeof state.getSelectedSasaran === 'function') {
-      return state.getSelectedSasaran() || {};
+      var fromState = state.getSelectedSasaran() || {};
+      if (fromState && Object.keys(fromState).length) return fromState;
     }
-    return {};
+
+    var storage = getStorage();
+    var keys = getStorageKeys();
+    if (storage && typeof storage.get === 'function') {
+      var fromStorage = storage.get(keys.SELECTED_SASARAN || LOCAL_SELECTED_SASARAN_KEY, {}) || {};
+      if (fromStorage && Object.keys(fromStorage).length) return fromStorage;
+    }
+
+    try {
+      return JSON.parse(localStorage.getItem(LOCAL_SELECTED_SASARAN_KEY) || '{}');
+    } catch (err) {
+      return {};
+    }
   }
 
   function setSelectedSasaran(item) {
+    var safeItem = item && typeof item === 'object' ? item : {};
     var state = getState();
+    var storage = getStorage();
+    var keys = getStorageKeys();
+
     if (state && typeof state.setSelectedSasaran === 'function') {
-      state.setSelectedSasaran(item || {});
+      state.setSelectedSasaran(safeItem);
     }
+
+    if (storage && typeof storage.set === 'function') {
+      storage.set(keys.SELECTED_SASARAN || LOCAL_SELECTED_SASARAN_KEY, safeItem);
+    }
+
+    try {
+      localStorage.setItem(LOCAL_SELECTED_SASARAN_KEY, JSON.stringify(safeItem));
+    } catch (err) {}
   }
 
   function setMode(mode) {
@@ -225,23 +279,42 @@
 
   function getLocalDraft() {
     var storage = getStorage();
-    if (!storage || typeof storage.get !== 'function') return null;
-    return storage.get(PENDAMPINGAN_DRAFT_KEY, null);
+    if (storage && typeof storage.get === 'function') {
+      return storage.get(PENDAMPINGAN_DRAFT_KEY, null);
+    }
+
+    try {
+      return JSON.parse(localStorage.getItem(PENDAMPINGAN_DRAFT_KEY) || 'null');
+    } catch (err) {
+      return null;
+    }
   }
 
   function saveLocalDraft(data) {
-    var storage = getStorage();
-    if (!storage || typeof storage.set !== 'function') return;
-    storage.set(PENDAMPINGAN_DRAFT_KEY, {
+    var payload = {
       saved_at: new Date().toISOString(),
       data: data || {}
-    });
+    };
+
+    var storage = getStorage();
+    if (storage && typeof storage.set === 'function') {
+      storage.set(PENDAMPINGAN_DRAFT_KEY, payload);
+    }
+
+    try {
+      localStorage.setItem(PENDAMPINGAN_DRAFT_KEY, JSON.stringify(payload));
+    } catch (err) {}
   }
 
   function clearLocalDraft() {
     var storage = getStorage();
-    if (!storage || typeof storage.remove !== 'function') return;
-    storage.remove(PENDAMPINGAN_DRAFT_KEY);
+    if (storage && typeof storage.remove === 'function') {
+      storage.remove(PENDAMPINGAN_DRAFT_KEY);
+    }
+
+    try {
+      localStorage.removeItem(PENDAMPINGAN_DRAFT_KEY);
+    } catch (err) {}
   }
 
   function getSyncQueue() {
@@ -300,17 +373,18 @@
   function normalizeDynamicField(field, index) {
     var raw = field || {};
     var id = raw.id || raw.question_code || raw.key || raw.name || raw.field_id || ('field_' + index);
-    var type = String(raw.type || raw.input_type || raw.component || 'text').toLowerCase();
+    var type = String(raw.type || raw.input_type || raw.component || raw.field_type || 'text').toLowerCase();
 
     if (type === 'string') type = 'text';
     if (type === 'dropdown') type = 'select';
 
     return {
       id: String(id),
-      label: String(raw.label || raw.question || raw.title || id),
+      label: String(raw.label || raw.question || raw.title || raw.question_label || id),
       type: type,
-      required: raw.required === true || raw.is_required === true,
+      required: raw.required === true || raw.is_required === true || String(raw.required_runtime || '').toUpperCase() === 'TRUE',
       placeholder: String(raw.placeholder || ''),
+      help_text: String(raw.help_text || ''),
       options: Array.isArray(raw.options)
         ? raw.options
         : (typeof raw.options === 'string'
@@ -323,7 +397,18 @@
   function normalizeDynamicFieldsResponse(data, jenisSasaran) {
     if (Array.isArray(data)) return data;
     if (Array.isArray(data && data.fields)) return data.fields;
-    if (Array.isArray(data && data.questions)) return data.questions;
+    if (Array.isArray(data && data.questions)) {
+      return data.questions.filter(function (q) {
+        var code = String(q.question_code || '').toUpperCase();
+        return [
+          'INFORMASI_KUNJUNGAN',
+          'TANGGAL_KUNJUNGAN',
+          'METODE_KUNJUNGAN',
+          'LOKASI_GPS'
+        ].indexOf(code) === -1;
+      });
+    }
+    if (Array.isArray(data && data.items)) return data.items;
     return getFallbackFields(jenisSasaran);
   }
 
@@ -347,7 +432,7 @@
         { question_code: 'catatan_bufas', label: 'Catatan BUFAS', type: 'textarea', required: false }
       ],
       BADUTA: [
-        { question_code: 'berat_badan', label: 'Berat Badan', type: 'text', required: false },
+        { question_code: 'berat_badan', label: 'Berat Badan', type: 'number', required: false },
         { question_code: 'asi_eksklusif', label: 'ASI Eksklusif', type: 'select', required: false, options: ['YA', 'TIDAK'] },
         { question_code: 'catatan_baduta', label: 'Catatan BADUTA', type: 'textarea', required: false }
       ]
@@ -356,7 +441,7 @@
     return map[key] || [];
   }
 
-  function renderDynamicFields(fields, values) {
+  function renderDynamicFieldInputs(fields, values) {
     var safeFields = Array.isArray(fields) ? fields.map(normalizeDynamicField) : [];
     currentDynamicFields = safeFields;
 
@@ -436,10 +521,15 @@
         ].join('');
       }
 
+      var help = field.help_text
+        ? '<small class="muted-text">' + escapeHtml(field.help_text) + '</small>'
+        : '';
+
       return [
         '<div class="form-group">',
         '<label for="dyn-pen-' + escapeHtml(field.id) + '">' + escapeHtml(field.label) + requiredMark + '</label>',
         inputHtml,
+        help,
         '</div>'
       ].join('');
     }).join('');
@@ -464,7 +554,7 @@
     return values;
   }
 
-  function fillDynamicFields(extra) {
+  function applyDynamicFieldValues(extra) {
     var safeExtra = extra && typeof extra === 'object' ? extra : {};
 
     currentDynamicFields.forEach(function (field) {
@@ -516,6 +606,8 @@
 
   var PendampinganView = {
     init: function () {
+      if (isInitialized) return;
+      isInitialized = true;
       this.bindEvents();
       this.bindAutosave();
     },
@@ -561,14 +653,14 @@
       }
 
       var api = getApi();
-      var actions = getActions();
+      var action = getActionName('GET_PENDAMPINGAN_BY_ID', 'getPendampinganById');
 
       try {
         if (!api || typeof api.post !== 'function') {
           throw new Error('Api.post belum tersedia.');
         }
 
-        var result = await api.post(actions.GET_PENDAMPINGAN_BY_ID, {
+        var result = await api.post(action, {
           id_pendampingan: idPendampingan
         }, {
           includeAuth: true
@@ -679,8 +771,10 @@
       }
     },
 
-    async loadDynamicFields(jenisSasaran) {
-      if (!jenisSasaran) {
+    loadDynamicFields: async function (jenisSasaran) {
+      var key = String(jenisSasaran || '').toUpperCase();
+
+      if (!key) {
         currentDynamicFields = [];
         setHTML(
           'pendampingan-dynamic-fields',
@@ -689,25 +783,34 @@
         return;
       }
 
+      if (PENDAMPINGAN_FORM_CACHE[key]) {
+        renderDynamicFieldInputs(PENDAMPINGAN_FORM_CACHE[key], {});
+        return;
+      }
+
       var api = getApi();
-      var actions = getActions();
+      var action = getActionName('GET_FORM_DEFINITION', 'getFormDefinition');
 
       try {
         if (!api || typeof api.post !== 'function') {
           throw new Error('Api.post belum tersedia.');
         }
 
-        var result = await api.post(actions.GET_FORM_DEFINITION, {
-          jenis_sasaran: jenisSasaran,
-          form_id: getFormIdByJenis(jenisSasaran)
+        var result = await api.post(action, {
+          jenis_sasaran: key,
+          form_id: getFormIdByJenis(key),
+          form_type: 'PENDAMPINGAN'
         }, {
           includeAuth: true
         });
 
-        var fields = normalizeDynamicFieldsResponse(result && result.data, jenisSasaran);
-        renderDynamicFields(fields, {});
+        var fields = normalizeDynamicFieldsResponse(result && result.data, key);
+        PENDAMPINGAN_FORM_CACHE[key] = fields;
+        renderDynamicFieldInputs(fields, {});
       } catch (err) {
-        renderDynamicFields(getFallbackFields(jenisSasaran), {});
+        var fallback = getFallbackFields(key);
+        PENDAMPINGAN_FORM_CACHE[key] = fallback;
+        renderDynamicFieldInputs(fallback, {});
       }
     },
 
@@ -731,7 +834,7 @@
       if ((!extra || typeof extra !== 'object') && itemOrExtra && itemOrExtra.extra_fields_json) {
         extra = parseJsonSafely(itemOrExtra.extra_fields_json, {});
       }
-      fillDynamicFields(extra || {});
+      applyDynamicFieldValues(extra || {});
     },
 
     collectFormData: function () {
@@ -809,12 +912,11 @@
       }
 
       currentDynamicFields.forEach(function (field) {
-        if (field.required) {
-          var value = data.extra_fields && data.extra_fields[field.id];
-          var missing = field.type === 'checkbox' ? value !== true : !isRequired(value);
-          if (missing) {
-            issues.push({ type: 'error', text: field.label + ' wajib diisi.' });
-          }
+        if (!field.required) return;
+        var value = data.extra_fields && data.extra_fields[field.id];
+        var missing = field.type === 'checkbox' ? value !== true : !isRequired(value);
+        if (missing) {
+          issues.push({ type: 'error', text: field.label + ' wajib diisi.' });
         }
       });
 
@@ -864,7 +966,7 @@
       setValue('pen-status-kunjungan', draft.data.status_kunjungan || '');
       setValue('pen-catatan-umum', draft.data.catatan_umum || '');
 
-      fillDynamicFields(draft.data.extra_fields || {});
+      applyDynamicFieldValues(draft.data.extra_fields || {});
     },
 
     autosaveDraft: function () {
@@ -936,7 +1038,6 @@
 
     submit: async function () {
       var api = getApi();
-      var actions = getActions();
 
       if (!api || typeof api.post !== 'function') {
         showToast('Api.post belum tersedia.', 'error');
@@ -967,7 +1068,7 @@
         var action;
 
         if (mode === 'edit') {
-          action = actions.EDIT_PENDAMPINGAN;
+          action = getActionName('EDIT_PENDAMPINGAN', 'editPendampingan');
           payload = {
             id_pendampingan: editItem.id_pendampingan || data.id_pendampingan,
             tanggal_pendampingan: data.tanggal_pendampingan,
@@ -979,7 +1080,7 @@
             sync_source: 'ONLINE'
           };
         } else {
-          action = actions.SUBMIT_PENDAMPINGAN;
+          action = getActionName('SUBMIT_PENDAMPINGAN', 'submitPendampingan');
           payload = {
             id_sasaran: data.id_sasaran,
             jenis_sasaran: data.jenis_sasaran,
@@ -1082,8 +1183,6 @@
   };
 
   window.PendampinganView = PendampinganView;
-
-  // Alias sementara agar referensi lama tidak langsung patah
   window.PendampinganForm = PendampinganView;
 
   document.addEventListener('DOMContentLoaded', function () {
