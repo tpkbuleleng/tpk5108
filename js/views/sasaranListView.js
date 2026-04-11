@@ -1,4 +1,3 @@
-
 (function (window, document) {
   'use strict';
 
@@ -10,6 +9,9 @@
   var BTN_BACK_ID = 'btn-back-dashboard-from-list';
   var META_ID = 'sasaran-list-meta';
   var CONTAINER_ID = 'sasaran-list-container';
+
+  var LOCAL_SELECTED_KEY = 'tpk_selected_sasaran';
+  var LOCAL_CACHE_KEY = 'tpk_sasaran_cache_v1';
 
   function byId(id) {
     return document.getElementById(id);
@@ -46,6 +48,14 @@
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;');
+  }
+
+  function normalizeSpaces(value) {
+    return String(value == null ? '' : value).replace(/\s+/g, ' ').trim();
+  }
+
+  function normalizeUpper(value) {
+    return normalizeSpaces(value).toUpperCase();
   }
 
   function getProfile() {
@@ -107,9 +117,9 @@
 
   function getSelectedFilters() {
     return {
-      keyword: (byId(FILTER_KEYWORD_ID) ? byId(FILTER_KEYWORD_ID).value : '').trim(),
-      jenis_sasaran: (byId(FILTER_JENIS_ID) ? byId(FILTER_JENIS_ID).value : '').trim(),
-      status_sasaran: (byId(FILTER_STATUS_ID) ? byId(FILTER_STATUS_ID).value : '').trim()
+      keyword: normalizeSpaces(byId(FILTER_KEYWORD_ID) ? byId(FILTER_KEYWORD_ID).value : ''),
+      jenis_sasaran: normalizeSpaces(byId(FILTER_JENIS_ID) ? byId(FILTER_JENIS_ID).value : ''),
+      status_sasaran: normalizeSpaces(byId(FILTER_STATUS_ID) ? byId(FILTER_STATUS_ID).value : '')
     };
   }
 
@@ -153,6 +163,90 @@
     return parts.length ? parts.join(' • ') : '-';
   }
 
+  function getItemId(item) {
+    return String(item && (item.id_sasaran || item.id || '')).trim();
+  }
+
+  function setSelectedSasaran(item) {
+    var safeItem = item && typeof item === 'object' ? item : {};
+    var state = getState();
+    var storage = getStorage();
+    var keys = getStorageKeys();
+
+    if (state && typeof state.setSelectedSasaran === 'function') {
+      state.setSelectedSasaran(safeItem);
+    }
+
+    if (storage && typeof storage.set === 'function') {
+      if (keys.SELECTED_SASARAN) {
+        storage.set(keys.SELECTED_SASARAN, safeItem);
+      } else {
+        storage.set(LOCAL_SELECTED_KEY, safeItem);
+      }
+    }
+
+    try {
+      localStorage.setItem(LOCAL_SELECTED_KEY, JSON.stringify(safeItem));
+    } catch (err) {}
+  }
+
+  function saveLocalCache(items) {
+    try {
+      localStorage.setItem(LOCAL_CACHE_KEY, JSON.stringify({
+        saved_at: new Date().toISOString(),
+        items: Array.isArray(items) ? items : []
+      }));
+    } catch (err) {}
+  }
+
+  function readLocalCache() {
+    try {
+      var raw = JSON.parse(localStorage.getItem(LOCAL_CACHE_KEY) || '{}');
+      return Array.isArray(raw.items) ? raw.items : [];
+    } catch (err) {
+      return [];
+    }
+  }
+
+  function applyAllFilters(items, filters) {
+    var safeItems = Array.isArray(items) ? items.slice() : [];
+    var keyword = normalizeSpaces(filters && filters.keyword);
+    var jenis = normalizeUpper(filters && filters.jenis_sasaran);
+    var status = normalizeUpper(filters && filters.status_sasaran);
+
+    if (jenis) {
+      safeItems = safeItems.filter(function (item) {
+        return normalizeUpper(item.jenis_sasaran) === jenis;
+      });
+    }
+
+    if (status) {
+      safeItems = safeItems.filter(function (item) {
+        return normalizeUpper(item.status_sasaran || item.status) === status;
+      });
+    }
+
+    if (keyword) {
+      var q = keyword.toLowerCase();
+      safeItems = safeItems.filter(function (item) {
+        return [
+          item.id_sasaran,
+          item.nama_sasaran,
+          item.nik_sasaran,
+          item.nomor_kk,
+          item.jenis_sasaran,
+          item.dusun_rw,
+          item.desa_kelurahan,
+          item.kecamatan
+        ].some(function (v) {
+          return String(v || '').toLowerCase().indexOf(q) !== -1;
+        });
+      });
+    }
+
+    return safeItems;
+  }
+
   function renderList(items) {
     var box = byId(CONTAINER_ID);
     if (!box) return;
@@ -163,16 +257,17 @@
     }
 
     box.innerHTML = items.map(function (item) {
-      var status = item.status_sasaran || '-';
+      var status = item.status_sasaran || item.status || '-';
       var jenis = item.jenis_sasaran || '-';
       var nama = item.nama_sasaran || '-';
-      var id = item.id_sasaran || '-';
+      var id = getItemId(item) || '-';
       var nik = item.nik_sasaran || '-';
       var kk = item.nomor_kk || '-';
       var wilayah = getWilayahLabel(item);
       var tgl = formatDate(item.tanggal_lahir);
+
       return [
-        '<article class="list-card sasaran-item" data-id-sasaran="', escapeHtml(id), '">',
+        '<article class="list-card sasaran-item" data-id-sasaran="', escapeHtml(id), '" style="cursor:pointer;">',
           '<div class="list-card-header row-between">',
             '<div>',
               '<h4 style="margin:0 0 4px;">', escapeHtml(nama), '</h4>',
@@ -187,36 +282,27 @@
             '<div><span class="label">No. KK</span><strong>', escapeHtml(kk), '</strong></div>',
             '<div style="grid-column:1 / -1;"><span class="label">Wilayah</span><strong>', escapeHtml(wilayah), '</strong></div>',
           '</div>',
+          '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;">',
+            '<button type="button" class="btn btn-secondary btn-sasaran-detail" data-id-sasaran="', escapeHtml(id), '">Detail</button>',
+            '<button type="button" class="btn btn-primary btn-sasaran-pendampingan" data-id-sasaran="', escapeHtml(id), '">Lapor Pendampingan</button>',
+          '</div>',
         '</article>'
       ].join('');
     }).join('');
   }
 
-  function applyKeywordFilter(items, keyword) {
-    var q = String(keyword || '').trim().toLowerCase();
-    if (!q) return items.slice();
-
-    return items.filter(function (item) {
-      return [
-        item.id_sasaran,
-        item.nama_sasaran,
-        item.nik_sasaran,
-        item.nomor_kk,
-        item.jenis_sasaran,
-        item.dusun_rw,
-        item.desa_kelurahan
-      ].some(function (v) {
-        return String(v || '').toLowerCase().indexOf(q) !== -1;
-      });
-    });
-  }
-
   var SasaranListView = {
     _initialized: false,
     _lastItems: [],
+    _lastRenderedItems: [],
+    _itemMap: {},
 
     init: function () {
-      if (this._initialized) return;
+      if (this._initialized) {
+        this.renderLocal();
+        return;
+      }
+
       this._initialized = true;
 
       var refreshBtn = byId(BTN_REFRESH_ID);
@@ -224,10 +310,11 @@
       var keywordEl = byId(FILTER_KEYWORD_ID);
       var jenisEl = byId(FILTER_JENIS_ID);
       var statusEl = byId(FILTER_STATUS_ID);
+      var container = byId(CONTAINER_ID);
 
       if (refreshBtn && refreshBtn.dataset.bound !== '1') {
         refreshBtn.dataset.bound = '1';
-        refreshBtn.addEventListener('click', this.load.bind(this));
+        refreshBtn.addEventListener('click', this.load.bind(this, true));
       }
 
       if (backBtn && backBtn.dataset.bound !== '1') {
@@ -244,34 +331,70 @@
         if (!el || el.dataset.bound === '1') return;
         el.dataset.bound = '1';
 
-        if (el.id === FILTER_KEYWORD_ID) {
-          el.addEventListener('input', function () {
-            SasaranListView.renderLocal();
-          });
-        } else {
-          el.addEventListener('change', function () {
-            SasaranListView.load();
-          });
-        }
+        var evt = el.id === FILTER_KEYWORD_ID ? 'input' : 'change';
+        el.addEventListener(evt, function () {
+          SasaranListView.renderLocal();
+        });
       });
 
-      this.load();
+      if (container && container.dataset.bound !== '1') {
+        container.dataset.bound = '1';
+
+        container.addEventListener('click', function (event) {
+          var detailBtn = event.target.closest('.btn-sasaran-detail');
+          var penBtn = event.target.closest('.btn-sasaran-pendampingan');
+          var card = event.target.closest('.sasaran-item');
+
+          if (detailBtn) {
+            event.preventDefault();
+            event.stopPropagation();
+            SasaranListView.openDetail(detailBtn.getAttribute('data-id-sasaran'));
+            return;
+          }
+
+          if (penBtn) {
+            event.preventDefault();
+            event.stopPropagation();
+            SasaranListView.openPendampingan(penBtn.getAttribute('data-id-sasaran'));
+            return;
+          }
+
+          if (card) {
+            SasaranListView.openDetail(card.getAttribute('data-id-sasaran'));
+          }
+        });
+      }
+
+      var cached = readLocalCache();
+      if (cached.length) {
+        this._lastItems = cached.slice();
+        this.rebuildItemMap();
+        this.renderLocal();
+      } else {
+        this.load(false);
+      }
+    },
+
+    rebuildItemMap: function () {
+      var map = {};
+      this._lastItems.forEach(function (item) {
+        var id = getItemId(item);
+        if (id) map[id] = item;
+      });
+      this._itemMap = map;
     },
 
     buildPayload: function () {
       var profile = getProfile();
       var session = getSession();
-      var filters = getSelectedFilters();
 
       return {
         id_tim: getIdTim(profile, session),
-        book_key: getBookKey(profile, session),
-        status_sasaran: filters.status_sasaran || '',
-        jenis_sasaran: filters.jenis_sasaran || ''
+        book_key: getBookKey(profile, session)
       };
     },
 
-    load: async function () {
+    load: async function (forceRefresh) {
       var api = getApi();
       if (!api || typeof api.post !== 'function') {
         setMeta('Gagal memuat data sasaran.');
@@ -284,6 +407,11 @@
       if (!payload.id_tim) {
         setMeta('Gagal memuat data sasaran.');
         setEmpty('id_tim tidak ditemukan pada profil/session.');
+        return;
+      }
+
+      if (!forceRefresh && this._lastItems.length) {
+        this.renderLocal();
         return;
       }
 
@@ -300,14 +428,11 @@
 
         var data = result.data || {};
         var items = Array.isArray(data.items) ? data.items : (Array.isArray(data) ? data : []);
-        this._lastItems = items.slice();
-        this.renderLocal();
 
-        var filters = getSelectedFilters();
-        var label = 'Menampilkan ' + String(byId(CONTAINER_ID).querySelectorAll('.sasaran-item').length) + ' data';
-        if (filters.jenis_sasaran) label += ' • Jenis: ' + filters.jenis_sasaran;
-        if (filters.status_sasaran) label += ' • Status: ' + filters.status_sasaran;
-        setMeta(label);
+        this._lastItems = items.slice();
+        saveLocalCache(this._lastItems);
+        this.rebuildItemMap();
+        this.renderLocal();
       } catch (err) {
         setMeta('Gagal memuat data sasaran.');
         setEmpty(err && err.message ? err.message : 'Gagal terhubung ke server.');
@@ -316,12 +441,64 @@
 
     renderLocal: function () {
       var filters = getSelectedFilters();
-      var items = applyKeywordFilter(this._lastItems, filters.keyword);
+      var items = applyAllFilters(this._lastItems, filters);
+      this._lastRenderedItems = items.slice();
       renderList(items);
+
+      var label = 'Menampilkan ' + String(items.length) + ' data';
+      if (filters.jenis_sasaran) label += ' • Jenis: ' + filters.jenis_sasaran;
+      if (filters.status_sasaran) label += ' • Status: ' + filters.status_sasaran;
+      if (filters.keyword) label += ' • Kata kunci: ' + filters.keyword;
+      setMeta(label);
+    },
+
+    findItemById: function (idSasaran) {
+      var id = String(idSasaran || '').trim();
+      if (!id) return null;
+      return this._itemMap[id] || null;
+    },
+
+    openDetail: function (idSasaran) {
+      var item = this.findItemById(idSasaran);
+      if (!item) return;
+
+      setSelectedSasaran(item);
+
+      if (window.SasaranDetailView && typeof window.SasaranDetailView.open === 'function') {
+        window.SasaranDetailView.open(idSasaran);
+        return;
+      }
+
+      var router = getRouter();
+      if (router && typeof router.go === 'function') {
+        router.go('sasaranDetail');
+      }
+    },
+
+    openPendampingan: function (idSasaran) {
+      var item = this.findItemById(idSasaran);
+      if (!item) {
+        if (window.UI && typeof window.UI.showToast === 'function') {
+          window.UI.showToast('Data sasaran tidak ditemukan.', 'warning');
+        }
+        return;
+      }
+
+      setSelectedSasaran(item);
+
+      if (window.PendampinganView && typeof window.PendampinganView.openCreate === 'function') {
+        window.PendampinganView.openCreate(item);
+        return;
+      }
+
+      var router = getRouter();
+      if (router && typeof router.go === 'function') {
+        router.go('pendampingan');
+      }
     },
 
     refresh: function () {
-      return this.load();
+      return this.load(true);
     }
   };
 
