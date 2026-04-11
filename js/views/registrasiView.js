@@ -1,7 +1,7 @@
 (function (window, document) {
   'use strict';
 
-  window.__REG_VIEW_BUILD = '20260411-02';
+  window.__REG_VIEW_BUILD = '20260411-03';
   console.log('RegistrasiView build aktif:', window.__REG_VIEW_BUILD);
 
   var SCREEN_ID = 'registrasi-screen';
@@ -9,6 +9,7 @@
   var DRAFT_KEY = 'tpk_registrasi_draft';
   var PLACEHOLDER_16 = '9999999999999999';
   var VALIDATION_INTERVAL_MS = 800;
+  var DYNAMIC_RENDER_CONTAINER_ID = 'registrasi-dynamic-fields';
 
   var FIELD_IDS = {
     jenis_sasaran: 'reg-jenis-sasaran',
@@ -40,8 +41,6 @@
     ALAMAT: FIELD_IDS.alamat
   };
 
-  var DYNAMIC_RENDER_CONTAINER_ID = 'registrasi-dynamic-fields';
-
   var state = {
     screen: null,
     form: null,
@@ -53,7 +52,8 @@
     formDefinition: null,
     formQuestionsByCode: {},
     currentFormId: '',
-    isLoadingDefinition: false
+    isLoadingDefinition: false,
+    activeJenis: ''
   };
 
   function byId(id) {
@@ -109,12 +109,12 @@
     return String(value == null ? '' : value).replace(/\s+/g, ' ').trim();
   }
 
-  function digitsOnly(value) {
-    return String(value == null ? '' : value).replace(/\D+/g, '');
-  }
-
   function normalizeTextUpper(value) {
     return normalizeSpaces(value).toUpperCase();
+  }
+
+  function digitsOnly(value) {
+    return String(value == null ? '' : value).replace(/\D+/g, '');
   }
 
   function uniqByKey(list, keyFn) {
@@ -315,8 +315,16 @@
     return normalizeTextUpper(byId(FIELD_IDS.jenis_sasaran) ? byId(FIELD_IDS.jenis_sasaran).value : '');
   }
 
+  function normalizeStoreKey(code) {
+    return String(code || '').trim().toLowerCase();
+  }
+
   function getQuestionByCode(code) {
     return state.formQuestionsByCode[normalizeTextUpper(code)] || null;
+  }
+
+  function questionExists(code) {
+    return !!getQuestionByCode(code);
   }
 
   function getDynamicFieldId(questionCode) {
@@ -339,6 +347,7 @@
 
     var rules = Array.isArray(data.rules) ? data.rules : [];
     var form = data.form || {};
+
     return {
       form: form,
       questions: questions,
@@ -355,6 +364,11 @@
 
     var api = getApi();
     if (!api || typeof api.post !== 'function') return null;
+
+    var container = byId(DYNAMIC_RENDER_CONTAINER_ID);
+    if (container) {
+      container.innerHTML = '<p class="muted-text">Memuat pertanyaan khusus...</p>';
+    }
 
     var response = await api.post('getFormDefinition', {
       jenis_sasaran: jenis,
@@ -383,15 +397,25 @@
     if (!el) return;
 
     if (jenis === 'BUMIL' || jenis === 'BUFAS') {
+      fillSelect(FIELD_IDS.jenis_kelamin, [
+        { value: 'L', label: 'Laki-laki' },
+        { value: 'P', label: 'Perempuan' }
+      ], 'Pilih jenis kelamin', 'P');
       el.value = 'P';
       el.disabled = true;
       return;
     }
 
     var q = getQuestionByCode('JENIS_KELAMIN');
-    if (q && q.readonly_runtime) {
-      el.disabled = true;
-      return;
+    if (q && Array.isArray(q.options) && q.options.length) {
+      fillSelect(FIELD_IDS.jenis_kelamin, q.options.map(function (opt) {
+        return { value: opt.value, label: opt.label };
+      }), 'Pilih jenis kelamin', el.value || q.default_value_runtime || q.default_value);
+    } else if (!el.options || el.options.length <= 1) {
+      fillSelect(FIELD_IDS.jenis_kelamin, [
+        { value: 'L', label: 'Laki-laki' },
+        { value: 'P', label: 'Perempuan' }
+      ], 'Pilih jenis kelamin', el.value || '');
     }
 
     el.disabled = false;
@@ -421,13 +445,13 @@
     }
 
     if (code === 'KECAMATAN' || code === 'DESA_KELURAHAN' || code === 'DUSUN_RW') {
-      var value = question.default_value_runtime || question.default_value || '';
-      if (value && !el.value) el.value = value;
+      var defaultWilayah = question.default_value_runtime || question.default_value || '';
+      if (defaultWilayah && !el.value) el.value = defaultWilayah;
     }
 
     if (code === 'JENIS_SASARAN') {
-      var jenisValue = getJenisSasaranValue();
-      if (!jenisValue) setValue(domId, question.default_value_runtime || question.default_value || '');
+      el.disabled = false;
+      return;
     }
 
     if (code === 'NAMA_IBU_KANDUNG') {
@@ -435,13 +459,15 @@
     }
 
     if (code === 'KECAMATAN' || code === 'DESA_KELURAHAN' || code === 'DUSUN_RW') {
-      setDisabled(domId, !!question.readonly_runtime);
+      el.disabled = false;
       return;
     }
 
-    if (code !== 'JENIS_KELAMIN') {
-      setDisabled(domId, !!question.readonly_runtime);
+    if (code === 'JENIS_KELAMIN') {
+      return;
     }
+
+    el.disabled = !!question.readonly_runtime;
   }
 
   function getDynamicQuestions() {
@@ -452,10 +478,6 @@
     }).sort(function (a, b) {
       return Number(a.question_order || 0) - Number(b.question_order || 0);
     });
-  }
-
-  function normalizeStoreKey(code) {
-    return String(code || '').trim().toLowerCase();
   }
 
   function collectDynamicData() {
@@ -485,7 +507,9 @@
     };
 
     var dyn = collectDynamicData();
-    Object.keys(dyn).forEach(function (k) { base[k] = dyn[k]; });
+    Object.keys(dyn).forEach(function (k) {
+      base[k] = dyn[k];
+    });
 
     return base;
   }
@@ -591,13 +615,18 @@
     var container = byId(DYNAMIC_RENDER_CONTAINER_ID);
     if (!container) return;
 
+    var questions = getDynamicQuestions();
+    if (!questions.length) {
+      container.innerHTML = '<p class="muted-text">Pilih jenis sasaran untuk memuat pertanyaan khusus.</p>';
+      return;
+    }
+
     var previousValues = {};
     qsa('.reg-dynamic-field', container).forEach(function (el) {
       previousValues[normalizeTextUpper(el.getAttribute('data-question-code') || '')] = el.value || '';
     });
 
     var values = getAllCurrentValues();
-    var questions = getDynamicQuestions();
     var html = ['<div class="filters-grid">'];
 
     questions.forEach(function (q) {
@@ -609,13 +638,11 @@
       var fieldId = getDynamicFieldId(code);
       var label = escapeHtml(q.question_label || code);
       var placeholder = escapeHtml(q.placeholder || '');
-      var value = previousValues[code];
-      if (!value) value = q.default_value_runtime || q.default_value || '';
+      var value = previousValues[code] || q.default_value_runtime || q.default_value || '';
+      var type = String(q.field_type || '').toLowerCase();
 
       html.push('<div class="form-group form-group-span-2" id="group-' + escapeHtml(fieldId) + '">');
       html.push('<label for="' + escapeHtml(fieldId) + '">' + label + (requiredRuntime ? ' <span style="color:#c62828;">*</span>' : '') + '</label>');
-
-      var type = String(q.field_type || '').toLowerCase();
 
       if (type === 'select') {
         html.push('<select id="' + escapeHtml(fieldId) + '" class="reg-dynamic-field" data-question-code="' + escapeHtml(code) + '">');
@@ -644,10 +671,6 @@
     qsa('.reg-dynamic-field', container).forEach(function (el) {
       bindDynamicField(el);
     });
-
-    if (!questions.length) {
-      container.innerHTML = '<p class="muted-text">Pilih jenis sasaran untuk memuat pertanyaan khusus.</p>';
-    }
   }
 
   function validateData(data) {
@@ -660,7 +683,9 @@
     else if (data.nama_sasaran.length < 3) errors.push('Nama sasaran wajib diisi minimal 3 karakter.');
 
     if (!data.nama_kepala_keluarga) errors.push('Nama kepala keluarga wajib diisi.');
-    if (data.jenis_sasaran === 'BADUTA' && !data.nama_ibu_kandung) errors.push('Nama ibu kandung wajib diisi untuk BADUTA.');
+    if (data.jenis_sasaran === 'BADUTA' && questionExists('NAMA_IBU_KANDUNG') && !data.nama_ibu_kandung) {
+      errors.push('Nama ibu kandung wajib diisi untuk BADUTA.');
+    }
 
     if (!data.nik_sasaran) errors.push('NIK wajib diisi.');
     else if (data.nik_sasaran.length !== 16) errors.push('NIK harus 16 digit.');
@@ -676,14 +701,18 @@
     if (!data.jenis_kelamin) warnings.push('Jenis kelamin belum dipilih.');
     if (!data.tanggal_lahir) warnings.push('Tanggal lahir belum diisi.');
 
-    if (!data.sumber_air_minum_utama) errors.push('Sumber Air Minum Utama wajib dipilih.');
-    if (normalizeTextUpper(data.sumber_air_minum_utama) === 'LAINNYA' && !data.sumber_air_minum_utama_lainnya) {
-      errors.push('Sumber Air Minum Utama Lainnya wajib diisi jika memilih Lainnya.');
+    if (questionExists('SUMBER_AIR_MINUM_UTAMA')) {
+      if (!data.sumber_air_minum_utama) errors.push('Sumber Air Minum Utama wajib dipilih.');
+      if (normalizeTextUpper(data.sumber_air_minum_utama) === 'LAINNYA' && !data.sumber_air_minum_utama_lainnya) {
+        errors.push('Sumber Air Minum Utama Lainnya wajib diisi jika memilih Lainnya.');
+      }
     }
 
-    if (!data.fasilitas_bab) errors.push('Fasilitas BAB wajib dipilih.');
-    if (normalizeTextUpper(data.fasilitas_bab) === 'YA_LAINNYA' && !data.fasilitas_bab_lainnya) {
-      errors.push('Fasilitas BAB Lainnya wajib diisi jika memilih Ya Lainnya.');
+    if (questionExists('FASILITAS_BAB')) {
+      if (!data.fasilitas_bab) errors.push('Fasilitas BAB wajib dipilih.');
+      if (normalizeTextUpper(data.fasilitas_bab) === 'YA_LAINNYA' && !data.fasilitas_bab_lainnya) {
+        errors.push('Fasilitas BAB Lainnya wajib diisi jika memilih Ya Lainnya.');
+      }
     }
 
     if (data.nik_sasaran === PLACEHOLDER_16) warnings.push('NIK memakai nilai standar 16 digit angka 9.');
@@ -740,13 +769,17 @@
 
     if (result.errors && result.errors.length) {
       html.push('<div class="validation-block validation-block-error"><h4>Perlu diperbaiki:</h4><ul>');
-      result.errors.forEach(function (item) { html.push('<li>' + escapeHtml(item) + '</li>'); });
+      result.errors.forEach(function (item) {
+        html.push('<li>' + escapeHtml(item) + '</li>');
+      });
       html.push('</ul></div>');
     }
 
     if (result.warnings && result.warnings.length) {
       html.push('<div class="validation-block validation-block-warning"><h4>Perhatian:</h4><ul>');
-      result.warnings.forEach(function (item) { html.push('<li>' + escapeHtml(item) + '</li>'); });
+      result.warnings.forEach(function (item) {
+        html.push('<li>' + escapeHtml(item) + '</li>');
+      });
       html.push('</ul></div>');
     }
 
@@ -796,7 +829,9 @@
   }
 
   function clearDraft() {
-    try { localStorage.removeItem(DRAFT_KEY); } catch (err) {}
+    try {
+      localStorage.removeItem(DRAFT_KEY);
+    } catch (err) {}
   }
 
   function getProfileScopeFallback() {
@@ -874,9 +909,17 @@
 
     var kecamatanItems = uniqByKey(mappings.map(function (row) {
       return makeOption(row.kecamatan, row.kecamatan);
-    }).filter(Boolean), function (item) { return item.value; });
+    }).filter(Boolean), function (item) {
+      return item.value;
+    });
 
     var selectedKecamatan = current.kecamatan || normalizeSpaces(profile.nama_kecamatan || profile.kecamatan);
+    if (selectedKecamatan) {
+      var kecExists = kecamatanItems.some(function (item) {
+        return normalizeTextUpper(item.value) === normalizeTextUpper(selectedKecamatan);
+      });
+      if (!kecExists) selectedKecamatan = '';
+    }
     if (!selectedKecamatan && kecamatanItems.length === 1) selectedKecamatan = kecamatanItems[0].value;
     fillSelect(FIELD_IDS.nama_kecamatan, kecamatanItems, 'Pilih kecamatan', selectedKecamatan);
 
@@ -886,7 +929,9 @@
 
     var desaItems = uniqByKey(desaCandidates.map(function (row) {
       return makeOption(row.desa_kelurahan, row.desa_kelurahan);
-    }).filter(Boolean), function (item) { return item.value; });
+    }).filter(Boolean), function (item) {
+      return item.value;
+    });
 
     var selectedDesa = current.desa || normalizeSpaces(profile.desa_kelurahan || profile.nama_desa);
     if (selectedDesa) {
@@ -904,7 +949,9 @@
 
     var dusunItems = uniqByKey(dusunCandidates.map(function (row) {
       return makeOption(row.dusun_rw, row.dusun_rw);
-    }).filter(Boolean), function (item) { return item.value; });
+    }).filter(Boolean), function (item) {
+      return item.value;
+    });
 
     var selectedDusun = current.dusun || normalizeSpaces(profile.dusun_rw || profile.nama_dusun);
     if (selectedDusun) {
@@ -916,13 +963,9 @@
     if (!selectedDusun && dusunItems.length === 1) selectedDusun = dusunItems[0].value;
     fillSelect(FIELD_IDS.nama_dusun, dusunItems, 'Pilih dusun/RW', selectedDusun);
 
-    var qKec = getQuestionByCode('KECAMATAN');
-    var qDesa = getQuestionByCode('DESA_KELURAHAN');
-    var qDusun = getQuestionByCode('DUSUN_RW');
-
-    setDisabled(FIELD_IDS.nama_kecamatan, !!(qKec && qKec.readonly_runtime));
-    setDisabled(FIELD_IDS.nama_desa, !!(qDesa && qDesa.readonly_runtime));
-    setDisabled(FIELD_IDS.nama_dusun, !!(qDusun && qDusun.readonly_runtime));
+    setDisabled(FIELD_IDS.nama_kecamatan, false);
+    setDisabled(FIELD_IDS.nama_desa, false);
+    setDisabled(FIELD_IDS.nama_dusun, false);
   }
 
   async function hydrateWilayahOptions() {
@@ -967,21 +1010,30 @@
       state.formDefinition = null;
       state.formQuestionsByCode = {};
       state.currentFormId = '';
+      state.activeJenis = '';
       renderDynamicFields();
       applyJenisKelaminBehavior();
       return;
     }
 
     if (state.isLoadingDefinition) return;
+    if (state.activeJenis === normalizedJenis && state.formDefinition) {
+      applyJenisKelaminBehavior();
+      renderDynamicFields();
+      return;
+    }
+
     state.isLoadingDefinition = true;
 
     try {
       var previousDynamic = preserveDynamicValues ? collectDynamicData() : {};
       var formDefinition = await fetchFormDefinition(normalizedJenis);
+
       if (!formDefinition) {
         state.formDefinition = null;
         state.formQuestionsByCode = {};
         state.currentFormId = '';
+        state.activeJenis = '';
         renderDynamicFields();
         applyJenisKelaminBehavior();
         return;
@@ -989,6 +1041,7 @@
 
       state.formDefinition = formDefinition;
       state.currentFormId = normalizeSpaces(formDefinition.form && formDefinition.form.form_id || '');
+      state.activeJenis = normalizedJenis;
       buildQuestionIndex(formDefinition);
 
       Object.keys(state.formQuestionsByCode).forEach(function (code) {
@@ -998,8 +1051,9 @@
         applyStaticQuestionDefinition(q);
       });
 
+      renderDynamicFields();
+
       if (previousDynamic && Object.keys(previousDynamic).length) {
-        renderDynamicFields();
         Object.keys(previousDynamic).forEach(function (k) {
           var qCode = normalizeTextUpper(k);
           var q = getQuestionByCode(qCode);
@@ -1010,7 +1064,6 @@
       }
 
       applyJenisKelaminBehavior();
-      renderDynamicFields();
       refreshValidation(true);
     } catch (err) {
       console.error('loadDefinitionForJenis error:', err);
@@ -1020,23 +1073,50 @@
     }
   }
 
-  async function syncDependentFields() {
+  async function syncJenisOnly() {
     var jenis = getJenisSasaranValue();
-    var selectedKecamatan = byId(FIELD_IDS.nama_kecamatan) ? byId(FIELD_IDS.nama_kecamatan).value : '';
-    var selectedDesa = byId(FIELD_IDS.nama_desa) ? byId(FIELD_IDS.nama_desa).value : '';
-    var selectedDusun = byId(FIELD_IDS.nama_dusun) ? byId(FIELD_IDS.nama_dusun).value : '';
 
     setHidden('group-reg-nama-ibu-kandung', jenis !== 'BADUTA');
     if (jenis !== 'BADUTA') setValue(FIELD_IDS.nama_ibu_kandung, '');
 
-    await loadDefinitionForJenis(jenis, true);
-    applyScopeOptions({
-      kecamatan: selectedKecamatan,
-      desa: selectedDesa,
-      dusun: selectedDusun
-    });
+    await loadDefinitionForJenis(jenis, false);
     applyJenisKelaminBehavior();
     renderDynamicFields();
+    refreshValidation(true);
+  }
+
+  function bindDynamicFieldEventsToValidation() {
+    qsa('.reg-dynamic-field').forEach(function (el) {
+      bindDynamicField(el);
+    });
+  }
+
+  function syncWilayahSelection(level) {
+    var kec = byId(FIELD_IDS.nama_kecamatan);
+    var desa = byId(FIELD_IDS.nama_desa);
+    var dusun = byId(FIELD_IDS.nama_dusun);
+
+    if (level === 'kecamatan') {
+      applyScopeOptions({
+        kecamatan: kec ? (kec.value || '') : '',
+        desa: '',
+        dusun: ''
+      });
+    } else if (level === 'desa') {
+      applyScopeOptions({
+        kecamatan: kec ? (kec.value || '') : '',
+        desa: desa ? (desa.value || '') : '',
+        dusun: ''
+      });
+    } else {
+      applyScopeOptions({
+        kecamatan: kec ? (kec.value || '') : '',
+        desa: desa ? (desa.value || '') : '',
+        dusun: dusun ? (dusun.value || '') : ''
+      });
+    }
+
+    refreshValidation(true);
   }
 
   function buildRequestPayload() {
@@ -1085,6 +1165,8 @@
       nama_kecamatan: data.nama_kecamatan,
       nama_desa: data.nama_desa,
       nama_dusun: data.nama_dusun,
+      desa_kelurahan: data.nama_desa,
+      dusun_rw: data.nama_dusun,
       id_wilayah: selectedMap.id_wilayah || profile.id_wilayah || '',
       alamat: data.alamat,
       sumber_air_minum_utama: data.sumber_air_minum_utama,
@@ -1126,17 +1208,23 @@
 
     try {
       var api = getApi();
-      if (!api || typeof api.post !== 'function') throw new Error('Api.post belum tersedia.');
+      if (!api || typeof api.post !== 'function') {
+        throw new Error('Api.post belum tersedia.');
+      }
 
       var result = await api.post('registerSasaran', buildRequestPayload());
-      if (result && result.ok === false) throw new Error(result.message || 'Registrasi gagal disimpan.');
+      if (result && result.ok === false) {
+        throw new Error(result.message || 'Registrasi gagal disimpan.');
+      }
 
       clearDraft();
       toast((result && result.message) || 'Registrasi sasaran berhasil disimpan.', 'success');
       await resetForm();
 
       var router = getRouter();
-      if (router && typeof router.go === 'function') router.go('sasaranList');
+      if (router && typeof router.go === 'function') {
+        router.go('sasaranList');
+      }
     } catch (err) {
       console.error('submitRegistrasi error:', err);
       toast(err && err.message ? err.message : 'Registrasi sasaran gagal.', 'error');
@@ -1169,14 +1257,49 @@
     el.dataset.boundCommon = '1';
 
     var handler = function () {
-      syncDependentFields().then(function () {
-        refreshValidation(true);
-      });
+      refreshValidation(true);
     };
 
     ['input', 'change', 'blur', 'keyup'].forEach(function (evt) {
       el.addEventListener(evt, handler);
     });
+  }
+
+  function bindJenisChange() {
+    var el = byId(FIELD_IDS.jenis_sasaran);
+    if (!el || el.dataset.boundJenis === '1') return;
+    el.dataset.boundJenis = '1';
+
+    el.addEventListener('change', function () {
+      syncJenisOnly();
+    });
+  }
+
+  function bindWilayahChange() {
+    var kec = byId(FIELD_IDS.nama_kecamatan);
+    var desa = byId(FIELD_IDS.nama_desa);
+    var dusun = byId(FIELD_IDS.nama_dusun);
+
+    if (kec && kec.dataset.boundWilayah !== '1') {
+      kec.dataset.boundWilayah = '1';
+      kec.addEventListener('change', function () {
+        syncWilayahSelection('kecamatan');
+      });
+    }
+
+    if (desa && desa.dataset.boundWilayah !== '1') {
+      desa.dataset.boundWilayah = '1';
+      desa.addEventListener('change', function () {
+        syncWilayahSelection('desa');
+      });
+    }
+
+    if (dusun && dusun.dataset.boundWilayah !== '1') {
+      dusun.dataset.boundWilayah = '1';
+      dusun.addEventListener('change', function () {
+        syncWilayahSelection('dusun');
+      });
+    }
   }
 
   function startAutoValidation() {
@@ -1202,6 +1325,7 @@
     state.formDefinition = null;
     state.formQuestionsByCode = {};
     state.currentFormId = '';
+    state.activeJenis = '';
 
     setHidden('group-reg-nama-ibu-kandung', true);
 
@@ -1211,7 +1335,7 @@
     }
 
     await hydrateWilayahOptions();
-    await syncDependentFields();
+    applyJenisKelaminBehavior();
     refreshValidation(true);
   }
 
@@ -1225,7 +1349,9 @@
       }
     });
 
-    await syncDependentFields();
+    await hydrateWilayahOptions();
+    syncWilayahSelection('dusun');
+    await loadDefinitionForJenis(data.jenis_sasaran || '', false);
 
     var dynMap = {
       sumber_air_minum_utama: 'SUMBER_AIR_MINUM_UTAMA',
@@ -1243,7 +1369,9 @@
       if (el) el.value = data[key] || '';
     });
 
+    applyJenisKelaminBehavior();
     renderDynamicFields();
+    bindDynamicFieldEventsToValidation();
     refreshValidation(true);
   }
 
@@ -1265,11 +1393,12 @@
     var draftBtn = byId('btn-save-reg-draft');
     var resetBtn = byId('btn-reset-registrasi');
 
-    if (form) form.addEventListener('submit', submitRegistrasi);
+    if (form) {
+      form.addEventListener('submit', submitRegistrasi);
+    }
 
     if (backBtn) {
       backBtn.addEventListener('click', function () {
-        console.log('Klik tombol kembali registrasi');
         var router = getRouter();
         if (router && typeof router.go === 'function') {
           router.go('dashboard');
@@ -1277,16 +1406,28 @@
       });
     }
 
-    if (draftBtn) draftBtn.addEventListener('click', saveDraft);
+    if (draftBtn) {
+      draftBtn.addEventListener('click', saveDraft);
+    }
+
     if (resetBtn) {
       resetBtn.addEventListener('click', function () {
         resetForm();
       });
     }
 
-    Object.keys(FIELD_IDS).forEach(function (key) {
-      if (key === 'nik_sasaran' || key === 'nomor_kk') return;
-      bindCommonChange(FIELD_IDS[key]);
+    bindJenisChange();
+    bindWilayahChange();
+
+    [
+      FIELD_IDS.nama_sasaran,
+      FIELD_IDS.nama_kepala_keluarga,
+      FIELD_IDS.nama_ibu_kandung,
+      FIELD_IDS.jenis_kelamin,
+      FIELD_IDS.tanggal_lahir,
+      FIELD_IDS.alamat
+    ].forEach(function (id) {
+      bindCommonChange(id);
     });
 
     bindDigitOnly(FIELD_IDS.nik_sasaran);
@@ -1308,12 +1449,13 @@
     setText('registrasi-mode-badge', 'CREATE');
 
     await hydrateWilayahOptions();
-    await syncDependentFields();
 
     var draft = loadDraft();
     if (draft && draft.data) {
       await applyDraft(draft);
     } else {
+      renderDynamicFields();
+      applyJenisKelaminBehavior();
       refreshValidation(true);
     }
 
