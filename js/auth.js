@@ -399,9 +399,12 @@
 
       if (!result || result.ok === false) {
         showMessage(
-          (result && result.message) || 'Login gagal. Periksa kembali ID dan password.',
-          'error'
-        );
+  (result && result.message
+    ? result.message + (result.code ? ' [' + result.code + ']' : '')
+    : 'Login gagal. Periksa kembali ID dan password.'),
+  'error'
+);
+console.log('LOGIN_RESULT', result);
         return;
       }
 
