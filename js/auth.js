@@ -398,15 +398,18 @@
       var result = await submitLogin(idUser, password);
 
       if (!result || result.ok === false) {
-        showMessage(
-  (result && result.message
-    ? result.message + (result.code ? ' [' + result.code + ']' : '')
-    : 'Login gagal. Periksa kembali ID dan password.'),
-  'error'
-);
-console.log('LOGIN_RESULT', result);
-        return;
-      }
+  console.log('LOGIN_RESULT', result);
+  console.log('LOGIN_STAGE', result && result.data ? result.data.stage : '');
+  console.log('LOGIN_ERROR_DETAIL', result && result.data ? result.data.error : '');
+
+  showMessage(
+    (result && result.message
+      ? result.message + (result.code ? ' [' + result.code + ']' : '')
+      : 'Login gagal. Periksa kembali ID dan password.'),
+    'error'
+  );
+  return;
+}
 
       var wajibGantiPassword = !!(result.data && result.data.wajib_ganti_password);
       var immediateProfile = extractImmediateProfile(result);
