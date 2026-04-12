@@ -3,6 +3,29 @@
 
   const REG_DRAFT_KEY = 'tpk_registrasi_draft_v_final';
   const PLACEHOLDER_16 = '9999999999999999';
+  const DEFINITION_CACHE = {};
+  const STATIC_CODES = new Set([
+    'jenis_sasaran',
+    'nama_sasaran',
+    'nik_sasaran',
+    'nik',
+    'nomor_kk',
+    'jenis_kelamin',
+    'tanggal_lahir',
+    'nama_kecamatan',
+    'kecamatan',
+    'desa_kelurahan',
+    'nama_desa',
+    'dusun_rw',
+    'nama_dusun',
+    'alamat',
+    'id_sasaran',
+    'id_tim',
+    'nama_tim',
+    'id_wilayah',
+    'client_submit_id',
+    'sync_source'
+  ]);
 
   function byId(id) {
     return document.getElementById(id);
@@ -16,12 +39,21 @@
     return '';
   }
 
-  function toUpper(value) {
-    return String(value || '').trim().toUpperCase();
-  }
-
   function safeTrim(value) {
     return String(value || '').trim();
+  }
+
+  function toUpper(value) {
+    return safeTrim(value).toUpperCase();
+  }
+
+  function toLowerSnake(value) {
+    return safeTrim(value)
+      .replace(/\s+/g, '_')
+      .replace(/[^\w]/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .toLowerCase();
   }
 
   function safeJsonParse(value, fallback) {
@@ -38,9 +70,18 @@
     return typeof fn === 'function';
   }
 
-  function notify(message) {
+  function escapeHtml(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function notify(message, type) {
     if (window.Notifier && isFunction(window.Notifier.show)) {
-      window.Notifier.show(message);
+      window.Notifier.show(message, type);
       return;
     }
     window.alert(message);
@@ -87,27 +128,25 @@
     el.textContent = isLoading ? (text || 'Memproses...') : (el.dataset.originalText || el.textContent);
   }
 
-  function uiToggleHidden(id, hidden) {
-    if (window.UI && isFunction(window.UI.toggleHidden)) {
-      window.UI.toggleHidden(id, hidden);
-      return;
-    }
-    const el = byId(id);
+  function setReadonly(el, locked) {
     if (!el) return;
-    el.classList.toggle('hidden', !!hidden);
+    const tag = String(el.tagName || '').toLowerCase();
+    if (tag === 'select') {
+      el.disabled = !!locked;
+    } else {
+      el.readOnly = !!locked;
+    }
   }
 
   function goToRegistrasi() {
     if (window.Router && isFunction(window.Router.toRegistrasi)) {
       window.Router.toRegistrasi();
-      return;
     }
   }
 
   function goToSasaranList() {
     if (window.Router && isFunction(window.Router.toSasaranList)) {
       window.Router.toSasaranList();
-      return;
     }
   }
 
@@ -164,10 +203,10 @@
 
   function ensureClientSubmitId(existing) {
     if (window.ClientId && isFunction(window.ClientId.ensure)) {
-      return window.ClientId.ensure(existing, 'SUB');
+      return window.ClientId.ensure(existing, 'REG');
     }
     if (existing) return existing;
-    return `SUB-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+    return `REG-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
   }
 
   function validators() {
@@ -177,7 +216,7 @@
   function isRequired(value) {
     const api = validators();
     if (isFunction(api.isRequired)) return api.isRequired(value);
-    return String(value || '').trim() !== '';
+    return !(value === undefined || value === null || String(value).trim() === '');
   }
 
   function isNikOrKK16(value) {
@@ -218,8 +257,7 @@
   }
 
   function getDraftManager() {
-    if (window.DraftManager) return window.DraftManager;
-    return null;
+    return window.DraftManager || null;
   }
 
   function loadDraftLocal() {
@@ -273,7 +311,7 @@
       const raw = safeJsonParse(localStorage.getItem(key), []);
       const queue = Array.isArray(raw) ? raw : [];
       queue.push({
-        action: 'submitRegistrasiSasaran',
+        action: 'registerSasaran',
         created_at: new Date().toISOString(),
         sync_status: 'PENDING',
         payload: payload || {}
@@ -285,218 +323,81 @@
     }
   }
 
-  function buildWilayahText(item) {
-    return [
-      firstNonEmpty(item.nama_dusun, item.dusun_rw, item.nama_dusun_rw),
-      firstNonEmpty(item.nama_desa, item.desa_kelurahan, item.nama_desa_kelurahan),
-      firstNonEmpty(item.nama_kecamatan, item.kecamatan)
-    ].filter(Boolean).join(' / ');
-  }
+  function parseStoredAnswers(item) {
+    const out = {};
 
-  function extractExtraFields(item) {
-    if (!item || typeof item !== 'object') return {};
-    return firstNonEmpty(
-      item.extra_fields,
-      safeJsonParse(item.extra_fields_json, {}),
-      item.field_values,
-      item.jawaban,
-      safeJsonParse(item.data_laporan, {})
-    ) || {};
-  }
+    const dataLaporan = safeJsonParse(item && item.data_laporan, {});
+    const payloadJson = safeJsonParse(item && item.payload_json, {});
+    const extraFieldsJson = safeJsonParse(item && item.extra_fields_json, {});
 
-  function getFallbackDynamicFields(jenis) {
-    const key = toUpper(jenis);
-    const common = [
-      {
-        question_code: 'nama_kepala_keluarga',
-        label: 'Nama Kepala Keluarga',
-        type: 'text',
-        required: true,
-        placeholder: 'Masukkan nama kepala keluarga'
-      },
-      {
-        question_code: 'sumber_air_minum_utama',
-        label: 'Sumber Air Minum Utama',
-        type: 'select',
-        required: true,
-        options: [
-          { value: 'AIR_KEMASAN_ISI_ULANG', label: 'Air Kemasan / Isi Ulang' },
-          { value: 'LEDENG_PAM', label: 'Ledeng / Pam' },
-          { value: 'SUMUR_BOR_POMPA', label: 'Sumur Bor / Pompa' },
-          { value: 'SUMUR_TERLINDUNG', label: 'Sumur Terlindung' },
-          { value: 'SUMUR_TAK_TERLINDUNG', label: 'Sumur Tak Terlindung' },
-          { value: 'MATA_AIR_TERLINDUNG', label: 'Mata Air Terlindung' },
-          { value: 'MATA_AIR_TAK_TERLINDUNG', label: 'Mata Air Tak Terlindung' },
-          { value: 'AIR_PERMUKAAN', label: 'Air Permukaan' },
-          { value: 'AIR_HUJAN', label: 'Air Hujan' },
-          { value: 'LAINNYA', label: 'Lainnya' }
-        ]
-      },
-      {
-        question_code: 'sumber_air_minum_utama_lainnya',
-        label: 'Sumber Air Minum Utama Lainnya',
-        type: 'text',
-        required: false,
-        placeholder: 'Jelaskan sumber air minum lainnya',
-        parent_key: 'sumber_air_minum_utama',
-        parent_value: 'LAINNYA'
-      },
-      {
-        question_code: 'fasilitas_bab',
-        label: 'Fasilitas BAB',
-        type: 'select',
-        required: true,
-        options: [
-          { value: 'JAMBAN_SENDIRI_LEHER_ANGSA_SEPTIK', label: 'Jamban Sendiri + Tangki Septik / IPAL' },
-          { value: 'JAMBAN_MCK_KOMUNAL_LEHER_ANGSA_SEPTIK', label: 'MCK Komunal + Tangki Septik / IPAL' },
-          { value: 'YA_LAINNYA', label: 'Ya Lainnya' },
-          { value: 'TIDAK_ADA', label: 'Tidak Ada' }
-        ]
-      },
-      {
-        question_code: 'fasilitas_bab_lainnya',
-        label: 'Fasilitas BAB Lainnya',
-        type: 'text',
-        required: false,
-        placeholder: 'Jelaskan fasilitas BAB lainnya',
-        parent_key: 'fasilitas_bab',
-        parent_value: 'YA_LAINNYA'
-      },
-      {
-        question_code: 'keterangan_tambahan_awal',
-        label: 'Keterangan Tambahan',
-        type: 'textarea',
-        required: false,
-        placeholder: 'Catatan tambahan awal'
-      }
-    ];
-
-    if (key === 'BADUTA') {
-      common.unshift({
-        question_code: 'nama_ibu_kandung',
-        label: 'Nama Ibu Kandung',
-        type: 'text',
-        required: true,
-        placeholder: 'Masukkan nama ibu kandung'
+    [
+      dataLaporan.answers,
+      payloadJson.answers,
+      item && item.answers,
+      item && item.dynamic_fields,
+      item && item.extra_fields,
+      extraFieldsJson
+    ].forEach((obj) => {
+      if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return;
+      Object.keys(obj).forEach((key) => {
+        out[toLowerSnake(key)] = obj[key];
       });
-    }
+    });
 
-    return common;
+    return out;
   }
 
-  function renderDynamicFieldsNative(containerId, fields, values) {
-    const container = byId(containerId);
-    if (!container) return;
+  function getApi() {
+    return window.Api || null;
+  }
 
-    const list = Array.isArray(fields) ? fields : [];
-    if (!list.length) {
-      container.innerHTML = '<p class="muted-text">Tidak ada field khusus untuk jenis sasaran ini.</p>';
-      return;
+  async function callApi(action, payload) {
+    const api = getApi();
+    if (api && isFunction(api.post)) {
+      return api.post(action, payload || {});
     }
+    throw new Error('Api.post belum tersedia.');
+  }
 
-    container.innerHTML = list.map((field) => {
-      const key = safeTrim(field.question_code || field.code || field.key);
-      const type = safeTrim(field.type || field.field_type || 'text').toLowerCase();
-      const label = safeTrim(field.label || field.question_label || key);
-      const required = !!field.required || field.is_required === true || field.is_required === 'TRUE';
-      const placeholder = safeTrim(field.placeholder || field.help_text || '');
-      const value = firstNonEmpty(values[key], field.default_value, '');
-      const parentKey = safeTrim(field.parent_key || field.trigger_field || '');
-      const parentValue = safeTrim(field.parent_value || field.trigger_value || '');
-
-      const wrapperAttrs = [
-        'class="dynamic-field-card"',
-        parentKey ? `data-parent-key="${parentKey}"` : '',
-        parentValue ? `data-parent-value="${parentValue}"` : ''
-      ].filter(Boolean).join(' ');
-
-      let inputHtml = '';
-
-      if (type === 'textarea') {
-        inputHtml = `
-          <textarea
-            id="dyn-${key}"
-            data-dyn-key="${key}"
-            rows="3"
-            placeholder="${placeholder}"
-            ${required ? 'required' : ''}
-          >${value || ''}</textarea>
-        `;
-      } else if (type === 'select') {
-        const options = Array.isArray(field.options) ? field.options : [];
-        inputHtml = `
-          <select
-            id="dyn-${key}"
-            data-dyn-key="${key}"
-            ${required ? 'required' : ''}
-          >
-            <option value="">Pilih</option>
-            ${options.map((opt) => {
-              const val = safeTrim(opt.value != null ? opt.value : opt);
-              const lbl = safeTrim(opt.label != null ? opt.label : opt);
-              const selected = String(val) === String(value) ? 'selected' : '';
-              return `<option value="${val}" ${selected}>${lbl}</option>`;
-            }).join('')}
-          </select>
-        `;
-      } else {
-        inputHtml = `
-          <input
-            id="dyn-${key}"
-            data-dyn-key="${key}"
-            type="${type === 'date' ? 'date' : 'text'}"
-            value="${type === 'date' ? (value || '') : (value || '').replace(/"/g, '&quot;')}"
-            placeholder="${placeholder}"
-            ${required ? 'required' : ''}
-          />
-        `;
+  function extractErrorMessage(result, fallback) {
+    if (!result) return fallback;
+    if (result.message) {
+      if (result.data && Array.isArray(result.data.fields) && result.data.fields.length) {
+        const first = result.data.fields[0];
+        return first && first.message ? first.message : result.message;
       }
-
-      return `
-        <div ${wrapperAttrs}>
-          <div class="form-group">
-            <label for="dyn-${key}">${label}${required ? ' *' : ''}</label>
-            ${inputHtml}
-          </div>
-        </div>
-      `;
-    }).join('');
-  }
-
-  function collectDynamicFieldsNative(containerId) {
-    const container = byId(containerId);
-    const result = {};
-    if (!container) return result;
-
-    container.querySelectorAll('[data-dyn-key]').forEach((el) => {
-      result[el.dataset.dynKey] = el.value;
-    });
-
-    return result;
-  }
-
-  function fillDynamicFieldsNative(containerId, values) {
-    const container = byId(containerId);
-    if (!container || !values || typeof values !== 'object') return;
-
-    Object.keys(values).forEach((key) => {
-      const el = container.querySelector(`[data-dyn-key="${key}"]`);
-      if (el) el.value = values[key] == null ? '' : values[key];
-    });
-  }
-
-  function setReadonly(el, locked) {
-    if (!el) return;
-    const tag = String(el.tagName || '').toLowerCase();
-    if (tag === 'select') {
-      el.disabled = !!locked;
-    } else {
-      el.readOnly = !!locked;
+      return result.message;
     }
+    return fallback;
+  }
+
+  function mapJenisToFormId(jenis) {
+    const key = toUpper(jenis);
+    const map = {
+      CATIN: 'FRM1002',
+      BUMIL: 'FRM1003',
+      BUFAS: 'FRM1004',
+      BADUTA: 'FRM1005'
+    };
+    return map[key] || 'FRM1001';
+  }
+
+  function deepMergeObject(target, source) {
+    const out = Object.assign({}, target || {});
+    const src = source || {};
+    Object.keys(src).forEach((key) => {
+      if (src[key] !== undefined && src[key] !== null && src[key] !== '') {
+        out[key] = src[key];
+      }
+    });
+    return out;
   }
 
   const RegistrasiForm = {
     _isBound: false,
+    _currentDefinition: null,
+    _dynamicQuestions: [],
+    _currentFormId: '',
 
     init() {
       if (this._isBound) return;
@@ -514,9 +415,9 @@
       const jenisEl = byId('reg-jenis-sasaran');
 
       if (btnBack) {
-        btnBack.addEventListener('click', (event) => {
+        btnBack.addEventListener('click', async (event) => {
           event.preventDefault();
-          this.handleBack();
+          await this.handleBack();
         });
       }
 
@@ -550,6 +451,7 @@
 
       if (jenisEl) {
         jenisEl.addEventListener('change', async () => {
+          this.applyGenderLockByJenis();
           await this.handleJenisChange();
         });
       }
@@ -565,12 +467,10 @@
     async handleOpenEditFromDetail() {
       try {
         const item = await this.resolveCurrentSasaranForEdit();
-
         if (!item || !(item.id_sasaran || item.id)) {
           notify('Data sasaran untuk edit tidak ditemukan.');
           return;
         }
-
         await this.openEdit(item);
       } catch (err) {
         notify(err && err.message ? err.message : 'Gagal membuka mode edit sasaran.');
@@ -621,12 +521,15 @@
           if (data && (data.id_sasaran || data.id)) {
             return data;
           }
-        } catch (_) {
-          // lanjut ke method berikutnya
-        }
+        } catch (_) {}
       }
 
-      return null;
+      try {
+        const result = await callApi('getSasaranDetail', { id_sasaran: idSasaran });
+        return result && result.data ? result.data : null;
+      } catch (_) {
+        return null;
+      }
     },
 
     async openCreate() {
@@ -648,17 +551,20 @@
 
       setMode('edit');
       setEditItem(safeItem);
-
       goToRegistrasi();
 
       this.resetForm();
       this.applyModeUI();
       await this.prefillScope();
-      this.fillForm(safeItem);
+      this.fillStaticForm(safeItem);
 
-      await this.loadDynamicFields(safeItem.jenis_sasaran || '');
-      this.fillDynamicFields(safeItem);
+      const jenis = firstNonEmpty(safeItem.jenis_sasaran);
+      await this.loadDynamicFields(jenis);
 
+      const storedAnswers = parseStoredAnswers(safeItem);
+      this.fillDynamicFields(storedAnswers);
+      this.applyGenderLockByJenis();
+      this.updateConditionalDynamicFields();
       this.renderValidation();
     },
 
@@ -697,6 +603,10 @@
       const form = byId('registrasi-form');
       if (form) form.reset();
 
+      this._currentDefinition = null;
+      this._dynamicQuestions = [];
+      this._currentFormId = '';
+
       uiSetHTML(
         'registrasi-dynamic-fields',
         '<p class="muted-text">Pilih jenis sasaran untuk memuat pertanyaan khusus.</p>'
@@ -704,6 +614,7 @@
 
       const idEl = byId('reg-id-sasaran');
       if (idEl) idEl.value = '';
+      this.unlockGenderField();
     },
 
     getScopeFromProfile() {
@@ -768,17 +679,17 @@
       setReadonly(byId('reg-dusun'), true);
     },
 
-    fillForm(item) {
+    fillStaticForm(item) {
       const map = {
         'reg-id-sasaran': firstNonEmpty(item.id_sasaran, item.id),
         'reg-jenis-sasaran': firstNonEmpty(item.jenis_sasaran),
         'reg-nama-sasaran': firstNonEmpty(item.nama_sasaran, item.nama),
-        'reg-nik': firstNonEmpty(item.nik, item.nik_sasaran),
+        'reg-nik': firstNonEmpty(item.nik_sasaran, item.nik),
         'reg-no-kk': firstNonEmpty(item.nomor_kk, item.no_kk),
         'reg-jenis-kelamin': firstNonEmpty(item.jenis_kelamin),
         'reg-tanggal-lahir': firstNonEmpty(item.tanggal_lahir, item.tgl_lahir),
         'reg-kecamatan': firstNonEmpty(item.nama_kecamatan, item.kecamatan),
-        'reg-desa': firstNonEmpty(item.nama_desa, item.desa_kelurahan, item.nama_desa_kelurahan, item.nama_wilayah),
+        'reg-desa': firstNonEmpty(item.nama_desa, item.desa_kelurahan, item.nama_desa_kelurahan),
         'reg-dusun': firstNonEmpty(item.nama_dusun, item.dusun_rw, item.nama_dusun_rw),
         'reg-alamat': firstNonEmpty(item.alamat)
       };
@@ -795,8 +706,46 @@
       this.handleAnyFormChange();
     },
 
+    async getRegistrasiFormDefinition(jenisSasaran) {
+      const jenis = toUpper(jenisSasaran);
+      const formId = mapJenisToFormId(jenis);
+      const cacheKey = `${formId}:${jenis}`;
+
+      if (DEFINITION_CACHE[cacheKey]) {
+        return DEFINITION_CACHE[cacheKey];
+      }
+
+      let result = null;
+
+      try {
+        if (window.RegistrasiService && isFunction(window.RegistrasiService.getRegistrasiFormDefinition)) {
+          result = await window.RegistrasiService.getRegistrasiFormDefinition(jenis);
+        } else if (window.RegistrasiService && isFunction(window.RegistrasiService.getFormDefinition)) {
+          result = await window.RegistrasiService.getFormDefinition(jenis);
+        } else {
+          result = await callApi('getRegistrasiFormDefinition', {
+            jenis_sasaran: jenis,
+            form_id: formId
+          });
+        }
+      } catch (_) {
+        result = await callApi('getRegistrasiFormDefinition', {
+          jenis_sasaran: jenis,
+          form_id: formId
+        });
+      }
+
+      const data = result && result.data ? result.data : result;
+      DEFINITION_CACHE[cacheKey] = data || {};
+      return DEFINITION_CACHE[cacheKey];
+    },
+
     async loadDynamicFields(jenisSasaran) {
-      if (!jenisSasaran) {
+      const jenis = toUpper(jenisSasaran);
+      if (!jenis) {
+        this._currentDefinition = null;
+        this._dynamicQuestions = [];
+        this._currentFormId = '';
         uiSetHTML(
           'registrasi-dynamic-fields',
           '<p class="muted-text">Pilih jenis sasaran untuk memuat pertanyaan khusus.</p>'
@@ -804,72 +753,424 @@
         return;
       }
 
-      let fields = [];
-
+      let definition = {};
       try {
-        if (window.RegistrasiService && isFunction(window.RegistrasiService.getFormDefinition)) {
-          const result = await window.RegistrasiService.getFormDefinition(jenisSasaran);
-          fields = this.normalizeDynamicFields(result && result.data ? result.data : result, jenisSasaran);
-        } else {
-          fields = getFallbackDynamicFields(jenisSasaran);
-        }
-      } catch (_) {
-        fields = getFallbackDynamicFields(jenisSasaran);
+        definition = await this.getRegistrasiFormDefinition(jenis);
+      } catch (err) {
+        notify(err && err.message ? err.message : 'Gagal memuat pertanyaan registrasi.');
+        definition = {};
       }
 
-      if (window.DynamicForm && isFunction(window.DynamicForm.render)) {
-        window.DynamicForm.render('registrasi-dynamic-fields', fields, {});
-      } else {
-        renderDynamicFieldsNative('registrasi-dynamic-fields', fields, {});
+      const normalized = this.normalizeDefinition(definition, jenis);
+      this._currentDefinition = normalized;
+      this._dynamicQuestions = normalized.questions || [];
+      this._currentFormId = normalized.form_id || mapJenisToFormId(jenis);
+
+      this.renderDynamicFields(normalized.sections || []);
+      this.applyGenderLockByJenis();
+    },
+
+    normalizeDefinition(definition, jenisSasaran) {
+      const data = definition || {};
+      const sections = Array.isArray(data.sections) ? data.sections : [];
+      const fallbackQuestions = Array.isArray(data.questions) ? data.questions : [];
+      const dynamicQuestions = [];
+      const sectionMap = {};
+
+      sections.forEach((section, sectionIndex) => {
+        const normalizedSection = {
+          section_id: safeTrim(section.section_id || `SEC-${sectionIndex + 1}`),
+          section_label: safeTrim(section.section_label || section.label || ''),
+          section_order: Number(section.section_order || (sectionIndex + 1)),
+          questions: []
+        };
+
+        const sourceQuestions = Array.isArray(section.questions) ? section.questions : [];
+        sourceQuestions.forEach((question, qIndex) => {
+          const normalizedQuestion = this.normalizeQuestion(question, normalizedSection, qIndex);
+          if (!normalizedQuestion) return;
+          normalizedSection.questions.push(normalizedQuestion);
+          dynamicQuestions.push(normalizedQuestion);
+        });
+
+        if (normalizedSection.questions.length) {
+          sectionMap[normalizedSection.section_id] = normalizedSection;
+        }
+      });
+
+      fallbackQuestions.forEach((question, qIndex) => {
+        const normalizedQuestion = this.normalizeQuestion(question, null, qIndex);
+        if (!normalizedQuestion) return;
+
+        const sectionId = normalizedQuestion.section_id || 'SEC-DYNAMIC';
+        if (!sectionMap[sectionId]) {
+          sectionMap[sectionId] = {
+            section_id: sectionId,
+            section_label: safeTrim(normalizedQuestion.section_label || 'Data Khusus'),
+            section_order: Number(normalizedQuestion.section_order || 999),
+            questions: []
+          };
+        }
+
+        const exists = sectionMap[sectionId].questions.some((q) => q.code === normalizedQuestion.code);
+        if (!exists) {
+          sectionMap[sectionId].questions.push(normalizedQuestion);
+          dynamicQuestions.push(normalizedQuestion);
+        }
+      });
+
+      const dynamicSections = Object.values(sectionMap)
+        .map((section) => {
+          section.questions.sort((a, b) => Number(a.question_order || 0) - Number(b.question_order || 0));
+          return section;
+        })
+        .sort((a, b) => Number(a.section_order || 0) - Number(b.section_order || 0));
+
+      return {
+        form_id: safeTrim(firstNonEmpty(
+          data.form_id,
+          data.form && data.form.form_id,
+          mapJenisToFormId(jenisSasaran)
+        )),
+        jenis_sasaran: jenisSasaran,
+        sections: dynamicSections,
+        questions: dynamicQuestions
+      };
+    },
+
+    normalizeQuestion(question, section, qIndex) {
+      const rawCode = firstNonEmpty(
+        question.store_key,
+        question.question_code,
+        question.code,
+        question.key,
+        question.question_id
+      );
+      const code = toLowerSnake(rawCode);
+      if (!code) return null;
+      if (STATIC_CODES.has(code)) return null;
+
+      const fieldTypeRaw = toLowerSnake(firstNonEmpty(question.field_type, question.type, 'text'));
+      const fieldType = fieldTypeRaw === 'number' || fieldTypeRaw === 'integer' || fieldTypeRaw === 'decimal'
+        ? 'number'
+        : (fieldTypeRaw === 'textarea' ? 'textarea' : (fieldTypeRaw === 'date' ? 'date' : (fieldTypeRaw === 'select' ? 'select' : 'text')));
+
+      return {
+        question_id: safeTrim(question.question_id),
+        code: code,
+        label: safeTrim(firstNonEmpty(question.question_label, question.label, rawCode)),
+        short_label: safeTrim(firstNonEmpty(question.question_short_label, question.short_label)),
+        help_text: safeTrim(question.help_text),
+        placeholder: safeTrim(question.placeholder),
+        field_type: fieldType,
+        data_type: toLowerSnake(question.data_type || ''),
+        is_required: question.is_required === true || String(question.is_required).toUpperCase() === 'TRUE',
+        validation_rule: safeTrim(question.validation_rule),
+        visibility_rule: safeTrim(question.visibility_rule),
+        requirement_rule: safeTrim(question.requirement_rule),
+        readonly_rule: safeTrim(question.readonly_rule),
+        default_value: firstNonEmpty(question.resolved_default_value, question.default_value),
+        is_editable: question.is_editable_resolved !== undefined
+          ? !!question.is_editable_resolved
+          : !(question.is_editable === false || String(question.is_editable).toUpperCase() === 'FALSE'),
+        section_id: safeTrim(firstNonEmpty(question.section_id, section && section.section_id)),
+        section_label: safeTrim(firstNonEmpty(question.section_label, section && section.section_label)),
+        section_order: Number(firstNonEmpty(question.section_order, section && section.section_order, 999)),
+        question_order: Number(firstNonEmpty(question.question_order, qIndex + 1)),
+        options: Array.isArray(question.options) ? question.options.map((opt, idx) => ({
+          value: safeTrim(firstNonEmpty(opt.value, opt.option_value)),
+          label: safeTrim(firstNonEmpty(opt.label, opt.option_label, opt.value, opt.option_value)),
+          order: Number(firstNonEmpty(opt.order, opt.option_order, idx + 1))
+        })) : [],
+        rules: Array.isArray(question.rules) ? question.rules : []
+      };
+    },
+
+    renderDynamicFields(sections) {
+      const container = byId('registrasi-dynamic-fields');
+      if (!container) return;
+
+      if (!Array.isArray(sections) || !sections.length) {
+        uiSetHTML(
+          'registrasi-dynamic-fields',
+          '<p class="muted-text">Tidak ada pertanyaan khusus untuk jenis sasaran ini.</p>'
+        );
+        return;
       }
+
+      const html = sections.map((section) => {
+        const items = (section.questions || []).map((question) => this.renderDynamicQuestion(question)).join('');
+        return `
+          <section class="dynamic-section" data-section-id="${escapeHtml(section.section_id)}">
+            <div class="dynamic-section-header">${escapeHtml(section.section_label || 'Data Khusus')}</div>
+            <div class="dynamic-section-body">
+              ${items}
+            </div>
+          </section>
+        `;
+      }).join('');
+
+      uiSetHTML('registrasi-dynamic-fields', html);
+
+      this._dynamicQuestions.forEach((question) => {
+        const el = this.findDynamicInput(question.code);
+        if (!el) return;
+
+        if (question.default_value && !el.value) {
+          el.value = question.default_value;
+        }
+
+        if (!question.is_editable) {
+          setReadonly(el, true);
+        }
+
+        const listener = () => {
+          this.updateConditionalDynamicFields();
+          this.handleAnyFormChange();
+        };
+
+        el.addEventListener('change', listener);
+        el.addEventListener('input', listener);
+      });
 
       this.updateConditionalDynamicFields();
     },
 
-    normalizeDynamicFields(data, jenisSasaran) {
-      if (Array.isArray(data)) return data;
-      if (Array.isArray(data && data.fields)) return data.fields;
-      if (Array.isArray(data && data.questions)) return data.questions;
-      return getFallbackDynamicFields(jenisSasaran);
-    },
+    renderDynamicQuestion(question) {
+      const code = question.code;
+      const value = escapeHtml(firstNonEmpty(question.default_value, ''));
+      const label = escapeHtml(question.label || code);
+      const placeholder = escapeHtml(question.placeholder || question.help_text || '');
+      const requiredMark = question.is_required ? ' *' : '';
+      const help = question.help_text ? `<div class="form-help-text">${escapeHtml(question.help_text)}</div>` : '';
 
-    fillDynamicFields(item) {
-      const extra = extractExtraFields(item);
+      let inputHtml = '';
 
-      if (window.DynamicForm && isFunction(window.DynamicForm.fill)) {
-        window.DynamicForm.fill('registrasi-dynamic-fields', extra);
+      if (question.field_type === 'textarea') {
+        inputHtml = `
+          <textarea
+            id="dyn-${escapeHtml(code)}"
+            data-reg-question-code="${escapeHtml(code)}"
+            rows="3"
+            placeholder="${placeholder}"
+          >${value}</textarea>
+        `;
+      } else if (question.field_type === 'select') {
+        const options = (question.options || [])
+          .sort((a, b) => Number(a.order || 0) - Number(b.order || 0))
+          .map((opt) => `
+            <option value="${escapeHtml(opt.value)}">${escapeHtml(opt.label)}</option>
+          `).join('');
+
+        inputHtml = `
+          <select
+            id="dyn-${escapeHtml(code)}"
+            data-reg-question-code="${escapeHtml(code)}"
+          >
+            <option value="">Pilih</option>
+            ${options}
+          </select>
+        `;
       } else {
-        fillDynamicFieldsNative('registrasi-dynamic-fields', extra);
+        inputHtml = `
+          <input
+            id="dyn-${escapeHtml(code)}"
+            data-reg-question-code="${escapeHtml(code)}"
+            type="${question.field_type === 'date' ? 'date' : (question.field_type === 'number' ? 'number' : 'text')}"
+            value="${value}"
+            placeholder="${placeholder}"
+            ${question.field_type === 'number' ? 'step="any"' : ''}
+          />
+        `;
       }
 
+      return `
+        <div class="dynamic-field-card" data-question-code="${escapeHtml(code)}">
+          <div class="form-group">
+            <label for="dyn-${escapeHtml(code)}">${label}${requiredMark}</label>
+            ${inputHtml}
+            ${help}
+          </div>
+        </div>
+      `;
+    },
+
+    findDynamicInput(code) {
+      const container = byId('registrasi-dynamic-fields');
+      if (!container || !code) return null;
+      return container.querySelector(`[data-reg-question-code="${code}"]`);
+    },
+
+    fillDynamicFields(values) {
+      const data = values || {};
+      this._dynamicQuestions.forEach((question) => {
+        const el = this.findDynamicInput(question.code);
+        if (!el) return;
+        const val = firstNonEmpty(
+          data[question.code],
+          data[question.code.toUpperCase()],
+          question.default_value
+        );
+        if (val !== '') {
+          el.value = val;
+        }
+      });
       this.updateConditionalDynamicFields();
     },
 
     collectDynamicFields() {
-      if (window.DynamicForm && isFunction(window.DynamicForm.collect)) {
-        return window.DynamicForm.collect('registrasi-dynamic-fields') || {};
-      }
-      return collectDynamicFieldsNative('registrasi-dynamic-fields');
+      const out = {};
+      this._dynamicQuestions.forEach((question) => {
+        const el = this.findDynamicInput(question.code);
+        if (!el) return;
+        out[question.code] = el.value == null ? '' : el.value;
+      });
+      return out;
+    },
+
+    getCurrentAnswersMap() {
+      const dynamic = this.collectDynamicFields();
+      const map = deepMergeObject(dynamic, {
+        jenis_sasaran: safeTrim(byId('reg-jenis-sasaran') && byId('reg-jenis-sasaran').value),
+        nama_sasaran: safeTrim(byId('reg-nama-sasaran') && byId('reg-nama-sasaran').value),
+        nik_sasaran: safeTrim(byId('reg-nik') && byId('reg-nik').value),
+        nomor_kk: safeTrim(byId('reg-no-kk') && byId('reg-no-kk').value),
+        jenis_kelamin: safeTrim(byId('reg-jenis-kelamin') && byId('reg-jenis-kelamin').value),
+        tanggal_lahir: safeTrim(byId('reg-tanggal-lahir') && byId('reg-tanggal-lahir').value),
+        nama_kecamatan: safeTrim(byId('reg-kecamatan') && byId('reg-kecamatan').value),
+        kecamatan: safeTrim(byId('reg-kecamatan') && byId('reg-kecamatan').value),
+        desa_kelurahan: safeTrim(byId('reg-desa') && byId('reg-desa').value),
+        dusun_rw: safeTrim(byId('reg-dusun') && byId('reg-dusun').value),
+        alamat: safeTrim(byId('reg-alamat') && byId('reg-alamat').value)
+      });
+
+      return map;
     },
 
     updateConditionalDynamicFields() {
       const container = byId('registrasi-dynamic-fields');
       if (!container) return;
 
-      container.querySelectorAll('[data-parent-key]').forEach((card) => {
-        const parentKey = card.getAttribute('data-parent-key') || '';
-        const parentValue = card.getAttribute('data-parent-value') || '';
-        const parentEl = container.querySelector(`[data-dyn-key="${parentKey}"]`);
-        const childInput = card.querySelector('[data-dyn-key]');
-        const currentValue = parentEl ? String(parentEl.value || '') : '';
-        const visible = !parentKey || currentValue === parentValue;
+      const answers = this.getCurrentAnswersMap();
+
+      this._dynamicQuestions.forEach((question) => {
+        const card = container.querySelector(`[data-question-code="${question.code}"]`);
+        const input = this.findDynamicInput(question.code);
+        if (!card || !input) return;
+
+        const visible = this.isQuestionVisible(question, answers);
+        const required = visible && this.isQuestionRequired(question, answers);
 
         card.classList.toggle('hidden', !visible);
 
-        if (!visible && childInput) {
-          childInput.value = '';
+        if (!visible) {
+          input.value = '';
+        }
+
+        if (required) {
+          input.setAttribute('required', 'required');
+        } else {
+          input.removeAttribute('required');
+        }
+
+        if (!question.is_editable) {
+          setReadonly(input, true);
         }
       });
+    },
+
+    isQuestionVisible(question, answers) {
+      if (!question) return true;
+
+      const rules = Array.isArray(question.rules) ? question.rules : [];
+      const showRules = rules.filter((r) => toUpper(r.rule_type) === 'VISIBILITY' && toUpper(r.action) === 'SHOW');
+
+      if (showRules.length) {
+        return showRules.some((rule) => this.evaluateRule(rule, answers));
+      }
+
+      if (question.visibility_rule) {
+        return this.evaluateNamedRule(question.visibility_rule, answers);
+      }
+
+      return true;
+    },
+
+    isQuestionRequired(question, answers) {
+      let required = !!question.is_required;
+      const rules = Array.isArray(question.rules) ? question.rules : [];
+      const reqRules = rules.filter((r) => toUpper(r.rule_type) === 'REQUIREMENT');
+
+      if (reqRules.length) {
+        required = required || reqRules.some((rule) => this.evaluateRule(rule, answers));
+      }
+
+      if (question.requirement_rule) {
+        required = required || this.evaluateNamedRule(question.requirement_rule, answers);
+      }
+
+      return required;
+    },
+
+    evaluateRule(rule, answers) {
+      const triggerField = toLowerSnake(firstNonEmpty(rule.trigger_field));
+      const operator = toUpper(rule.operator);
+      const triggerValue = safeTrim(rule.trigger_value);
+      const actual = safeTrim(firstNonEmpty(
+        answers[triggerField],
+        answers[toUpper(triggerField)]
+      ));
+
+      if (operator === 'EQ' || operator === 'EQ_ANY') {
+        return actual === triggerValue;
+      }
+
+      if (operator === 'NE') {
+        return actual !== triggerValue;
+      }
+
+      if (operator === 'IN') {
+        return triggerValue.split('|').map((v) => safeTrim(v)).includes(actual);
+      }
+
+      if (operator === 'NOT_EMPTY') {
+        return isRequired(actual);
+      }
+
+      return false;
+    },
+
+    evaluateNamedRule(ruleName, answers) {
+      const name = toUpper(ruleName);
+
+      if (name === 'VIS_IF_SUMBER_AIR_LAINNYA' || name === 'REQ_IF_SUMBER_AIR_LAINNYA') {
+        return toUpper(answers.sumber_air_minum_utama) === 'LAINNYA';
+      }
+
+      if (name === 'VIS_IF_BAB_YA_LAINNYA' || name === 'REQ_IF_BAB_YA_LAINNYA') {
+        return toUpper(answers.fasilitas_bab) === 'YA_LAINNYA';
+      }
+
+      return false;
+    },
+
+    applyGenderLockByJenis() {
+      const jenis = toUpper(byId('reg-jenis-sasaran') && byId('reg-jenis-sasaran').value);
+      const el = byId('reg-jenis-kelamin');
+      if (!el) return;
+
+      if (jenis === 'BUMIL' || jenis === 'BUFAS') {
+        el.value = 'P';
+        setReadonly(el, true);
+      } else {
+        this.unlockGenderField();
+      }
+    },
+
+    unlockGenderField() {
+      const el = byId('reg-jenis-kelamin');
+      if (!el) return;
+      setReadonly(el, false);
     },
 
     collectFormData() {
@@ -880,26 +1181,32 @@
       const localDraft = loadDraftLocal();
       const localDraftData = localDraft && localDraft.data ? localDraft.data : {};
 
+      const answers = {
+        jenis_sasaran: safeTrim(byId('reg-jenis-sasaran') && byId('reg-jenis-sasaran').value),
+        nama_sasaran: safeTrim(byId('reg-nama-sasaran') && byId('reg-nama-sasaran').value),
+        nik_sasaran: safeTrim(byId('reg-nik') && byId('reg-nik').value),
+        nomor_kk: safeTrim(byId('reg-no-kk') && byId('reg-no-kk').value),
+        jenis_kelamin: safeTrim(byId('reg-jenis-kelamin') && byId('reg-jenis-kelamin').value),
+        tanggal_lahir: safeTrim(byId('reg-tanggal-lahir') && byId('reg-tanggal-lahir').value),
+        nama_kecamatan: safeTrim(byId('reg-kecamatan') && byId('reg-kecamatan').value),
+        desa_kelurahan: safeTrim(byId('reg-desa') && byId('reg-desa').value),
+        dusun_rw: safeTrim(byId('reg-dusun') && byId('reg-dusun').value),
+        alamat: safeTrim(byId('reg-alamat') && byId('reg-alamat').value)
+      };
+
+      Object.assign(answers, this.collectDynamicFields());
+
       return {
         id_sasaran: firstNonEmpty(
           byId('reg-id-sasaran') && byId('reg-id-sasaran').value,
           editItem.id_sasaran,
           editItem.id
         ),
-        jenis_sasaran: safeTrim(byId('reg-jenis-sasaran') && byId('reg-jenis-sasaran').value),
-        nama_sasaran: safeTrim(byId('reg-nama-sasaran') && byId('reg-nama-sasaran').value),
-        nik: safeTrim(byId('reg-nik') && byId('reg-nik').value),
-        nomor_kk: safeTrim(byId('reg-no-kk') && byId('reg-no-kk').value),
-        jenis_kelamin: safeTrim(byId('reg-jenis-kelamin') && byId('reg-jenis-kelamin').value),
-        tanggal_lahir: safeTrim(byId('reg-tanggal-lahir') && byId('reg-tanggal-lahir').value),
-        nama_kecamatan: safeTrim(byId('reg-kecamatan') && byId('reg-kecamatan').value),
-        nama_desa: safeTrim(byId('reg-desa') && byId('reg-desa').value),
-        nama_dusun: safeTrim(byId('reg-dusun') && byId('reg-dusun').value),
-        alamat: safeTrim(byId('reg-alamat') && byId('reg-alamat').value),
+        form_id: this._currentFormId || mapJenisToFormId(answers.jenis_sasaran),
+        answers: answers,
         id_tim: firstNonEmpty(profile.id_tim),
         nama_tim: firstNonEmpty(profile.nama_tim, profile.nomor_tim, profile.id_tim),
         id_wilayah: firstNonEmpty(profileScope.id_wilayah),
-        extra_fields: this.collectDynamicFields(),
         client_submit_id: mode === 'create'
           ? ensureClientSubmitId(localDraftData.client_submit_id)
           : '',
@@ -910,54 +1217,55 @@
     validate(data) {
       const issues = [];
       const mode = getMode();
-      const jenis = toUpper(data.jenis_sasaran);
+      const jenis = toUpper(data.answers.jenis_sasaran);
+      const answers = this.getCurrentAnswersMap();
 
       if (mode === 'edit' && !isRequired(data.id_sasaran)) {
         issues.push({ type: 'error', text: 'ID sasaran tidak ditemukan untuk proses edit.' });
       }
 
-      if (!isRequired(data.jenis_sasaran)) {
+      if (!isRequired(data.answers.jenis_sasaran)) {
         issues.push({ type: 'error', text: 'Jenis sasaran wajib dipilih.' });
       }
 
-      if (!isRequired(data.nama_sasaran)) {
+      if (!isRequired(data.answers.nama_sasaran)) {
         issues.push({ type: 'error', text: 'Nama sasaran wajib diisi.' });
       }
 
-      if (!isNikOrKK16(data.nik)) {
+      if (!isNikOrKK16(data.answers.nik_sasaran)) {
         issues.push({ type: 'error', text: 'NIK harus 16 digit angka.' });
       }
 
-      if (!isNikOrKK16(data.nomor_kk)) {
+      if (!isNikOrKK16(data.answers.nomor_kk)) {
         issues.push({ type: 'error', text: 'Nomor KK harus 16 digit angka.' });
       }
 
-      if (data.nik === PLACEHOLDER_16) {
+      if (data.answers.nik_sasaran === PLACEHOLDER_16) {
         issues.push({ type: 'warn', text: 'NIK menggunakan placeholder 16 digit angka 9.' });
       }
 
-      if (data.nomor_kk === PLACEHOLDER_16) {
+      if (data.answers.nomor_kk === PLACEHOLDER_16) {
         issues.push({ type: 'warn', text: 'Nomor KK menggunakan placeholder 16 digit angka 9.' });
       }
 
-      if (!isRequired(data.jenis_kelamin)) {
+      if (!isRequired(data.answers.jenis_kelamin)) {
         issues.push({ type: 'warn', text: 'Jenis kelamin belum dipilih.' });
       }
 
-      if (!isRequired(data.tanggal_lahir)) {
+      if (!isRequired(data.answers.tanggal_lahir)) {
         issues.push({ type: 'error', text: 'Tanggal lahir wajib diisi.' });
-      } else if (!isDateNotFuture(data.tanggal_lahir)) {
+      } else if (!isDateNotFuture(data.answers.tanggal_lahir)) {
         issues.push({ type: 'error', text: 'Tanggal lahir tidak boleh melebihi hari ini.' });
       } else {
-        const ageYears = calcAgeYears(data.tanggal_lahir);
-        const ageMonths = calcAgeMonths(data.tanggal_lahir);
+        const ageYears = calcAgeYears(data.answers.tanggal_lahir);
+        const ageMonths = calcAgeMonths(data.answers.tanggal_lahir);
 
         if (jenis === 'BADUTA' && ageMonths != null && ageMonths > 24) {
           issues.push({ type: 'error', text: 'Usia BADUTA tidak boleh lebih dari 24 bulan.' });
         }
 
         if (jenis === 'BUMIL' || jenis === 'BUFAS') {
-          if (data.jenis_kelamin && toUpper(data.jenis_kelamin) !== 'P') {
+          if (toUpper(data.answers.jenis_kelamin) !== 'P') {
             issues.push({ type: 'error', text: `${jenis} wajib berjenis kelamin Perempuan.` });
           }
           if (ageYears != null && ageYears > 55) {
@@ -966,34 +1274,56 @@
         }
       }
 
-      if (!isRequired(data.nama_kecamatan)) {
+      if (!isRequired(data.answers.nama_kecamatan)) {
         issues.push({ type: 'warn', text: 'Kecamatan belum terisi.' });
       }
 
-      if (!isRequired(data.nama_desa)) {
+      if (!isRequired(data.answers.desa_kelurahan)) {
         issues.push({ type: 'warn', text: 'Desa/Kelurahan belum terisi.' });
       }
 
-      if (!isRequired(data.nama_dusun)) {
+      if (!isRequired(data.answers.dusun_rw)) {
         issues.push({ type: 'warn', text: 'Dusun/RW belum terisi.' });
       }
 
-      if (!isRequired(data.alamat)) {
+      if (!isRequired(data.answers.alamat)) {
         issues.push({ type: 'warn', text: 'Alamat lengkap belum terisi.' });
       }
 
-      const extra = data.extra_fields || {};
-      if (isRequired(extra.sumber_air_minum_utama) && extra.sumber_air_minum_utama === 'LAINNYA' && !isRequired(extra.sumber_air_minum_utama_lainnya)) {
-        issues.push({ type: 'error', text: 'Sumber air minum lainnya wajib diisi.' });
-      }
+      this._dynamicQuestions.forEach((question) => {
+        const visible = this.isQuestionVisible(question, answers);
+        const required = visible && this.isQuestionRequired(question, answers);
+        const value = firstNonEmpty(answers[question.code]);
 
-      if (isRequired(extra.fasilitas_bab) && extra.fasilitas_bab === 'YA_LAINNYA' && !isRequired(extra.fasilitas_bab_lainnya)) {
-        issues.push({ type: 'error', text: 'Fasilitas BAB lainnya wajib diisi.' });
-      }
+        if (required && !isRequired(value)) {
+          issues.push({
+            type: 'error',
+            text: `${question.label} wajib diisi.`
+          });
+        }
 
-      if (jenis === 'BADUTA' && !isRequired(extra.nama_ibu_kandung)) {
-        issues.push({ type: 'error', text: 'Nama ibu kandung wajib diisi untuk BADUTA.' });
-      }
+        if (!visible) return;
+
+        if (question.code === 'sumber_air_minum_utama_lainnya' && toUpper(answers.sumber_air_minum_utama) === 'LAINNYA' && !isRequired(value)) {
+          issues.push({ type: 'error', text: 'Sumber air minum lainnya wajib diisi.' });
+        }
+
+        if (question.code === 'fasilitas_bab_lainnya' && toUpper(answers.fasilitas_bab) === 'YA_LAINNYA' && !isRequired(value)) {
+          issues.push({ type: 'error', text: 'Fasilitas BAB lainnya wajib diisi.' });
+        }
+
+        if (question.code === 'nama_ibu_kandung' && jenis === 'BADUTA' && !isRequired(value)) {
+          issues.push({ type: 'error', text: 'Nama ibu kandung wajib diisi untuk BADUTA.' });
+        }
+
+        if ((question.field_type === 'number' || question.data_type === 'integer' || question.data_type === 'decimal') && isRequired(value) && Number.isNaN(Number(value))) {
+          issues.push({ type: 'error', text: `${question.label} harus berupa angka.` });
+        }
+
+        if ((question.field_type === 'date' || question.data_type === 'date') && isRequired(value) && !isDateNotFuture(value)) {
+          issues.push({ type: 'error', text: `${question.label} tidak boleh melebihi hari ini.` });
+        }
+      });
 
       if (!issues.some((item) => item.type === 'error')) {
         issues.push({
@@ -1018,7 +1348,7 @@
         <ul class="validation-list">
           ${issues.map((issue) => `
             <li class="validation-item-${issue.type}">
-              ${issue.text}
+              ${escapeHtml(issue.text)}
             </li>
           `).join('')}
         </ul>
@@ -1033,9 +1363,21 @@
       const draft = loadDraftLocal();
       if (!draft || !draft.data) return;
 
-      this.fillForm(draft.data);
+      const draftData = draft.data;
+      const answers = draftData.answers || {};
 
-      const jenis = draft.data.jenis_sasaran || '';
+      uiSetValue('reg-jenis-sasaran', firstNonEmpty(answers.jenis_sasaran, draftData.jenis_sasaran));
+      uiSetValue('reg-nama-sasaran', firstNonEmpty(answers.nama_sasaran, draftData.nama_sasaran));
+      uiSetValue('reg-nik', firstNonEmpty(answers.nik_sasaran, draftData.nik_sasaran, draftData.nik));
+      uiSetValue('reg-no-kk', firstNonEmpty(answers.nomor_kk, draftData.nomor_kk));
+      uiSetValue('reg-jenis-kelamin', firstNonEmpty(answers.jenis_kelamin, draftData.jenis_kelamin));
+      uiSetValue('reg-tanggal-lahir', firstNonEmpty(answers.tanggal_lahir, draftData.tanggal_lahir));
+      uiSetValue('reg-kecamatan', firstNonEmpty(answers.nama_kecamatan, answers.kecamatan, draftData.nama_kecamatan));
+      uiSetValue('reg-desa', firstNonEmpty(answers.desa_kelurahan, draftData.nama_desa, draftData.desa_kelurahan));
+      uiSetValue('reg-dusun', firstNonEmpty(answers.dusun_rw, draftData.nama_dusun, draftData.dusun_rw));
+      uiSetValue('reg-alamat', firstNonEmpty(answers.alamat, draftData.alamat));
+
+      const jenis = firstNonEmpty(answers.jenis_sasaran, draftData.jenis_sasaran);
       if (!jenis) {
         this.renderValidation();
         return;
@@ -1043,7 +1385,8 @@
 
       this.loadDynamicFields(jenis)
         .then(() => {
-          this.fillDynamicFields({ extra_fields: draft.data.extra_fields || {} });
+          this.fillDynamicFields(answers);
+          this.applyGenderLockByJenis();
           this.renderValidation();
         })
         .catch(() => {
@@ -1062,50 +1405,21 @@
       this.renderValidation();
     },
 
-    buildPayload(data, mode, editItem) {
-      if (window.FormMapper && isFunction(window.FormMapper.buildPayload)) {
-        return window.FormMapper.buildPayload(data, mode, editItem || {});
-      }
+    buildPayload(data, mode) {
+      const payload = {
+        form_id: data.form_id || mapJenisToFormId(data.answers.jenis_sasaran),
+        jenis_sasaran: data.answers.jenis_sasaran,
+        answers: Object.assign({}, data.answers),
+        sync_source: 'ONLINE'
+      };
 
       if (mode === 'edit') {
-        return {
-          id_sasaran: firstNonEmpty(data.id_sasaran, editItem.id_sasaran, editItem.id),
-          jenis_sasaran: data.jenis_sasaran,
-          nama_sasaran: data.nama_sasaran,
-          nik: data.nik,
-          nomor_kk: data.nomor_kk,
-          jenis_kelamin: data.jenis_kelamin,
-          tanggal_lahir: data.tanggal_lahir,
-          nama_kecamatan: data.nama_kecamatan,
-          nama_desa: data.nama_desa,
-          nama_dusun: data.nama_dusun,
-          alamat: data.alamat,
-          extra_fields: data.extra_fields,
-          sync_source: 'ONLINE'
-        };
+        payload.id_sasaran = data.id_sasaran;
+      } else {
+        payload.client_submit_id = data.client_submit_id;
       }
 
-      return {
-        jenis_sasaran: data.jenis_sasaran,
-        form_id: window.FormMapper && isFunction(window.FormMapper.getFormIdByJenis)
-          ? window.FormMapper.getFormIdByJenis(data.jenis_sasaran)
-          : '',
-        nama_sasaran: data.nama_sasaran,
-        nik: data.nik,
-        nomor_kk: data.nomor_kk,
-        jenis_kelamin: data.jenis_kelamin,
-        tanggal_lahir: data.tanggal_lahir,
-        nama_kecamatan: data.nama_kecamatan,
-        nama_desa: data.nama_desa,
-        nama_dusun: data.nama_dusun,
-        alamat: data.alamat,
-        id_tim: data.id_tim,
-        nama_tim: data.nama_tim,
-        id_wilayah: data.id_wilayah,
-        client_submit_id: data.client_submit_id,
-        sync_source: 'ONLINE',
-        extra_fields: data.extra_fields
-      };
+      return payload;
     },
 
     async submit() {
@@ -1122,7 +1436,7 @@
         return;
       }
 
-      const payload = this.buildPayload(data, mode, editItem);
+      const payload = this.buildPayload(data, mode);
       uiSetLoading('btn-submit-registrasi', true, mode === 'edit' ? 'Menyimpan...' : 'Mengirim...');
 
       try {
@@ -1132,25 +1446,36 @@
         }
 
         if (!navigator.onLine && mode === 'create') {
-          enqueueOfflineRegistrasi(payload);
-          saveDraftLocal(payload);
-          notify('Sedang offline. Registrasi disimpan ke draft sinkronisasi.');
+          const queued = enqueueOfflineRegistrasi(payload);
+          if (queued) {
+            saveDraftLocal(payload);
+            notify('Sedang offline. Registrasi disimpan ke draft sinkronisasi.');
+          } else {
+            notify('Gagal menyimpan draft registrasi offline.');
+          }
           return;
         }
 
-        if (!window.RegistrasiService) {
-          throw new Error('RegistrasiService belum tersedia.');
-        }
+        let result = null;
 
-        const action = mode === 'edit' ? 'updateSasaran' : 'submitRegistrasi';
-        if (!isFunction(window.RegistrasiService[action])) {
-          throw new Error(`Method RegistrasiService.${action} tidak ditemukan.`);
+        if (mode === 'edit') {
+          if (window.RegistrasiService && isFunction(window.RegistrasiService.updateSasaran)) {
+            result = await window.RegistrasiService.updateSasaran(payload);
+          } else {
+            result = await callApi('updateSasaran', payload);
+          }
+        } else {
+          if (window.RegistrasiService && isFunction(window.RegistrasiService.registerSasaran)) {
+            result = await window.RegistrasiService.registerSasaran(payload);
+          } else if (window.RegistrasiService && isFunction(window.RegistrasiService.submitRegistrasi)) {
+            result = await window.RegistrasiService.submitRegistrasi(payload);
+          } else {
+            result = await callApi('registerSasaran', payload);
+          }
         }
-
-        const result = await window.RegistrasiService[action](payload);
 
         if (!result || result.ok !== true) {
-          throw new Error((result && result.message) || 'Gagal menyimpan data sasaran.');
+          throw new Error(extractErrorMessage(result, 'Gagal menyimpan data sasaran.'));
         }
 
         clearDraftLocal();
@@ -1179,14 +1504,10 @@
           } else {
             goToSasaranList();
           }
-          notify('Perubahan data sasaran berhasil disimpan.');
+          notify('Perubahan data sasaran berhasil disimpan.', 'success');
         } else {
           goToSasaranList();
-          if (result && result.data && result.data.duplicate) {
-            notify('Registrasi sasaran sudah pernah tersimpan sebelumnya.');
-          } else {
-            notify('Registrasi sasaran berhasil disimpan.');
-          }
+          notify('Registrasi sasaran berhasil disimpan.', 'success');
         }
       } catch (err) {
         if (mode === 'create') {
