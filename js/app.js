@@ -22,7 +22,7 @@
     }
 
     try {
-      const registration = await navigator.serviceWorker.register('./sw.js');
+      var registration = await navigator.serviceWorker.register('./sw.js');
       log('Service worker registered:', registration.scope || './sw.js');
       return registration;
     } catch (err) {
@@ -55,19 +55,30 @@
     }
   }
 
-  async function init() {
+  function scheduleBackgroundTasks() {
+    function run() {
+      registerServiceWorker();
+    }
+
+    if (typeof window.requestIdleCallback === 'function') {
+      window.requestIdleCallback(run, { timeout: 4000 });
+      return;
+    }
+
+    window.setTimeout(run, 1200);
+  }
+
+  function init() {
     if (hasInitialized) return;
     hasInitialized = true;
 
     log('app.js loaded');
 
-    // Jalankan aplikasi dulu agar splash/login tidak menunggu SW
-    startApplication();
-
-    // Service worker didaftarkan di belakang layar
     Promise.resolve().then(function () {
-      return registerServiceWorker();
+      return startApplication();
     });
+
+    scheduleBackgroundTasks();
   }
 
   if (document.readyState === 'loading') {
