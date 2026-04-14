@@ -3,13 +3,14 @@
 
   const APP_CONFIG = {
     APP_NAME: 'TPK KABUPATEN BULELENG',
-    APP_VERSION: '2.1.1',
+    APP_VERSION: '2.1.2',
 
     API_BASE_URL: 'https://script.google.com/macros/s/AKfycbwZiCcv7MCL21R1VqlOFsx1x_Ax_8yoxVwjIumG3kVYwDSQTfXX9VjQnz2GsAW2ItzAAQ/exec',
     API_TIMEOUT_MS: 30000,
 
     ASSETS: {
-      LOGO_URL: './assets/img/logo.png'
+      LOGO_URL: './assets/img/logo.png',
+      LOGO_192_URL: './assets/img/logo-192.png'
     },
 
     STORAGE_KEYS: {
