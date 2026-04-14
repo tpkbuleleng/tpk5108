@@ -17,15 +17,20 @@
     safeConsole('log', arguments);
   }
 
-  function warn() {
-    safeConsole('warn', arguments);
-  }
-
   function getConfig() {
     if (!window.APP_CONFIG) {
       throw new Error('APP_CONFIG belum tersedia.');
     }
     return window.APP_CONFIG;
+  }
+
+  function getActions() {
+    return getConfig().API_ACTIONS || {};
+  }
+
+  function getActionName(actionKey, fallbackAction) {
+    var actions = getActions();
+    return actions[actionKey] || fallbackAction || actionKey || '';
   }
 
   function getStorage() {
@@ -353,9 +358,7 @@
       return createNetworkError('Action API wajib diisi.');
     }
 
-    var queryParams = Object.assign({}, params || {}, {
-      action: action
-    });
+    var queryParams = Object.assign({}, params || {}, { action: action });
 
     if (opts.includeAuth !== false) {
       var token = opts.sessionToken || getSessionToken();
@@ -397,8 +400,7 @@
   }
 
   async function healthCheck() {
-    var config = getConfig();
-    return get(config.API_ACTIONS.HEALTH_CHECK, {}, { includeAuth: false });
+    return get(getActionName('HEALTH_CHECK', 'healthCheck'), {}, { includeAuth: false });
   }
 
   async function login(payload) {
@@ -413,7 +415,7 @@
       data.app_version = config.APP_VERSION || '';
     }
 
-    var result = await post(config.API_ACTIONS.LOGIN, data, {
+    var result = await post(getActionName('LOGIN', 'login'), data, {
       includeAuth: false
     });
 
@@ -425,13 +427,54 @@
   }
 
   async function logout(payload) {
-    var config = getConfig();
-    var result = await post(config.API_ACTIONS.LOGOUT, payload || {}, {
+    var result = await post(getActionName('LOGOUT', 'logout'), payload || {}, {
       includeAuth: true
     });
 
     clearSessionToken();
     return result;
+  }
+
+  async function validateSession(payload) {
+    return post(getActionName('VALIDATE_SESSION', 'validateSession'), payload || {}, {
+      includeAuth: true,
+      timeoutMs: 15000
+    });
+  }
+
+  async function bootstrapSession(payload) {
+    return post(getActionName('BOOTSTRAP_SESSION', 'bootstrapSession'), payload || {}, {
+      includeAuth: true,
+      timeoutMs: 20000
+    });
+  }
+
+  async function refreshBootstrapLite(payload) {
+    return post(getActionName('REFRESH_BOOTSTRAP_LITE', 'refreshBootstrapLite'), payload || {}, {
+      includeAuth: true,
+      timeoutMs: 20000
+    });
+  }
+
+  async function getMyProfileLite(payload) {
+    return post(getActionName('GET_MY_PROFILE_LITE', 'getMyProfileLite'), payload || {}, {
+      includeAuth: true,
+      timeoutMs: 15000
+    });
+  }
+
+  async function getDashboardSummaryLite(payload) {
+    return post(getActionName('GET_DASHBOARD_SUMMARY_LITE', 'getDashboardSummaryLite'), payload || {}, {
+      includeAuth: true,
+      timeoutMs: 20000
+    });
+  }
+
+  async function getAppBootstrapRef(payload) {
+    return post(getActionName('GET_APP_BOOTSTRAP_REF', 'getAppBootstrapRef'), payload || {}, {
+      includeAuth: false,
+      timeoutMs: 20000
+    });
   }
 
   async function reportClientError(message, extraPayload) {
@@ -444,7 +487,7 @@
       occurred_at: nowIso()
     }, extraPayload || {});
 
-    return post(config.API_ACTIONS.LOG_CLIENT_ERROR, payload, {
+    return post(getActionName('LOG_CLIENT_ERROR', 'logClientError'), payload, {
       includeAuth: true,
       timeoutMs: 12000
     });
@@ -452,6 +495,7 @@
 
   var Api = {
     getBaseUrl: getApiBaseUrl,
+    getActionName: getActionName,
     getDeviceId: getOrCreateDeviceId,
     getSessionToken: getSessionToken,
     setSessionToken: setSessionToken,
@@ -463,6 +507,12 @@
     healthCheck: healthCheck,
     login: login,
     logout: logout,
+    validateSession: validateSession,
+    bootstrapSession: bootstrapSession,
+    refreshBootstrapLite: refreshBootstrapLite,
+    getMyProfileLite: getMyProfileLite,
+    getDashboardSummaryLite: getDashboardSummaryLite,
+    getAppBootstrapRef: getAppBootstrapRef,
     reportClientError: reportClientError
   };
 
