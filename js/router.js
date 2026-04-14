@@ -38,7 +38,6 @@
   };
 
   var scriptPromises = {};
-  var hasScheduledWarmup = false;
 
   function getAppState() {
     return window.AppState || null;
@@ -254,30 +253,6 @@
     }
   }
 
-  function scheduleWarmupAfterDashboard() {
-    if (hasScheduledWarmup) return;
-    hasScheduledWarmup = true;
-
-    var warmRoutes = ['sasaranList', 'sasaranDetail', 'registrasi', 'pendampingan', 'sync', 'rekapKader'];
-
-    function runWarmup() {
-      warmRoutes.forEach(function (routeName, index) {
-        window.setTimeout(function () {
-          ensureRouteAssets(routeName).catch(function (err) {
-            console.warn('Warmup route gagal:', routeName, err && err.message ? err.message : err);
-          });
-        }, index * 250);
-      });
-    }
-
-    if (typeof window.requestIdleCallback === 'function') {
-      window.requestIdleCallback(runWarmup, { timeout: 2500 });
-      return;
-    }
-
-    window.setTimeout(runWarmup, 1500);
-  }
-
   function afterRouteChange(routeName, screenId, token, options) {
     var opts = options || {};
 
@@ -301,10 +276,6 @@
 
         if (typeof opts.onRouteReady === 'function') {
           opts.onRouteReady({ route: routeName, screenId: screenId });
-        }
-
-        if (routeName === 'dashboard') {
-          scheduleWarmupAfterDashboard();
         }
       })
       .catch(function (err) {
