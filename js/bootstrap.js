@@ -58,6 +58,12 @@
     };
   }
 
+  function setText(id, value) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = (value === undefined || value === null || value === '') ? '-' : String(value);
+  }
+
   function setTextAliases(ids, value) {
     (ids || []).forEach(function(id) {
       setText(id, value);
