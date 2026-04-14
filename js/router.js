@@ -13,6 +13,33 @@
     rekapKader: 'rekap-kader-screen'
   };
 
+  var ROUTE_ASSET_MAP = {
+    dashboard: [
+      { src: './js/views/dashboardView.js', globalName: 'DashboardView' }
+    ],
+    sasaranList: [
+      { src: './js/views/sasaranListView.js?v=20260412-01', globalName: 'SasaranListView' }
+    ],
+    sasaranDetail: [
+      { src: './js/views/sasaranDetailView.js?v=20260412-01', globalName: 'SasaranDetailView' }
+    ],
+    registrasi: [
+      { src: './js/views/registrasiView.js?v=20260411-03', globalName: 'RegistrasiView' }
+    ],
+    pendampingan: [
+      { src: './js/views/pendampinganView.js?v=20260412-01', globalName: 'PendampinganView' }
+    ],
+    sync: [
+      { src: './js/views/syncView.js', globalName: 'SyncView' }
+    ],
+    rekapKader: [
+      { src: './js/views/rekapKaderView.js', globalName: 'RekapKaderView' }
+    ]
+  };
+
+  var scriptPromises = {};
+  var hasScheduledWarmup = false;
+
   function getAppState() {
     return window.AppState || null;
   }
@@ -78,10 +105,104 @@
   function updateCurrentRoute(routeName, screenId) {
     Router.currentRoute = routeName || '';
     Router.currentScreenId = screenId || '';
+    Router.routeToken += 1;
 
     var appState = getAppState();
     if (appState && typeof appState.setCurrentRoute === 'function') {
       appState.setCurrentRoute(routeName || '');
+    }
+
+    return Router.routeToken;
+  }
+
+  function getRouteAssets(routeName) {
+    return ROUTE_ASSET_MAP[routeName] || [];
+  }
+
+  function isGlobalReady(globalName) {
+    return !!(globalName && window[globalName]);
+  }
+
+  function hasScriptTag(src) {
+    return !!document.querySelector('script[data-lazy-src="' + src.replace(/"/g, '\\"') + '"]');
+  }
+
+  function loadScriptOnce(src, globalName) {
+    if (!src) return Promise.resolve();
+
+    if (isGlobalReady(globalName)) {
+      return Promise.resolve();
+    }
+
+    if (scriptPromises[src]) {
+      return scriptPromises[src];
+    }
+
+    if (hasScriptTag(src) && !scriptPromises[src]) {
+      scriptPromises[src] = new Promise(function (resolve) {
+        var tries = 0;
+        function waitUntilReady() {
+          tries += 1;
+          if (isGlobalReady(globalName) || tries > 40) {
+            resolve();
+            return;
+          }
+          window.setTimeout(waitUntilReady, 100);
+        }
+        waitUntilReady();
+      });
+      return scriptPromises[src];
+    }
+
+    scriptPromises[src] = new Promise(function (resolve, reject) {
+      var script = document.createElement('script');
+      script.src = src;
+      script.async = true;
+      script.defer = true;
+      script.dataset.lazySrc = src;
+
+      script.onload = function () {
+        resolve();
+      };
+
+      script.onerror = function () {
+        reject(new Error('Gagal memuat script: ' + src));
+      };
+
+      document.body.appendChild(script);
+    });
+
+    return scriptPromises[src];
+  }
+
+  function ensureRouteAssets(routeName) {
+    var assets = getRouteAssets(routeName);
+    if (!assets.length) {
+      return Promise.resolve();
+    }
+
+    return Promise.all(assets.map(function (asset) {
+      return loadScriptOnce(asset.src, asset.globalName);
+    }));
+  }
+
+  function invokeDefaultRouteReady(routeName) {
+    try {
+      if (routeName === 'sasaranList' && window.SasaranListView && typeof window.SasaranListView.load === 'function') {
+        window.SasaranListView.load();
+        return;
+      }
+
+      if (routeName === 'sync' && window.SyncView && typeof window.SyncView.refresh === 'function') {
+        window.SyncView.refresh();
+        return;
+      }
+
+      if (routeName === 'rekapKader' && window.RekapKaderView && typeof window.RekapKaderView.load === 'function') {
+        window.RekapKaderView.load();
+      }
+    } catch (err) {
+      console.error('Gagal menjalankan route ready hook:', routeName, err);
     }
   }
 
@@ -133,10 +254,32 @@
     }
   }
 
-  function afterRouteChange(routeName, screenId, options) {
-    var opts = options || {};
+  function scheduleWarmupAfterDashboard() {
+    if (hasScheduledWarmup) return;
+    hasScheduledWarmup = true;
 
-    tryInitView(routeName, screenId);
+    var warmRoutes = ['sasaranList', 'sasaranDetail', 'registrasi', 'pendampingan', 'sync', 'rekapKader'];
+
+    function runWarmup() {
+      warmRoutes.forEach(function (routeName, index) {
+        window.setTimeout(function () {
+          ensureRouteAssets(routeName).catch(function (err) {
+            console.warn('Warmup route gagal:', routeName, err && err.message ? err.message : err);
+          });
+        }, index * 250);
+      });
+    }
+
+    if (typeof window.requestIdleCallback === 'function') {
+      window.requestIdleCallback(runWarmup, { timeout: 2500 });
+      return;
+    }
+
+    window.setTimeout(runWarmup, 1500);
+  }
+
+  function afterRouteChange(routeName, screenId, token, options) {
+    var opts = options || {};
 
     if (opts.scrollToTop !== false) {
       try {
@@ -146,14 +289,33 @@
       }
     }
 
-    if (typeof opts.onAfterRoute === 'function') {
-      opts.onAfterRoute({ route: routeName, screenId: screenId });
-    }
+    Promise.resolve()
+      .then(function () {
+        return ensureRouteAssets(routeName);
+      })
+      .then(function () {
+        if (token !== Router.routeToken) return;
+
+        tryInitView(routeName, screenId);
+        invokeDefaultRouteReady(routeName);
+
+        if (typeof opts.onRouteReady === 'function') {
+          opts.onRouteReady({ route: routeName, screenId: screenId });
+        }
+
+        if (routeName === 'dashboard') {
+          scheduleWarmupAfterDashboard();
+        }
+      })
+      .catch(function (err) {
+        console.error('Gagal memuat asset route:', routeName, err);
+      });
   }
 
   var Router = {
     currentRoute: '',
     currentScreenId: '',
+    routeToken: 0,
     routes: Object.freeze(Object.assign({}, ROUTE_MAP)),
 
     go: function (routeName, options) {
@@ -171,9 +333,22 @@
         return false;
       }
 
-      updateCurrentRoute(normalizedRoute, screenId);
-      afterRouteChange(normalizedRoute, screenId, options);
+      var token = updateCurrentRoute(normalizedRoute, screenId);
+      afterRouteChange(normalizedRoute, screenId, token, options);
       return true;
+    },
+
+    ensureRouteAssets: function (routeName) {
+      return ensureRouteAssets(normalizeRouteName(routeName));
+    },
+
+    preloadRoutes: function (routeNames) {
+      var routes = Array.isArray(routeNames) ? routeNames : [];
+      routes.forEach(function (routeName) {
+        ensureRouteAssets(normalizeRouteName(routeName)).catch(function (err) {
+          console.warn('Preload route gagal:', routeName, err && err.message ? err.message : err);
+        });
+      });
     },
 
     getCurrentRoute: function () {
