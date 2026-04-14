@@ -204,47 +204,6 @@
     el.textContent = value == null || value === '' ? '-' : String(value);
   }
 
-
-  function normalizeDisplayText(value) {
-    var text = String(value == null ? '' : value).replace(/\s+/g, ' ').trim();
-    if (!text) return '';
-    var upper = text.toUpperCase();
-    if (upper === '-' || upper === 'NULL' || upper === 'UNDEFINED' || upper === 'N/A' || upper === 'NA') {
-      return '';
-    }
-    return text;
-  }
-
-  function parseWilayahDisplay(profile) {
-    var data = profile || {};
-    var wilayah = normalizeDisplayText(data.wilayah_tugas || data.wilayah || '');
-    var desa = normalizeDisplayText(data.desa_kelurahan || data.nama_desa || data.desa || '');
-    var dusun = normalizeDisplayText(data.dusun_rw || data.nama_dusun || data.dusun || '');
-    var kecamatan = normalizeDisplayText(data.nama_kecamatan || data.kecamatan || '');
-
-    if (wilayah) {
-      var parts = wilayah.split(/\s*,\s*/).map(function(part) {
-        return String(part || '').trim();
-      }).filter(Boolean);
-
-      if (!kecamatan && parts[0]) kecamatan = parts[0];
-      if (!desa && parts[1]) desa = parts[1];
-      if (!dusun && parts.length > 2) dusun = parts.slice(2).join(', ');
-    }
-
-    return {
-      kecamatan: kecamatan || '-',
-      desa: desa || '-',
-      dusun: dusun || '-'
-    };
-  }
-
-  function setTextAliases(ids, value) {
-    (ids || []).forEach(function(id) {
-      setText(id, value);
-    });
-  }
-
   function setValue(id, value) {
     var el = byId(id);
     if (!el) return;
@@ -323,56 +282,22 @@
     return data.id_tim || '-';
   }
 
-  function getBootstrapLiteKey() {
-    if (window.Storage && typeof window.Storage.getBootstrapLiteKey === 'function') {
-      return window.Storage.getBootstrapLiteKey();
-    }
-    return 'tpk_bootstrap_lite';
-  }
-
-  function getBootstrapLite() {
-    var storage = getStorage();
-    if (storage && typeof storage.getBootstrapLite === 'function') {
-      return storage.getBootstrapLite({}) || {};
-    }
-    if (storage && typeof storage.get === 'function') {
-      return storage.get(getBootstrapLiteKey(), {}) || {};
-    }
-    return {};
-  }
-
-  function persistBootstrapLite(data) {
-    var storage = getStorage();
-    var payload = data && typeof data === 'object' ? data : {};
-
-    if (storage && typeof storage.setBootstrapLite === 'function') {
-      storage.setBootstrapLite(payload);
-      return;
-    }
-
-    if (storage && typeof storage.set === 'function') {
-      storage.set(getBootstrapLiteKey(), payload);
-    }
-  }
-
   function getProfile() {
     var state = getState();
-    var profileFromState = {};
     if (state && typeof state.getProfile === 'function') {
-      profileFromState = state.getProfile() || {};
+      var profileFromState = state.getProfile();
       if (profileFromState && Object.keys(profileFromState).length) {
-        return mergeProfilePayload((getBootstrapLite().profile || {}), {}, profileFromState);
+        return profileFromState;
       }
     }
 
     var storage = getStorage();
     var keys = getStorageKeys();
-    var storageProfile = {};
     if (storage && typeof storage.get === 'function' && keys.PROFILE) {
-      storageProfile = storage.get(keys.PROFILE, {}) || {};
+      return storage.get(keys.PROFILE, {}) || {};
     }
 
-    return mergeProfilePayload((getBootstrapLite().profile || {}), {}, storageProfile);
+    return {};
   }
 
   function persistProfile(profile) {
@@ -518,68 +443,24 @@
     });
   }
 
-
-  function setAnyText(ids, value) {
-    var list = Array.isArray(ids) ? ids : [ids];
-    list.forEach(function (id) {
-      setText(id, value);
-    });
-  }
-
-  function getDashboardLiteSummary() {
-    var bootstrapLite = getBootstrapLite();
-    return bootstrapLite && bootstrapLite.dashboard ? bootstrapLite.dashboard : {};
-  }
-
-  function applyDashboardSummaryLite(summary) {
-    var data = summary || {};
-
-    setAnyText(['dashboard-total-sasaran', 'stat-total-sasaran', 'summary-total-sasaran'], data.total_sasaran);
-    setAnyText(['dashboard-total-sasaran-aktif', 'stat-total-sasaran-aktif', 'summary-total-sasaran-aktif'], data.total_sasaran_aktif != null ? data.total_sasaran_aktif : data.total_sasaran);
-    setAnyText(['dashboard-total-pendampingan', 'stat-total-pendampingan', 'summary-total-pendampingan'], data.total_pendampingan_bulan_ini);
-    setAnyText(['dashboard-total-sudah-didampingi', 'stat-total-sudah-didampingi', 'summary-total-sudah-didampingi'], data.total_sasaran_sudah_didampingi);
-    setAnyText(['dashboard-total-belum-didampingi', 'stat-total-belum-didampingi', 'summary-total-belum-didampingi'], data.total_sasaran_belum_didampingi);
-    setAnyText(['dashboard-periode-key', 'summary-periode-key'], data.periode_key || '-');
-  }
-
-  function applyBootstrapLite(bootstrapLite) {
-    var payload = bootstrapLite && typeof bootstrapLite === 'object' ? bootstrapLite : {};
-    var currentProfile = getProfile();
-    var mergedProfile = mergeProfilePayload(currentProfile, {}, payload.profile || {});
-
-    if (payload && Object.keys(payload).length) {
-      persistBootstrapLite(payload);
-    }
-
-    if (mergedProfile && Object.keys(mergedProfile).length) {
-      persistProfile(mergedProfile);
-      applyDashboardProfile(mergedProfile);
-      fillProfileForm(mergedProfile);
-      renderMenu(mergedProfile.role_akses || mergedProfile.role || 'KADER');
-    }
-
-    applyDashboardSummaryLite(payload.dashboard || {});
-  }
-
   function applyDashboardProfile(profile) {
     var data = profile || {};
-    var wilayah = parseWilayahDisplay(data);
 
     setText('profile-nama', data.nama_kader || data.nama_user || data.nama || '-');
     setText('profile-unsur', data.unsur_tpk || data.unsur || '-');
     setText('profile-id', data.id_user || '-');
     setText('profile-tim', getDisplayNomorTim(data));
-    setTextAliases(['profile-desa', 'wilayah-desa', 'profile-desa-value'], wilayah.desa);
-    setTextAliases(['profile-dusun', 'wilayah-dusun', 'profile-dusun-value'], wilayah.dusun);
-    setTextAliases(['header-kecamatan', 'profile-kecamatan', 'wilayah-kecamatan'], wilayah.kecamatan);
+    setText('profile-desa', data.desa_kelurahan || data.nama_desa || '-');
+    setText('profile-dusun', data.dusun_rw || data.nama_dusun || '-');
+    setText('header-kecamatan', data.nama_kecamatan || data.kecamatan || '-');
 
     setText('modal-profile-nama', data.nama_kader || data.nama_user || data.nama || '-');
     setText('modal-profile-id', data.id_user || '-');
     setText('modal-profile-unsur', data.unsur_tpk || data.unsur || '-');
     setText('modal-profile-tim', getDisplayNomorTim(data));
-    setText('modal-profile-kecamatan', wilayah.kecamatan);
-    setText('modal-profile-desa', wilayah.desa);
-    setText('modal-profile-dusun', wilayah.dusun);
+    setText('modal-profile-kecamatan', data.nama_kecamatan || data.kecamatan || '-');
+    setText('modal-profile-desa', data.desa_kelurahan || data.nama_desa || '-');
+    setText('modal-profile-dusun', data.dusun_rw || data.nama_dusun || '-');
     setText('modal-profile-status-kader', data.status_kader_tpk || '-');
     setText('modal-profile-nomor-wa', formatPhone(data.nomor_wa));
     setText('modal-profile-bpjstk', formatFlag(data.memiliki_bpjstk || data.status_bpjstk));
@@ -994,15 +875,23 @@
       return;
     }
 
-    go('registrasi');
+    go('registrasi', {
+      onRouteReady: function () {
+        if (window.RegistrasiView && typeof window.RegistrasiView.openCreate === 'function') {
+          window.RegistrasiView.openCreate();
+        }
+      }
+    });
   }
 
   function openSasaranList() {
-    go('sasaranList');
-
-    if (window.SasaranListView && typeof window.SasaranListView.load === 'function') {
-      window.SasaranListView.load();
-    }
+    go('sasaranList', {
+      onRouteReady: function () {
+        if (window.SasaranListView && typeof window.SasaranListView.load === 'function') {
+          window.SasaranListView.load();
+        }
+      }
+    });
   }
 
   function openPendampinganEntry() {
@@ -1011,19 +900,23 @@
   }
 
   function openSyncScreen() {
-    go('sync');
-
-    if (window.SyncView && typeof window.SyncView.refresh === 'function') {
-      window.SyncView.refresh();
-    }
+    go('sync', {
+      onRouteReady: function () {
+        if (window.SyncView && typeof window.SyncView.refresh === 'function') {
+          window.SyncView.refresh();
+        }
+      }
+    });
   }
 
   function openRekapKader() {
-    go('rekapKader');
-
-    if (window.RekapKaderView && typeof window.RekapKaderView.load === 'function') {
-      window.RekapKaderView.load();
-    }
+    go('rekapKader', {
+      onRouteReady: function () {
+        if (window.RekapKaderView && typeof window.RekapKaderView.load === 'function') {
+          window.RekapKaderView.load();
+        }
+      }
+    });
   }
 
   async function logoutCurrentUser() {
@@ -1268,19 +1161,12 @@
   }
 
   function init() {
-    var bootstrapLite = getBootstrapLite();
     var profile = getProfile();
     var role = profile.role_akses || profile.role || 'KADER';
 
     applyTheme(getThemeValue());
     cleanupDashboardText();
-    if (bootstrapLite && Object.keys(bootstrapLite).length) {
-      applyBootstrapLite(bootstrapLite);
-      profile = getProfile();
-      role = profile.role_akses || profile.role || role;
-    } else {
-      applyDashboardProfile(profile);
-    }
+    applyDashboardProfile(profile);
     renderMenu(role);
     setVersionText();
     applyFontSize(getFontSizeValue());
@@ -1329,9 +1215,7 @@
     fillProfileForm: fillProfileForm,
     saveProfileUpdate: saveProfileUpdate,
     applyFontSize: applyFontSize,
-    applyTheme: applyTheme,
-    applyBootstrapLite: applyBootstrapLite,
-    applyDashboardSummaryLite: applyDashboardSummaryLite
+    applyTheme: applyTheme
   };
 
   window.DashboardView = DashboardView;
