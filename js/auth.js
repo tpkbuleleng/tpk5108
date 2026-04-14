@@ -55,6 +55,24 @@
   }
 
 
+  function getBootstrapLiteStorageKey() {
+    if (window.Storage && typeof window.Storage.getBootstrapLiteKey === 'function') {
+      return window.Storage.getBootstrapLiteKey();
+    }
+    return 'tpk_bootstrap_lite';
+  }
+
+  function getStoredBootstrapLite() {
+    var storage = getStorage();
+    if (storage && typeof storage.getBootstrapLite === 'function') {
+      return storage.getBootstrapLite({}) || {};
+    }
+    if (storage && typeof storage.get === 'function') {
+      return storage.get(getBootstrapLiteStorageKey(), {}) || {};
+    }
+    return {};
+  }
+
   function getStoredProfile() {
     var appState = getAppState();
     if (appState && typeof appState.getProfile === 'function') {
@@ -66,11 +84,15 @@
 
     var storage = getStorage();
     var keys = getStorageKeys();
+    var bootstrapLite = getStoredBootstrapLite();
+    var bootstrapProfile = bootstrapLite && bootstrapLite.profile ? bootstrapLite.profile : {};
+    var profileFromStorage = {};
+
     if (storage && typeof storage.get === 'function' && keys.PROFILE) {
-      return storage.get(keys.PROFILE, {}) || {};
+      profileFromStorage = storage.get(keys.PROFILE, {}) || {};
     }
 
-    return {};
+    return mergeProfileData(profileFromStorage, bootstrapProfile);
   }
 
   function mergeProfileData(existingProfile, incomingProfile) {
@@ -193,12 +215,30 @@
     var keys = getStorageKeys();
     var data = profile || {};
 
-    if (storage && typeof storage.set === 'function' && keys.PROFILE) {
+    if (storage && typeof storage.setProfile === 'function') {
+      storage.setProfile(data);
+    } else if (storage && typeof storage.set === 'function' && keys.PROFILE) {
       storage.set(keys.PROFILE, data);
     }
 
     if (appState && typeof appState.setProfile === 'function') {
       appState.setProfile(data);
+    }
+  }
+
+  function saveBootstrapLite(bootstrapLite) {
+    var storage = getStorage();
+    var data = bootstrapLite && typeof bootstrapLite === 'object' ? bootstrapLite : {};
+
+    if (!storage) return;
+
+    if (typeof storage.setBootstrapLite === 'function') {
+      storage.setBootstrapLite(data);
+      return;
+    }
+
+    if (typeof storage.set === 'function') {
+      storage.set(getBootstrapLiteStorageKey(), data);
     }
   }
 
@@ -221,9 +261,12 @@
       window.Api.clearSessionToken();
     }
 
-    if (storage && typeof storage.remove === 'function') {
+    if (storage && typeof storage.clearSession === 'function') {
+      storage.clearSession();
+    } else if (storage && typeof storage.remove === 'function') {
       if (keys.SESSION_TOKEN) storage.remove(keys.SESSION_TOKEN);
       if (keys.PROFILE) storage.remove(keys.PROFILE);
+      storage.remove(getBootstrapLiteStorageKey());
     }
 
     if (appState && typeof appState.setProfile === 'function') {
@@ -231,9 +274,16 @@
     }
   }
 
+  function extractBootstrapLite(loginResult) {
+    var data = (loginResult && loginResult.data) || {};
+    return data.bootstrap_lite && typeof data.bootstrap_lite === 'object' ? data.bootstrap_lite : {};
+  }
+
   function extractImmediateProfile(loginResult) {
     var data = (loginResult && loginResult.data) || {};
+    var bootstrapLite = extractBootstrapLite(loginResult);
 
+    if (bootstrapLite.profile && typeof bootstrapLite.profile === 'object') return bootstrapLite.profile;
     if (data.profile && typeof data.profile === 'object') return data.profile;
     if (data.session && typeof data.session === 'object') return data.session;
 
@@ -241,40 +291,36 @@
   }
 
   async function resolveProfileAfterLogin(loginResult) {
-    var data = (loginResult && loginResult.data) || {};
-    var actions = getActions();
+    var bootstrapLite = extractBootstrapLite(loginResult);
 
-    if (data.profile && typeof data.profile === 'object') {
-      return data.profile;
+    if (bootstrapLite && bootstrapLite.profile && Object.keys(bootstrapLite.profile).length) {
+      return bootstrapLite.profile;
     }
 
-    if (data.session && typeof data.session === 'object') {
-      return data.session;
-    }
+    if (window.Api && typeof window.Api.refreshBootstrapLite === 'function') {
+      var refreshResult = await window.Api.refreshBootstrapLite({});
+      if (refreshResult && refreshResult.ok) {
+        var refreshData = refreshResult.data || {};
+        var refreshedBootstrapLite = refreshData.bootstrap_lite || {};
 
-    if (window.Api && actions.BOOTSTRAP_SESSION) {
-      var sessionResult = await window.Api.post(actions.BOOTSTRAP_SESSION, {}, {
-        includeAuth: true
-      });
-
-      if (sessionResult && sessionResult.ok) {
-        var sessionData = sessionResult.data || {};
-        if (sessionData.profile && typeof sessionData.profile === 'object') {
-          return sessionData.profile;
+        if (refreshedBootstrapLite && Object.keys(refreshedBootstrapLite).length) {
+          saveBootstrapLite(refreshedBootstrapLite);
+          if (window.AppBootstrap && typeof window.AppBootstrap.applyBootstrapLite === 'function') {
+            window.AppBootstrap.applyBootstrapLite(refreshedBootstrapLite);
+          }
+          return refreshedBootstrapLite.profile || refreshData.profile || refreshData.session || {};
         }
-        if (sessionData.session && typeof sessionData.session === 'object') {
-          return sessionData.session;
+
+        if (refreshData.profile && typeof refreshData.profile === 'object') {
+          return refreshData.profile;
         }
       }
     }
 
-    if (window.Api && actions.GET_MY_PROFILE) {
-      var profileResult = await window.Api.post(actions.GET_MY_PROFILE, {}, {
-        includeAuth: true
-      });
-
-      if (profileResult && profileResult.ok && profileResult.data) {
-        return profileResult.data;
+    if (window.Api && typeof window.Api.getMyProfileLite === 'function') {
+      var profileLiteResult = await window.Api.getMyProfileLite({});
+      if (profileLiteResult && profileLiteResult.ok && profileLiteResult.data) {
+        return profileLiteResult.data;
       }
     }
 
@@ -365,10 +411,10 @@
           var mergedProfile = mergeProfileData(getStoredProfile(), resolvedProfile);
           saveProfile(mergedProfile);
           applyProfileToUi(mergedProfile);
+        }
 
-          if (window.DashboardView && typeof window.DashboardView.refresh === 'function') {
-            window.DashboardView.refresh();
-          }
+        if (window.DashboardView && typeof window.DashboardView.refresh === 'function') {
+          window.DashboardView.refresh();
         }
       } catch (err) {
         console.warn('Gagal memuat profil lanjutan setelah login:', err && err.message ? err.message : err);
@@ -412,8 +458,16 @@
 }
 
       var wajibGantiPassword = !!(result.data && result.data.wajib_ganti_password);
+      var bootstrapLite = extractBootstrapLite(result);
       var immediateProfile = extractImmediateProfile(result);
       var mergedImmediateProfile = mergeProfileData(getStoredProfile(), immediateProfile);
+
+      if (bootstrapLite && Object.keys(bootstrapLite).length) {
+        saveBootstrapLite(bootstrapLite);
+        if (window.AppBootstrap && typeof window.AppBootstrap.applyBootstrapLite === 'function') {
+          window.AppBootstrap.applyBootstrapLite(bootstrapLite);
+        }
+      }
 
       if (mergedImmediateProfile && Object.keys(mergedImmediateProfile).length) {
         saveProfile(mergedImmediateProfile);
@@ -421,6 +475,10 @@
       }
 
       openDashboard();
+
+      if (window.DashboardView && typeof window.DashboardView.refresh === 'function') {
+        window.DashboardView.refresh();
+      }
 
       setTimeout(function () {
         hydrateDashboardAfterLogin(result);
