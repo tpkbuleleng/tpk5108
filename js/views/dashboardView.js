@@ -282,22 +282,56 @@
     return data.id_tim || '-';
   }
 
+  function getBootstrapLiteKey() {
+    if (window.Storage && typeof window.Storage.getBootstrapLiteKey === 'function') {
+      return window.Storage.getBootstrapLiteKey();
+    }
+    return 'tpk_bootstrap_lite';
+  }
+
+  function getBootstrapLite() {
+    var storage = getStorage();
+    if (storage && typeof storage.getBootstrapLite === 'function') {
+      return storage.getBootstrapLite({}) || {};
+    }
+    if (storage && typeof storage.get === 'function') {
+      return storage.get(getBootstrapLiteKey(), {}) || {};
+    }
+    return {};
+  }
+
+  function persistBootstrapLite(data) {
+    var storage = getStorage();
+    var payload = data && typeof data === 'object' ? data : {};
+
+    if (storage && typeof storage.setBootstrapLite === 'function') {
+      storage.setBootstrapLite(payload);
+      return;
+    }
+
+    if (storage && typeof storage.set === 'function') {
+      storage.set(getBootstrapLiteKey(), payload);
+    }
+  }
+
   function getProfile() {
     var state = getState();
+    var profileFromState = {};
     if (state && typeof state.getProfile === 'function') {
-      var profileFromState = state.getProfile();
+      profileFromState = state.getProfile() || {};
       if (profileFromState && Object.keys(profileFromState).length) {
-        return profileFromState;
+        return mergeProfilePayload((getBootstrapLite().profile || {}), {}, profileFromState);
       }
     }
 
     var storage = getStorage();
     var keys = getStorageKeys();
+    var storageProfile = {};
     if (storage && typeof storage.get === 'function' && keys.PROFILE) {
-      return storage.get(keys.PROFILE, {}) || {};
+      storageProfile = storage.get(keys.PROFILE, {}) || {};
     }
 
-    return {};
+    return mergeProfilePayload((getBootstrapLite().profile || {}), {}, storageProfile);
   }
 
   function persistProfile(profile) {
@@ -441,6 +475,49 @@
         closeModal(modalId);
       }
     });
+  }
+
+
+  function setAnyText(ids, value) {
+    var list = Array.isArray(ids) ? ids : [ids];
+    list.forEach(function (id) {
+      setText(id, value);
+    });
+  }
+
+  function getDashboardLiteSummary() {
+    var bootstrapLite = getBootstrapLite();
+    return bootstrapLite && bootstrapLite.dashboard ? bootstrapLite.dashboard : {};
+  }
+
+  function applyDashboardSummaryLite(summary) {
+    var data = summary || {};
+
+    setAnyText(['dashboard-total-sasaran', 'stat-total-sasaran', 'summary-total-sasaran'], data.total_sasaran);
+    setAnyText(['dashboard-total-sasaran-aktif', 'stat-total-sasaran-aktif', 'summary-total-sasaran-aktif'], data.total_sasaran_aktif != null ? data.total_sasaran_aktif : data.total_sasaran);
+    setAnyText(['dashboard-total-pendampingan', 'stat-total-pendampingan', 'summary-total-pendampingan'], data.total_pendampingan_bulan_ini);
+    setAnyText(['dashboard-total-sudah-didampingi', 'stat-total-sudah-didampingi', 'summary-total-sudah-didampingi'], data.total_sasaran_sudah_didampingi);
+    setAnyText(['dashboard-total-belum-didampingi', 'stat-total-belum-didampingi', 'summary-total-belum-didampingi'], data.total_sasaran_belum_didampingi);
+    setAnyText(['dashboard-periode-key', 'summary-periode-key'], data.periode_key || '-');
+  }
+
+  function applyBootstrapLite(bootstrapLite) {
+    var payload = bootstrapLite && typeof bootstrapLite === 'object' ? bootstrapLite : {};
+    var currentProfile = getProfile();
+    var mergedProfile = mergeProfilePayload(currentProfile, {}, payload.profile || {});
+
+    if (payload && Object.keys(payload).length) {
+      persistBootstrapLite(payload);
+    }
+
+    if (mergedProfile && Object.keys(mergedProfile).length) {
+      persistProfile(mergedProfile);
+      applyDashboardProfile(mergedProfile);
+      fillProfileForm(mergedProfile);
+      renderMenu(mergedProfile.role_akses || mergedProfile.role || 'KADER');
+    }
+
+    applyDashboardSummaryLite(payload.dashboard || {});
   }
 
   function applyDashboardProfile(profile) {
@@ -1149,12 +1226,19 @@
   }
 
   function init() {
+    var bootstrapLite = getBootstrapLite();
     var profile = getProfile();
     var role = profile.role_akses || profile.role || 'KADER';
 
     applyTheme(getThemeValue());
     cleanupDashboardText();
-    applyDashboardProfile(profile);
+    if (bootstrapLite && Object.keys(bootstrapLite).length) {
+      applyBootstrapLite(bootstrapLite);
+      profile = getProfile();
+      role = profile.role_akses || profile.role || role;
+    } else {
+      applyDashboardProfile(profile);
+    }
     renderMenu(role);
     setVersionText();
     applyFontSize(getFontSizeValue());
@@ -1203,7 +1287,9 @@
     fillProfileForm: fillProfileForm,
     saveProfileUpdate: saveProfileUpdate,
     applyFontSize: applyFontSize,
-    applyTheme: applyTheme
+    applyTheme: applyTheme,
+    applyBootstrapLite: applyBootstrapLite,
+    applyDashboardSummaryLite: applyDashboardSummaryLite
   };
 
   window.DashboardView = DashboardView;
