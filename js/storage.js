@@ -1,6 +1,8 @@
 (function (window) {
   'use strict';
 
+  var BOOTSTRAP_LITE_KEY = 'tpk_bootstrap_lite';
+
   function getConfig() {
     return window.APP_CONFIG || {};
   }
@@ -38,6 +40,10 @@
 
   function safeStringify(value) {
     return JSON.stringify(value);
+  }
+
+  function getBootstrapLiteKey() {
+    return BOOTSTRAP_LITE_KEY;
   }
 
   const Storage = {
@@ -113,12 +119,35 @@
       }
     },
 
+    getProfile(fallback) {
+      const keys = getStorageKeys();
+      return this.get(keys.PROFILE || 'tpk_profile', fallback || {});
+    },
+
+    setProfile(value) {
+      const keys = getStorageKeys();
+      return this.set(keys.PROFILE || 'tpk_profile', value || {});
+    },
+
+    getBootstrapLite(fallback) {
+      return this.get(getBootstrapLiteKey(), fallback || {});
+    },
+
+    setBootstrapLite(value) {
+      return this.set(getBootstrapLiteKey(), value || {});
+    },
+
+    removeBootstrapLite() {
+      this.remove(getBootstrapLiteKey());
+    },
+
     clearSession() {
       const keys = getStorageKeys();
 
       [
         keys.SESSION_TOKEN,
-        keys.PROFILE
+        keys.PROFILE,
+        getBootstrapLiteKey()
       ].filter(Boolean).forEach((key) => this.remove(key));
     },
 
@@ -126,14 +155,9 @@
       const keys = getStorageKeys();
 
       [
-        // skema baru
         keys.SYNC_QUEUE,
-
-        // fallback key lama bila masih sempat tertinggal
         keys.REGISTRASI_DRAFT,
         keys.PENDAMPINGAN_DRAFT,
-
-        // fallback literal tambahan
         'tpk_registrasi_draft',
         'tpk_pendampingan_draft'
       ].filter(Boolean).forEach((key) => this.remove(key));
@@ -143,17 +167,13 @@
       const keys = getStorageKeys();
 
       [
-        // skema baru
         keys.APP_BOOTSTRAP,
         keys.SELECTED_SASARAN,
         keys.SASARAN_CACHE,
-
-        // fallback skema lama
         keys.BOOTSTRAP,
         keys.DASHBOARD_CACHE,
         keys.EDIT_PENDAMPINGAN,
-
-        // fallback literal tambahan
+        getBootstrapLiteKey(),
         'tpk_dashboard_cache',
         'tpk_edit_pendampingan'
       ].filter(Boolean).forEach((key) => this.remove(key));
@@ -173,11 +193,13 @@
       this.clearDrafts();
       this.clearRuntimeCache();
       this.clearSyncData();
+    },
+
+    getBootstrapLiteKey() {
+      return getBootstrapLiteKey();
     }
   };
 
   window.Storage = Storage;
-
-  // Alias sementara agar file lama yang belum selesai dimigrasikan tidak langsung patah
   window.StorageHelper = Storage;
 })(window);
