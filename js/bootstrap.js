@@ -1,6 +1,8 @@
 (function (window, document) {
   'use strict';
 
+  var BOOTSTRAP_LITE_KEY = 'tpk_bootstrap_lite';
+
   function getDisplayNomorTim(data) {
     data = data || {};
 
@@ -20,7 +22,6 @@
 
     return data.id_tim || '-';
   }
-
 
   function mergeProfileData(existingProfile, incomingProfile) {
     var existing = existingProfile && typeof existingProfile === 'object' ? existingProfile : {};
@@ -48,24 +49,20 @@
       this.showSplashStatus('Menyiapkan aplikasi...');
       this.applyStaticBranding();
 
-      const cachedBootstrap = this.getCachedBootstrap();
-      if (cachedBootstrap && Object.keys(cachedBootstrap).length) {
-        this.applyBootstrapToUi(cachedBootstrap);
+      var cachedBootstrapLite = this.getCachedBootstrapLite();
+      var cachedProfile = this.getCachedProfile();
+      var token = this.getSessionToken();
+      var effectiveProfile = mergeProfileData(cachedProfile, (cachedBootstrapLite && cachedBootstrapLite.profile) || {});
+
+      if (cachedBootstrapLite && Object.keys(cachedBootstrapLite).length) {
+        this.applyBootstrapLite(cachedBootstrapLite, { persist: false });
+      } else if (effectiveProfile && Object.keys(effectiveProfile).length) {
+        this.persistProfile(effectiveProfile);
+        this.applyProfileToUi(effectiveProfile);
       }
 
-      const cachedProfile = this.getCachedProfile();
-      const token = this.getSessionToken();
-
-      if (cachedProfile && Object.keys(cachedProfile).length) {
-        if (window.AppState && typeof window.AppState.setProfile === 'function') {
-          window.AppState.setProfile(cachedProfile);
-        }
-        this.applyProfileToUi(cachedProfile);
-      }
-
-      if (token && cachedProfile && Object.keys(cachedProfile).length) {
+      if (token && (effectiveProfile && Object.keys(effectiveProfile).length || cachedBootstrapLite && Object.keys(cachedBootstrapLite).length)) {
         this.openScreen('dashboard-screen');
-
         if (window.Router && typeof window.Router.go === 'function') {
           window.Router.go('dashboard');
         }
@@ -73,97 +70,57 @@
         this.openScreen('login-screen');
       }
 
-      Promise.resolve().then(async () => {
-        const bootstrapResult = await this.loadInitialRefs(false);
-        if (bootstrapResult && bootstrapResult.ok) {
-          this.applyBootstrapToUi(bootstrapResult.data || {});
-        }
-      });
-
       if (token) {
         this.showSplashStatus('Memeriksa sesi pengguna...');
-
-        const sessionOk = await this.restoreSessionAndRoute({
-          preferCachedUi: true
-        });
-
+        var sessionOk = await this.restoreSessionAndRoute({ preferCachedUi: true });
         if (!sessionOk) {
           this.openScreen('login-screen');
         }
       }
     },
 
-    async loadInitialRefs(forceRefresh = false) {
+    async loadInitialRefs(forceRefresh) {
+      forceRefresh = !!forceRefresh;
+
       try {
         if (!forceRefresh) {
           const cached = this.getCachedBootstrap();
           if (cached && Object.keys(cached).length) {
-            return {
-              ok: true,
-              data: cached,
-              source: 'cache'
-            };
+            return { ok: true, data: cached, source: 'cache' };
           }
         }
 
-        if (!window.Api || typeof window.Api.post !== 'function') {
-          throw new Error('Api.post belum tersedia');
+        if (!window.Api || typeof window.Api.getAppBootstrapRef !== 'function') {
+          throw new Error('Api.getAppBootstrapRef belum tersedia');
         }
 
-        const action = window.APP_CONFIG.API_ACTIONS.GET_APP_BOOTSTRAP_REF;
-        const result = await window.Api.post(action, {}, {
-          includeAuth: false
-        });
-
+        const result = await window.Api.getAppBootstrapRef({});
         if (result && result.ok) {
           const normalized = this.normalizeBootstrapData(result.data || {});
           this.setCachedBootstrap(normalized);
-
-          return {
-            ok: true,
-            data: normalized,
-            source: 'api'
-          };
+          return { ok: true, data: normalized, source: 'api' };
         }
 
         const cached = this.getCachedBootstrap();
         if (cached && Object.keys(cached).length) {
-          return {
-            ok: true,
-            data: cached,
-            source: 'cache_fallback'
-          };
+          return { ok: true, data: cached, source: 'cache_fallback' };
         }
 
-        return {
-          ok: false,
-          message: (result && result.message) || 'Bootstrap refs gagal diambil.',
-          data: {}
-        };
+        return { ok: false, message: (result && result.message) || 'Bootstrap refs gagal diambil.', data: {} };
       } catch (err) {
         const cached = this.getCachedBootstrap();
         if (cached && Object.keys(cached).length) {
           console.warn('Bootstrap refs gagal diambil dari API, memakai cache lokal:', err && err.message ? err.message : err);
-          return {
-            ok: true,
-            data: cached,
-            source: 'cache_fallback'
-          };
+          return { ok: true, data: cached, source: 'cache_fallback' };
         }
 
         console.warn('Bootstrap refs gagal diambil:', err && err.message ? err.message : err);
-
-        return {
-          ok: false,
-          message: err && err.message ? err.message : 'Bootstrap refs gagal diambil.',
-          data: {}
-        };
+        return { ok: false, message: err && err.message ? err.message : 'Bootstrap refs gagal diambil.', data: {} };
       }
     },
 
     normalizeBootstrapData(data) {
       const refs = data || {};
-
       return {
         app_name: refs.app_name || window.APP_CONFIG.APP_NAME || 'TPK KABUPATEN BULELENG',
         app_version: refs.app_version || window.APP_CONFIG.APP_VERSION || '1.0.0',
@@ -180,7 +137,6 @@
       if (!window.Storage || typeof window.Storage.get !== 'function') {
         return '';
       }
-
       return window.Storage.get(window.APP_CONFIG.STORAGE_KEYS.SESSION_TOKEN, '');
     },
 
@@ -188,15 +144,23 @@
       if (!window.Storage || typeof window.Storage.get !== 'function') {
         return {};
       }
-
       return window.Storage.get(window.APP_CONFIG.STORAGE_KEYS.PROFILE, {});
+    },
+
+    persistProfile(profile) {
+      var data = profile || {};
+      if (window.Storage && typeof window.Storage.set === 'function') {
+        window.Storage.set(window.APP_CONFIG.STORAGE_KEYS.PROFILE, data);
+      }
+      if (window.AppState && typeof window.AppState.setProfile === 'function') {
+        window.AppState.setProfile(data);
+      }
     },
 
     getCachedBootstrap() {
       if (!window.Storage || typeof window.Storage.get !== 'function') {
         return {};
       }
-
       return window.Storage.get(window.APP_CONFIG.STORAGE_KEYS.APP_BOOTSTRAP, {});
     },
 
@@ -204,7 +168,6 @@
       if (!window.Storage || typeof window.Storage.set !== 'function') {
         return;
       }
-
       window.Storage.set(window.APP_CONFIG.STORAGE_KEYS.APP_BOOTSTRAP, data || {});
     },
 
@@ -212,8 +175,44 @@
       if (!window.Storage || typeof window.Storage.remove !== 'function') {
         return;
       }
-
       window.Storage.remove(window.APP_CONFIG.STORAGE_KEYS.APP_BOOTSTRAP);
+    },
+
+    getBootstrapLiteKey() {
+      if (window.Storage && typeof window.Storage.getBootstrapLiteKey === 'function') {
+        return window.Storage.getBootstrapLiteKey();
+      }
+      return BOOTSTRAP_LITE_KEY;
+    },
+
+    getCachedBootstrapLite() {
+      if (window.Storage && typeof window.Storage.getBootstrapLite === 'function') {
+        return window.Storage.getBootstrapLite({}) || {};
+      }
+      if (!window.Storage || typeof window.Storage.get !== 'function') {
+        return {};
+      }
+      return window.Storage.get(this.getBootstrapLiteKey(), {});
+    },
+
+    setCachedBootstrapLite(data) {
+      if (window.Storage && typeof window.Storage.setBootstrapLite === 'function') {
+        window.Storage.setBootstrapLite(data || {});
+        return;
+      }
+      if (window.Storage && typeof window.Storage.set === 'function') {
+        window.Storage.set(this.getBootstrapLiteKey(), data || {});
+      }
+    },
+
+    clearCachedBootstrapLite() {
+      if (window.Storage && typeof window.Storage.removeBootstrapLite === 'function') {
+        window.Storage.removeBootstrapLite();
+        return;
+      }
+      if (window.Storage && typeof window.Storage.remove === 'function') {
+        window.Storage.remove(this.getBootstrapLiteKey());
+      }
     },
 
     getJenisSasaranOptions() {
@@ -232,16 +231,16 @@
     },
 
     getAppInfo() {
-      const data = this.getCachedBootstrap();
+      var lite = this.getCachedBootstrapLite();
+      var refs = this.getCachedBootstrap();
       return {
-        app_name: data.app_name || window.APP_CONFIG.APP_NAME || 'TPK KABUPATEN BULELENG',
-        app_version: data.app_version || window.APP_CONFIG.APP_VERSION || '1.0.0'
+        app_name: lite.app_name || refs.app_name || window.APP_CONFIG.APP_NAME || 'TPK KABUPATEN BULELENG',
+        app_version: lite.app_version || refs.app_version || window.APP_CONFIG.APP_VERSION || '1.0.0'
       };
     },
 
     applyStaticBranding() {
       const logoUrl = window.APP_CONFIG.ASSETS.LOGO_URL;
-
       const loginLogo = document.getElementById('loginLogo');
       const splashLogo = document.querySelector('.splash-logo');
       const topbarLogo = document.querySelector('.topbar-logo');
@@ -282,7 +281,39 @@
       if (settingsVersion) settingsVersion.textContent = appVersion;
     },
 
-    async restoreSessionAndRoute(options = {}) {
+    applyBootstrapLite(bootstrapLite, options) {
+      var payload = bootstrapLite && typeof bootstrapLite === 'object' ? bootstrapLite : {};
+      var opts = options || {};
+      var profile = mergeProfileData(this.getCachedProfile(), payload.profile || {});
+
+      if (opts.persist !== false) {
+        this.setCachedBootstrapLite(payload);
+        if (profile && Object.keys(profile).length) {
+          this.persistProfile(profile);
+        }
+      }
+
+      this.applyBootstrapToUi({
+        app_name: payload.app_name || window.APP_CONFIG.APP_NAME,
+        app_version: payload.app_version || window.APP_CONFIG.APP_VERSION
+      });
+
+      if (profile && Object.keys(profile).length) {
+        this.applyProfileToUi(profile);
+      }
+
+      if (window.DashboardView && typeof window.DashboardView.applyBootstrapLite === 'function') {
+        window.DashboardView.applyBootstrapLite(payload);
+      } else if (window.DashboardView && typeof window.DashboardView.refresh === 'function') {
+        window.DashboardView.refresh();
+      }
+
+      return payload;
+    },
+
+    async restoreSessionAndRoute(options) {
+      options = options || {};
+
       try {
         if (!window.Storage || !window.Api) {
           return false;
@@ -293,47 +324,42 @@
           return false;
         }
 
-        const validateAction = window.APP_CONFIG.API_ACTIONS.VALIDATE_SESSION;
-        const validateResult = await window.Api.post(validateAction, {}, {
-          includeAuth: true
-        });
+        var result = null;
 
-        if (!validateResult || !validateResult.ok) {
+        if (typeof window.Api.refreshBootstrapLite === 'function') {
+          result = await window.Api.refreshBootstrapLite({});
+        }
+
+        if ((!result || !result.ok) && typeof window.Api.bootstrapSession === 'function') {
+          result = await window.Api.bootstrapSession({});
+        }
+
+        if (!result || !result.ok) {
           this.clearSession();
           return false;
         }
 
-        const bootstrapSessionAction = window.APP_CONFIG.API_ACTIONS.BOOTSTRAP_SESSION;
-        const sessionResult = await window.Api.post(bootstrapSessionAction, {}, {
-          includeAuth: true
-        });
+        var responseData = result.data || {};
+        var bootstrapLite = responseData.bootstrap_lite || {};
+        var sessionProfile = responseData.profile || responseData.session || {};
 
-        if (!sessionResult || !sessionResult.ok) {
-          this.clearSession();
-          return false;
+        if (!bootstrapLite.profile && sessionProfile && Object.keys(sessionProfile).length) {
+          bootstrapLite.profile = sessionProfile;
+        }
+        if (!bootstrapLite.session && responseData.session) {
+          bootstrapLite.session = responseData.session;
+        }
+        if (!bootstrapLite.permissions && responseData.permissions) {
+          bootstrapLite.permissions = responseData.permissions;
+        }
+        if (!bootstrapLite.expired_at && responseData.expired_at) {
+          bootstrapLite.expired_at = responseData.expired_at;
         }
 
-        const sessionData = sessionResult.data || {};
-        const profile = sessionData.profile || sessionData.session || {};
-        const cachedProfile = this.getCachedProfile();
-        const mergedProfile = mergeProfileData(cachedProfile, profile || {});
-
-        if (window.Storage && typeof window.Storage.set === 'function') {
-          window.Storage.set(window.APP_CONFIG.STORAGE_KEYS.PROFILE, mergedProfile || {});
-        }
-
-        if (window.AppState && typeof window.AppState.setProfile === 'function') {
-          window.AppState.setProfile(mergedProfile || {});
-        }
-
-        this.applyProfileToUi(mergedProfile || {});
+        this.applyBootstrapLite(bootstrapLite);
 
         if (!options.preferCachedUi) {
           this.openScreen('dashboard-screen');
-        }
-
-        if (window.DashboardView && typeof window.DashboardView.refresh === 'function') {
-          window.DashboardView.refresh();
         }
 
         if (window.Router && typeof window.Router.go === 'function') {
@@ -350,7 +376,6 @@
 
     applyProfileToUi(profile) {
       const data = profile || {};
-
       this.setText('profile-nama', data.nama_kader || data.nama_user || data.nama || '-');
       this.setText('profile-unsur', data.unsur_tpk || data.unsur || '-');
       this.setText('profile-id', data.id_user || '-');
@@ -361,12 +386,13 @@
     },
 
     clearSession() {
-      if (!window.Storage || typeof window.Storage.remove !== 'function') {
-        return;
+      if (window.Storage && typeof window.Storage.clearSession === 'function') {
+        window.Storage.clearSession();
+      } else if (window.Storage && typeof window.Storage.remove === 'function') {
+        window.Storage.remove(window.APP_CONFIG.STORAGE_KEYS.SESSION_TOKEN);
+        window.Storage.remove(window.APP_CONFIG.STORAGE_KEYS.PROFILE);
+        window.Storage.remove(this.getBootstrapLiteKey());
       }
-
-      window.Storage.remove(window.APP_CONFIG.STORAGE_KEYS.SESSION_TOKEN);
-      window.Storage.remove(window.APP_CONFIG.STORAGE_KEYS.PROFILE);
 
       if (window.AppState && typeof window.AppState.setProfile === 'function') {
         window.AppState.setProfile({});
