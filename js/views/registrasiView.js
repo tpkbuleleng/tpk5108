@@ -2,6 +2,7 @@
   'use strict';
 
   const REG_DRAFT_KEY = 'tpk_registrasi_draft_v_final';
+  const REG_RETURN_ROUTE_KEY = 'tpk_registrasi_return_route';
   const PLACEHOLDER_16 = '9999999999999999';
   const DEFINITION_CACHE = {};
   const STATIC_CODES = new Set([
@@ -148,6 +149,65 @@
     if (window.Router && isFunction(window.Router.toSasaranList)) {
       window.Router.toSasaranList();
     }
+  }
+
+  function goToDashboard() {
+    if (window.Router && isFunction(window.Router.toDashboard)) {
+      window.Router.toDashboard();
+    }
+  }
+
+  function getCurrentRouteName() {
+    if (window.Router && isFunction(window.Router.getCurrentRoute)) {
+      return safeTrim(window.Router.getCurrentRoute());
+    }
+    return '';
+  }
+
+  function normalizeReturnRoute(routeName) {
+    const raw = safeTrim(routeName);
+    if (!raw) return '';
+
+    const aliases = {
+      dashboard: 'dashboard',
+      sasaranList: 'sasaranList',
+      'sasaran-list': 'sasaranList',
+      sasaran_list: 'sasaranList',
+      sasaranDetail: 'sasaranDetail',
+      'sasaran-detail': 'sasaranDetail',
+      sasaran_detail: 'sasaranDetail',
+      registrasi: 'registrasi'
+    };
+
+    return aliases[raw] || '';
+  }
+
+  function saveReturnRoute(routeName) {
+    const normalized = normalizeReturnRoute(routeName);
+    if (!normalized || normalized === 'registrasi') return;
+    try {
+      sessionStorage.setItem(REG_RETURN_ROUTE_KEY, normalized);
+    } catch (_) {}
+  }
+
+  function readReturnRoute() {
+    try {
+      return normalizeReturnRoute(sessionStorage.getItem(REG_RETURN_ROUTE_KEY));
+    } catch (_) {
+      return '';
+    }
+  }
+
+  function clearReturnRoute() {
+    try {
+      sessionStorage.removeItem(REG_RETURN_ROUTE_KEY);
+    } catch (_) {}
+  }
+
+  function captureReturnRoute(preferredRoute) {
+    const current = normalizeReturnRoute(preferredRoute) || normalizeReturnRoute(getCurrentRouteName()) || readReturnRoute() || 'dashboard';
+    saveReturnRoute(current);
+    return current;
   }
 
   function getProfile() {
@@ -533,6 +593,7 @@
     },
 
     async openCreate() {
+      captureReturnRoute();
       resetStateCreate();
       goToRegistrasi();
       this.resetForm();
@@ -549,6 +610,7 @@
         return;
       }
 
+      captureReturnRoute();
       setMode('edit');
       setEditItem(safeItem);
       goToRegistrasi();
@@ -1480,6 +1542,7 @@
 
         clearDraftLocal();
         clearEditItem();
+        clearReturnRoute();
         setMode('create');
 
         this.resetForm();
@@ -1523,13 +1586,26 @@
       const mode = getMode();
       const editItem = getEditItem();
       const targetId = firstNonEmpty(editItem.id_sasaran, editItem.id);
+      const returnRoute = readReturnRoute();
+
+      clearReturnRoute();
 
       if (mode === 'edit' && window.SasaranDetail && isFunction(window.SasaranDetail.openById) && targetId) {
         await window.SasaranDetail.openById(targetId);
         return;
       }
 
-      goToSasaranList();
+      if (returnRoute === 'sasaranList') {
+        goToSasaranList();
+        return;
+      }
+
+      if (returnRoute === 'sasaranDetail' && window.SasaranDetail && isFunction(window.SasaranDetail.openById) && targetId) {
+        await window.SasaranDetail.openById(targetId);
+        return;
+      }
+
+      goToDashboard();
     }
   };
 
