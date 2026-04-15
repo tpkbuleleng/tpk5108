@@ -2564,3 +2564,224 @@
     window.RegistrasiForm.init();
   }
 })(window, document);
+
+
+/* ===== HOTFIX V7: cascade wilayah asal pasangan CATIN + hard BUMIL weight guard ===== */
+(function (window, document) {
+  'use strict';
+  const RF = window.RegistrasiForm;
+  if (!RF) return;
+
+  const V7_WILAYAH_CACHE = { rows: null };
+
+  function s(v) { return String(v == null ? '' : v).trim(); }
+  function up(v) { return s(v).toUpperCase(); }
+  function uniq(arr) {
+    const out = [];
+    const seen = {};
+    (arr || []).forEach((v) => {
+      const t = s(v);
+      if (!t || seen[t]) return;
+      seen[t] = true;
+      out.push(t);
+    });
+    return out;
+  }
+  function byCode(code) {
+    return RF.findDynamicInput ? RF.findDynamicInput(code) : null;
+  }
+  function fillSelect(selectEl, values, selectedValue) {
+    if (!selectEl) return [];
+    const opts = uniq(values);
+    const selected = s(selectedValue);
+    let html = '<option value="">Pilih</option>';
+    opts.forEach((value) => {
+      const esc = String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      html += '<option value="' + esc + '">' + esc + '</option>';
+    });
+    selectEl.innerHTML = html;
+    if (selected && opts.indexOf(selected) >= 0) {
+      selectEl.value = selected;
+    } else if (opts.length === 1) {
+      selectEl.value = opts[0];
+    } else {
+      selectEl.value = '';
+    }
+    selectEl.disabled = false;
+    return opts;
+  }
+  async function fetchWilayahBaliRowsV7() {
+    if (Array.isArray(V7_WILAYAH_CACHE.rows)) return V7_WILAYAH_CACHE.rows;
+    try {
+      const action = (window.APP_CONFIG && window.APP_CONFIG.API_ACTIONS && window.APP_CONFIG.API_ACTIONS.GET_WILAYAH_REF) || 'getWilayahRef';
+      const api = window.Api;
+      if (!api || typeof api.post !== 'function') throw new Error('Api.post belum tersedia');
+      const result = await api.post(action, {});
+      const rows = result && Array.isArray(result.data) ? result.data : [];
+      V7_WILAYAH_CACHE.rows = rows.map((row) => ({
+        kabupaten: s(row.kabupaten),
+        kecamatan: s(row.kecamatan),
+        desa_kelurahan: s(row.desa_kelurahan || row.nama_desa || row.nama_desa_kelurahan)
+      })).filter((row) => row.kabupaten || row.kecamatan || row.desa_kelurahan);
+    } catch (_) {
+      V7_WILAYAH_CACHE.rows = [];
+    }
+    return V7_WILAYAH_CACHE.rows;
+  }
+
+  const _origApplyDefV7 = RF.applyDefinitionOverrides;
+  RF.applyDefinitionOverrides = function (definition, jenisSasaran, refs) {
+    const out = _origApplyDefV7.call(this, definition, jenisSasaran, refs);
+    if (up(jenisSasaran) !== 'CATIN') return out;
+
+    const rows = uniq((refs && Array.isArray(refs.master_wilayah) ? refs.master_wilayah : []).map((r) => s(r.kabupaten))).map((kab) => ({value: kab, label: kab}));
+    (out.sections || []).forEach((section) => {
+      (section.questions || []).forEach((q) => {
+        if (q.code === 'kabupaten_asal_pasangan') {
+          q.options = rows.map((o, i) => ({ value: o.value, label: o.label, order: i + 1 }));
+        }
+        if (q.code === 'kecamatan_asal_pasangan' || q.code === 'desa_asal_pasangan') {
+          q.options = [];
+        }
+      });
+    });
+    (out.questions || []).forEach((q) => {
+      if (q.code === 'kecamatan_asal_pasangan' || q.code === 'desa_asal_pasangan') q.options = [];
+      if (q.code === 'kabupaten_asal_pasangan') q.options = rows.map((o, i) => ({ value: o.value, label: o.label, order: i + 1 }));
+    });
+    return out;
+  };
+
+  RF.bindCatinPartnerCascadeV7 = async function () {
+    const jenisEl = document.getElementById('reg-jenis-sasaran');
+    if (up(jenisEl && jenisEl.value) !== 'CATIN') return;
+
+    const rows = await fetchWilayahBaliRowsV7();
+    if (!rows.length) return;
+
+    const kabEl = byCode('kabupaten_asal_pasangan');
+    const kecEl = byCode('kecamatan_asal_pasangan');
+    const desaEl = byCode('desa_asal_pasangan');
+    const dusunEl = byCode('dusun_asal_pasangan');
+    if (!kabEl || !kecEl || !desaEl) return;
+
+    const render = (changed) => {
+      const selectedKab = s(kabEl.value);
+      if (changed === 'kabupaten') {
+        kecEl.value = '';
+        desaEl.value = '';
+      }
+      const kabupatenOptions = uniq(rows.map((r) => r.kabupaten));
+      fillSelect(kabEl, kabupatenOptions, selectedKab);
+
+      const activeKab = s(kabEl.value);
+      const rowsKab = activeKab ? rows.filter((r) => s(r.kabupaten) === activeKab) : [];
+      const selectedKec = changed === 'kabupaten' ? '' : s(kecEl.value);
+      const kecamatanOptions = uniq(rowsKab.map((r) => r.kecamatan));
+      fillSelect(kecEl, kecamatanOptions, selectedKec);
+
+      const activeKec = s(kecEl.value);
+      if (changed === 'kecamatan') {
+        desaEl.value = '';
+      }
+      const rowsKec = activeKab && activeKec ? rowsKab.filter((r) => s(r.kecamatan) === activeKec) : [];
+      const selectedDesa = changed === 'kabupaten' || changed === 'kecamatan' ? '' : s(desaEl.value);
+      const desaOptions = uniq(rowsKec.map((r) => r.desa_kelurahan));
+      fillSelect(desaEl, desaOptions, selectedDesa);
+
+      kabEl.disabled = false;
+      kecEl.disabled = false;
+      desaEl.disabled = false;
+      if (dusunEl) {
+        dusunEl.readOnly = false;
+        dusunEl.disabled = false;
+      }
+    };
+
+    if (kabEl.dataset.v7CascadeBound !== '1') {
+      kabEl.dataset.v7CascadeBound = '1';
+      kabEl.addEventListener('change', () => {
+        render('kabupaten');
+        if (typeof RF.handleAnyFormChange === 'function') RF.handleAnyFormChange();
+      });
+    }
+    if (kecEl.dataset.v7CascadeBound !== '1') {
+      kecEl.dataset.v7CascadeBound = '1';
+      kecEl.addEventListener('change', () => {
+        render('kecamatan');
+        if (typeof RF.handleAnyFormChange === 'function') RF.handleAnyFormChange();
+      });
+    }
+    render('');
+  };
+
+  function bindNumericGuard(code, min, max, label, decimals) {
+    const el = byCode(code);
+    if (!el) return;
+    if (el.dataset.v7RangeBound === '1') return;
+    el.dataset.v7RangeBound = '1';
+    el.setAttribute('type', 'number');
+    el.setAttribute('inputmode', 'decimal');
+    el.setAttribute('step', decimals ? '0.1' : '1');
+    el.setAttribute('min', String(min));
+    el.setAttribute('max', String(max));
+
+    const normalize = () => {
+      const raw = s(el.value).replace(',', '.');
+      if (!raw) return;
+      let n = Number(raw);
+      if (Number.isNaN(n)) {
+        el.value = '';
+        return;
+      }
+      if (!decimals) n = Math.round(n);
+      else n = Math.round(n * 10) / 10;
+      if (n < min || n > max) {
+        el.value = '';
+        window.alert(label + ' harus antara ' + min + ' sampai ' + max + '.');
+        return;
+      }
+      el.value = String(n);
+    };
+
+    el.addEventListener('blur', normalize);
+    el.addEventListener('change', normalize);
+  }
+
+  RF.applyInputConstraintsV7 = function () {
+    bindNumericGuard('berat_badan_sebelum_hamil', 25, 200, 'Berat Badan Sebelum Hamil', true);
+  };
+
+  const _origRenderV7 = RF.renderDynamicFields;
+  RF.renderDynamicFields = function (sections) {
+    const out = _origRenderV7.call(this, sections);
+    Promise.resolve().then(() => this.bindCatinPartnerCascadeV7()).catch(function () {});
+    this.applyInputConstraintsV7();
+    return out;
+  };
+
+  const _origFillV7 = RF.fillDynamicFields;
+  RF.fillDynamicFields = function (values) {
+    const out = _origFillV7.call(this, values);
+    Promise.resolve().then(() => this.bindCatinPartnerCascadeV7()).catch(function () {});
+    this.applyInputConstraintsV7();
+    return out;
+  };
+
+  const _origValidateV7 = RF.validate;
+  RF.validate = function (data) {
+    const issues = _origValidateV7.call(this, data) || [];
+    const answers = (data && data.answers) || {};
+    const raw = s(answers.berat_badan_sebelum_hamil).replace(',', '.');
+    if (raw) {
+      const n = Number(raw);
+      if (Number.isNaN(n) || n < 25 || n > 200) {
+        if (!issues.some((it) => String(it.text||'').indexOf('Berat Badan Sebelum Hamil') >= 0)) {
+          issues.push({ type: 'error', text: 'Berat Badan Sebelum Hamil harus antara 25 sampai 200 Kg.' });
+        }
+      }
+    }
+    return issues;
+  };
+})(window, document);
+/* ===== HOTFIX V7 end ===== */
