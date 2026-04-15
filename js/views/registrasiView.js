@@ -226,6 +226,75 @@
     return out;
   }
 
+  function splitScopedValues(value) {
+    const raw = safeTrim(value);
+    if (!raw) return [];
+    return uniqueStrings(
+      raw
+        .split(/\s*\/\s*|\s*;\s*|\s*\|\s*/)
+        .map((item) => safeTrim(item))
+        .filter(Boolean)
+    );
+  }
+
+  function getProfileScopeLite() {
+    const profile = getProfile();
+    const scope = profile.scope_wilayah || profile.tim_wilayah_scope || profile.wilayah_scope || {};
+
+    return {
+      nama_kecamatan: firstNonEmpty(
+        scope.kecamatan,
+        scope.nama_kecamatan,
+        profile.nama_kecamatan,
+        profile.kecamatan
+      ),
+      nama_desa: firstNonEmpty(
+        scope.desa_kelurahan,
+        scope.nama_desa,
+        scope.nama_desa_kelurahan,
+        profile.nama_desa,
+        profile.desa_kelurahan,
+        profile.nama_desa_kelurahan
+      ),
+      nama_dusun: firstNonEmpty(
+        scope.dusun_rw,
+        scope.nama_dusun,
+        scope.nama_dusun_rw,
+        profile.nama_dusun,
+        profile.dusun_rw,
+        profile.nama_dusun_rw
+      )
+    };
+  }
+
+  function buildRowsFromProfileScope() {
+    const scope = getProfileScopeLite();
+    const kecamatanList = splitScopedValues(scope.nama_kecamatan);
+    const desaList = splitScopedValues(scope.nama_desa);
+    const dusunList = splitScopedValues(scope.nama_dusun);
+
+    const fallbackKecamatan = kecamatanList[0] || '';
+    const fallbackDesa = desaList[0] || '';
+
+    if (dusunList.length) {
+      return dusunList.map((dusun) => ({
+        kecamatan: fallbackKecamatan,
+        desa_kelurahan: fallbackDesa,
+        dusun_rw: dusun
+      }));
+    }
+
+    if (fallbackKecamatan || fallbackDesa) {
+      return [{
+        kecamatan: fallbackKecamatan,
+        desa_kelurahan: fallbackDesa,
+        dusun_rw: ''
+      }];
+    }
+
+    return [];
+  }
+
   function toOptionHtml(value) {
     const safe = escapeHtml(value);
     return `<option value="${safe}">${safe}</option>`;
@@ -258,9 +327,15 @@
     if (Array.isArray(SCOPE_TIM_ROWS_CACHE)) return SCOPE_TIM_ROWS_CACHE;
 
     const profile = getProfile();
-    const idTim = safeTrim(profile.id_tim);
+    const idTim = safeTrim(
+      profile.id_tim ||
+      profile.id_tim_tugas ||
+      profile.idTim ||
+      ''
+    );
+
     if (!idTim) {
-      SCOPE_TIM_ROWS_CACHE = [];
+      SCOPE_TIM_ROWS_CACHE = buildRowsFromProfileScope();
       return SCOPE_TIM_ROWS_CACHE;
     }
 
@@ -271,10 +346,15 @@
         kecamatan: firstNonEmpty(row.kecamatan, row.nama_kecamatan),
         desa_kelurahan: firstNonEmpty(row.desa_kelurahan, row.nama_desa, row.nama_desa_kelurahan),
         dusun_rw: firstNonEmpty(row.dusun_rw, row.nama_dusun, row.nama_dusun_rw)
-      }));
+      })).filter((row) => row.kecamatan || row.desa_kelurahan || row.dusun_rw);
+
+      if (!SCOPE_TIM_ROWS_CACHE.length) {
+        SCOPE_TIM_ROWS_CACHE = buildRowsFromProfileScope();
+      }
+
       return SCOPE_TIM_ROWS_CACHE;
     } catch (_) {
-      SCOPE_TIM_ROWS_CACHE = [];
+      SCOPE_TIM_ROWS_CACHE = buildRowsFromProfileScope();
       return SCOPE_TIM_ROWS_CACHE;
     }
   }
@@ -847,10 +927,17 @@
       const dusunEl = byId('reg-dusun');
 
       if (!rows.length) {
-        uiSetValue('reg-kecamatan', fallback.kecamatan || '');
-        uiSetValue('reg-desa', fallback.desa || '');
-        uiSetValue('reg-dusun', fallback.dusun || '');
-        this.lockScopeFields();
+        const fallbackKecamatan = splitScopedValues(fallback.kecamatan || '');
+        const fallbackDesa = splitScopedValues(fallback.desa || '');
+        const fallbackDusun = splitScopedValues(fallback.dusun || '');
+
+        const finalFallbackKecamatan = fillSelectOptions(kecEl, fallbackKecamatan, fallbackKecamatan[0] || fallback.kecamatan || '');
+        const finalFallbackDesa = fillSelectOptions(desaEl, fallbackDesa, fallbackDesa[0] || fallback.desa || '');
+        const finalFallbackDusun = fillSelectOptions(dusunEl, fallbackDusun, fallbackDusun[0] || fallback.dusun || '');
+
+        setSelectEditableByOptionCount(kecEl, finalFallbackKecamatan.length);
+        setSelectEditableByOptionCount(desaEl, finalFallbackDesa.length);
+        setSelectEditableByOptionCount(dusunEl, finalFallbackDusun.length);
         return;
       }
 
