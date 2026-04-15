@@ -2824,3 +2824,196 @@
   };
 })(window, document);
 /* ===== HOTFIX V7 end ===== */
+
+
+/* ===== HOTFIX V9 start ===== */
+(function (window, document) {
+  'use strict';
+  var RF = window.RegistrasiForm;
+  if (!RF) return;
+
+  function s(v) {
+    return String(v == null ? '' : v).trim();
+  }
+
+  function norm(v) {
+    return s(v)
+      .toLowerCase()
+      .replace(/\s+/g, '_')
+      .replace(/[^a-z0-9_]/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_+|_+$/g, '');
+  }
+
+  function findQuestionByAliases(aliases, labels) {
+    var list = Array.isArray(RF._dynamicQuestions) ? RF._dynamicQuestions : [];
+    var aliasMap = {};
+    (aliases || []).forEach(function (a) { aliasMap[norm(a)] = true; });
+    var labelMap = {};
+    (labels || []).forEach(function (a) { labelMap[s(a).toLowerCase()] = true; });
+    for (var i = 0; i < list.length; i += 1) {
+      var q = list[i] || {};
+      var code = norm(q.code || q.question_code || q.store_key || q.question_id || '');
+      var label = s(q.label || q.question_label || '').toLowerCase();
+      if (aliasMap[code] || labelMap[label]) return q;
+    }
+    return null;
+  }
+
+  function findInputByQuestion(question, aliases, labels) {
+    if (question && question.code && typeof RF.findDynamicInput === 'function') {
+      var direct = RF.findDynamicInput(question.code);
+      if (direct) return direct;
+    }
+
+    var container = document.getElementById('registrasi-dynamic-fields');
+    if (!container) return null;
+
+    var aliasMap = {};
+    (aliases || []).forEach(function (a) { aliasMap[norm(a)] = true; });
+    var labelMap = {};
+    (labels || []).forEach(function (a) { labelMap[s(a).toLowerCase()] = true; });
+
+    var nodes = container.querySelectorAll('[data-reg-question-code], input, select, textarea');
+    for (var i = 0; i < nodes.length; i += 1) {
+      var el = nodes[i];
+      var code = norm(el.getAttribute('data-reg-question-code') || el.name || el.id || '');
+      if (aliasMap[code]) return el;
+      var card = el.closest ? el.closest('.dynamic-field-card') : null;
+      if (card) {
+        var labelEl = card.querySelector('label');
+        var label = s(labelEl && labelEl.textContent).replace(/\*/g, '').trim().toLowerCase();
+        if (labelMap[label]) return el;
+      }
+    }
+    return null;
+  }
+
+  function bindGuard(el, cfg) {
+    if (!el || el.dataset.v9Bound === '1') return;
+    el.dataset.v9Bound = '1';
+    try {
+      el.setAttribute('type', 'number');
+      el.setAttribute('inputmode', 'decimal');
+      el.setAttribute('min', String(cfg.min));
+      el.setAttribute('max', String(cfg.max));
+      if (cfg.decimals) {
+        el.setAttribute('step', '0.1');
+      } else {
+        el.setAttribute('step', '1');
+      }
+    } catch (_) {}
+
+    var sanitize = function () {
+      var raw = s(el.value).replace(',', '.');
+      raw = raw.replace(/[^0-9.]/g, '');
+      if (!cfg.decimals) raw = raw.replace(/\./g, '');
+      else {
+        var parts = raw.split('.');
+        raw = parts.shift() + (parts.length ? '.' + parts.join('') : '');
+      }
+      return raw;
+    };
+
+    var onInput = function () {
+      var raw = sanitize();
+      if (!raw) {
+        el.value = '';
+        return;
+      }
+      var n = Number(raw);
+      if (Number.isNaN(n)) {
+        el.value = '';
+        return;
+      }
+      if (!cfg.decimals) n = Math.round(n);
+      else n = Math.round(n * 10) / 10;
+      if (n > cfg.max) n = cfg.max;
+      el.value = String(n);
+    };
+
+    var onValidate = function () {
+      var raw = sanitize();
+      if (!raw) {
+        el.value = '';
+        return;
+      }
+      var n = Number(raw);
+      if (Number.isNaN(n)) {
+        el.value = '';
+        return;
+      }
+      if (!cfg.decimals) n = Math.round(n);
+      else n = Math.round(n * 10) / 10;
+      if (n < cfg.min || n > cfg.max) {
+        el.value = '';
+        window.alert(cfg.label + ' harus antara ' + cfg.min + ' sampai ' + cfg.max + (cfg.suffix || '') + '.');
+        return;
+      }
+      el.value = String(n);
+    };
+
+    el.addEventListener('input', onInput);
+    el.addEventListener('blur', onValidate);
+    el.addEventListener('change', onValidate);
+  }
+
+  RF.applyInputConstraintsV9 = function () {
+    var q = findQuestionByAliases(
+      ['berat_badan_sebelum_hamil', 'bb_sebelum_hamil', 'bbsbh', 'berat_sebelum_hamil'],
+      ['Berat Badan Sebelum Hamil', 'Berat Badan Sebelum Hamil (Kg)']
+    );
+    var el = findInputByQuestion(
+      q,
+      ['berat_badan_sebelum_hamil', 'bb_sebelum_hamil', 'bbsbh', 'berat_sebelum_hamil'],
+      ['Berat Badan Sebelum Hamil', 'Berat Badan Sebelum Hamil (Kg)']
+    );
+    bindGuard(el, { min: 25, max: 200, decimals: true, label: 'Berat Badan Sebelum Hamil', suffix: ' Kg' });
+  };
+
+  var _render = RF.renderDynamicFields;
+  RF.renderDynamicFields = function (sections) {
+    var out = _render.call(this, sections);
+    try { this.applyInputConstraintsV9(); } catch (_) {}
+    return out;
+  };
+
+  var _fill = RF.fillDynamicFields;
+  RF.fillDynamicFields = function (values) {
+    var out = _fill.call(this, values);
+    try { this.applyInputConstraintsV9(); } catch (_) {}
+    return out;
+  };
+
+  var _validate = RF.validate;
+  RF.validate = function (data) {
+    var issues = _validate.call(this, data) || [];
+    var answers = (data && data.answers) || {};
+    var candidateKeys = ['berat_badan_sebelum_hamil', 'bb_sebelum_hamil', 'bbsbh', 'berat_sebelum_hamil'];
+    var raw = '';
+    for (var i = 0; i < candidateKeys.length; i += 1) {
+      if (s(answers[candidateKeys[i]])) {
+        raw = s(answers[candidateKeys[i]]);
+        break;
+      }
+    }
+    if (!raw) {
+      var q = findQuestionByAliases(
+        ['berat_badan_sebelum_hamil', 'bb_sebelum_hamil', 'bbsbh', 'berat_sebelum_hamil'],
+        ['Berat Badan Sebelum Hamil', 'Berat Badan Sebelum Hamil (Kg)']
+      );
+      if (q && s(answers[q.code])) raw = s(answers[q.code]);
+    }
+    raw = s(raw).replace(',', '.');
+    if (raw) {
+      var n = Number(raw);
+      if (Number.isNaN(n) || n < 25 || n > 200) {
+        if (!issues.some(function (it) { return String(it.text || '').indexOf('Berat Badan Sebelum Hamil') >= 0; })) {
+          issues.push({ type: 'error', text: 'Berat Badan Sebelum Hamil harus antara 25 sampai 200 Kg.' });
+        }
+      }
+    }
+    return issues;
+  };
+})(window, document);
+/* ===== HOTFIX V9 end ===== */
