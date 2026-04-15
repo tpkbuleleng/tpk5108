@@ -91,8 +91,34 @@
     return merged;
   }
 
+
+  function getCurrentRouteSafe() {
+    try {
+      if (window.Router && typeof window.Router.getCurrentRoute === 'function') {
+        return String(window.Router.getCurrentRoute() || '').trim();
+      }
+      if (window.AppState && typeof window.AppState.getCurrentRoute === 'function') {
+        return String(window.AppState.getCurrentRoute() || '').trim();
+      }
+    } catch (_) {}
+    return '';
+  }
+
+  function isProtectedActiveRoute(routeName) {
+    var route = String(routeName || '').trim();
+    return route === 'registrasi' ||
+      route === 'sasaranList' ||
+      route === 'sasaranDetail' ||
+      route === 'pendampingan' ||
+      route === 'sync' ||
+      route === 'rekapKader';
+  }
+
   const AppBootstrap = {
     async init() {
+      this._initRunId = (this._initRunId || 0) + 1;
+      var initRunId = this._initRunId;
+
       this.showSplashStatus('Menyiapkan aplikasi...');
       this.applyStaticBranding();
 
@@ -108,7 +134,7 @@
         this.applyProfileToUi(effectiveProfile);
       }
 
-      if (token && (effectiveProfile && Object.keys(effectiveProfile).length || cachedBootstrapLite && Object.keys(cachedBootstrapLite).length)) {
+      if (token && ((effectiveProfile && Object.keys(effectiveProfile).length) || (cachedBootstrapLite && Object.keys(cachedBootstrapLite).length))) {
         this.openScreen('dashboard-screen');
         if (window.Router && typeof window.Router.go === 'function') {
           window.Router.go('dashboard');
@@ -119,8 +145,12 @@
 
       if (token) {
         this.showSplashStatus('Memeriksa sesi pengguna...');
-        var sessionOk = await this.restoreSessionAndRoute({ preferCachedUi: true });
-        if (!sessionOk) {
+        var sessionOk = await this.restoreSessionAndRoute({
+          preferCachedUi: true,
+          preserveActiveRoute: true,
+          initRunId: initRunId
+        });
+        if (!sessionOk && initRunId === this._initRunId) {
           this.openScreen('login-screen');
         }
       }
@@ -286,6 +316,15 @@
       };
     },
 
+
+    shouldPreserveActiveRoute(routeName) {
+      return isProtectedActiveRoute(routeName);
+    },
+
+    getCurrentRouteForRestore() {
+      return getCurrentRouteSafe();
+    },
+
     applyStaticBranding() {
       const logoUrl = window.APP_CONFIG.ASSETS.LOGO_URL;
       const loginLogo = document.getElementById('loginLogo');
@@ -371,6 +410,8 @@
           return false;
         }
 
+        var initRunId = Number(options.initRunId || 0);
+        var routeBeforeRestore = this.getCurrentRouteForRestore();
         var result = null;
 
         if (typeof window.Api.refreshBootstrapLite === 'function') {
@@ -405,12 +446,21 @@
 
         this.applyBootstrapLite(bootstrapLite);
 
-        if (!options.preferCachedUi) {
-          this.openScreen('dashboard-screen');
+        if (initRunId && initRunId !== Number(this._initRunId || 0)) {
+          return true;
         }
 
-        if (window.Router && typeof window.Router.go === 'function') {
-          window.Router.go('dashboard');
+        var activeRouteNow = this.getCurrentRouteForRestore() || routeBeforeRestore;
+        var preserveActiveRoute = options.preserveActiveRoute !== false && this.shouldPreserveActiveRoute(activeRouteNow);
+
+        if (!preserveActiveRoute) {
+          if (!options.preferCachedUi) {
+            this.openScreen('dashboard-screen');
+          }
+
+          if (window.Router && typeof window.Router.go === 'function') {
+            window.Router.go('dashboard');
+          }
         }
 
         return true;
