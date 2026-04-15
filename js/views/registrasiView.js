@@ -2,11 +2,8 @@
   'use strict';
 
   const REG_DRAFT_KEY = 'tpk_registrasi_draft_v_final';
-  const REG_RETURN_ROUTE_KEY = 'tpk_registrasi_return_route';
   const PLACEHOLDER_16 = '9999999999999999';
   const DEFINITION_CACHE = {};
-  let SCOPE_TIM_ROWS_CACHE = null;
-  let MASTER_WILAYAH_ROWS_CACHE = null;
   const STATIC_CODES = new Set([
     'jenis_sasaran',
     'nama_sasaran',
@@ -27,9 +24,7 @@
     'nama_tim',
     'id_wilayah',
     'client_submit_id',
-    'sync_source',
-    'nama_kepala_keluarga',
-    'nama_ibu_kandung'
+    'sync_source'
   ]);
 
   function byId(id) {
@@ -155,279 +150,10 @@
     }
   }
 
-
-  function getStorage() {
-    return window.Storage || window.StorageHelper || null;
-  }
-
-  function getStorageKeys() {
-    return (window.APP_CONFIG && window.APP_CONFIG.STORAGE_KEYS) || {};
-  }
-
-  function goToDashboard() {
-    if (window.Router && isFunction(window.Router.toDashboard)) {
-      window.Router.toDashboard();
-    }
-  }
-
-  function getCurrentRouteName() {
-    if (window.Router && isFunction(window.Router.getCurrentRoute)) {
-      return safeTrim(window.Router.getCurrentRoute());
-    }
-    return '';
-  }
-
-  function normalizeReturnRoute(routeName) {
-    const raw = safeTrim(routeName);
-    if (!raw) return '';
-
-    const aliases = {
-      dashboard: 'dashboard',
-      sasaranList: 'sasaranList',
-      'sasaran-list': 'sasaranList',
-      sasaran_list: 'sasaranList',
-      sasaranDetail: 'sasaranDetail',
-      'sasaran-detail': 'sasaranDetail',
-      sasaran_detail: 'sasaranDetail',
-      registrasi: 'registrasi'
-    };
-
-    return aliases[raw] || '';
-  }
-
-  function saveReturnRoute(routeName) {
-    const normalized = normalizeReturnRoute(routeName);
-    if (!normalized || normalized === 'registrasi') return;
-    try {
-      sessionStorage.setItem(REG_RETURN_ROUTE_KEY, normalized);
-    } catch (_) {}
-  }
-
-  function readReturnRoute() {
-    try {
-      return normalizeReturnRoute(sessionStorage.getItem(REG_RETURN_ROUTE_KEY));
-    } catch (_) {
-      return '';
-    }
-  }
-
-  function clearReturnRoute() {
-    try {
-      sessionStorage.removeItem(REG_RETURN_ROUTE_KEY);
-    } catch (_) {}
-  }
-
-  function captureReturnRoute(preferredRoute) {
-    const current = normalizeReturnRoute(preferredRoute) || normalizeReturnRoute(getCurrentRouteName()) || readReturnRoute() || 'dashboard';
-    saveReturnRoute(current);
-    return current;
-  }
-
-  function uniqueStrings(values) {
-    const seen = {};
-    const out = [];
-    (values || []).forEach((value) => {
-      const v = safeTrim(value);
-      if (!v || seen[v]) return;
-      seen[v] = true;
-      out.push(v);
-    });
-    return out;
-  }
-
-  function splitScopedValues(value) {
-    const raw = safeTrim(value);
-    if (!raw) return [];
-    return uniqueStrings(
-      raw
-        .split(/\s*\/\s*|\s*;\s*|\s*\|\s*/)
-        .map((item) => safeTrim(item))
-        .filter(Boolean)
-    );
-  }
-
-  function getProfileScopeLite() {
-    const profile = getProfile();
-    const scope = profile.scope_wilayah || profile.tim_wilayah_scope || profile.wilayah_scope || {};
-
-    return {
-      nama_kecamatan: firstNonEmpty(
-        scope.kecamatan,
-        scope.nama_kecamatan,
-        profile.nama_kecamatan,
-        profile.kecamatan
-      ),
-      nama_desa: firstNonEmpty(
-        scope.desa_kelurahan,
-        scope.nama_desa,
-        scope.nama_desa_kelurahan,
-        profile.nama_desa,
-        profile.desa_kelurahan,
-        profile.nama_desa_kelurahan
-      ),
-      nama_dusun: firstNonEmpty(
-        scope.dusun_rw,
-        scope.nama_dusun,
-        scope.nama_dusun_rw,
-        profile.nama_dusun,
-        profile.dusun_rw,
-        profile.nama_dusun_rw
-      )
-    };
-  }
-
-  function buildRowsFromProfileScope() {
-    const scope = getProfileScopeLite();
-    const kecamatanList = splitScopedValues(scope.nama_kecamatan);
-    const desaList = splitScopedValues(scope.nama_desa);
-    const dusunList = splitScopedValues(scope.nama_dusun);
-
-    const fallbackKecamatan = kecamatanList[0] || '';
-    const fallbackDesa = desaList[0] || '';
-
-    if (dusunList.length) {
-      return dusunList.map((dusun) => ({
-        kecamatan: fallbackKecamatan,
-        desa_kelurahan: fallbackDesa,
-        dusun_rw: dusun
-      }));
-    }
-
-    if (fallbackKecamatan || fallbackDesa) {
-      return [{
-        kecamatan: fallbackKecamatan,
-        desa_kelurahan: fallbackDesa,
-        dusun_rw: ''
-      }];
-    }
-
-    return [];
-  }
-
-  function toOptionHtml(value) {
-    const safe = escapeHtml(value);
-    return `<option value="${safe}">${safe}</option>`;
-  }
-
-  function fillSelectOptions(selectEl, values, selectedValue) {
-    if (!selectEl) return [];
-
-    const options = uniqueStrings(values);
-    const selected = safeTrim(selectedValue);
-    if (selected && options.indexOf(selected) === -1) {
-      options.unshift(selected);
-    }
-
-    selectEl.innerHTML = ['<option value=>Pilih</option>']
-      .concat(options.map((value) => toOptionHtml(value)))
-      .join('');
-
-    selectEl.value = selected || (options.length === 1 ? options[0] : '');
-    return options;
-  }
-
-  function setSelectEditableByOptionCount(selectEl, optionCount) {
-    if (!selectEl) return;
-    const total = Number(optionCount || 0);
-    setReadonly(selectEl, total <= 1);
-  }
-
-  async function fetchTimScopeRows() {
-    if (Array.isArray(SCOPE_TIM_ROWS_CACHE) && SCOPE_TIM_ROWS_CACHE.length) {
-      return SCOPE_TIM_ROWS_CACHE;
-    }
-
-    const profile = getProfile();
-    const idTim = safeTrim(
-      profile.id_tim ||
-      profile.id_tim_tugas ||
-      profile.idTim ||
-      profile.idTimTugas ||
-      ''
-    );
-
-    const profileScopeRows = buildRowsFromProfileScope();
-    if (!idTim) {
-      SCOPE_TIM_ROWS_CACHE = profileScopeRows;
-      return SCOPE_TIM_ROWS_CACHE;
-    }
-
-    try {
-      const timRefAction = (window.APP_CONFIG && window.APP_CONFIG.API_ACTIONS && window.APP_CONFIG.API_ACTIONS.GET_TIM_REF)
-        ? window.APP_CONFIG.API_ACTIONS.GET_TIM_REF
-        : 'getTimRef';
-
-      const result = await callApi(timRefAction, { id_tim: idTim });
-      const rows = result && Array.isArray(result.data) ? result.data : [];
-      SCOPE_TIM_ROWS_CACHE = rows.map((row) => ({
-        kecamatan: firstNonEmpty(row.kecamatan, row.nama_kecamatan),
-        desa_kelurahan: firstNonEmpty(row.desa_kelurahan, row.nama_desa, row.nama_desa_kelurahan),
-        dusun_rw: firstNonEmpty(row.dusun_rw, row.nama_dusun, row.nama_dusun_rw)
-      })).filter((row) => row.kecamatan || row.desa_kelurahan || row.dusun_rw);
-
-      if (!SCOPE_TIM_ROWS_CACHE.length) {
-        SCOPE_TIM_ROWS_CACHE = profileScopeRows;
-      }
-
-      return SCOPE_TIM_ROWS_CACHE;
-    } catch (_) {
-      SCOPE_TIM_ROWS_CACHE = profileScopeRows;
-      return SCOPE_TIM_ROWS_CACHE;
-    }
-  }
-
-  async function fetchMasterWilayahRows() {
-    if (Array.isArray(MASTER_WILAYAH_ROWS_CACHE)) return MASTER_WILAYAH_ROWS_CACHE;
-
-    try {
-      const result = await callApi('getWilayahRef', {});
-      MASTER_WILAYAH_ROWS_CACHE = result && Array.isArray(result.data) ? result.data : [];
-      return MASTER_WILAYAH_ROWS_CACHE;
-    } catch (_) {
-      MASTER_WILAYAH_ROWS_CACHE = [];
-      return MASTER_WILAYAH_ROWS_CACHE;
-    }
-  }
-
   function getProfile() {
     if (window.Session && isFunction(window.Session.getProfile)) {
-      const sessionProfile = window.Session.getProfile() || {};
-      if (sessionProfile && typeof sessionProfile === 'object' && Object.keys(sessionProfile).length) {
-        return sessionProfile;
-      }
+      return window.Session.getProfile() || {};
     }
-
-    if (window.AppState && isFunction(window.AppState.getProfile)) {
-      const stateProfile = window.AppState.getProfile() || {};
-      if (stateProfile && typeof stateProfile === 'object' && Object.keys(stateProfile).length) {
-        return stateProfile;
-      }
-    }
-
-    const storage = getStorage();
-    const keys = getStorageKeys();
-    if (storage && isFunction(storage.get) && keys.PROFILE) {
-      const storedProfile = storage.get(keys.PROFILE, {}) || {};
-      if (storedProfile && typeof storedProfile === 'object' && Object.keys(storedProfile).length) {
-        return storedProfile;
-      }
-    }
-
-    try {
-      const rawProfile = window.localStorage.getItem((keys && keys.PROFILE) || 'tpk_profile');
-      const parsedProfile = safeJsonParse(rawProfile, {});
-      if (parsedProfile && typeof parsedProfile === 'object' && Object.keys(parsedProfile).length) {
-        return parsedProfile;
-      }
-    } catch (_) {}
-
-    if (window.AppBootstrap && isFunction(window.AppBootstrap.getCachedProfile)) {
-      const cachedProfile = window.AppBootstrap.getCachedProfile() || {};
-      if (cachedProfile && typeof cachedProfile === 'object' && Object.keys(cachedProfile).length) {
-        return cachedProfile;
-      }
-    }
-
     return {};
   }
 
@@ -687,9 +413,6 @@
       const btnSubmit = byId('btn-submit-registrasi');
       const btnEditFromDetail = byId('btn-go-to-edit-sasaran');
       const jenisEl = byId('reg-jenis-sasaran');
-      const kecEl = byId('reg-kecamatan');
-      const desaEl = byId('reg-desa');
-      const dusunEl = byId('reg-dusun');
 
       if (btnBack) {
         btnBack.addEventListener('click', async (event) => {
@@ -729,28 +452,7 @@
       if (jenisEl) {
         jenisEl.addEventListener('change', async () => {
           this.applyGenderLockByJenis();
-          this.applyJenisSpecificStaticFields();
           await this.handleJenisChange();
-        });
-      }
-
-      if (kecEl) {
-        kecEl.addEventListener('change', () => {
-          this.handleScopeCascadeChange('kecamatan');
-          this.handleAnyFormChange();
-        });
-      }
-
-      if (desaEl) {
-        desaEl.addEventListener('change', () => {
-          this.handleScopeCascadeChange('desa');
-          this.handleAnyFormChange();
-        });
-      }
-
-      if (dusunEl) {
-        dusunEl.addEventListener('change', () => {
-          this.handleAnyFormChange();
         });
       }
 
@@ -831,7 +533,6 @@
     },
 
     async openCreate() {
-      captureReturnRoute();
       resetStateCreate();
       goToRegistrasi();
       this.resetForm();
@@ -848,7 +549,6 @@
         return;
       }
 
-      captureReturnRoute();
       setMode('edit');
       setEditItem(safeItem);
       goToRegistrasi();
@@ -864,7 +564,6 @@
       const storedAnswers = parseStoredAnswers(safeItem);
       this.fillDynamicFields(storedAnswers);
       this.applyGenderLockByJenis();
-      this.applyJenisSpecificStaticFields();
       this.updateConditionalDynamicFields();
       this.renderValidation();
     },
@@ -916,7 +615,6 @@
       const idEl = byId('reg-id-sasaran');
       if (idEl) idEl.value = '';
       this.unlockGenderField();
-      this.applyJenisSpecificStaticFields();
     },
 
     getScopeFromProfile() {
@@ -956,92 +654,23 @@
       const selected = getSelectedSasaran();
       const editItem = getEditItem();
 
-      const preferred = {
-        kecamatan: mode === 'edit'
-          ? firstNonEmpty(editItem.nama_kecamatan, editItem.kecamatan, profileScope.nama_kecamatan)
-          : firstNonEmpty(profileScope.nama_kecamatan, selected.nama_kecamatan, selected.kecamatan),
-        desa: mode === 'edit'
-          ? firstNonEmpty(editItem.nama_desa, editItem.desa_kelurahan, editItem.nama_desa_kelurahan, profileScope.nama_desa)
-          : firstNonEmpty(profileScope.nama_desa, selected.nama_desa, selected.desa_kelurahan, selected.nama_desa_kelurahan),
-        dusun: mode === 'edit'
-          ? firstNonEmpty(editItem.nama_dusun, editItem.dusun_rw, editItem.nama_dusun_rw, profileScope.nama_dusun)
-          : firstNonEmpty(profileScope.nama_dusun, selected.nama_dusun, selected.dusun_rw, selected.nama_dusun_rw)
-      };
+      const kecamatan = mode === 'edit'
+        ? firstNonEmpty(editItem.nama_kecamatan, editItem.kecamatan, profileScope.nama_kecamatan)
+        : firstNonEmpty(profileScope.nama_kecamatan, selected.nama_kecamatan, selected.kecamatan);
 
-      await this.ensureScopeOptions(preferred);
-    },
+      const desa = mode === 'edit'
+        ? firstNonEmpty(editItem.nama_desa, editItem.desa_kelurahan, editItem.nama_desa_kelurahan, profileScope.nama_desa)
+        : firstNonEmpty(profileScope.nama_desa, selected.nama_desa, selected.desa_kelurahan, selected.nama_desa_kelurahan);
 
-    async ensureScopeOptions(preferred) {
-      const rows = await fetchTimScopeRows();
-      const fallback = preferred || {};
-      const kecEl = byId('reg-kecamatan');
-      const desaEl = byId('reg-desa');
-      const dusunEl = byId('reg-dusun');
+      const dusun = mode === 'edit'
+        ? firstNonEmpty(editItem.nama_dusun, editItem.dusun_rw, editItem.nama_dusun_rw, profileScope.nama_dusun)
+        : firstNonEmpty(profileScope.nama_dusun, selected.nama_dusun, selected.dusun_rw, selected.nama_dusun_rw);
 
-      if (!rows.length) {
-        const profileScope = getProfileScopeLite();
-        const fallbackKecamatan = splitScopedValues(fallback.kecamatan || profileScope.nama_kecamatan || '');
-        const fallbackDesa = splitScopedValues(fallback.desa || profileScope.nama_desa || '');
-        const fallbackDusun = splitScopedValues(fallback.dusun || profileScope.nama_dusun || '');
+      uiSetValue('reg-kecamatan', kecamatan);
+      uiSetValue('reg-desa', desa);
+      uiSetValue('reg-dusun', dusun);
 
-        const finalFallbackKecamatan = fillSelectOptions(kecEl, fallbackKecamatan, safeTrim(fallback.kecamatan || profileScope.nama_kecamatan || fallbackKecamatan[0] || ''));
-        const finalFallbackDesa = fillSelectOptions(desaEl, fallbackDesa, safeTrim(fallback.desa || profileScope.nama_desa || fallbackDesa[0] || ''));
-        const finalFallbackDusun = fillSelectOptions(dusunEl, fallbackDusun, safeTrim(fallback.dusun || profileScope.nama_dusun || fallbackDusun[0] || ''));
-
-        setSelectEditableByOptionCount(kecEl, finalFallbackKecamatan.length);
-        setSelectEditableByOptionCount(desaEl, finalFallbackDesa.length);
-        setSelectEditableByOptionCount(dusunEl, finalFallbackDusun.length);
-        return;
-      }
-
-      const selectedKecamatan = safeTrim(fallback.kecamatan || (kecEl && kecEl.value) || '');
-      const rowsByKecamatan = selectedKecamatan
-        ? rows.filter((row) => safeTrim(row.kecamatan) === selectedKecamatan)
-        : rows.slice();
-
-      const selectedDesa = safeTrim(fallback.desa || (desaEl && desaEl.value) || '');
-      const rowsByDesa = selectedDesa
-        ? rowsByKecamatan.filter((row) => safeTrim(row.desa_kelurahan) === selectedDesa)
-        : rowsByKecamatan.slice();
-
-      const kecamatanOptions = uniqueStrings(rows.map((row) => row.kecamatan));
-      const desaOptions = uniqueStrings(rowsByKecamatan.map((row) => row.desa_kelurahan));
-      const dusunOptions = uniqueStrings(rowsByDesa.map((row) => row.dusun_rw));
-
-      const finalKecamatanOptions = fillSelectOptions(kecEl, kecamatanOptions, selectedKecamatan);
-      const activeKecamatan = safeTrim(kecEl && kecEl.value);
-      const finalRowsByKecamatan = activeKecamatan
-        ? rows.filter((row) => safeTrim(row.kecamatan) === activeKecamatan)
-        : rows.slice();
-      const finalDesaOptions = fillSelectOptions(desaEl, uniqueStrings(finalRowsByKecamatan.map((row) => row.desa_kelurahan)), selectedDesa);
-      const activeDesa = safeTrim(desaEl && desaEl.value);
-      const finalRowsByDesa = activeDesa
-        ? finalRowsByKecamatan.filter((row) => safeTrim(row.desa_kelurahan) === activeDesa)
-        : finalRowsByKecamatan.slice();
-      const finalDusunOptions = fillSelectOptions(dusunEl, uniqueStrings(finalRowsByDesa.map((row) => row.dusun_rw)), safeTrim(fallback.dusun || (dusunEl && dusunEl.value) || ''));
-
-      setSelectEditableByOptionCount(kecEl, finalKecamatanOptions.length);
-      setSelectEditableByOptionCount(desaEl, finalDesaOptions.length);
-      setSelectEditableByOptionCount(dusunEl, finalDusunOptions.length);
-    },
-
-    handleScopeCascadeChange(level) {
-      const preferred = {
-        kecamatan: safeTrim(byId('reg-kecamatan') && byId('reg-kecamatan').value),
-        desa: safeTrim(byId('reg-desa') && byId('reg-desa').value),
-        dusun: safeTrim(byId('reg-dusun') && byId('reg-dusun').value)
-      };
-
-      if (level === 'kecamatan') {
-        preferred.desa = '';
-        preferred.dusun = '';
-      }
-
-      if (level === 'desa') {
-        preferred.dusun = '';
-      }
-
-      this.ensureScopeOptions(preferred);
+      this.lockScopeFields();
     },
 
     lockScopeFields() {
@@ -1055,8 +684,6 @@
         'reg-id-sasaran': firstNonEmpty(item.id_sasaran, item.id),
         'reg-jenis-sasaran': firstNonEmpty(item.jenis_sasaran),
         'reg-nama-sasaran': firstNonEmpty(item.nama_sasaran, item.nama),
-        'reg-nama-kepala-keluarga': firstNonEmpty(item.nama_kepala_keluarga),
-        'reg-nama-ibu-kandung': firstNonEmpty(item.nama_ibu_kandung),
         'reg-nik': firstNonEmpty(item.nik_sasaran, item.nik),
         'reg-no-kk': firstNonEmpty(item.nomor_kk, item.no_kk),
         'reg-jenis-kelamin': firstNonEmpty(item.jenis_kelamin),
@@ -1070,13 +697,6 @@
       Object.keys(map).forEach((id) => {
         uiSetValue(id, map[id]);
       });
-
-      this.ensureScopeOptions({
-        kecamatan: map['reg-kecamatan'],
-        desa: map['reg-desa'],
-        dusun: map['reg-dusun']
-      });
-      this.applyJenisSpecificStaticFields();
     },
 
     async handleJenisChange() {
@@ -1141,11 +761,7 @@
         definition = {};
       }
 
-      const refs = {
-        master_wilayah: jenis === 'CATIN' ? await fetchMasterWilayahRows() : []
-      };
-
-      const normalized = this.normalizeDefinition(definition, jenis, refs);
+      const normalized = this.normalizeDefinition(definition, jenis);
       this._currentDefinition = normalized;
       this._dynamicQuestions = normalized.questions || [];
       this._currentFormId = normalized.form_id || mapJenisToFormId(jenis);
@@ -1154,7 +770,7 @@
       this.applyGenderLockByJenis();
     },
 
-    normalizeDefinition(definition, jenisSasaran, refs) {
+    normalizeDefinition(definition, jenisSasaran) {
       const data = definition || {};
       const sections = Array.isArray(data.sections) ? data.sections : [];
       const fallbackQuestions = Array.isArray(data.questions) ? data.questions : [];
@@ -1210,7 +826,7 @@
         })
         .sort((a, b) => Number(a.section_order || 0) - Number(b.section_order || 0));
 
-      return this.applyDefinitionOverrides({
+      return {
         form_id: safeTrim(firstNonEmpty(
           data.form_id,
           data.form && data.form.form_id,
@@ -1219,249 +835,7 @@
         jenis_sasaran: jenisSasaran,
         sections: dynamicSections,
         questions: dynamicQuestions
-      }, jenisSasaran, refs || {});
-    },
-
-    applyDefinitionOverrides(definition, jenisSasaran, refs) {
-      const jenis = toUpper(jenisSasaran);
-      const masterWilayahRows = Array.isArray(refs && refs.master_wilayah) ? refs.master_wilayah : [];
-      const sections = (definition.sections || []).map((section) => Object.assign({}, section, { questions: (section.questions || []).map((question) => Object.assign({}, question)) }));
-
-      sections.forEach((section) => {
-        section.questions = section.questions
-          .map((question) => this.applyQuestionOverrides(question, jenis))
-          .filter(Boolean);
-      });
-
-      let noteQuestions = [];
-      sections.forEach((section) => {
-        const keep = [];
-        (section.questions || []).forEach((question) => {
-          if (question.code === 'keterangan_tambahan_awal' || question.code === 'keterangan_tambahan') {
-            noteQuestions.push(Object.assign({}, question, { section_label: 'Catatan Tambahan' }));
-            return;
-          }
-          keep.push(question);
-        });
-        section.questions = keep;
-      });
-
-      if (jenis === 'CATIN') {
-        sections.forEach((section) => {
-          section.questions = (section.questions || []).filter((question) => {
-            return question.code !== 'data_pasangan' && question.code !== 'domisili_setelah_menikah';
-          });
-        });
-
-        const partnerSection = {
-          section_id: 'SEC-CATIN-PASANGAN',
-          section_label: 'Data Pasangan CATIN',
-          section_order: 850,
-          questions: this.buildCatinPartnerQuestions(masterWilayahRows)
-        };
-
-        sections.push(partnerSection);
-      }
-
-      if (noteQuestions.length) {
-        noteQuestions = noteQuestions.map((question, index) => Object.assign({}, question, {
-          question_order: 900 + index,
-          section_id: 'SEC-CATATAN-AKHIR',
-          section_label: 'Catatan Tambahan',
-          section_order: 999
-        }));
-
-        sections.push({
-          section_id: 'SEC-CATATAN-AKHIR',
-          section_label: 'Catatan Tambahan',
-          section_order: 999,
-          questions: noteQuestions
-        });
-      }
-
-      const cleanedSections = sections
-        .map((section) => Object.assign({}, section, {
-          questions: (section.questions || []).sort((a, b) => Number(a.question_order || 0) - Number(b.question_order || 0))
-        }))
-        .filter((section) => section.questions && section.questions.length)
-        .sort((a, b) => Number(a.section_order || 0) - Number(b.section_order || 0));
-
-      const flatQuestions = [];
-      cleanedSections.forEach((section) => {
-        (section.questions || []).forEach((question) => {
-          flatQuestions.push(question);
-        });
-      });
-
-      return Object.assign({}, definition, {
-        sections: cleanedSections,
-        questions: flatQuestions
-      });
-    },
-
-    applyQuestionOverrides(question, jenisSasaran) {
-      const q = Object.assign({}, question || {});
-
-      if (jenisSasaran === 'BADUTA' && q.code === 'berat_badan_lahir') {
-        q.label = 'Berat Badan Lahir (Kg)';
-        q.placeholder = 'Contoh: 2.8';
-        q.help_text = 'Masukkan berat badan lahir dalam Kg.';
-        q.field_type = 'number';
-        q.data_type = 'decimal';
-      }
-
-      return q;
-    },
-
-    buildCatinPartnerQuestions(masterWilayahRows) {
-      const kabupatenOptions = uniqueStrings((masterWilayahRows || []).map((row) => firstNonEmpty(row.kabupaten))).length
-        ? uniqueStrings((masterWilayahRows || []).map((row) => firstNonEmpty(row.kabupaten)))
-        : ['BULELENG'];
-      const kecamatanOptions = uniqueStrings((masterWilayahRows || []).map((row) => firstNonEmpty(row.kecamatan)));
-      const desaOptions = uniqueStrings((masterWilayahRows || []).map((row) => firstNonEmpty(row.desa_kelurahan, row.nama_desa, row.nama_desa_kelurahan)));
-
-      const buildOptions = (items) => items.map((value, index) => ({ value: value, label: value, order: index + 1 }));
-
-      return [
-        {
-          question_id: 'OVR-FRM1002-NAMA-PASANGAN',
-          code: 'nama_pasangan',
-          label: 'Nama Pasangan',
-          short_label: 'Nama Pasangan',
-          help_text: 'Nama lengkap pasangan CATIN.',
-          placeholder: 'Masukkan nama pasangan',
-          field_type: 'text',
-          data_type: 'string',
-          is_required: true,
-          validation_rule: '',
-          visibility_rule: '',
-          requirement_rule: '',
-          readonly_rule: '',
-          default_value: '',
-          is_editable: true,
-          section_id: 'SEC-CATIN-PASANGAN',
-          section_label: 'Data Pasangan CATIN',
-          section_order: 850,
-          question_order: 10,
-          options: [],
-          rules: []
-        },
-        {
-          question_id: 'OVR-FRM1002-NIK-PASANGAN',
-          code: 'nik_pasangan',
-          label: 'NIK Pasangan',
-          short_label: 'NIK Pasangan',
-          help_text: 'Jika tidak diketahui, gunakan 16 digit angka 9.',
-          placeholder: '16 digit NIK pasangan',
-          field_type: 'text',
-          data_type: 'string',
-          is_required: true,
-          validation_rule: 'NIK_16_OR_9999',
-          visibility_rule: '',
-          requirement_rule: '',
-          readonly_rule: '',
-          default_value: '',
-          is_editable: true,
-          section_id: 'SEC-CATIN-PASANGAN',
-          section_label: 'Data Pasangan CATIN',
-          section_order: 850,
-          question_order: 20,
-          options: [],
-          rules: []
-        },
-        {
-          question_id: 'OVR-FRM1002-KAB-ASAL-PASANGAN',
-          code: 'kabupaten_asal_pasangan',
-          label: 'Kabupaten Asal Pasangan',
-          short_label: 'Kabupaten Asal',
-          help_text: 'Pilih kabupaten asal pasangan.',
-          placeholder: '',
-          field_type: 'select',
-          data_type: 'string',
-          is_required: true,
-          validation_rule: '',
-          visibility_rule: '',
-          requirement_rule: '',
-          readonly_rule: '',
-          default_value: '',
-          is_editable: true,
-          section_id: 'SEC-CATIN-PASANGAN',
-          section_label: 'Data Pasangan CATIN',
-          section_order: 850,
-          question_order: 30,
-          options: buildOptions(kabupatenOptions),
-          rules: []
-        },
-        {
-          question_id: 'OVR-FRM1002-KEC-ASAL-PASANGAN',
-          code: 'kecamatan_asal_pasangan',
-          label: 'Kecamatan Asal Pasangan',
-          short_label: 'Kecamatan Asal',
-          help_text: 'Pilih kecamatan asal pasangan.',
-          placeholder: '',
-          field_type: 'select',
-          data_type: 'string',
-          is_required: true,
-          validation_rule: '',
-          visibility_rule: '',
-          requirement_rule: '',
-          readonly_rule: '',
-          default_value: '',
-          is_editable: true,
-          section_id: 'SEC-CATIN-PASANGAN',
-          section_label: 'Data Pasangan CATIN',
-          section_order: 850,
-          question_order: 40,
-          options: buildOptions(kecamatanOptions),
-          rules: []
-        },
-        {
-          question_id: 'OVR-FRM1002-DESA-ASAL-PASANGAN',
-          code: 'desa_asal_pasangan',
-          label: 'Desa Asal Pasangan',
-          short_label: 'Desa Asal',
-          help_text: 'Pilih desa/kelurahan asal pasangan.',
-          placeholder: '',
-          field_type: 'select',
-          data_type: 'string',
-          is_required: true,
-          validation_rule: '',
-          visibility_rule: '',
-          requirement_rule: '',
-          readonly_rule: '',
-          default_value: '',
-          is_editable: true,
-          section_id: 'SEC-CATIN-PASANGAN',
-          section_label: 'Data Pasangan CATIN',
-          section_order: 850,
-          question_order: 50,
-          options: buildOptions(desaOptions),
-          rules: []
-        },
-        {
-          question_id: 'OVR-FRM1002-DUSUN-ASAL-PASANGAN',
-          code: 'dusun_asal_pasangan',
-          label: 'Dusun Asal Pasangan',
-          short_label: 'Dusun Asal',
-          help_text: 'Isi teks dusun/banjar/lingkungan asal pasangan.',
-          placeholder: 'Masukkan dusun asal pasangan',
-          field_type: 'text',
-          data_type: 'string',
-          is_required: true,
-          validation_rule: '',
-          visibility_rule: '',
-          requirement_rule: '',
-          readonly_rule: '',
-          default_value: '',
-          is_editable: true,
-          section_id: 'SEC-CATIN-PASANGAN',
-          section_label: 'Data Pasangan CATIN',
-          section_order: 850,
-          question_order: 60,
-          options: [],
-          rules: []
-        }
-      ];
+      };
     },
 
     normalizeQuestion(question, section, qIndex) {
@@ -1659,8 +1033,6 @@
       const map = deepMergeObject(dynamic, {
         jenis_sasaran: safeTrim(byId('reg-jenis-sasaran') && byId('reg-jenis-sasaran').value),
         nama_sasaran: safeTrim(byId('reg-nama-sasaran') && byId('reg-nama-sasaran').value),
-        nama_kepala_keluarga: safeTrim(byId('reg-nama-kepala-keluarga') && byId('reg-nama-kepala-keluarga').value),
-        nama_ibu_kandung: safeTrim(byId('reg-nama-ibu-kandung') && byId('reg-nama-ibu-kandung').value),
         nik_sasaran: safeTrim(byId('reg-nik') && byId('reg-nik').value),
         nomor_kk: safeTrim(byId('reg-no-kk') && byId('reg-no-kk').value),
         jenis_kelamin: safeTrim(byId('reg-jenis-kelamin') && byId('reg-jenis-kelamin').value),
@@ -1795,25 +1167,6 @@
       }
     },
 
-    applyJenisSpecificStaticFields() {
-      const jenis = toUpper(byId('reg-jenis-sasaran') && byId('reg-jenis-sasaran').value);
-      const groupIbu = byId('group-reg-nama-ibu-kandung');
-      const inputIbu = byId('reg-nama-ibu-kandung');
-
-      if (groupIbu) {
-        groupIbu.classList.toggle('hidden', jenis !== 'BADUTA');
-      }
-
-      if (inputIbu) {
-        if (jenis === 'BADUTA') {
-          inputIbu.setAttribute('required', 'required');
-        } else {
-          inputIbu.removeAttribute('required');
-          inputIbu.value = '';
-        }
-      }
-    },
-
     unlockGenderField() {
       const el = byId('reg-jenis-kelamin');
       if (!el) return;
@@ -1831,8 +1184,6 @@
       const answers = {
         jenis_sasaran: safeTrim(byId('reg-jenis-sasaran') && byId('reg-jenis-sasaran').value),
         nama_sasaran: safeTrim(byId('reg-nama-sasaran') && byId('reg-nama-sasaran').value),
-        nama_kepala_keluarga: safeTrim(byId('reg-nama-kepala-keluarga') && byId('reg-nama-kepala-keluarga').value),
-        nama_ibu_kandung: safeTrim(byId('reg-nama-ibu-kandung') && byId('reg-nama-ibu-kandung').value),
         nik_sasaran: safeTrim(byId('reg-nik') && byId('reg-nik').value),
         nomor_kk: safeTrim(byId('reg-no-kk') && byId('reg-no-kk').value),
         jenis_kelamin: safeTrim(byId('reg-jenis-kelamin') && byId('reg-jenis-kelamin').value),
@@ -1879,14 +1230,6 @@
 
       if (!isRequired(data.answers.nama_sasaran)) {
         issues.push({ type: 'error', text: 'Nama sasaran wajib diisi.' });
-      }
-
-      if (!isRequired(data.answers.nama_kepala_keluarga)) {
-        issues.push({ type: 'error', text: 'Nama Kepala Keluarga wajib diisi.' });
-      }
-
-      if (jenis === 'BADUTA' && !isRequired(data.answers.nama_ibu_kandung)) {
-        issues.push({ type: 'error', text: 'Nama Ibu Kandung wajib diisi untuk BADUTA.' });
       }
 
       if (!isNikOrKK16(data.answers.nik_sasaran)) {
@@ -2025,8 +1368,6 @@
 
       uiSetValue('reg-jenis-sasaran', firstNonEmpty(answers.jenis_sasaran, draftData.jenis_sasaran));
       uiSetValue('reg-nama-sasaran', firstNonEmpty(answers.nama_sasaran, draftData.nama_sasaran));
-      uiSetValue('reg-nama-kepala-keluarga', firstNonEmpty(answers.nama_kepala_keluarga, draftData.nama_kepala_keluarga));
-      uiSetValue('reg-nama-ibu-kandung', firstNonEmpty(answers.nama_ibu_kandung, draftData.nama_ibu_kandung));
       uiSetValue('reg-nik', firstNonEmpty(answers.nik_sasaran, draftData.nik_sasaran, draftData.nik));
       uiSetValue('reg-no-kk', firstNonEmpty(answers.nomor_kk, draftData.nomor_kk));
       uiSetValue('reg-jenis-kelamin', firstNonEmpty(answers.jenis_kelamin, draftData.jenis_kelamin));
@@ -2046,7 +1387,6 @@
         .then(() => {
           this.fillDynamicFields(answers);
           this.applyGenderLockByJenis();
-          this.applyJenisSpecificStaticFields();
           this.renderValidation();
         })
         .catch(() => {
@@ -2140,7 +1480,6 @@
 
         clearDraftLocal();
         clearEditItem();
-        clearReturnRoute();
         setMode('create');
 
         this.resetForm();
@@ -2184,28 +1523,613 @@
       const mode = getMode();
       const editItem = getEditItem();
       const targetId = firstNonEmpty(editItem.id_sasaran, editItem.id);
-      const returnRoute = readReturnRoute();
-
-      clearReturnRoute();
 
       if (mode === 'edit' && window.SasaranDetail && isFunction(window.SasaranDetail.openById) && targetId) {
         await window.SasaranDetail.openById(targetId);
         return;
       }
 
+      goToSasaranList();
+    }
+  };
+
+
+  // --- V4 hotfix start: wilayah fallback, route back, CATIN/BADUTA overrides ---
+  (function applyRegistrasiV4Hotfix() {
+    const REG_RETURN_ROUTE_KEY_V4 = 'tpk_registrasi_return_route';
+    let SCOPE_TIM_ROWS_CACHE_V4 = null;
+    let MASTER_WILAYAH_ROWS_CACHE_V4 = null;
+
+    STATIC_CODES.add('nama_kepala_keluarga');
+    STATIC_CODES.add('nama_ibu_kandung');
+
+    function getLocalJsonV4(key) {
+      try {
+        return safeJsonParse(localStorage.getItem(key), null);
+      } catch (_) {
+        return null;
+      }
+    }
+
+    function splitCombinedOptionsV4(value) {
+      return uniqueStringsV4(String(value || '')
+        .split('/')
+        .map(function (item) { return safeTrim(item); })
+        .filter(Boolean));
+    }
+
+    function uniqueStringsV4(values) {
+      const seen = {};
+      const out = [];
+      (values || []).forEach(function (value) {
+        const v = safeTrim(value);
+        if (!v || seen[v]) return;
+        seen[v] = true;
+        out.push(v);
+      });
+      return out;
+    }
+
+    function toOptionHtmlV4(value) {
+      const safe = escapeHtml(value);
+      return '<option value="' + safe + '">' + safe + '</option>';
+    }
+
+    function fillSelectOptionsV4(selectEl, values, selectedValue) {
+      if (!selectEl) return [];
+      const options = uniqueStringsV4(values);
+      const selected = safeTrim(selectedValue);
+      if (selected && options.indexOf(selected) === -1) options.unshift(selected);
+      selectEl.innerHTML = ['<option value="">Pilih</option>'].concat(options.map(toOptionHtmlV4)).join('');
+      selectEl.value = selected || (options.length === 1 ? options[0] : '');
+      return options;
+    }
+
+    function setSelectEditableByOptionCountV4(selectEl, optionCount) {
+      if (!selectEl) return;
+      setReadonly(selectEl, Number(optionCount || 0) <= 1);
+    }
+
+    function normalizeReturnRouteV4(routeName) {
+      const raw = safeTrim(routeName);
+      if (!raw) return '';
+      const aliases = {
+        dashboard: 'dashboard',
+        sasaranList: 'sasaranList',
+        'sasaran-list': 'sasaranList',
+        sasaran_list: 'sasaranList',
+        sasaranDetail: 'sasaranDetail',
+        'sasaran-detail': 'sasaranDetail',
+        sasaran_detail: 'sasaranDetail',
+        registrasi: 'registrasi'
+      };
+      return aliases[raw] || '';
+    }
+
+    function getCurrentRouteNameV4() {
+      if (window.Router && isFunction(window.Router.getCurrentRoute)) {
+        return safeTrim(window.Router.getCurrentRoute());
+      }
+      return '';
+    }
+
+    function saveReturnRouteV4(routeName) {
+      const normalized = normalizeReturnRouteV4(routeName);
+      if (!normalized || normalized === 'registrasi') return;
+      try { sessionStorage.setItem(REG_RETURN_ROUTE_KEY_V4, normalized); } catch (_) {}
+    }
+
+    function readReturnRouteV4() {
+      try { return normalizeReturnRouteV4(sessionStorage.getItem(REG_RETURN_ROUTE_KEY_V4)); } catch (_) { return ''; }
+    }
+
+    function clearReturnRouteV4() {
+      try { sessionStorage.removeItem(REG_RETURN_ROUTE_KEY_V4); } catch (_) {}
+    }
+
+    function captureReturnRouteV4(preferredRoute) {
+      const current = normalizeReturnRouteV4(preferredRoute) || normalizeReturnRouteV4(getCurrentRouteNameV4()) || readReturnRouteV4() || 'dashboard';
+      saveReturnRouteV4(current);
+      return current;
+    }
+
+    function goToDashboardV4() {
+      if (window.Router && isFunction(window.Router.toDashboard)) {
+        window.Router.toDashboard();
+      }
+    }
+
+    function buildRowsFromProfileScopeV4(profile) {
+      const p = profile || {};
+      const scope = p.scope_wilayah || p.tim_wilayah_scope || p.wilayah_scope || {};
+      const kecamatan = firstNonEmpty(scope.kecamatan, scope.nama_kecamatan, p.kecamatan, p.nama_kecamatan);
+      const desa = firstNonEmpty(scope.desa_kelurahan, scope.nama_desa, scope.nama_desa_kelurahan, p.desa_kelurahan, p.nama_desa, p.nama_desa_kelurahan);
+      const dusunRaw = firstNonEmpty(scope.dusun_rw, scope.nama_dusun, scope.nama_dusun_rw, p.dusun_rw, p.nama_dusun, p.nama_dusun_rw, p.wilayah_tugas_dusun_rw || '');
+      const dusunList = splitCombinedOptionsV4(dusunRaw);
+      return (dusunList.length ? dusunList : ['']).filter(Boolean).map(function (dusun) {
+        return {
+          kecamatan: kecamatan,
+          desa_kelurahan: desa,
+          dusun_rw: dusun
+        };
+      });
+    }
+
+    getProfile = function () {
+      let profile = {};
+      try {
+        if (window.Session && isFunction(window.Session.getProfile)) {
+          profile = window.Session.getProfile() || {};
+        }
+      } catch (_) {}
+      if (profile && Object.keys(profile).length) return profile;
+
+      try {
+        if (window.AppState && isFunction(window.AppState.getProfile)) {
+          profile = window.AppState.getProfile() || {};
+        }
+      } catch (_) {}
+      if (profile && Object.keys(profile).length) return profile;
+
+      profile = getLocalJsonV4('tpk_profile') || {};
+      if (profile && Object.keys(profile).length) return profile;
+
+      const bootstrap = getLocalJsonV4('tpk_bootstrap_lite') || getLocalJsonV4('tpk_app_bootstrap') || {};
+      profile = (bootstrap && bootstrap.profile) || {};
+      if (profile && Object.keys(profile).length) return profile;
+
+      try {
+        if (window.AppBootstrap && isFunction(window.AppBootstrap.getCachedProfile)) {
+          profile = window.AppBootstrap.getCachedProfile() || {};
+        }
+      } catch (_) {}
+      return profile || {};
+    };
+
+    async function fetchMasterWilayahRowsV4() {
+      if (Array.isArray(MASTER_WILAYAH_ROWS_CACHE_V4)) return MASTER_WILAYAH_ROWS_CACHE_V4;
+      try {
+        const action = (window.APP_CONFIG && window.APP_CONFIG.API_ACTIONS && window.APP_CONFIG.API_ACTIONS.GET_WILAYAH_REF) || 'getWilayahRef';
+        const result = await callApi(action, {});
+        MASTER_WILAYAH_ROWS_CACHE_V4 = result && Array.isArray(result.data) ? result.data : [];
+        return MASTER_WILAYAH_ROWS_CACHE_V4;
+      } catch (_) {
+        MASTER_WILAYAH_ROWS_CACHE_V4 = [];
+        return MASTER_WILAYAH_ROWS_CACHE_V4;
+      }
+    }
+
+    async function fetchTimScopeRowsV4() {
+      if (Array.isArray(SCOPE_TIM_ROWS_CACHE_V4)) return SCOPE_TIM_ROWS_CACHE_V4;
+      const profile = getProfile() || {};
+      const idTim = safeTrim(profile.id_tim || profile.idTim || profile.scope_code);
+      const fallbackRows = buildRowsFromProfileScopeV4(profile);
+      if (!idTim) {
+        SCOPE_TIM_ROWS_CACHE_V4 = fallbackRows;
+        return SCOPE_TIM_ROWS_CACHE_V4;
+      }
+      try {
+        const action = (window.APP_CONFIG && window.APP_CONFIG.API_ACTIONS && window.APP_CONFIG.API_ACTIONS.GET_TIM_REF) || 'getTimRef';
+        const result = await callApi(action, { id_tim: idTim });
+        const rows = result && Array.isArray(result.data) ? result.data : [];
+        SCOPE_TIM_ROWS_CACHE_V4 = rows.map(function (row) {
+          return {
+            kecamatan: firstNonEmpty(row.kecamatan, row.nama_kecamatan),
+            desa_kelurahan: firstNonEmpty(row.desa_kelurahan, row.nama_desa, row.nama_desa_kelurahan),
+            dusun_rw: firstNonEmpty(row.dusun_rw, row.nama_dusun, row.nama_dusun_rw)
+          };
+        }).filter(function (row) {
+          return row.kecamatan || row.desa_kelurahan || row.dusun_rw;
+        });
+        if (!SCOPE_TIM_ROWS_CACHE_V4.length) {
+          SCOPE_TIM_ROWS_CACHE_V4 = fallbackRows;
+        }
+        return SCOPE_TIM_ROWS_CACHE_V4;
+      } catch (_) {
+        SCOPE_TIM_ROWS_CACHE_V4 = fallbackRows;
+        return SCOPE_TIM_ROWS_CACHE_V4;
+      }
+    }
+
+    const _origInitV4 = RegistrasiForm.init;
+    RegistrasiForm.init = function () {
+      const res = _origInitV4.apply(this, arguments);
+      if (!this.__v4Bound) {
+        this.__v4Bound = true;
+        const jenisEl = byId('reg-jenis-sasaran');
+        const kecEl = byId('reg-kecamatan');
+        const desaEl = byId('reg-desa');
+        const dusunEl = byId('reg-dusun');
+        if (jenisEl) {
+          jenisEl.addEventListener('change', () => {
+            this.applyJenisSpecificStaticFields();
+          });
+        }
+        if (kecEl) {
+          kecEl.addEventListener('change', () => {
+            this.handleScopeCascadeChange('kecamatan');
+          });
+        }
+        if (desaEl) {
+          desaEl.addEventListener('change', () => {
+            this.handleScopeCascadeChange('desa');
+          });
+        }
+        if (dusunEl) {
+          dusunEl.addEventListener('change', () => {
+            this.handleAnyFormChange();
+          });
+        }
+      }
+      if (normalizeReturnRouteV4(getCurrentRouteNameV4()) === 'registrasi') {
+        Promise.resolve().then(() => this.prefillScope()).then(() => {
+          this.applyJenisSpecificStaticFields();
+          this.renderValidation();
+        }).catch(function () {});
+      }
+      return res;
+    };
+
+    RegistrasiForm.applyJenisSpecificStaticFields = function () {
+      const jenis = toUpper(byId('reg-jenis-sasaran') && byId('reg-jenis-sasaran').value);
+      const groupIbu = byId('group-reg-nama-ibu-kandung');
+      const inputIbu = byId('reg-nama-ibu-kandung');
+      if (groupIbu) groupIbu.classList.toggle('hidden', jenis !== 'BADUTA');
+      if (inputIbu) {
+        if (jenis === 'BADUTA') inputIbu.setAttribute('required', 'required');
+        else {
+          inputIbu.removeAttribute('required');
+          inputIbu.value = '';
+        }
+      }
+    };
+
+    RegistrasiForm.ensureScopeOptions = async function (preferred) {
+      const rows = await fetchTimScopeRowsV4();
+      const profile = getProfile() || {};
+      const scope = profile.scope_wilayah || profile.tim_wilayah_scope || profile.wilayah_scope || {};
+      const fallback = preferred || {};
+      const kecEl = byId('reg-kecamatan');
+      const desaEl = byId('reg-desa');
+      const dusunEl = byId('reg-dusun');
+
+      const fallbackKecamatan = firstNonEmpty(fallback.kecamatan, scope.kecamatan, scope.nama_kecamatan, profile.kecamatan, profile.nama_kecamatan);
+      const fallbackDesa = firstNonEmpty(fallback.desa, scope.desa_kelurahan, scope.nama_desa, scope.nama_desa_kelurahan, profile.desa_kelurahan, profile.nama_desa, profile.nama_desa_kelurahan);
+      const fallbackDusun = firstNonEmpty(fallback.dusun, scope.dusun_rw, scope.nama_dusun, scope.nama_dusun_rw, profile.dusun_rw, profile.nama_dusun, profile.nama_dusun_rw, profile.wilayah_tugas_dusun_rw);
+
+      if (!rows.length) {
+        const kec = fillSelectOptionsV4(kecEl, [fallbackKecamatan], fallbackKecamatan);
+        const desa = fillSelectOptionsV4(desaEl, [fallbackDesa], fallbackDesa);
+        const dusun = fillSelectOptionsV4(dusunEl, splitCombinedOptionsV4(fallbackDusun), splitCombinedOptionsV4(fallbackDusun)[0] || fallbackDusun);
+        setSelectEditableByOptionCountV4(kecEl, kec.length);
+        setSelectEditableByOptionCountV4(desaEl, desa.length);
+        setSelectEditableByOptionCountV4(dusunEl, dusun.length);
+        return;
+      }
+
+      const selectedKecamatan = safeTrim(fallback.kecamatan || (kecEl && kecEl.value) || fallbackKecamatan);
+      const selectedDesa = safeTrim(fallback.desa || (desaEl && desaEl.value) || fallbackDesa);
+      const selectedDusun = safeTrim(fallback.dusun || (dusunEl && dusunEl.value) || splitCombinedOptionsV4(fallbackDusun)[0] || fallbackDusun);
+
+      const kecamatanOptions = uniqueStringsV4(rows.map(function (row) { return row.kecamatan; }));
+      const finalKecamatanOptions = fillSelectOptionsV4(kecEl, kecamatanOptions, selectedKecamatan);
+
+      const activeKecamatan = safeTrim(kecEl && kecEl.value);
+      const rowsByKecamatan = activeKecamatan ? rows.filter(function (row) { return safeTrim(row.kecamatan) === activeKecamatan; }) : rows.slice();
+      const finalDesaOptions = fillSelectOptionsV4(desaEl, uniqueStringsV4(rowsByKecamatan.map(function (row) { return row.desa_kelurahan; })), selectedDesa);
+
+      const activeDesa = safeTrim(desaEl && desaEl.value);
+      const rowsByDesa = activeDesa ? rowsByKecamatan.filter(function (row) { return safeTrim(row.desa_kelurahan) === activeDesa; }) : rowsByKecamatan.slice();
+      const finalDusunOptions = fillSelectOptionsV4(dusunEl, uniqueStringsV4(rowsByDesa.map(function (row) { return row.dusun_rw; })), selectedDusun);
+
+      setSelectEditableByOptionCountV4(kecEl, finalKecamatanOptions.length);
+      setSelectEditableByOptionCountV4(desaEl, finalDesaOptions.length);
+      setSelectEditableByOptionCountV4(dusunEl, finalDusunOptions.length);
+    };
+
+    RegistrasiForm.handleScopeCascadeChange = function (level) {
+      const preferred = {
+        kecamatan: safeTrim(byId('reg-kecamatan') && byId('reg-kecamatan').value),
+        desa: safeTrim(byId('reg-desa') && byId('reg-desa').value),
+        dusun: safeTrim(byId('reg-dusun') && byId('reg-dusun').value)
+      };
+      if (level === 'kecamatan') {
+        preferred.desa = '';
+        preferred.dusun = '';
+      }
+      if (level === 'desa') {
+        preferred.dusun = '';
+      }
+      this.ensureScopeOptions(preferred).then(() => this.handleAnyFormChange()).catch(function () {});
+    };
+
+    RegistrasiForm.prefillScope = async function () {
+      const mode = getMode();
+      const profileScope = this.getScopeFromProfile();
+      const selected = getSelectedSasaran();
+      const editItem = getEditItem();
+      const preferred = {
+        kecamatan: mode === 'edit'
+          ? firstNonEmpty(editItem.nama_kecamatan, editItem.kecamatan, profileScope.nama_kecamatan)
+          : firstNonEmpty(profileScope.nama_kecamatan, selected.nama_kecamatan, selected.kecamatan),
+        desa: mode === 'edit'
+          ? firstNonEmpty(editItem.nama_desa, editItem.desa_kelurahan, editItem.nama_desa_kelurahan, profileScope.nama_desa)
+          : firstNonEmpty(profileScope.nama_desa, selected.nama_desa, selected.desa_kelurahan, selected.nama_desa_kelurahan),
+        dusun: mode === 'edit'
+          ? firstNonEmpty(editItem.nama_dusun, editItem.dusun_rw, editItem.nama_dusun_rw, profileScope.nama_dusun)
+          : firstNonEmpty(profileScope.nama_dusun, selected.nama_dusun, selected.dusun_rw, selected.nama_dusun_rw)
+      };
+      await this.ensureScopeOptions(preferred);
+    };
+
+    RegistrasiForm.fillStaticForm = function (item) {
+      const map = {
+        'reg-id-sasaran': firstNonEmpty(item.id_sasaran, item.id),
+        'reg-jenis-sasaran': firstNonEmpty(item.jenis_sasaran),
+        'reg-nama-sasaran': firstNonEmpty(item.nama_sasaran, item.nama),
+        'reg-nama-kepala-keluarga': firstNonEmpty(item.nama_kepala_keluarga),
+        'reg-nama-ibu-kandung': firstNonEmpty(item.nama_ibu_kandung),
+        'reg-nik': firstNonEmpty(item.nik_sasaran, item.nik),
+        'reg-no-kk': firstNonEmpty(item.nomor_kk, item.no_kk),
+        'reg-jenis-kelamin': firstNonEmpty(item.jenis_kelamin),
+        'reg-tanggal-lahir': firstNonEmpty(item.tanggal_lahir, item.tgl_lahir),
+        'reg-kecamatan': firstNonEmpty(item.nama_kecamatan, item.kecamatan),
+        'reg-desa': firstNonEmpty(item.nama_desa, item.desa_kelurahan, item.nama_desa_kelurahan),
+        'reg-dusun': firstNonEmpty(item.nama_dusun, item.dusun_rw, item.nama_dusun_rw),
+        'reg-alamat': firstNonEmpty(item.alamat)
+      };
+      Object.keys(map).forEach(function (id) { uiSetValue(id, map[id]); });
+      this.ensureScopeOptions({
+        kecamatan: map['reg-kecamatan'],
+        desa: map['reg-desa'],
+        dusun: map['reg-dusun']
+      }).catch(function () {});
+      this.applyJenisSpecificStaticFields();
+    };
+
+    const _origOpenCreateV4 = RegistrasiForm.openCreate;
+    RegistrasiForm.openCreate = async function () {
+      captureReturnRouteV4();
+      const out = await _origOpenCreateV4.apply(this, arguments);
+      this.applyJenisSpecificStaticFields();
+      return out;
+    };
+
+    const _origOpenEditV4 = RegistrasiForm.openEdit;
+    RegistrasiForm.openEdit = async function (item) {
+      captureReturnRouteV4();
+      const out = await _origOpenEditV4.call(this, item);
+      this.applyJenisSpecificStaticFields();
+      return out;
+    };
+
+    RegistrasiForm.normalizeDefinition = function (definition, jenisSasaran, refs) {
+      const data = definition || {};
+      const sections = Array.isArray(data.sections) ? data.sections : [];
+      const fallbackQuestions = Array.isArray(data.questions) ? data.questions : [];
+      const dynamicQuestions = [];
+      const sectionMap = {};
+
+      sections.forEach((section, sectionIndex) => {
+        const normalizedSection = {
+          section_id: safeTrim(section.section_id || ('SEC-' + (sectionIndex + 1))),
+          section_label: safeTrim(section.section_label || section.label || ''),
+          section_order: Number(section.section_order || (sectionIndex + 1)),
+          questions: []
+        };
+        const sourceQuestions = Array.isArray(section.questions) ? section.questions : [];
+        sourceQuestions.forEach((question, qIndex) => {
+          const normalizedQuestion = this.normalizeQuestion(question, normalizedSection, qIndex);
+          if (!normalizedQuestion) return;
+          normalizedSection.questions.push(normalizedQuestion);
+          dynamicQuestions.push(normalizedQuestion);
+        });
+        if (normalizedSection.questions.length) sectionMap[normalizedSection.section_id] = normalizedSection;
+      });
+
+      fallbackQuestions.forEach((question, qIndex) => {
+        const normalizedQuestion = this.normalizeQuestion(question, null, qIndex);
+        if (!normalizedQuestion) return;
+        const sectionId = normalizedQuestion.section_id || 'SEC-DYNAMIC';
+        if (!sectionMap[sectionId]) {
+          sectionMap[sectionId] = {
+            section_id: sectionId,
+            section_label: safeTrim(normalizedQuestion.section_label || 'Data Khusus'),
+            section_order: Number(normalizedQuestion.section_order || 999),
+            questions: []
+          };
+        }
+        const exists = sectionMap[sectionId].questions.some((q) => q.code === normalizedQuestion.code);
+        if (!exists) {
+          sectionMap[sectionId].questions.push(normalizedQuestion);
+          dynamicQuestions.push(normalizedQuestion);
+        }
+      });
+
+      const dynamicSections = Object.values(sectionMap)
+        .map((section) => {
+          section.questions.sort((a, b) => Number(a.question_order || 0) - Number(b.question_order || 0));
+          return section;
+        })
+        .sort((a, b) => Number(a.section_order || 0) - Number(b.section_order || 0));
+
+      const masterWilayahRows = Array.isArray(refs && refs.master_wilayah) ? refs.master_wilayah : [];
+      const cleanedSections = dynamicSections.map((section) => ({
+        section_id: section.section_id,
+        section_label: section.section_label,
+        section_order: section.section_order,
+        questions: []
+      }));
+      const sectionById = {};
+      cleanedSections.forEach((section) => { sectionById[section.section_id] = section; });
+      let noteQuestions = [];
+
+      dynamicSections.forEach((section) => {
+        (section.questions || []).forEach((question) => {
+          let q = Object.assign({}, question || {});
+          if (jenisSasaran === 'BADUTA' && q.code === 'berat_badan_lahir') {
+            q.label = 'Berat Badan Lahir (Kg)';
+            q.placeholder = 'Contoh: 2.8';
+            q.help_text = 'Masukkan berat badan lahir dalam Kg.';
+            q.field_type = 'number';
+            q.data_type = 'decimal';
+          }
+          if (q.code === 'keterangan_tambahan_awal' || q.code === 'keterangan_tambahan') {
+            noteQuestions.push(Object.assign({}, q));
+            return;
+          }
+          if (jenisSasaran === 'CATIN' && (q.code === 'data_pasangan' || q.code === 'domisili_setelah_menikah')) {
+            return;
+          }
+          sectionById[section.section_id].questions.push(q);
+        });
+      });
+
+      if (jenisSasaran === 'CATIN') {
+        const rows = masterWilayahRows || [];
+        const kabupatenOptions = uniqueStringsV4(rows.map((row) => firstNonEmpty(row.kabupaten))).length
+          ? uniqueStringsV4(rows.map((row) => firstNonEmpty(row.kabupaten)))
+          : ['BULELENG'];
+        const kecamatanOptions = uniqueStringsV4(rows.map((row) => firstNonEmpty(row.kecamatan)));
+        const desaOptions = uniqueStringsV4(rows.map((row) => firstNonEmpty(row.desa_kelurahan, row.nama_desa, row.nama_desa_kelurahan)));
+        const buildOptions = (items) => items.map((value, index) => ({ value: value, label: value, order: index + 1 }));
+        cleanedSections.push({
+          section_id: 'SEC-CATIN-PASANGAN',
+          section_label: 'Data Pasangan CATIN',
+          section_order: 850,
+          questions: [
+            {question_id:'OVR-CATIN-NAMA-PASANGAN', code:'nama_pasangan', label:'Nama Pasangan', short_label:'Nama Pasangan', help_text:'Nama lengkap pasangan CATIN.', placeholder:'Masukkan nama pasangan', field_type:'text', data_type:'string', is_required:true, section_id:'SEC-CATIN-PASANGAN', section_label:'Data Pasangan CATIN', section_order:850, question_order:10, options:[], rules:[]},
+            {question_id:'OVR-CATIN-NIK-PASANGAN', code:'nik_pasangan', label:'NIK Pasangan', short_label:'NIK Pasangan', help_text:'Jika tidak diketahui, gunakan 16 digit angka 9.', placeholder:'16 digit NIK pasangan', field_type:'text', data_type:'string', is_required:true, section_id:'SEC-CATIN-PASANGAN', section_label:'Data Pasangan CATIN', section_order:850, question_order:20, options:[], rules:[]},
+            {question_id:'OVR-CATIN-KAB-ASAL', code:'kabupaten_asal_pasangan', label:'Kabupaten Asal Pasangan', short_label:'Kabupaten Asal', help_text:'Pilih kabupaten asal pasangan.', placeholder:'', field_type:'select', data_type:'string', is_required:true, section_id:'SEC-CATIN-PASANGAN', section_label:'Data Pasangan CATIN', section_order:850, question_order:30, options:buildOptions(kabupatenOptions), rules:[]},
+            {question_id:'OVR-CATIN-KEC-ASAL', code:'kecamatan_asal_pasangan', label:'Kecamatan Asal Pasangan', short_label:'Kecamatan Asal', help_text:'Pilih kecamatan asal pasangan.', placeholder:'', field_type:'select', data_type:'string', is_required:true, section_id:'SEC-CATIN-PASANGAN', section_label:'Data Pasangan CATIN', section_order:850, question_order:40, options:buildOptions(kecamatanOptions), rules:[]},
+            {question_id:'OVR-CATIN-DESA-ASAL', code:'desa_asal_pasangan', label:'Desa Asal Pasangan', short_label:'Desa Asal', help_text:'Pilih desa/kelurahan asal pasangan.', placeholder:'', field_type:'select', data_type:'string', is_required:true, section_id:'SEC-CATIN-PASANGAN', section_label:'Data Pasangan CATIN', section_order:850, question_order:50, options:buildOptions(desaOptions), rules:[]},
+            {question_id:'OVR-CATIN-DUSUN-ASAL', code:'dusun_asal_pasangan', label:'Dusun Asal Pasangan', short_label:'Dusun Asal', help_text:'Isi teks dusun/banjar/lingkungan asal pasangan.', placeholder:'Masukkan dusun asal pasangan', field_type:'text', data_type:'string', is_required:true, section_id:'SEC-CATIN-PASANGAN', section_label:'Data Pasangan CATIN', section_order:850, question_order:60, options:[], rules:[]}
+          ]
+        });
+      }
+
+      if (noteQuestions.length) {
+        cleanedSections.push({
+          section_id: 'SEC-CATATAN-AKHIR',
+          section_label: 'Catatan Tambahan',
+          section_order: 999,
+          questions: noteQuestions.map((q, index) => Object.assign({}, q, {
+            section_id: 'SEC-CATATAN-AKHIR',
+            section_label: 'Catatan Tambahan',
+            section_order: 999,
+            question_order: 900 + index
+          }))
+        });
+      }
+
+      const finalSections = cleanedSections
+        .map((section) => Object.assign({}, section, { questions: (section.questions || []).sort((a, b) => Number(a.question_order || 0) - Number(b.question_order || 0)) }))
+        .filter((section) => section.questions && section.questions.length)
+        .sort((a, b) => Number(a.section_order || 0) - Number(b.section_order || 0));
+      const flatQuestions = [];
+      finalSections.forEach((section) => { (section.questions || []).forEach((question) => flatQuestions.push(question)); });
+      return {
+        form_id: safeTrim(firstNonEmpty(data.form_id, data.form && data.form.form_id, mapJenisToFormId(jenisSasaran))),
+        jenis_sasaran: jenisSasaran,
+        sections: finalSections,
+        questions: flatQuestions
+      };
+    };
+
+    RegistrasiForm.loadDynamicFields = async function (jenisSasaran) {
+      const jenis = toUpper(jenisSasaran);
+      if (!jenis) {
+        this._currentDefinition = null;
+        this._dynamicQuestions = [];
+        this._currentFormId = '';
+        uiSetHTML('registrasi-dynamic-fields', '<p class="muted-text">Pilih jenis sasaran untuk memuat pertanyaan khusus.</p>');
+        return;
+      }
+      let definition = {};
+      try {
+        definition = await this.getRegistrasiFormDefinition(jenis);
+      } catch (err) {
+        notify(err && err.message ? err.message : 'Gagal memuat pertanyaan registrasi.');
+        definition = {};
+      }
+      const refs = { master_wilayah: jenis === 'CATIN' ? await fetchMasterWilayahRowsV4() : [] };
+      const normalized = this.normalizeDefinition(definition, jenis, refs);
+      this._currentDefinition = normalized;
+      this._dynamicQuestions = normalized.questions || [];
+      this._currentFormId = normalized.form_id || mapJenisToFormId(jenis);
+      this.renderDynamicFields(normalized.sections || []);
+      this.applyGenderLockByJenis();
+      this.applyJenisSpecificStaticFields();
+    };
+
+    const _origCollectFormDataV4 = RegistrasiForm.collectFormData;
+    RegistrasiForm.collectFormData = function () {
+      const data = _origCollectFormDataV4.apply(this, arguments);
+      data.answers = data.answers || {};
+      data.answers.nama_kepala_keluarga = safeTrim(byId('reg-nama-kepala-keluarga') && byId('reg-nama-kepala-keluarga').value);
+      data.answers.nama_ibu_kandung = safeTrim(byId('reg-nama-ibu-kandung') && byId('reg-nama-ibu-kandung').value);
+      return data;
+    };
+
+    const _origTryLoadDraftV4 = RegistrasiForm.tryLoadDraft;
+    RegistrasiForm.tryLoadDraft = function () {
+      const draft = loadDraftLocal();
+      if (draft && draft.data && draft.data.answers) {
+        const answers = draft.data.answers;
+        uiSetValue('reg-nama-kepala-keluarga', firstNonEmpty(answers.nama_kepala_keluarga, draft.data.nama_kepala_keluarga));
+        uiSetValue('reg-nama-ibu-kandung', firstNonEmpty(answers.nama_ibu_kandung, draft.data.nama_ibu_kandung));
+      }
+      const out = _origTryLoadDraftV4.apply(this, arguments);
+      this.applyJenisSpecificStaticFields();
+      return out;
+    };
+
+    const _origValidateV4 = RegistrasiForm.validate;
+    RegistrasiForm.validate = function (data) {
+      const issues = _origValidateV4.apply(this, arguments) || [];
+      const jenis = toUpper(data && data.answers && data.answers.jenis_sasaran);
+      const namaKK = safeTrim(data && data.answers && data.answers.nama_kepala_keluarga);
+      const namaIbu = safeTrim(data && data.answers && data.answers.nama_ibu_kandung);
+      if (!namaKK && !issues.some((item) => String(item.text || '').indexOf('Nama Kepala Keluarga') >= 0)) {
+        issues.unshift({ type: 'error', text: 'Nama Kepala Keluarga wajib diisi.' });
+      }
+      if (jenis === 'BADUTA' && !namaIbu && !issues.some((item) => String(item.text || '').indexOf('Nama Ibu Kandung') >= 0)) {
+        issues.unshift({ type: 'error', text: 'Nama Ibu Kandung wajib diisi untuk BADUTA.' });
+      }
+      return issues;
+    };
+
+    const _origSubmitV4 = RegistrasiForm.submit;
+    RegistrasiForm.submit = async function () {
+      try {
+        return await _origSubmitV4.apply(this, arguments);
+      } finally {
+        if (getMode() !== 'edit') clearReturnRouteV4();
+      }
+    };
+
+    RegistrasiForm.handleBack = async function () {
+      const mode = getMode();
+      const editItem = getEditItem();
+      const targetId = firstNonEmpty(editItem.id_sasaran, editItem.id);
+      const returnRoute = readReturnRouteV4();
+      clearReturnRouteV4();
+      if (mode === 'edit' && window.SasaranDetail && isFunction(window.SasaranDetail.openById) && targetId) {
+        await window.SasaranDetail.openById(targetId);
+        return;
+      }
       if (returnRoute === 'sasaranList') {
         goToSasaranList();
         return;
       }
-
       if (returnRoute === 'sasaranDetail' && window.SasaranDetail && isFunction(window.SasaranDetail.openById) && targetId) {
         await window.SasaranDetail.openById(targetId);
         return;
       }
-
-      goToDashboard();
-    }
-  };
+      goToDashboardV4();
+    };
+  })();
+  // --- V4 hotfix end ---
 
   window.RegistrasiForm = RegistrasiForm;
 
