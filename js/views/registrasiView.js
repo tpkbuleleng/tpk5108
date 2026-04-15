@@ -155,6 +155,15 @@
     }
   }
 
+
+  function getStorage() {
+    return window.Storage || window.StorageHelper || null;
+  }
+
+  function getStorageKeys() {
+    return (window.APP_CONFIG && window.APP_CONFIG.STORAGE_KEYS) || {};
+  }
+
   function goToDashboard() {
     if (window.Router && isFunction(window.Router.toDashboard)) {
       window.Router.toDashboard();
@@ -324,23 +333,31 @@
   }
 
   async function fetchTimScopeRows() {
-    if (Array.isArray(SCOPE_TIM_ROWS_CACHE)) return SCOPE_TIM_ROWS_CACHE;
+    if (Array.isArray(SCOPE_TIM_ROWS_CACHE) && SCOPE_TIM_ROWS_CACHE.length) {
+      return SCOPE_TIM_ROWS_CACHE;
+    }
 
     const profile = getProfile();
     const idTim = safeTrim(
       profile.id_tim ||
       profile.id_tim_tugas ||
       profile.idTim ||
+      profile.idTimTugas ||
       ''
     );
 
+    const profileScopeRows = buildRowsFromProfileScope();
     if (!idTim) {
-      SCOPE_TIM_ROWS_CACHE = buildRowsFromProfileScope();
+      SCOPE_TIM_ROWS_CACHE = profileScopeRows;
       return SCOPE_TIM_ROWS_CACHE;
     }
 
     try {
-      const result = await callApi('getTimRef', { id_tim: idTim });
+      const timRefAction = (window.APP_CONFIG && window.APP_CONFIG.API_ACTIONS && window.APP_CONFIG.API_ACTIONS.GET_TIM_REF)
+        ? window.APP_CONFIG.API_ACTIONS.GET_TIM_REF
+        : 'getTimRef';
+
+      const result = await callApi(timRefAction, { id_tim: idTim });
       const rows = result && Array.isArray(result.data) ? result.data : [];
       SCOPE_TIM_ROWS_CACHE = rows.map((row) => ({
         kecamatan: firstNonEmpty(row.kecamatan, row.nama_kecamatan),
@@ -349,12 +366,12 @@
       })).filter((row) => row.kecamatan || row.desa_kelurahan || row.dusun_rw);
 
       if (!SCOPE_TIM_ROWS_CACHE.length) {
-        SCOPE_TIM_ROWS_CACHE = buildRowsFromProfileScope();
+        SCOPE_TIM_ROWS_CACHE = profileScopeRows;
       }
 
       return SCOPE_TIM_ROWS_CACHE;
     } catch (_) {
-      SCOPE_TIM_ROWS_CACHE = buildRowsFromProfileScope();
+      SCOPE_TIM_ROWS_CACHE = profileScopeRows;
       return SCOPE_TIM_ROWS_CACHE;
     }
   }
@@ -374,8 +391,43 @@
 
   function getProfile() {
     if (window.Session && isFunction(window.Session.getProfile)) {
-      return window.Session.getProfile() || {};
+      const sessionProfile = window.Session.getProfile() || {};
+      if (sessionProfile && typeof sessionProfile === 'object' && Object.keys(sessionProfile).length) {
+        return sessionProfile;
+      }
     }
+
+    if (window.AppState && isFunction(window.AppState.getProfile)) {
+      const stateProfile = window.AppState.getProfile() || {};
+      if (stateProfile && typeof stateProfile === 'object' && Object.keys(stateProfile).length) {
+        return stateProfile;
+      }
+    }
+
+    const storage = getStorage();
+    const keys = getStorageKeys();
+    if (storage && isFunction(storage.get) && keys.PROFILE) {
+      const storedProfile = storage.get(keys.PROFILE, {}) || {};
+      if (storedProfile && typeof storedProfile === 'object' && Object.keys(storedProfile).length) {
+        return storedProfile;
+      }
+    }
+
+    try {
+      const rawProfile = window.localStorage.getItem((keys && keys.PROFILE) || 'tpk_profile');
+      const parsedProfile = safeJsonParse(rawProfile, {});
+      if (parsedProfile && typeof parsedProfile === 'object' && Object.keys(parsedProfile).length) {
+        return parsedProfile;
+      }
+    } catch (_) {}
+
+    if (window.AppBootstrap && isFunction(window.AppBootstrap.getCachedProfile)) {
+      const cachedProfile = window.AppBootstrap.getCachedProfile() || {};
+      if (cachedProfile && typeof cachedProfile === 'object' && Object.keys(cachedProfile).length) {
+        return cachedProfile;
+      }
+    }
+
     return {};
   }
 
@@ -927,13 +979,14 @@
       const dusunEl = byId('reg-dusun');
 
       if (!rows.length) {
-        const fallbackKecamatan = splitScopedValues(fallback.kecamatan || '');
-        const fallbackDesa = splitScopedValues(fallback.desa || '');
-        const fallbackDusun = splitScopedValues(fallback.dusun || '');
+        const profileScope = getProfileScopeLite();
+        const fallbackKecamatan = splitScopedValues(fallback.kecamatan || profileScope.nama_kecamatan || '');
+        const fallbackDesa = splitScopedValues(fallback.desa || profileScope.nama_desa || '');
+        const fallbackDusun = splitScopedValues(fallback.dusun || profileScope.nama_dusun || '');
 
-        const finalFallbackKecamatan = fillSelectOptions(kecEl, fallbackKecamatan, fallbackKecamatan[0] || fallback.kecamatan || '');
-        const finalFallbackDesa = fillSelectOptions(desaEl, fallbackDesa, fallbackDesa[0] || fallback.desa || '');
-        const finalFallbackDusun = fillSelectOptions(dusunEl, fallbackDusun, fallbackDusun[0] || fallback.dusun || '');
+        const finalFallbackKecamatan = fillSelectOptions(kecEl, fallbackKecamatan, safeTrim(fallback.kecamatan || profileScope.nama_kecamatan || fallbackKecamatan[0] || ''));
+        const finalFallbackDesa = fillSelectOptions(desaEl, fallbackDesa, safeTrim(fallback.desa || profileScope.nama_desa || fallbackDesa[0] || ''));
+        const finalFallbackDusun = fillSelectOptions(dusunEl, fallbackDusun, safeTrim(fallback.dusun || profileScope.nama_dusun || fallbackDusun[0] || ''));
 
         setSelectEditableByOptionCount(kecEl, finalFallbackKecamatan.length);
         setSelectEditableByOptionCount(desaEl, finalFallbackDesa.length);
