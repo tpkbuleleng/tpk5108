@@ -2193,6 +2193,367 @@
   })();
   // --- V4 hotfix end ---
 
+
+  /* ===== HOTFIX V6: cascade wilayah pasangan CATIN + hard numeric constraints ===== */
+  const NUMERIC_RULES_V6 = {
+    berat_badan_sebelum_hamil: {
+      min: 25,
+      max: 200,
+      step: '0.1',
+      label: 'Berat Badan Sebelum Hamil',
+      decimals: 1
+    },
+    berat_badan_lahir: {
+      min: 0.5,
+      max: 6,
+      step: '0.1',
+      label: 'Berat Badan Lahir',
+      decimals: 1
+    },
+    panjang_badan_lahir: {
+      min: 20,
+      max: 70,
+      step: '1',
+      label: 'Panjang Badan Lahir',
+      decimals: 0
+    }
+  };
+
+  function uniqueRowsByFieldsV6(rows) {
+    const seen = {};
+    return (rows || []).filter((row) => {
+      const key = [
+        safeTrim(firstNonEmpty(row.kabupaten)),
+        safeTrim(firstNonEmpty(row.kecamatan)),
+        safeTrim(firstNonEmpty(row.desa_kelurahan, row.nama_desa, row.nama_desa_kelurahan))
+      ].join('|');
+      if (!key) return false;
+      if (seen[key]) return false;
+      seen[key] = true;
+      return true;
+    });
+  }
+
+  function normalizeWilayahBaliRowsV6(rows) {
+    return uniqueRowsByFieldsV6((rows || []).map((row) => ({
+      kabupaten: firstNonEmpty(row.kabupaten),
+      kecamatan: firstNonEmpty(row.kecamatan),
+      desa_kelurahan: firstNonEmpty(row.desa_kelurahan, row.nama_desa, row.nama_desa_kelurahan)
+    }))).sort((a, b) => {
+      const ka = safeTrim(a.kabupaten);
+      const kb = safeTrim(b.kabupaten);
+      if (ka !== kb) return ka.localeCompare(kb, 'id');
+      const ca = safeTrim(a.kecamatan);
+      const cb = safeTrim(b.kecamatan);
+      if (ca !== cb) return ca.localeCompare(cb, 'id');
+      return safeTrim(a.desa_kelurahan).localeCompare(safeTrim(b.desa_kelurahan), 'id');
+    });
+  }
+
+  function fillSelectOptionsKeepSelectionV6(selectEl, values, preferred) {
+    return fillSelectOptionsV4(selectEl, values, preferred || (selectEl && selectEl.value) || '');
+  }
+
+  function ensureEditableV6(el) {
+    if (!el) return;
+    setReadonly(el, false);
+    el.disabled = false;
+  }
+
+  function bindDigitsOnlyMaxV6(el, maxLength) {
+    if (!el || el.dataset.v6DigitsBound === '1') return;
+    el.dataset.v6DigitsBound = '1';
+    el.setAttribute('inputmode', 'numeric');
+    el.setAttribute('maxlength', String(maxLength));
+    const sanitize = () => {
+      const digits = String(el.value || '').replace(/\D+/g, '').slice(0, maxLength);
+      if (el.value !== digits) el.value = digits;
+    };
+    el.addEventListener('input', sanitize);
+    el.addEventListener('blur', sanitize);
+  }
+
+  function bindNumericRangeV6(el, rule) {
+    if (!el || !rule) return;
+    if (el.dataset.v6RangeBound === '1') return;
+    el.dataset.v6RangeBound = '1';
+    el.setAttribute('type', 'number');
+    el.setAttribute('inputmode', 'decimal');
+    el.setAttribute('step', rule.step || 'any');
+    if (rule.min !== undefined) el.setAttribute('min', String(rule.min));
+    if (rule.max !== undefined) el.setAttribute('max', String(rule.max));
+
+    function normalize() {
+      const raw = String(el.value || '').trim().replace(',', '.');
+      if (!raw) return;
+      let n = Number(raw);
+      if (Number.isNaN(n)) {
+        el.value = '';
+        return;
+      }
+      if (rule.decimals === 0) n = Math.round(n);
+      if (rule.decimals === 1) n = Math.round(n * 10) / 10;
+      if (n < rule.min || n > rule.max) {
+        el.value = '';
+        notify(`${rule.label} harus antara ${rule.min} sampai ${rule.max}.`, 'warning');
+        return;
+      }
+      el.value = String(n);
+    }
+
+    el.addEventListener('blur', normalize);
+  }
+
+  RegistrasiForm.applyInputConstraintsV6 = function () {
+    bindDigitsOnlyMaxV6(this.findDynamicInput('nik_pasangan'), 16);
+    Object.keys(NUMERIC_RULES_V6).forEach((code) => {
+      bindNumericRangeV6(this.findDynamicInput(code), NUMERIC_RULES_V6[code]);
+    });
+  };
+
+  RegistrasiForm.bindCatinPartnerCascadeV6 = async function () {
+    const jenis = toUpper(byId('reg-jenis-sasaran') && byId('reg-jenis-sasaran').value);
+    if (jenis !== 'CATIN') return;
+
+    const rowsRaw = await fetchMasterWilayahRowsV4();
+    const rows = normalizeWilayahBaliRowsV6(rowsRaw);
+    if (!rows.length) return;
+
+    const kabEl = this.findDynamicInput('kabupaten_asal_pasangan');
+    const kecEl = this.findDynamicInput('kecamatan_asal_pasangan');
+    const desaEl = this.findDynamicInput('desa_asal_pasangan');
+    const dusunEl = this.findDynamicInput('dusun_asal_pasangan');
+    if (!kabEl || !kecEl || !desaEl) return;
+
+    const renderCascade = (changedLevel) => {
+      const selectedKab = safeTrim(kabEl.value);
+      if (changedLevel === 'kabupaten') {
+        kecEl.value = '';
+        desaEl.value = '';
+      }
+      const rowsKab = selectedKab
+        ? rows.filter((row) => safeTrim(row.kabupaten) === selectedKab)
+        : rows.slice();
+
+      const kabupatenOptions = uniqueStringsV4(rows.map((row) => row.kabupaten));
+      fillSelectOptionsKeepSelectionV6(kabEl, kabupatenOptions, selectedKab);
+
+      const selectedKec = safeTrim(kecEl.value);
+      const kecamatanOptions = uniqueStringsV4(rowsKab.map((row) => row.kecamatan));
+      fillSelectOptionsKeepSelectionV6(kecEl, kecamatanOptions, selectedKec);
+
+      const activeKec = safeTrim(kecEl.value);
+      if (changedLevel === 'kecamatan') {
+        desaEl.value = '';
+      }
+      const rowsKec = activeKec
+        ? rowsKab.filter((row) => safeTrim(row.kecamatan) === activeKec)
+        : rowsKab.slice();
+
+      const selectedDesa = safeTrim(desaEl.value);
+      const desaOptions = uniqueStringsV4(rowsKec.map((row) => row.desa_kelurahan));
+      fillSelectOptionsKeepSelectionV6(desaEl, desaOptions, selectedDesa);
+
+      ensureEditableV6(kabEl);
+      ensureEditableV6(kecEl);
+      ensureEditableV6(desaEl);
+      ensureEditableV6(dusunEl);
+    };
+
+    if (kabEl.dataset.v6CascadeBound !== '1') {
+      kabEl.dataset.v6CascadeBound = '1';
+      kabEl.addEventListener('change', () => {
+        renderCascade('kabupaten');
+        this.handleAnyFormChange();
+      });
+    }
+
+    if (kecEl.dataset.v6CascadeBound !== '1') {
+      kecEl.dataset.v6CascadeBound = '1';
+      kecEl.addEventListener('change', () => {
+        renderCascade('kecamatan');
+        this.handleAnyFormChange();
+      });
+    }
+
+    renderCascade('');
+  };
+
+  const _origRenderDynamicFieldsV6 = RegistrasiForm.renderDynamicFields;
+  RegistrasiForm.renderDynamicFields = function (sections) {
+    const out = _origRenderDynamicFieldsV6.call(this, sections);
+    Promise.resolve().then(() => this.bindCatinPartnerCascadeV6()).catch(function () {});
+    this.applyInputConstraintsV6();
+    return out;
+  };
+
+  const _origFillDynamicFieldsV6 = RegistrasiForm.fillDynamicFields;
+  RegistrasiForm.fillDynamicFields = function (values) {
+    const out = _origFillDynamicFieldsV6.call(this, values);
+    Promise.resolve().then(() => this.bindCatinPartnerCascadeV6()).catch(function () {});
+    this.applyInputConstraintsV6();
+    return out;
+  };
+
+  const _origValidateV6 = RegistrasiForm.validate;
+  RegistrasiForm.validate = function (data) {
+    let issues = (_origValidateV6.call(this, data) || []).filter((item) => item && item.type !== 'ok');
+
+    const answers = (data && data.answers) || {};
+    const nikPasangan = safeTrim(answers.nik_pasangan);
+    if (nikPasangan && !/^\d{16}$/.test(nikPasangan)) {
+      issues.push({ type: 'error', text: 'NIK Pasangan harus 16 digit angka.' });
+    }
+
+    Object.keys(NUMERIC_RULES_V6).forEach((code) => {
+      const raw = safeTrim(answers[code]);
+      if (!raw) return;
+      const value = Number(String(raw).replace(',', '.'));
+      const rule = NUMERIC_RULES_V6[code];
+      if (Number.isNaN(value) || value < rule.min || value > rule.max) {
+        issues.push({ type: 'error', text: `${rule.label} harus antara ${rule.min} sampai ${rule.max}.` });
+      }
+    });
+
+    if (!issues.some((item) => item.type === 'error')) {
+      issues.push({
+        type: 'ok',
+        text: getMode() === 'edit'
+          ? 'Validasi edit sasaran lolos. Perubahan siap disimpan.'
+          : 'Validasi registrasi sasaran lolos. Data siap dikirim.'
+      });
+    }
+
+    return issues;
+  };
+
+  RegistrasiForm.applyQuestionOverrides = function (question, jenisSasaran) {
+    const q = Object.assign({}, question || {});
+    if (jenisSasaran === 'BADUTA' && q.code === 'berat_badan_lahir') {
+      q.label = 'Berat Badan Lahir (Kg)';
+      q.placeholder = 'Contoh: 2.8';
+      q.help_text = 'Masukkan berat badan lahir dalam Kg (0.5 - 6 Kg).';
+      q.field_type = 'number';
+      q.data_type = 'decimal';
+      q.min_value = 0.5;
+      q.max_value = 6;
+    }
+    if (jenisSasaran === 'BADUTA' && q.code === 'panjang_badan_lahir') {
+      q.label = 'Panjang Badan Lahir (Cm)';
+      q.placeholder = 'Contoh: 49';
+      q.help_text = 'Masukkan panjang badan lahir dalam Cm (20 - 70 Cm).';
+      q.field_type = 'number';
+      q.data_type = 'integer';
+      q.min_value = 20;
+      q.max_value = 70;
+    }
+    if (jenisSasaran === 'BUMIL' && q.code === 'kehamilan_diinginkan') {
+      q.options = [
+        { value: 'YA_INGIN_HAMIL_SEGERA', label: 'Ya, Ingin Hamil Segera', order: 1 },
+        { value: 'TIDAK_INGIN_HAMIL_NANTI', label: 'Tidak, Ingin Hamil Nanti', order: 2 },
+        { value: 'TIDAK_INGIN_HAMIL_LAGI', label: 'Tidak Ingin Hamil Lagi', order: 3 }
+      ];
+      q.help_text = 'Kehamilan diinginkan atau tidak';
+    }
+    if (jenisSasaran === 'BUMIL' && q.code === 'berat_badan_sebelum_hamil') {
+      q.label = 'Berat Badan Sebelum Hamil (Kg)';
+      q.placeholder = 'Contoh: 48';
+      q.help_text = 'Masukkan berat badan sebelum hamil dalam Kg (25 - 200 Kg).';
+      q.field_type = 'number';
+      q.data_type = 'decimal';
+      q.min_value = 25;
+      q.max_value = 200;
+    }
+    if (jenisSasaran === 'BUFAS' && q.code === 'cara_persalinan') {
+      q.options = (q.options || []).filter((opt) => {
+        const label = toUpper(opt && opt.label);
+        return label !== 'VAKUM / FORSEP' && label !== 'LAINNYA';
+      });
+    }
+    return q;
+  };
+
+  RegistrasiForm.applyDefinitionOverrides = function (definition, jenisSasaran, refs) {
+    const jenis = toUpper(jenisSasaran);
+    const masterWilayahRows = Array.isArray(refs && refs.master_wilayah) ? refs.master_wilayah : [];
+    const rowsBali = normalizeWilayahBaliRowsV6(masterWilayahRows);
+    const sections = (definition.sections || []).map((section) => Object.assign({}, section, {
+      questions: (section.questions || []).map((question) => this.applyQuestionOverrides(question, jenis)).filter(Boolean)
+    }));
+
+    let noteQuestions = [];
+    sections.forEach((section) => {
+      const keep = [];
+      (section.questions || []).forEach((question) => {
+        if (question.code === 'keterangan_tambahan_awal' || question.code === 'keterangan_tambahan') {
+          noteQuestions.push(Object.assign({}, question, { section_label: 'Catatan Tambahan' }));
+          return;
+        }
+        keep.push(question);
+      });
+      section.questions = keep;
+    });
+
+    if (jenis === 'CATIN') {
+      sections.forEach((section) => {
+        section.questions = (section.questions || []).filter((question) => {
+          return question.code !== 'data_pasangan' && question.code !== 'domisili_setelah_menikah';
+        });
+      });
+
+      const kabupatenOptions = uniqueStringsV4(rowsBali.map((row) => row.kabupaten));
+      const kecamatanOptions = uniqueStringsV4(rowsBali.map((row) => row.kecamatan));
+      const desaOptions = uniqueStringsV4(rowsBali.map((row) => row.desa_kelurahan));
+      const buildOptions = (items) => items.map((value, index) => ({ value: value, label: value, order: index + 1 }));
+
+      sections.push({
+        section_id: 'SEC-CATIN-PASANGAN',
+        section_label: 'Data Pasangan CATIN',
+        section_order: 850,
+        questions: [
+          { question_id:'OVR-CATIN-NAMA-PASANGAN', code:'nama_pasangan', label:'Nama Pasangan', short_label:'Nama Pasangan', help_text:'Nama lengkap pasangan CATIN.', placeholder:'Masukkan nama pasangan', field_type:'text', data_type:'string', is_required:true, is_editable:true, section_id:'SEC-CATIN-PASANGAN', section_label:'Data Pasangan CATIN', section_order:850, question_order:10, options:[], rules:[] },
+          { question_id:'OVR-CATIN-NIK-PASANGAN', code:'nik_pasangan', label:'NIK Pasangan', short_label:'NIK Pasangan', help_text:'Jika tidak diketahui, gunakan 16 digit angka 9.', placeholder:'16 digit NIK pasangan', field_type:'text', data_type:'string', is_required:true, is_editable:true, section_id:'SEC-CATIN-PASANGAN', section_label:'Data Pasangan CATIN', section_order:850, question_order:20, options:[], rules:[] },
+          { question_id:'OVR-CATIN-KAB-ASAL', code:'kabupaten_asal_pasangan', label:'Kabupaten Asal Pasangan', short_label:'Kabupaten Asal', help_text:'Pilih kabupaten asal pasangan.', placeholder:'', field_type:'select', data_type:'string', is_required:true, is_editable:true, section_id:'SEC-CATIN-PASANGAN', section_label:'Data Pasangan CATIN', section_order:850, question_order:30, options:buildOptions(kabupatenOptions), rules:[] },
+          { question_id:'OVR-CATIN-KEC-ASAL', code:'kecamatan_asal_pasangan', label:'Kecamatan Asal Pasangan', short_label:'Kecamatan Asal', help_text:'Pilih kecamatan asal pasangan.', placeholder:'', field_type:'select', data_type:'string', is_required:true, is_editable:true, section_id:'SEC-CATIN-PASANGAN', section_label:'Data Pasangan CATIN', section_order:850, question_order:40, options:buildOptions(kecamatanOptions), rules:[] },
+          { question_id:'OVR-CATIN-DESA-ASAL', code:'desa_asal_pasangan', label:'Desa Asal Pasangan', short_label:'Desa Asal', help_text:'Pilih desa/kelurahan asal pasangan.', placeholder:'', field_type:'select', data_type:'string', is_required:true, is_editable:true, section_id:'SEC-CATIN-PASANGAN', section_label:'Data Pasangan CATIN', section_order:850, question_order:50, options:buildOptions(desaOptions), rules:[] },
+          { question_id:'OVR-CATIN-DUSUN-ASAL', code:'dusun_asal_pasangan', label:'Dusun Asal Pasangan', short_label:'Dusun Asal', help_text:'Isi teks dusun/banjar/lingkungan asal pasangan.', placeholder:'Masukkan dusun asal pasangan', field_type:'text', data_type:'string', is_required:true, is_editable:true, section_id:'SEC-CATIN-PASANGAN', section_label:'Data Pasangan CATIN', section_order:850, question_order:60, options:[], rules:[] }
+        ]
+      });
+    }
+
+    if (noteQuestions.length) {
+      noteQuestions = noteQuestions.map((question, index) => Object.assign({}, question, {
+        question_order: 900 + index,
+        section_id: 'SEC-CATATAN-AKHIR',
+        section_label: 'Catatan Tambahan',
+        section_order: 999
+      }));
+      sections.push({
+        section_id: 'SEC-CATATAN-AKHIR',
+        section_label: 'Catatan Tambahan',
+        section_order: 999,
+        questions: noteQuestions
+      });
+    }
+
+    const cleanedSections = sections
+      .map((section) => Object.assign({}, section, {
+        questions: (section.questions || []).sort((a, b) => Number(a.question_order || 0) - Number(b.question_order || 0))
+      }))
+      .filter((section) => section.questions && section.questions.length)
+      .sort((a, b) => Number(a.section_order || 0) - Number(b.section_order || 0));
+
+    const flatQuestions = [];
+    cleanedSections.forEach((section) => {
+      (section.questions || []).forEach((question) => flatQuestions.push(question));
+    });
+
+    return Object.assign({}, definition, {
+      sections: cleanedSections,
+      questions: flatQuestions
+    });
+  };
+
   window.RegistrasiForm = RegistrasiForm;
 
   if (document.readyState === 'loading') {
