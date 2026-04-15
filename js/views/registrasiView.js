@@ -2718,17 +2718,55 @@
   function bindNumericGuard(code, min, max, label, decimals) {
     const el = byCode(code);
     if (!el) return;
-    if (el.dataset.v7RangeBound === '1') return;
-    el.dataset.v7RangeBound = '1';
+    if (el.dataset.v8RangeBound === '1') return;
+    el.dataset.v8RangeBound = '1';
     el.setAttribute('type', 'number');
     el.setAttribute('inputmode', 'decimal');
     el.setAttribute('step', decimals ? '0.1' : '1');
     el.setAttribute('min', String(min));
     el.setAttribute('max', String(max));
 
-    const normalize = () => {
-      const raw = s(el.value).replace(',', '.');
-      if (!raw) return;
+    const sanitizeRaw = () => {
+      let raw = s(el.value).replace(',', '.');
+      raw = raw.replace(/[^0-9.\-]/g, '');
+      const firstDot = raw.indexOf('.');
+      if (firstDot >= 0) {
+        raw = raw.slice(0, firstDot + 1) + raw.slice(firstDot + 1).replace(/\./g, '');
+      }
+      if (!decimals) raw = raw.replace(/\./g, '');
+      return raw;
+    };
+
+    const softNormalize = () => {
+      const raw = sanitizeRaw();
+      if (!raw) {
+        el.value = '';
+        return;
+      }
+      let n = Number(raw);
+      if (Number.isNaN(n)) {
+        el.value = '';
+        return;
+      }
+      if (!decimals) n = Math.round(n);
+      else n = Math.round(n * 10) / 10;
+      if (n > max) {
+        el.value = String(max);
+        return;
+      }
+      if (n < 0) {
+        el.value = '';
+        return;
+      }
+      el.value = String(n);
+    };
+
+    const hardValidate = () => {
+      const raw = sanitizeRaw();
+      if (!raw) {
+        el.value = '';
+        return;
+      }
       let n = Number(raw);
       if (Number.isNaN(n)) {
         el.value = '';
@@ -2744,8 +2782,9 @@
       el.value = String(n);
     };
 
-    el.addEventListener('blur', normalize);
-    el.addEventListener('change', normalize);
+    el.addEventListener('input', softNormalize);
+    el.addEventListener('blur', hardValidate);
+    el.addEventListener('change', hardValidate);
   }
 
   RF.applyInputConstraintsV7 = function () {
