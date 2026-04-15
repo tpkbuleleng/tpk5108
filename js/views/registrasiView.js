@@ -877,6 +877,8 @@
         section_label: safeTrim(firstNonEmpty(question.section_label, section && section.section_label)),
         section_order: Number(firstNonEmpty(question.section_order, section && section.section_order, 999)),
         question_order: Number(firstNonEmpty(question.question_order, qIndex + 1)),
+        min_value: firstNonEmpty(question.min_value, ''),
+        max_value: firstNonEmpty(question.max_value, ''),
         options: Array.isArray(question.options) ? question.options.map((opt, idx) => ({
           value: safeTrim(firstNonEmpty(opt.value, opt.option_value)),
           label: safeTrim(firstNonEmpty(opt.label, opt.option_label, opt.value, opt.option_value)),
@@ -972,6 +974,11 @@
           </select>
         `;
       } else {
+        const minAttr = (question.min_value !== undefined && question.min_value !== null && question.min_value !== '') ? `min="${escapeHtml(question.min_value)}"` : '';
+        const maxAttr = (question.max_value !== undefined && question.max_value !== null && question.max_value !== '') ? `max="${escapeHtml(question.max_value)}"` : '';
+        const stepAttr = question.field_type === 'number'
+          ? `step="${question.data_type === 'integer' ? '1' : 'any'}"`
+          : '';
         inputHtml = `
           <input
             id="dyn-${escapeHtml(code)}"
@@ -979,7 +986,9 @@
             type="${question.field_type === 'date' ? 'date' : (question.field_type === 'number' ? 'number' : 'text')}"
             value="${value}"
             placeholder="${placeholder}"
-            ${question.field_type === 'number' ? 'step="any"' : ''}
+            ${minAttr}
+            ${maxAttr}
+            ${stepAttr}
           />
         `;
       }
@@ -1318,6 +1327,19 @@
 
         if ((question.field_type === 'number' || question.data_type === 'integer' || question.data_type === 'decimal') && isRequired(value) && Number.isNaN(Number(value))) {
           issues.push({ type: 'error', text: `${question.label} harus berupa angka.` });
+        }
+
+        if (isRequired(value) && !Number.isNaN(Number(value))) {
+          const numericValue = Number(value);
+          if (question.code === 'berat_badan_sebelum_hamil' && (numericValue < 25 || numericValue > 200)) {
+            issues.push({ type: 'error', text: 'Berat Badan Sebelum Hamil harus antara 25 sampai 200 Kg.' });
+          }
+          if (question.code === 'berat_badan_lahir' && (numericValue < 0.5 || numericValue > 6)) {
+            issues.push({ type: 'error', text: 'Berat Badan Lahir harus antara 0,5 sampai 6 Kg.' });
+          }
+          if (question.code === 'panjang_badan_lahir' && (numericValue < 20 || numericValue > 70)) {
+            issues.push({ type: 'error', text: 'Panjang Badan Lahir harus antara 20 sampai 70 Cm.' });
+          }
         }
 
         if ((question.field_type === 'date' || question.data_type === 'date') && isRequired(value) && !isDateNotFuture(value)) {
@@ -1800,7 +1822,8 @@
       if (!rows.length) {
         const kec = fillSelectOptionsV4(kecEl, [fallbackKecamatan], fallbackKecamatan);
         const desa = fillSelectOptionsV4(desaEl, [fallbackDesa], fallbackDesa);
-        const dusun = fillSelectOptionsV4(dusunEl, splitCombinedOptionsV4(fallbackDusun), splitCombinedOptionsV4(fallbackDusun)[0] || fallbackDusun);
+        const dusunParts = splitCombinedOptionsV4(fallbackDusun);
+        const dusun = fillSelectOptionsV4(dusunEl, dusunParts, dusunParts[0] || fallbackDusun);
         setSelectEditableByOptionCountV4(kecEl, kec.length);
         setSelectEditableByOptionCountV4(desaEl, desa.length);
         setSelectEditableByOptionCountV4(dusunEl, dusun.length);
@@ -1809,7 +1832,7 @@
 
       const selectedKecamatan = safeTrim(fallback.kecamatan || (kecEl && kecEl.value) || fallbackKecamatan);
       const selectedDesa = safeTrim(fallback.desa || (desaEl && desaEl.value) || fallbackDesa);
-      const selectedDusun = safeTrim(fallback.dusun || (dusunEl && dusunEl.value) || splitCombinedOptionsV4(fallbackDusun)[0] || fallbackDusun);
+      const selectedDusun = safeTrim(splitCombinedOptionsV4(fallback.dusun || (dusunEl && dusunEl.value) || fallbackDusun)[0] || fallback.dusun || (dusunEl && dusunEl.value) || fallbackDusun);
 
       const kecamatanOptions = uniqueStringsV4(rows.map(function (row) { return row.kecamatan; }));
       const finalKecamatanOptions = fillSelectOptionsV4(kecEl, kecamatanOptions, selectedKecamatan);
@@ -1820,7 +1843,8 @@
 
       const activeDesa = safeTrim(desaEl && desaEl.value);
       const rowsByDesa = activeDesa ? rowsByKecamatan.filter(function (row) { return safeTrim(row.desa_kelurahan) === activeDesa; }) : rowsByKecamatan.slice();
-      const finalDusunOptions = fillSelectOptionsV4(dusunEl, uniqueStringsV4(rowsByDesa.map(function (row) { return row.dusun_rw; })), selectedDusun);
+      const dusunOptionValues = uniqueStringsV4([].concat.apply([], rowsByDesa.map(function (row) { return splitCombinedOptionsV4(row.dusun_rw); })));
+      const finalDusunOptions = fillSelectOptionsV4(dusunEl, dusunOptionValues, selectedDusun);
 
       setSelectEditableByOptionCountV4(kecEl, finalKecamatanOptions.length);
       setSelectEditableByOptionCountV4(desaEl, finalDesaOptions.length);
@@ -1973,6 +1997,44 @@
             q.help_text = 'Masukkan berat badan lahir dalam Kg.';
             q.field_type = 'number';
             q.data_type = 'decimal';
+            q.min_value = '0.5';
+            q.max_value = '6';
+            q.is_editable = true;
+          }
+          if (jenisSasaran === 'BADUTA' && q.code === 'panjang_badan_lahir') {
+            q.label = 'Panjang Badan Lahir (Cm)';
+            q.placeholder = 'Contoh: 48';
+            q.help_text = 'Masukkan panjang badan lahir dalam Cm.';
+            q.field_type = 'number';
+            q.data_type = 'decimal';
+            q.min_value = '20';
+            q.max_value = '70';
+            q.is_editable = true;
+          }
+          if (jenisSasaran === 'BUMIL' && q.code === 'kehamilan_diinginkan') {
+            q.options = [
+              { value: 'YA_INGIN_HAMIL_SEGERA', label: 'Ya, Ingin Hamil Segera', order: 1 },
+              { value: 'TIDAK_INGIN_HAMIL_NANTI', label: 'Tidak, Ingin Hamil Nanti', order: 2 },
+              { value: 'TIDAK_INGIN_HAMIL_LAGI', label: 'Tidak Ingin Hamil Lagi', order: 3 }
+            ];
+            q.is_editable = true;
+          }
+          if (jenisSasaran === 'BUMIL' && q.code === 'berat_badan_sebelum_hamil') {
+            q.label = 'Berat Badan Sebelum Hamil (Kg)';
+            q.placeholder = 'Contoh: 45';
+            q.help_text = 'Masukkan berat badan sebelum hamil dalam Kg.';
+            q.field_type = 'number';
+            q.data_type = 'decimal';
+            q.min_value = '25';
+            q.max_value = '200';
+            q.is_editable = true;
+          }
+          if (jenisSasaran === 'BUFAS' && q.code === 'cara_persalinan') {
+            q.options = (q.options || []).filter(function (opt) {
+              var label = toUpper(opt.label || opt.value);
+              return label !== 'VAKUM / FORSEP' && label !== 'VAKUM/FORSEP' && label !== 'LAINNYA';
+            });
+            q.is_editable = true;
           }
           if (q.code === 'keterangan_tambahan_awal' || q.code === 'keterangan_tambahan') {
             noteQuestions.push(Object.assign({}, q));
@@ -1998,12 +2060,12 @@
           section_label: 'Data Pasangan CATIN',
           section_order: 850,
           questions: [
-            {question_id:'OVR-CATIN-NAMA-PASANGAN', code:'nama_pasangan', label:'Nama Pasangan', short_label:'Nama Pasangan', help_text:'Nama lengkap pasangan CATIN.', placeholder:'Masukkan nama pasangan', field_type:'text', data_type:'string', is_required:true, section_id:'SEC-CATIN-PASANGAN', section_label:'Data Pasangan CATIN', section_order:850, question_order:10, options:[], rules:[]},
-            {question_id:'OVR-CATIN-NIK-PASANGAN', code:'nik_pasangan', label:'NIK Pasangan', short_label:'NIK Pasangan', help_text:'Jika tidak diketahui, gunakan 16 digit angka 9.', placeholder:'16 digit NIK pasangan', field_type:'text', data_type:'string', is_required:true, section_id:'SEC-CATIN-PASANGAN', section_label:'Data Pasangan CATIN', section_order:850, question_order:20, options:[], rules:[]},
-            {question_id:'OVR-CATIN-KAB-ASAL', code:'kabupaten_asal_pasangan', label:'Kabupaten Asal Pasangan', short_label:'Kabupaten Asal', help_text:'Pilih kabupaten asal pasangan.', placeholder:'', field_type:'select', data_type:'string', is_required:true, section_id:'SEC-CATIN-PASANGAN', section_label:'Data Pasangan CATIN', section_order:850, question_order:30, options:buildOptions(kabupatenOptions), rules:[]},
-            {question_id:'OVR-CATIN-KEC-ASAL', code:'kecamatan_asal_pasangan', label:'Kecamatan Asal Pasangan', short_label:'Kecamatan Asal', help_text:'Pilih kecamatan asal pasangan.', placeholder:'', field_type:'select', data_type:'string', is_required:true, section_id:'SEC-CATIN-PASANGAN', section_label:'Data Pasangan CATIN', section_order:850, question_order:40, options:buildOptions(kecamatanOptions), rules:[]},
-            {question_id:'OVR-CATIN-DESA-ASAL', code:'desa_asal_pasangan', label:'Desa Asal Pasangan', short_label:'Desa Asal', help_text:'Pilih desa/kelurahan asal pasangan.', placeholder:'', field_type:'select', data_type:'string', is_required:true, section_id:'SEC-CATIN-PASANGAN', section_label:'Data Pasangan CATIN', section_order:850, question_order:50, options:buildOptions(desaOptions), rules:[]},
-            {question_id:'OVR-CATIN-DUSUN-ASAL', code:'dusun_asal_pasangan', label:'Dusun Asal Pasangan', short_label:'Dusun Asal', help_text:'Isi teks dusun/banjar/lingkungan asal pasangan.', placeholder:'Masukkan dusun asal pasangan', field_type:'text', data_type:'string', is_required:true, section_id:'SEC-CATIN-PASANGAN', section_label:'Data Pasangan CATIN', section_order:850, question_order:60, options:[], rules:[]}
+            {question_id:'OVR-CATIN-NAMA-PASANGAN', code:'nama_pasangan', label:'Nama Pasangan', short_label:'Nama Pasangan', help_text:'Nama lengkap pasangan CATIN.', placeholder:'Masukkan nama pasangan', field_type:'text', data_type:'string', is_required:true, is_editable:true, section_id:'SEC-CATIN-PASANGAN', section_label:'Data Pasangan CATIN', section_order:850, question_order:10, options:[], rules:[]},
+            {question_id:'OVR-CATIN-NIK-PASANGAN', code:'nik_pasangan', label:'NIK Pasangan', short_label:'NIK Pasangan', help_text:'Jika tidak diketahui, gunakan 16 digit angka 9.', placeholder:'16 digit NIK pasangan', field_type:'text', data_type:'string', is_required:true, is_editable:true, section_id:'SEC-CATIN-PASANGAN', section_label:'Data Pasangan CATIN', section_order:850, question_order:20, options:[], rules:[]},
+            {question_id:'OVR-CATIN-KAB-ASAL', code:'kabupaten_asal_pasangan', label:'Kabupaten Asal Pasangan', short_label:'Kabupaten Asal', help_text:'Pilih kabupaten asal pasangan.', placeholder:'', field_type:'select', data_type:'string', is_required:true, is_editable:true, section_id:'SEC-CATIN-PASANGAN', section_label:'Data Pasangan CATIN', section_order:850, question_order:30, options:buildOptions(kabupatenOptions), rules:[]},
+            {question_id:'OVR-CATIN-KEC-ASAL', code:'kecamatan_asal_pasangan', label:'Kecamatan Asal Pasangan', short_label:'Kecamatan Asal', help_text:'Pilih kecamatan asal pasangan.', placeholder:'', field_type:'select', data_type:'string', is_required:true, is_editable:true, section_id:'SEC-CATIN-PASANGAN', section_label:'Data Pasangan CATIN', section_order:850, question_order:40, options:buildOptions(kecamatanOptions), rules:[]},
+            {question_id:'OVR-CATIN-DESA-ASAL', code:'desa_asal_pasangan', label:'Desa Asal Pasangan', short_label:'Desa Asal', help_text:'Pilih desa/kelurahan asal pasangan.', placeholder:'', field_type:'select', data_type:'string', is_required:true, is_editable:true, section_id:'SEC-CATIN-PASANGAN', section_label:'Data Pasangan CATIN', section_order:850, question_order:50, options:buildOptions(desaOptions), rules:[]},
+            {question_id:'OVR-CATIN-DUSUN-ASAL', code:'dusun_asal_pasangan', label:'Dusun Asal Pasangan', short_label:'Dusun Asal', help_text:'Isi teks dusun/banjar/lingkungan asal pasangan.', placeholder:'Masukkan dusun asal pasangan', field_type:'text', data_type:'string', is_required:true, is_editable:true, section_id:'SEC-CATIN-PASANGAN', section_label:'Data Pasangan CATIN', section_order:850, question_order:60, options:[], rules:[]}
           ]
         });
       }
