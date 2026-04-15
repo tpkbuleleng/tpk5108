@@ -91,34 +91,34 @@
     return merged;
   }
 
-
-  function getCurrentRouteSafe() {
+  function getCurrentRouteName() {
     try {
       if (window.Router && typeof window.Router.getCurrentRoute === 'function') {
         return String(window.Router.getCurrentRoute() || '').trim();
       }
+      if (window.Router && window.Router.currentRoute) {
+        return String(window.Router.currentRoute || '').trim();
+      }
       if (window.AppState && typeof window.AppState.getCurrentRoute === 'function') {
         return String(window.AppState.getCurrentRoute() || '').trim();
       }
-    } catch (_) {}
+      if (window.AppState && window.AppState.currentRoute) {
+        return String(window.AppState.currentRoute || '').trim();
+      }
+    } catch (err) {}
     return '';
   }
 
-  function isProtectedActiveRoute(routeName) {
+  function isSafeToForceDashboard(routeName) {
     var route = String(routeName || '').trim();
-    return route === 'registrasi' ||
-      route === 'sasaranList' ||
-      route === 'sasaranDetail' ||
-      route === 'pendampingan' ||
-      route === 'sync' ||
-      route === 'rekapKader';
+    if (!route) return true;
+    return route === 'splash' || route === 'login' || route === 'dashboard';
   }
 
   const AppBootstrap = {
-    async init() {
-      this._initRunId = (this._initRunId || 0) + 1;
-      var initRunId = this._initRunId;
+    _initRunId: 0,
 
+    async init() {
       this.showSplashStatus('Menyiapkan aplikasi...');
       this.applyStaticBranding();
 
@@ -134,23 +134,27 @@
         this.applyProfileToUi(effectiveProfile);
       }
 
+      var initRunId = Date.now();
+      this._initRunId = initRunId;
+      var currentRoute = getCurrentRouteName();
+
       if (token && ((effectiveProfile && Object.keys(effectiveProfile).length) || (cachedBootstrapLite && Object.keys(cachedBootstrapLite).length))) {
-        this.openScreen('dashboard-screen');
-        if (window.Router && typeof window.Router.go === 'function') {
-          window.Router.go('dashboard');
+        if (isSafeToForceDashboard(currentRoute)) {
+          this.openScreen('dashboard-screen');
+          if (window.Router && typeof window.Router.go === 'function') {
+            window.Router.go('dashboard');
+          }
         }
       } else {
-        this.openScreen('login-screen');
+        if (!currentRoute || currentRoute === 'splash' || currentRoute === 'login') {
+          this.openScreen('login-screen');
+        }
       }
 
       if (token) {
         this.showSplashStatus('Memeriksa sesi pengguna...');
-        var sessionOk = await this.restoreSessionAndRoute({
-          preferCachedUi: true,
-          preserveActiveRoute: true,
-          initRunId: initRunId
-        });
-        if (!sessionOk && initRunId === this._initRunId) {
+        var sessionOk = await this.restoreSessionAndRoute({ preferCachedUi: true, initRunId: initRunId });
+        if (!sessionOk && this._initRunId === initRunId) {
           this.openScreen('login-screen');
         }
       }
@@ -316,15 +320,6 @@
       };
     },
 
-
-    shouldPreserveActiveRoute(routeName) {
-      return isProtectedActiveRoute(routeName);
-    },
-
-    getCurrentRouteForRestore() {
-      return getCurrentRouteSafe();
-    },
-
     applyStaticBranding() {
       const logoUrl = window.APP_CONFIG.ASSETS.LOGO_URL;
       const loginLogo = document.getElementById('loginLogo');
@@ -399,6 +394,7 @@
 
     async restoreSessionAndRoute(options) {
       options = options || {};
+      var initRunId = options.initRunId || 0;
 
       try {
         if (!window.Storage || !window.Api) {
@@ -410,8 +406,6 @@
           return false;
         }
 
-        var initRunId = Number(options.initRunId || 0);
-        var routeBeforeRestore = this.getCurrentRouteForRestore();
         var result = null;
 
         if (typeof window.Api.refreshBootstrapLite === 'function') {
@@ -446,14 +440,12 @@
 
         this.applyBootstrapLite(bootstrapLite);
 
-        if (initRunId && initRunId !== Number(this._initRunId || 0)) {
+        if (initRunId && this._initRunId !== initRunId) {
           return true;
         }
 
-        var activeRouteNow = this.getCurrentRouteForRestore() || routeBeforeRestore;
-        var preserveActiveRoute = options.preserveActiveRoute !== false && this.shouldPreserveActiveRoute(activeRouteNow);
-
-        if (!preserveActiveRoute) {
+        var currentRoute = getCurrentRouteName();
+        if (isSafeToForceDashboard(currentRoute)) {
           if (!options.preferCachedUi) {
             this.openScreen('dashboard-screen');
           }
