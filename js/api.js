@@ -1,6 +1,10 @@
 (function (window) {
   'use strict';
 
+  var DEFAULT_TIMEOUT_MS = 45000;
+  var DEFAULT_RETRY_COUNT = 0;
+  var DEFAULT_RETRY_DELAY_MS = 1200;
+
   function nowIso() {
     return new Date().toISOString();
   }
@@ -15,6 +19,10 @@
 
   function log() {
     safeConsole('log', arguments);
+  }
+
+  function warn() {
+    safeConsole('warn', arguments);
   }
 
   function getConfig() {
@@ -309,10 +317,44 @@
     );
   }
 
+  function normalizeFetchError(err) {
+    if (err && err.name === 'AbortError') {
+      return createNetworkError('Permintaan ke server melewati batas waktu.', {
+        error: String(err),
+        is_timeout: true
+      });
+    }
+
+    return createNetworkError(
+      err && err.message ? err.message : 'Koneksi ke backend gagal.',
+      { error: String(err) }
+    );
+  }
+
+  function isRetriableFailure(result) {
+    if (!result) return true;
+    if (result.ok === true) return false;
+    if (result.code === 0) return true;
+
+    var message = String(result.message || '').toLowerCase();
+    if (message.indexOf('batas waktu') >= 0) return true;
+    if (message.indexOf('koneksi') >= 0) return true;
+    if (message.indexOf('network') >= 0) return true;
+    if (message.indexOf('failed to fetch') >= 0) return true;
+    return false;
+  }
+
+  function sleep(ms) {
+    return new Promise(function (resolve) {
+      window.setTimeout(resolve, ms || 0);
+    });
+  }
+
   function getSensitiveStorageKeys(options) {
     var config = getConfig();
     var keys = config.STORAGE_KEYS || {};
     var opts = options || {};
+
     var list = [
       keys.SESSION_TOKEN,
       keys.PROFILE,
@@ -330,9 +372,7 @@
       'tpk_pendampingan_form_cache_v1',
       'tpk_registrasi_draft_v_final',
       'tpk_pendampingan_draft',
-      'tpk_sync_queue_v1',
-      'tpk_app_font_size',
-      'tpk_app_theme'
+      'tpk_sync_queue_v1'
     ];
 
     if (opts.keepDeviceId !== true) {
@@ -394,51 +434,22 @@
     return normalized;
   }
 
-  async function post(action, payload, options) {
-    var config = getConfig();
-    var opts = options || {};
-    var timeoutMs = typeof opts.timeoutMs === 'number'
-      ? opts.timeoutMs
-      : (config.API_TIMEOUT_MS || 15000);
-
-    if (!action) {
-      return createNetworkError('Action API wajib diisi.');
-    }
-
-    var body = buildBody(action, payload || {}, opts);
+  async function doFetchJson(method, url, fetchOptions, timeoutMs) {
     var abortState = createAbortController(timeoutMs);
 
     try {
-      var response = await fetch(getApiBaseUrl(), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'text/plain;charset=utf-8'
-        },
-        body: JSON.stringify(body),
+      var response = await fetch(url, Object.assign({}, fetchOptions, {
+        method: method,
         signal: abortState.controller ? abortState.controller.signal : undefined,
         credentials: 'omit',
         redirect: 'follow',
         mode: 'cors'
-      });
+      }));
 
       var parsed = await parseResponse(response);
-      var normalized = normalizeResponse(parsed, response);
-
-      if (normalized.ok && normalized.data && normalized.data.session_token) {
-        setSessionToken(normalized.data.session_token);
-      }
-
-      return handleAuthFailureCleanup(normalized);
+      return normalizeResponse(parsed, response);
     } catch (err) {
-      if (err && err.name === 'AbortError') {
-        return createNetworkError('Permintaan ke server melewati batas waktu.', {
-          error: String(err)
-        });
-      }
-
-      return createNetworkError(err && err.message ? err.message : 'Koneksi ke backend gagal.', {
-        error: String(err)
-      });
+      return normalizeFetchError(err);
     } finally {
       if (abortState.timer) {
         clearTimeout(abortState.timer);
@@ -446,12 +457,67 @@
     }
   }
 
+  async function executeWithRetry(executor, options) {
+    var opts = options || {};
+    var retryCount = typeof opts.retryCount === 'number' ? opts.retryCount : DEFAULT_RETRY_COUNT;
+    var retryDelayMs = typeof opts.retryDelayMs === 'number' ? opts.retryDelayMs : DEFAULT_RETRY_DELAY_MS;
+
+    var attempt = 0;
+    var result = null;
+
+    while (attempt <= retryCount) {
+      result = await executor(attempt);
+
+      if (!isRetriableFailure(result) || attempt >= retryCount) {
+        return result;
+      }
+
+      warn('API retry attempt:', attempt + 1, result && result.message ? result.message : result);
+      await sleep(retryDelayMs);
+      attempt += 1;
+    }
+
+    return result;
+  }
+
+  async function post(action, payload, options) {
+    var config = getConfig();
+    var opts = options || {};
+    var timeoutMs = typeof opts.timeoutMs === 'number'
+      ? opts.timeoutMs
+      : (config.API_TIMEOUT_MS || DEFAULT_TIMEOUT_MS);
+
+    if (!action) {
+      return createNetworkError('Action API wajib diisi.');
+    }
+
+    var body = buildBody(action, payload || {}, opts);
+
+    var result = await executeWithRetry(function () {
+      return doFetchJson('POST', getApiBaseUrl(), {
+        headers: {
+          'Content-Type': 'text/plain;charset=utf-8'
+        },
+        body: JSON.stringify(body)
+      }, timeoutMs);
+    }, {
+      retryCount: typeof opts.retryCount === 'number' ? opts.retryCount : DEFAULT_RETRY_COUNT,
+      retryDelayMs: typeof opts.retryDelayMs === 'number' ? opts.retryDelayMs : DEFAULT_RETRY_DELAY_MS
+    });
+
+    if (result.ok && result.data && result.data.session_token) {
+      setSessionToken(result.data.session_token);
+    }
+
+    return handleAuthFailureCleanup(result);
+  }
+
   async function get(action, params, options) {
     var config = getConfig();
     var opts = options || {};
     var timeoutMs = typeof opts.timeoutMs === 'number'
       ? opts.timeoutMs
-      : (config.API_TIMEOUT_MS || 15000);
+      : (config.API_TIMEOUT_MS || DEFAULT_TIMEOUT_MS);
 
     if (!action) {
       return createNetworkError('Action API wajib diisi.');
@@ -468,39 +534,23 @@
 
     var queryString = buildQueryString(queryParams);
     var url = getApiBaseUrl() + (queryString ? ('?' + queryString) : '');
-    var abortState = createAbortController(timeoutMs);
 
-    try {
-      var response = await fetch(url, {
-        method: 'GET',
-        signal: abortState.controller ? abortState.controller.signal : undefined,
-        credentials: 'omit',
-        redirect: 'follow',
-        mode: 'cors'
-      });
+    var result = await executeWithRetry(function () {
+      return doFetchJson('GET', url, {}, timeoutMs);
+    }, {
+      retryCount: typeof opts.retryCount === 'number' ? opts.retryCount : DEFAULT_RETRY_COUNT,
+      retryDelayMs: typeof opts.retryDelayMs === 'number' ? opts.retryDelayMs : DEFAULT_RETRY_DELAY_MS
+    });
 
-      var parsed = await parseResponse(response);
-      var normalized = normalizeResponse(parsed, response);
-      return handleAuthFailureCleanup(normalized);
-    } catch (err) {
-      if (err && err.name === 'AbortError') {
-        return createNetworkError('Permintaan ke server melewati batas waktu.', {
-          error: String(err)
-        });
-      }
-
-      return createNetworkError(err && err.message ? err.message : 'Koneksi ke backend gagal.', {
-        error: String(err)
-      });
-    } finally {
-      if (abortState.timer) {
-        clearTimeout(abortState.timer);
-      }
-    }
+    return handleAuthFailureCleanup(result);
   }
 
   async function healthCheck() {
-    return get(getActionName('HEALTH_CHECK', 'healthCheck'), {}, { includeAuth: false, timeoutMs: 8000 });
+    return get(getActionName('HEALTH_CHECK', 'healthCheck'), {}, {
+      includeAuth: false,
+      timeoutMs: 10000,
+      retryCount: 0
+    });
   }
 
   async function login(payload) {
@@ -517,7 +567,9 @@
 
     var result = await post(getActionName('LOGIN', 'login'), data, {
       includeAuth: false,
-      timeoutMs: 12000
+      timeoutMs: 60000,
+      retryCount: 1,
+      retryDelayMs: 1500
     });
 
     if (result.ok && result.data && result.data.session_token) {
@@ -531,7 +583,8 @@
     var opts = options || {};
     var result = await post(getActionName('LOGOUT', 'logout'), payload || {}, {
       includeAuth: true,
-      timeoutMs: 8000
+      timeoutMs: 10000,
+      retryCount: 0
     });
 
     clearSensitiveClientState({
@@ -544,42 +597,54 @@
   async function validateSession(payload) {
     return post(getActionName('VALIDATE_SESSION', 'validateSession'), payload || {}, {
       includeAuth: true,
-      timeoutMs: 8000
+      timeoutMs: 25000,
+      retryCount: 1,
+      retryDelayMs: 1000
     });
   }
 
   async function bootstrapSession(payload) {
     return post(getActionName('BOOTSTRAP_SESSION', 'bootstrapSession'), payload || {}, {
       includeAuth: true,
-      timeoutMs: 10000
+      timeoutMs: 45000,
+      retryCount: 1,
+      retryDelayMs: 1500
     });
   }
 
   async function refreshBootstrapLite(payload) {
     return post(getActionName('REFRESH_BOOTSTRAP_LITE', 'refreshBootstrapLite'), payload || {}, {
       includeAuth: true,
-      timeoutMs: 10000
+      timeoutMs: 30000,
+      retryCount: 1,
+      retryDelayMs: 1200
     });
   }
 
   async function getMyProfileLite(payload) {
     return post(getActionName('GET_MY_PROFILE_LITE', 'getMyProfileLite'), payload || {}, {
       includeAuth: true,
-      timeoutMs: 8000
+      timeoutMs: 25000,
+      retryCount: 1,
+      retryDelayMs: 1000
     });
   }
 
   async function getDashboardSummaryLite(payload) {
     return post(getActionName('GET_DASHBOARD_SUMMARY_LITE', 'getDashboardSummaryLite'), payload || {}, {
       includeAuth: true,
-      timeoutMs: 10000
+      timeoutMs: 30000,
+      retryCount: 1,
+      retryDelayMs: 1200
     });
   }
 
   async function getAppBootstrapRef(payload) {
     return post(getActionName('GET_APP_BOOTSTRAP_REF', 'getAppBootstrapRef'), payload || {}, {
       includeAuth: false,
-      timeoutMs: 10000
+      timeoutMs: 30000,
+      retryCount: 1,
+      retryDelayMs: 1000
     });
   }
 
@@ -595,7 +660,8 @@
 
     return post(getActionName('LOG_CLIENT_ERROR', 'logClientError'), payload, {
       includeAuth: true,
-      timeoutMs: 8000
+      timeoutMs: 8000,
+      retryCount: 0
     });
   }
 
