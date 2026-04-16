@@ -1,8 +1,10 @@
 (function (window, document) {
   'use strict';
 
-  window.__SASARAN_LIST_VIEW_BUILD = '20260412-01';
-  console.log('SasaranListView build aktif:', window.__SASARAN_LIST_VIEW_BUILD);
+  var CACHE_KEY = 'tpk_sasaran_cache_v2';
+  var SELECTED_KEY = 'tpk_selected_sasaran';
+  var DETAIL_CACHE_KEY = 'tpk_sasaran_detail_cache_v1';
+  var CACHE_TTL_MS = 5 * 60 * 1000;
 
   var SCREEN_ID = 'sasaran-list-screen';
   var FILTER_KEYWORD_ID = 'filter-keyword-sasaran';
@@ -10,11 +12,8 @@
   var FILTER_STATUS_ID = 'filter-status-sasaran';
   var BTN_REFRESH_ID = 'btn-refresh-sasaran';
   var BTN_BACK_ID = 'btn-back-dashboard-from-list';
-  var META_ID = 'sasaran-list-meta';
   var CONTAINER_ID = 'sasaran-list-container';
-
-  var LOCAL_SELECTED_KEY = 'tpk_selected_sasaran';
-  var LOCAL_CACHE_KEY = 'tpk_sasaran_cache_v1';
+  var META_ID = 'sasaran-list-meta';
 
   function byId(id) {
     return document.getElementById(id);
@@ -26,10 +25,6 @@
 
   function getRouter() {
     return window.Router || null;
-  }
-
-  function getState() {
-    return window.AppState || null;
   }
 
   function getStorage() {
@@ -44,283 +39,395 @@
     return getConfig().STORAGE_KEYS || {};
   }
 
-  function getUI() {
-    return window.UI || null;
+  function getAppState() {
+    return window.AppState || null;
   }
 
-  function toast(message, type) {
-    var ui = getUI();
-    if (ui && typeof ui.showToast === 'function') {
-      ui.showToast(message, type || 'info');
-      return;
-    }
-    if (ui && typeof ui.toast === 'function') {
-      ui.toast(message, type || 'info');
-      return;
-    }
+  function safeJsonParse(raw, fallback) {
+    if (!raw) return fallback;
+    if (typeof raw === 'object') return raw;
     try {
-      window.alert(message);
+      return JSON.parse(raw);
+    } catch (err) {
+      return fallback;
+    }
+  }
+
+  function readStorage(key, fallback) {
+    var storage = getStorage();
+    if (storage && typeof storage.get === 'function') {
+      return storage.get(key, fallback);
+    }
+
+    try {
+      var raw = localStorage.getItem(key);
+      if (!raw) return fallback;
+      return safeJsonParse(raw, fallback);
+    } catch (err) {
+      return fallback;
+    }
+  }
+
+  function writeStorage(key, value) {
+    var storage = getStorage();
+    if (storage && typeof storage.set === 'function') {
+      storage.set(key, value);
+      return;
+    }
+
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
     } catch (err) {}
   }
 
-  function escapeHtml(value) {
-    return String(value == null ? '' : value)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
-  }
-
-  function normalizeSpaces(value) {
+  function normalizeText(value) {
     return String(value == null ? '' : value).replace(/\s+/g, ' ').trim();
   }
 
   function normalizeUpper(value) {
-    return normalizeSpaces(value).toUpperCase();
+    return normalizeText(value).toUpperCase();
+  }
+
+  function isMeaningful(value) {
+    var text = normalizeText(value);
+    if (!text) return false;
+    var upper = text.toUpperCase();
+    return upper !== '-' && upper !== 'NULL' && upper !== 'UNDEFINED' && upper !== 'N/A';
+  }
+
+  function pickFirstFilled(values, fallback) {
+    var list = Array.isArray(values) ? values : [values];
+
+    for (var i = 0; i < list.length; i += 1) {
+      if (isMeaningful(list[i])) return String(list[i]);
+    }
+
+    return fallback || '';
   }
 
   function getProfile() {
-    var state = getState();
-    if (state && typeof state.getProfile === 'function') {
-      var fromState = state.getProfile();
-      if (fromState && Object.keys(fromState).length) return fromState;
+    var appState = getAppState();
+    if (appState && typeof appState.getProfile === 'function') {
+      var stateProfile = appState.getProfile() || {};
+      if (stateProfile && Object.keys(stateProfile).length) return stateProfile;
     }
 
-    var storage = getStorage();
     var keys = getStorageKeys();
-    if (storage && typeof storage.get === 'function' && keys.PROFILE) {
-      return storage.get(keys.PROFILE, {}) || {};
+    if (keys.PROFILE) {
+      var storedProfile = readStorage(keys.PROFILE, {});
+      if (storedProfile && Object.keys(storedProfile).length) return storedProfile;
     }
 
-    try {
-      return JSON.parse(localStorage.getItem('tpk_profile') || '{}');
-    } catch (err) {
-      return {};
+    var bootstrap = readStorage('tpk_bootstrap_lite', {});
+    if (bootstrap && bootstrap.profile && Object.keys(bootstrap.profile).length) {
+      return bootstrap.profile;
     }
+
+    return readStorage('tpk_profile', {}) || {};
   }
 
   function getSession() {
-    var state = getState();
-    if (state && typeof state.getSession === 'function') {
-      var fromState = state.getSession();
-      if (fromState && Object.keys(fromState).length) return fromState;
+    var appState = getAppState();
+    if (appState && typeof appState.getSession === 'function') {
+      var stateSession = appState.getSession() || {};
+      if (stateSession && Object.keys(stateSession).length) return stateSession;
     }
 
-    try {
-      return JSON.parse(localStorage.getItem('tpk_session') || '{}');
-    } catch (err) {
-      return {};
+    var bootstrap = readStorage('tpk_bootstrap_lite', {});
+    if (bootstrap && bootstrap.session && Object.keys(bootstrap.session).length) {
+      return bootstrap.session;
     }
+
+    return {};
   }
 
   function getIdTim(profile, session) {
-    profile = profile || {};
-    session = session || {};
-    return String(
-      profile.id_tim ||
-      session.id_tim ||
-      (session.session && session.session.id_tim) ||
-      ''
-    ).trim();
+    return pickFirstFilled([
+      profile && profile.id_tim,
+      session && session.id_tim
+    ], '');
   }
 
   function getBookKey(profile, session) {
-    profile = profile || {};
-    session = session || {};
-    return String(
-      profile.kode_kecamatan ||
-      profile.book_key ||
-      session.kode_kecamatan ||
-      session.book_key ||
-      ''
-    ).trim().toUpperCase();
+    return pickFirstFilled([
+      profile && profile.kode_kecamatan,
+      profile && profile.book_key,
+      session && session.kode_kecamatan,
+      session && session.book_key
+    ], '');
+  }
+
+  function getScopeCacheKey() {
+    var profile = getProfile();
+    var session = getSession();
+
+    var idUser = pickFirstFilled([
+      profile.id_user,
+      profile.username,
+      session.id_user,
+      session.username
+    ], 'anon');
+
+    var idTim = getIdTim(profile, session) || 'NO_TIM';
+    var bookKey = getBookKey(profile, session) || 'NO_BOOK';
+
+    return [idUser, idTim, bookKey].join('::');
+  }
+
+  function getItemId(item) {
+    return normalizeText(
+      (item && (item.id_sasaran || item.id)) || ''
+    );
+  }
+
+  function normalizeItem(item) {
+    var raw = item || {};
+
+    var nama = pickFirstFilled([raw.nama_sasaran, raw.nama], '');
+    var wilayah = pickFirstFilled([
+      raw.nama_wilayah,
+      raw.wilayah,
+      [raw.nama_dusun || raw.dusun_rw || raw.dusun || '', raw.nama_desa || raw.desa_kelurahan || raw.desa || '', raw.nama_kecamatan || raw.kecamatan || ''].filter(Boolean).join(' • ')
+    ], '-');
+
+    return Object.assign({}, raw, {
+      id_sasaran: pickFirstFilled([raw.id_sasaran, raw.id], ''),
+      nama_sasaran: nama,
+      jenis_sasaran: pickFirstFilled([raw.jenis_sasaran], ''),
+      status_sasaran: pickFirstFilled([raw.status_sasaran, raw.status], 'AKTIF'),
+      nik_sasaran: pickFirstFilled([raw.nik_sasaran, raw.nik], ''),
+      nomor_kk: pickFirstFilled([raw.nomor_kk], ''),
+      tanggal_lahir: pickFirstFilled([raw.tanggal_lahir], ''),
+      nama_wilayah: wilayah,
+      nama_kecamatan: pickFirstFilled([raw.nama_kecamatan, raw.kecamatan], ''),
+      nama_desa: pickFirstFilled([raw.nama_desa, raw.desa_kelurahan, raw.desa], ''),
+      nama_dusun: pickFirstFilled([raw.nama_dusun, raw.dusun_rw, raw.dusun], '')
+    });
+  }
+
+  function readCacheEnvelope() {
+    return readStorage(CACHE_KEY, null);
+  }
+
+  function readLocalCache() {
+    var envelope = readCacheEnvelope();
+    var scopeKey = getScopeCacheKey();
+
+    if (!envelope || envelope.scope_key !== scopeKey) {
+      return {
+        items: [],
+        isFresh: false,
+        cachedAt: '',
+        ageMs: 0
+      };
+    }
+
+    var items = Array.isArray(envelope.items) ? envelope.items.map(normalizeItem) : [];
+    var cachedAt = envelope.cached_at || '';
+    var ageMs = cachedAt ? (Date.now() - new Date(cachedAt).getTime()) : Number.MAX_SAFE_INTEGER;
+    var isFresh = ageMs >= 0 && ageMs <= CACHE_TTL_MS;
+
+    return {
+      items: items,
+      isFresh: isFresh,
+      cachedAt: cachedAt,
+      ageMs: ageMs
+    };
+  }
+
+  function saveLocalCache(items) {
+    writeStorage(CACHE_KEY, {
+      scope_key: getScopeCacheKey(),
+      cached_at: new Date().toISOString(),
+      items: Array.isArray(items) ? items.map(normalizeItem) : []
+    });
+  }
+
+  function setSelectedSasaran(item) {
+    var safeItem = normalizeItem(item || {});
+    var storage = getStorage();
+    var keys = getStorageKeys();
+    var appState = getAppState();
+
+    if (appState && typeof appState.setSelectedSasaran === 'function') {
+      appState.setSelectedSasaran(safeItem);
+    }
+
+    if (storage && typeof storage.set === 'function') {
+      storage.set(keys.SELECTED_SASARAN || SELECTED_KEY, safeItem);
+    }
+
+    try {
+      localStorage.setItem(SELECTED_KEY, JSON.stringify(safeItem));
+    } catch (err) {}
+  }
+
+  function saveDetailPreview(item) {
+    var safeItem = normalizeItem(item || {});
+    var id = getItemId(safeItem);
+    if (!id) return;
+
+    var scopeKey = getScopeCacheKey();
+    var map = readStorage(DETAIL_CACHE_KEY, {});
+    map = map && typeof map === 'object' ? map : {};
+    map[scopeKey] = map[scopeKey] || {};
+    map[scopeKey][id] = {
+      cached_at: new Date().toISOString(),
+      detail: safeItem
+    };
+
+    writeStorage(DETAIL_CACHE_KEY, map);
   }
 
   function getSelectedFilters() {
     return {
-      keyword: normalizeSpaces(byId(FILTER_KEYWORD_ID) ? byId(FILTER_KEYWORD_ID).value : ''),
-      jenis_sasaran: normalizeSpaces(byId(FILTER_JENIS_ID) ? byId(FILTER_JENIS_ID).value : ''),
-      status_sasaran: normalizeSpaces(byId(FILTER_STATUS_ID) ? byId(FILTER_STATUS_ID).value : '')
+      keyword: normalizeText(byId(FILTER_KEYWORD_ID) && byId(FILTER_KEYWORD_ID).value),
+      jenis_sasaran: normalizeUpper(byId(FILTER_JENIS_ID) && byId(FILTER_JENIS_ID).value),
+      status_sasaran: normalizeUpper(byId(FILTER_STATUS_ID) && byId(FILTER_STATUS_ID).value)
     };
+  }
+
+  function applyAllFilters(items, filters) {
+    var list = Array.isArray(items) ? items.slice() : [];
+    var f = filters || {};
+
+    return list.filter(function (item) {
+      var safe = normalizeItem(item);
+
+      if (f.jenis_sasaran && normalizeUpper(safe.jenis_sasaran) !== f.jenis_sasaran) {
+        return false;
+      }
+
+      if (f.status_sasaran && normalizeUpper(safe.status_sasaran) !== f.status_sasaran) {
+        return false;
+      }
+
+      if (f.keyword) {
+        var haystack = [
+          safe.id_sasaran,
+          safe.nama_sasaran,
+          safe.nik_sasaran,
+          safe.nomor_kk,
+          safe.jenis_sasaran,
+          safe.nama_wilayah
+        ].join(' ').toLowerCase();
+
+        if (haystack.indexOf(f.keyword.toLowerCase()) === -1) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }
+
+  function formatDate(value) {
+    if (!isMeaningful(value)) return '-';
+
+    var raw = String(value).trim();
+    var dt = new Date(raw);
+    if (!isNaN(dt.getTime())) {
+      try {
+        return dt.toLocaleDateString('id-ID');
+      } catch (err) {
+        return raw;
+      }
+    }
+
+    return raw;
+  }
+
+  function getStatusBadgeClass(status) {
+    var value = normalizeUpper(status);
+    if (value === 'AKTIF') return 'badge-success-soft';
+    if (value === 'SELESAI') return 'badge-success';
+    if (value === 'PERLU_REVIEW') return 'badge-warning';
+    if (value === 'NONAKTIF') return 'badge-danger-soft';
+    if (value === 'RUJUK') return 'badge-warning';
+    return 'badge-neutral';
   }
 
   function setMeta(text) {
     var el = byId(META_ID);
-    if (el) el.textContent = text || '';
-  }
-
-  function setLoading() {
-    var box = byId(CONTAINER_ID);
-    if (box) {
-      box.innerHTML = '<p class="muted-text">Memuat data sasaran...</p>';
+    if (el) {
+      el.textContent = text || '';
     }
-    setMeta('Sedang memuat data sasaran...');
   }
 
   function setEmpty(message) {
-    var box = byId(CONTAINER_ID);
-    if (box) {
-      box.innerHTML = '<p class="muted-text">' + escapeHtml(message || 'Belum ada data sasaran.') + '</p>';
-    }
+    var container = byId(CONTAINER_ID);
+    if (!container) return;
+
+    container.innerHTML = '<p class="muted-text">' + String(message || 'Belum ada data sasaran.') + '</p>';
   }
 
-  function formatDate(value) {
-    if (!value) return '-';
-    var d = new Date(value);
-    if (isNaN(d.getTime())) return String(value);
-    try {
-      return d.toLocaleDateString('id-ID');
-    } catch (err) {
-      return String(value);
-    }
-  }
+  function setLoading(message) {
+    var container = byId(CONTAINER_ID);
+    if (!container) return;
 
-  function getWilayahLabel(item) {
-    var parts = [
-      item.dusun_rw || item.nama_dusun || '',
-      item.desa_kelurahan || item.nama_desa || '',
-      item.kecamatan || item.nama_kecamatan || ''
-    ].filter(Boolean);
-    return parts.length ? parts.join(' • ') : '-';
-  }
-
-  function getItemId(item) {
-    return String(item && (item.id_sasaran || item.id || '')).trim();
-  }
-
-  function setSelectedSasaran(item) {
-    var safeItem = item && typeof item === 'object' ? item : {};
-    var state = getState();
-    var storage = getStorage();
-    var keys = getStorageKeys();
-
-    if (state && typeof state.setSelectedSasaran === 'function') {
-      state.setSelectedSasaran(safeItem);
-    }
-
-    if (storage && typeof storage.set === 'function') {
-      storage.set(keys.SELECTED_SASARAN || LOCAL_SELECTED_KEY, safeItem);
-    }
-
-    try {
-      localStorage.setItem(LOCAL_SELECTED_KEY, JSON.stringify(safeItem));
-    } catch (err) {}
-  }
-
-  function saveLocalCache(items) {
-    try {
-      localStorage.setItem(LOCAL_CACHE_KEY, JSON.stringify({
-        saved_at: new Date().toISOString(),
-        items: Array.isArray(items) ? items : []
-      }));
-    } catch (err) {}
-  }
-
-  function readLocalCache() {
-    try {
-      var raw = JSON.parse(localStorage.getItem(LOCAL_CACHE_KEY) || '{}');
-      return Array.isArray(raw.items) ? raw.items : [];
-    } catch (err) {
-      return [];
-    }
-  }
-
-  function applyAllFilters(items, filters) {
-    var safeItems = Array.isArray(items) ? items.slice() : [];
-    var keyword = normalizeSpaces(filters && filters.keyword);
-    var jenis = normalizeUpper(filters && filters.jenis_sasaran);
-    var status = normalizeUpper(filters && filters.status_sasaran);
-
-    if (jenis) {
-      safeItems = safeItems.filter(function (item) {
-        return normalizeUpper(item.jenis_sasaran) === jenis;
-      });
-    }
-
-    if (status) {
-      safeItems = safeItems.filter(function (item) {
-        return normalizeUpper(item.status_sasaran || item.status) === status;
-      });
-    }
-
-    if (keyword) {
-      var q = keyword.toLowerCase();
-      safeItems = safeItems.filter(function (item) {
-        return [
-          item.id_sasaran,
-          item.nama_sasaran,
-          item.nik_sasaran,
-          item.nomor_kk,
-          item.jenis_sasaran,
-          item.dusun_rw,
-          item.desa_kelurahan,
-          item.kecamatan
-        ].some(function (v) {
-          return String(v || '').toLowerCase().indexOf(q) !== -1;
-        });
-      });
-    }
-
-    return safeItems;
+    container.innerHTML = '<p class="muted-text">' + String(message || 'Memuat data sasaran...') + '</p>';
   }
 
   function renderList(items) {
-    var box = byId(CONTAINER_ID);
-    if (!box) return;
+    var container = byId(CONTAINER_ID);
+    if (!container) return;
 
-    if (!items || !items.length) {
-      box.innerHTML = '<p class="muted-text">Tidak ada data sasaran sesuai filter.</p>';
+    var list = Array.isArray(items) ? items.map(normalizeItem) : [];
+
+    if (!list.length) {
+      setEmpty('Belum ada data sasaran.');
       return;
     }
 
-    box.innerHTML = items.map(function (item) {
-      var status = item.status_sasaran || item.status || '-';
-      var jenis = item.jenis_sasaran || '-';
-      var nama = item.nama_sasaran || '-';
-      var id = getItemId(item) || '-';
-      var nik = item.nik_sasaran || '-';
-      var kk = item.nomor_kk || '-';
-      var wilayah = getWilayahLabel(item);
-      var tgl = formatDate(item.tanggal_lahir);
-
+    container.innerHTML = list.map(function (item) {
+      var id = getItemId(item);
       return [
-        '<article class="list-card sasaran-item" data-id-sasaran="', escapeHtml(id), '" style="cursor:pointer;">',
-          '<div class="list-card-header row-between">',
+        '<article class="card sasaran-item" data-id-sasaran="', id, '">',
+          '<div class="section-header row-between">',
             '<div>',
-              '<h4 style="margin:0 0 4px;">', escapeHtml(nama), '</h4>',
-              '<p class="muted-text" style="margin:0;">ID Sasaran: ', escapeHtml(id), '</p>',
+              '<h3 style="margin:0 0 6px;">', normalizeUpper(item.nama_sasaran || '-'), '</h3>',
+              '<p class="muted-text" style="margin:0;">ID Sasaran: ', item.id_sasaran || '-', '</p>',
             '</div>',
-            '<span class="badge badge-neutral">', escapeHtml(status), '</span>',
+            '<span class="badge ', getStatusBadgeClass(item.status_sasaran), '">', item.status_sasaran || '-', '</span>',
           '</div>',
-          '<div class="profile-grid" style="margin-top:12px;">',
-            '<div><span class="label">Jenis Sasaran</span><strong>', escapeHtml(jenis), '</strong></div>',
-            '<div><span class="label">Tanggal Lahir</span><strong>', escapeHtml(tgl), '</strong></div>',
-            '<div><span class="label">NIK</span><strong>', escapeHtml(nik), '</strong></div>',
-            '<div><span class="label">No. KK</span><strong>', escapeHtml(kk), '</strong></div>',
-            '<div style="grid-column:1 / -1;"><span class="label">Wilayah</span><strong>', escapeHtml(wilayah), '</strong></div>',
+
+          '<div class="profile-grid">',
+            '<div><span class="label">Jenis Sasaran</span><strong>', item.jenis_sasaran || '-', '</strong></div>',
+            '<div><span class="label">Tanggal Lahir</span><strong>', formatDate(item.tanggal_lahir), '</strong></div>',
+            '<div><span class="label">NIK</span><strong>', item.nik_sasaran || '-', '</strong></div>',
+            '<div><span class="label">No. KK</span><strong>', item.nomor_kk || '-', '</strong></div>',
+            '<div style="grid-column:1 / -1;"><span class="label">Wilayah</span><strong>', item.nama_wilayah || '-', '</strong></div>',
           '</div>',
-          '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;">',
-            '<button type="button" class="btn btn-secondary btn-sasaran-detail" data-id-sasaran="', escapeHtml(id), '">Detail</button>',
-            '<button type="button" class="btn btn-primary btn-sasaran-pendampingan" data-id-sasaran="', escapeHtml(id), '">Lapor Pendampingan</button>',
+
+          '<div class="section-actions action-grid-2">',
+            '<button class="btn btn-secondary btn-sasaran-detail" data-id-sasaran="', id, '">Detail</button>',
+            '<button class="btn btn-primary btn-sasaran-pendampingan" data-id-sasaran="', id, '">Lapor Pendampingan</button>',
           '</div>',
         '</article>'
       ].join('');
     }).join('');
   }
 
+  function toast(message, type) {
+    if (window.UI && typeof window.UI.showToast === 'function') {
+      window.UI.showToast(message, type || 'info');
+      return;
+    }
+
+    try {
+      window.alert(message);
+    } catch (err) {}
+  }
+
   var SasaranListView = {
     _initialized: false,
+    _loading: false,
     _lastItems: [],
     _lastRenderedItems: [],
     _itemMap: {},
 
     init: function () {
-      if (this._initialized) {
-        this.renderLocal();
-        return;
-      }
-
+      if (this._initialized) return;
       this._initialized = true;
 
       var refreshBtn = byId(BTN_REFRESH_ID);
@@ -384,15 +491,17 @@
       }
 
       var cached = readLocalCache();
-      if (cached.length) {
-        this._lastItems = cached.slice();
+      if (cached.items.length) {
+        this._lastItems = cached.items.slice();
         this.rebuildItemMap();
         this.renderLocal();
 
-        var self = this;
-        window.setTimeout(function () {
-          self.load(true);
-        }, 100);
+        if (cached.isFresh) {
+          setMeta('Menampilkan ' + cached.items.length + ' data dari cache lokal.');
+        } else {
+          setMeta('Menampilkan ' + cached.items.length + ' data cache lama • menyegarkan data...');
+          this.load(false);
+        }
       } else {
         this.load(true);
       }
@@ -401,8 +510,9 @@
     rebuildItemMap: function () {
       var map = {};
       this._lastItems.forEach(function (item) {
-        var id = getItemId(item);
-        if (id) map[id] = item;
+        var normalized = normalizeItem(item);
+        var id = getItemId(normalized);
+        if (id) map[id] = normalized;
       });
       this._itemMap = map;
     },
@@ -433,17 +543,43 @@
         return;
       }
 
-      if (!forceRefresh && this._lastItems.length) {
+      var cached = readLocalCache();
+      var hasMemory = this._lastItems.length > 0;
+      var hasFreshCache = cached.items.length > 0 && cached.isFresh;
+
+      if (!forceRefresh && hasFreshCache) {
+        this._lastItems = cached.items.slice();
+        this.rebuildItemMap();
         this.renderLocal();
+        setMeta('Menampilkan ' + this._lastRenderedItems.length + ' data dari cache lokal.');
         return;
       }
 
-      setLoading();
+      if (!forceRefresh && hasMemory) {
+        this.renderLocal();
+      } else if (!forceRefresh && cached.items.length) {
+        this._lastItems = cached.items.slice();
+        this.rebuildItemMap();
+        this.renderLocal();
+      } else {
+        setLoading('Memuat data sasaran...');
+      }
+
+      if (this._loading) return;
+      this._loading = true;
 
       try {
-        var result = await api.post('getSasaranByTim', payload);
+        var result = await api.post('getSasaranByTim', payload, {
+          includeAuth: true,
+          timeoutMs: 10000
+        });
 
         if (!result || result.ok === false) {
+          if (this._lastItems.length) {
+            setMeta('Menampilkan cache lokal • ' + ((result && result.message) || 'Gagal menyegarkan data.'));
+            return;
+          }
+
           setMeta('Gagal memuat data sasaran.');
           setEmpty((result && result.message) || 'Gagal memuat data sasaran.');
           return;
@@ -452,13 +588,20 @@
         var data = result.data || {};
         var items = Array.isArray(data.items) ? data.items : (Array.isArray(data) ? data : []);
 
-        this._lastItems = items.slice();
+        this._lastItems = items.map(normalizeItem);
         saveLocalCache(this._lastItems);
         this.rebuildItemMap();
         this.renderLocal();
       } catch (err) {
+        if (this._lastItems.length) {
+          setMeta('Menampilkan cache lokal • ' + (err && err.message ? err.message : 'Gagal terhubung ke server.'));
+          return;
+        }
+
         setMeta('Gagal memuat data sasaran.');
         setEmpty(err && err.message ? err.message : 'Gagal terhubung ke server.');
+      } finally {
+        this._loading = false;
       }
     },
 
@@ -486,15 +629,27 @@
       if (!item) return;
 
       setSelectedSasaran(item);
+      saveDetailPreview(item);
 
       if (window.SasaranDetailView && typeof window.SasaranDetailView.open === 'function') {
-        window.SasaranDetailView.open(idSasaran);
+        window.SasaranDetailView.open(idSasaran, {
+          selected: item
+        });
         return;
       }
 
       var router = getRouter();
       if (router && typeof router.go === 'function') {
-        router.go('sasaranDetail');
+        router.go('sasaranDetail', {
+          onRouteReady: function () {
+            if (window.SasaranDetailView && typeof window.SasaranDetailView.open === 'function') {
+              window.SasaranDetailView.open(idSasaran, {
+                skipRoute: true,
+                selected: item
+              });
+            }
+          }
+        });
       }
     },
 
@@ -506,6 +661,7 @@
       }
 
       setSelectedSasaran(item);
+      saveDetailPreview(item);
 
       if (window.PendampinganView && typeof window.PendampinganView.openCreate === 'function') {
         window.PendampinganView.openCreate(item);
@@ -514,7 +670,13 @@
 
       var router = getRouter();
       if (router && typeof router.go === 'function') {
-        router.go('pendampingan');
+        router.go('pendampingan', {
+          onRouteReady: function () {
+            if (window.PendampinganView && typeof window.PendampinganView.openCreate === 'function') {
+              window.PendampinganView.openCreate(item);
+            }
+          }
+        });
       }
     },
 
