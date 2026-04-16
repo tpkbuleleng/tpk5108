@@ -21,7 +21,7 @@
       { src: './js/views/sasaranListView.js?v=20260412-01', globalName: 'SasaranListView' }
     ],
     sasaranDetail: [
-      { src: './js/views/sasaranDetailView.js?v=20260416-01', globalName: 'SasaranDetailView' }
+      { src: './js/views/sasaranDetailView.js?v=20260416-02', globalName: 'SasaranDetailView' }
     ],
     registrasi: [
       { src: './js/views/registrasiView.js?v=20260411-03', globalName: 'RegistrasiView' }
