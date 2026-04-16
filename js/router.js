@@ -27,7 +27,7 @@
       { src: './js/views/registrasiView.js?v=20260411-03', globalName: 'RegistrasiView' }
     ],
     pendampingan: [
-      { src: './js/views/pendampinganView.js?v=20260412-01', globalName: 'PendampinganView' }
+      { src: './js/views/pendampinganView.js?v=20260416-02', globalName: 'PendampinganView' }
     ],
     sync: [
       { src: './js/views/syncView.js', globalName: 'SyncView' }
