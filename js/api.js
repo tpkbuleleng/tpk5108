@@ -91,6 +91,20 @@
     return 'id-' + Date.now() + '-' + Math.random().toString(36).slice(2, 12);
   }
 
+  function uniqueStrings(values) {
+    var seen = {};
+    var out = [];
+
+    (values || []).forEach(function (value) {
+      var text = String(value || '').trim();
+      if (!text || seen[text]) return;
+      seen[text] = true;
+      out.push(text);
+    });
+
+    return out;
+  }
+
   function getOrCreateDeviceId() {
     var config = getConfig();
     var key = config.STORAGE_KEYS.DEVICE_ID;
@@ -295,12 +309,97 @@
     );
   }
 
+  function getSensitiveStorageKeys(options) {
+    var config = getConfig();
+    var keys = config.STORAGE_KEYS || {};
+    var opts = options || {};
+    var list = [
+      keys.SESSION_TOKEN,
+      keys.PROFILE,
+      keys.BOOTSTRAP,
+      keys.BOOTSTRAP_LITE,
+      keys.SYNC_QUEUE,
+      keys.SELECTED_SASARAN,
+      'tpk_profile',
+      'tpk_bootstrap_lite',
+      'tpk_app_bootstrap',
+      'tpk_selected_sasaran',
+      'tpk_sasaran_cache_v1',
+      'tpk_sasaran_cache_v2',
+      'tpk_sasaran_detail_cache_v1',
+      'tpk_pendampingan_form_cache_v1',
+      'tpk_registrasi_draft_v_final',
+      'tpk_pendampingan_draft',
+      'tpk_sync_queue_v1',
+      'tpk_app_font_size',
+      'tpk_app_theme'
+    ];
+
+    if (opts.keepDeviceId !== true) {
+      list.push(keys.DEVICE_ID);
+    }
+
+    return uniqueStrings(list);
+  }
+
+  function removeFromBrowserStorage(storageObj, key) {
+    try {
+      if (storageObj && typeof storageObj.removeItem === 'function') {
+        storageObj.removeItem(key);
+      }
+    } catch (err) {}
+  }
+
+  function clearSensitiveClientState(options) {
+    var opts = options || {};
+    var keys = getSensitiveStorageKeys({
+      keepDeviceId: opts.keepDeviceId !== false
+    });
+
+    keys.forEach(function (key) {
+      if (!key) return;
+      removeStorageValue(key);
+      removeFromBrowserStorage(window.localStorage, key);
+      removeFromBrowserStorage(window.sessionStorage, key);
+    });
+
+    try {
+      if (window.AppState && typeof window.AppState.clearSelectedSasaran === 'function') {
+        window.AppState.clearSelectedSasaran();
+      }
+    } catch (err) {}
+
+    try {
+      if (window.AppState && typeof window.AppState.setSyncQueue === 'function') {
+        window.AppState.setSyncQueue([]);
+      }
+    } catch (err2) {}
+
+    try {
+      if (window.AppState && typeof window.AppState.setCurrentRoute === 'function') {
+        window.AppState.setCurrentRoute('login');
+      }
+    } catch (err3) {}
+
+    clearSessionToken();
+  }
+
+  function handleAuthFailureCleanup(normalized) {
+    if (!normalized) return normalized;
+
+    if (normalized.code === 401 || normalized.code === 403) {
+      clearSessionToken();
+    }
+
+    return normalized;
+  }
+
   async function post(action, payload, options) {
     var config = getConfig();
     var opts = options || {};
     var timeoutMs = typeof opts.timeoutMs === 'number'
       ? opts.timeoutMs
-      : (config.API_TIMEOUT_MS || 30000);
+      : (config.API_TIMEOUT_MS || 15000);
 
     if (!action) {
       return createNetworkError('Action API wajib diisi.');
@@ -329,7 +428,7 @@
         setSessionToken(normalized.data.session_token);
       }
 
-      return normalized;
+      return handleAuthFailureCleanup(normalized);
     } catch (err) {
       if (err && err.name === 'AbortError') {
         return createNetworkError('Permintaan ke server melewati batas waktu.', {
@@ -352,7 +451,7 @@
     var opts = options || {};
     var timeoutMs = typeof opts.timeoutMs === 'number'
       ? opts.timeoutMs
-      : (config.API_TIMEOUT_MS || 30000);
+      : (config.API_TIMEOUT_MS || 15000);
 
     if (!action) {
       return createNetworkError('Action API wajib diisi.');
@@ -381,7 +480,8 @@
       });
 
       var parsed = await parseResponse(response);
-      return normalizeResponse(parsed, response);
+      var normalized = normalizeResponse(parsed, response);
+      return handleAuthFailureCleanup(normalized);
     } catch (err) {
       if (err && err.name === 'AbortError') {
         return createNetworkError('Permintaan ke server melewati batas waktu.', {
@@ -400,7 +500,7 @@
   }
 
   async function healthCheck() {
-    return get(getActionName('HEALTH_CHECK', 'healthCheck'), {}, { includeAuth: false });
+    return get(getActionName('HEALTH_CHECK', 'healthCheck'), {}, { includeAuth: false, timeoutMs: 8000 });
   }
 
   async function login(payload) {
@@ -416,7 +516,8 @@
     }
 
     var result = await post(getActionName('LOGIN', 'login'), data, {
-      includeAuth: false
+      includeAuth: false,
+      timeoutMs: 12000
     });
 
     if (result.ok && result.data && result.data.session_token) {
@@ -426,54 +527,59 @@
     return result;
   }
 
-  async function logout(payload) {
+  async function logout(payload, options) {
+    var opts = options || {};
     var result = await post(getActionName('LOGOUT', 'logout'), payload || {}, {
-      includeAuth: true
+      includeAuth: true,
+      timeoutMs: 8000
     });
 
-    clearSessionToken();
+    clearSensitiveClientState({
+      keepDeviceId: opts.keepDeviceId !== false
+    });
+
     return result;
   }
 
   async function validateSession(payload) {
     return post(getActionName('VALIDATE_SESSION', 'validateSession'), payload || {}, {
       includeAuth: true,
-      timeoutMs: 15000
+      timeoutMs: 8000
     });
   }
 
   async function bootstrapSession(payload) {
     return post(getActionName('BOOTSTRAP_SESSION', 'bootstrapSession'), payload || {}, {
       includeAuth: true,
-      timeoutMs: 20000
+      timeoutMs: 10000
     });
   }
 
   async function refreshBootstrapLite(payload) {
     return post(getActionName('REFRESH_BOOTSTRAP_LITE', 'refreshBootstrapLite'), payload || {}, {
       includeAuth: true,
-      timeoutMs: 20000
+      timeoutMs: 10000
     });
   }
 
   async function getMyProfileLite(payload) {
     return post(getActionName('GET_MY_PROFILE_LITE', 'getMyProfileLite'), payload || {}, {
       includeAuth: true,
-      timeoutMs: 15000
+      timeoutMs: 8000
     });
   }
 
   async function getDashboardSummaryLite(payload) {
     return post(getActionName('GET_DASHBOARD_SUMMARY_LITE', 'getDashboardSummaryLite'), payload || {}, {
       includeAuth: true,
-      timeoutMs: 20000
+      timeoutMs: 10000
     });
   }
 
   async function getAppBootstrapRef(payload) {
     return post(getActionName('GET_APP_BOOTSTRAP_REF', 'getAppBootstrapRef'), payload || {}, {
       includeAuth: false,
-      timeoutMs: 20000
+      timeoutMs: 10000
     });
   }
 
@@ -489,7 +595,7 @@
 
     return post(getActionName('LOG_CLIENT_ERROR', 'logClientError'), payload, {
       includeAuth: true,
-      timeoutMs: 12000
+      timeoutMs: 8000
     });
   }
 
@@ -500,6 +606,7 @@
     getSessionToken: getSessionToken,
     setSessionToken: setSessionToken,
     clearSessionToken: clearSessionToken,
+    clearSensitiveClientState: clearSensitiveClientState,
     buildMeta: buildMeta,
     buildBody: buildBody,
     get: get,
