@@ -2554,7 +2554,8 @@
     });
   };
 
-  window.RegistrasiForm = RegistrasiForm;
+    window.RegistrasiForm = RegistrasiForm;
+  window.RegistrasiView = RegistrasiForm;
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', function () {
