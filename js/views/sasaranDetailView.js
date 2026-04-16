@@ -1,19 +1,14 @@
 (function (window, document) {
   'use strict';
 
-  var CACHE_KEY = 'tpk_sasaran_cache_v2';
   var SELECTED_KEY = 'tpk_selected_sasaran';
   var DETAIL_CACHE_KEY = 'tpk_sasaran_detail_cache_v1';
-  var CACHE_TTL_MS = 5 * 60 * 1000;
+  var DETAIL_CACHE_TTL_MS = 10 * 60 * 1000;
+  var RIWAYAT_CACHE_TTL_MS = 5 * 60 * 1000;
 
-  var SCREEN_ID = 'sasaran-list-screen';
-  var FILTER_KEYWORD_ID = 'filter-keyword-sasaran';
-  var FILTER_JENIS_ID = 'filter-jenis-sasaran';
-  var FILTER_STATUS_ID = 'filter-status-sasaran';
-  var BTN_REFRESH_ID = 'btn-refresh-sasaran';
-  var BTN_BACK_ID = 'btn-back-dashboard-from-list';
-  var CONTAINER_ID = 'sasaran-list-container';
-  var META_ID = 'sasaran-list-meta';
+  var isInitialized = false;
+  var currentRequestToken = 0;
+  var currentDetail = null;
 
   function byId(id) {
     return document.getElementById(id);
@@ -27,8 +22,16 @@
     return window.Router || null;
   }
 
+  function getUI() {
+    return window.UI || null;
+  }
+
   function getStorage() {
     return window.Storage || null;
+  }
+
+  function getState() {
+    return window.AppState || null;
   }
 
   function getConfig() {
@@ -39,8 +42,13 @@
     return getConfig().STORAGE_KEYS || {};
   }
 
-  function getAppState() {
-    return window.AppState || null;
+  function getActions() {
+    return getConfig().API_ACTIONS || {};
+  }
+
+  function getActionName(key, fallback) {
+    var actions = getActions();
+    return actions[key] || fallback;
   }
 
   function safeJsonParse(raw, fallback) {
@@ -80,22 +88,71 @@
     } catch (err) {}
   }
 
+  function showToast(message, type) {
+    var ui = getUI();
+    if (ui && typeof ui.showToast === 'function') {
+      ui.showToast(message, type || 'info');
+      return;
+    }
+
+    if (ui && typeof ui.toast === 'function') {
+      ui.toast(message, type || 'info');
+      return;
+    }
+
+    try {
+      window.alert(message);
+    } catch (err) {}
+  }
+
+  function setText(id, value) {
+    var ui = getUI();
+    if (ui && typeof ui.setText === 'function') {
+      ui.setText(id, value);
+      return;
+    }
+
+    var el = byId(id);
+    if (el) {
+      el.textContent = isMeaningful(value) ? String(value) : '-';
+    }
+  }
+
+  function setHTML(id, html) {
+    var ui = getUI();
+    if (ui && typeof ui.setHTML === 'function') {
+      ui.setHTML(id, html);
+      return;
+    }
+
+    var el = byId(id);
+    if (el) {
+      el.innerHTML = html || '';
+    }
+  }
+
   function normalizeText(value) {
     return String(value == null ? '' : value).replace(/\s+/g, ' ').trim();
   }
 
-  function normalizeUpper(value) {
+  function normalizeUpperDisplay(value) {
     return normalizeText(value).toUpperCase();
   }
 
   function isMeaningful(value) {
+    if (value === undefined || value === null) return false;
     var text = normalizeText(value);
     if (!text) return false;
+
     var upper = text.toUpperCase();
-    return upper !== '-' && upper !== 'NULL' && upper !== 'UNDEFINED' && upper !== 'N/A';
+    return upper !== '-' &&
+      upper !== 'NULL' &&
+      upper !== 'UNDEFINED' &&
+      upper !== 'N/A' &&
+      upper !== 'NA';
   }
 
-  function pickFirstFilled(values, fallback) {
+  function pickFirstMeaningful(values, fallback) {
     var list = Array.isArray(values) ? values : [values];
 
     for (var i = 0; i < list.length; i += 1) {
@@ -105,220 +162,13 @@
     return fallback || '';
   }
 
-  function getProfile() {
-    var appState = getAppState();
-    if (appState && typeof appState.getProfile === 'function') {
-      var stateProfile = appState.getProfile() || {};
-      if (stateProfile && Object.keys(stateProfile).length) return stateProfile;
-    }
-
-    var keys = getStorageKeys();
-    if (keys.PROFILE) {
-      var storedProfile = readStorage(keys.PROFILE, {});
-      if (storedProfile && Object.keys(storedProfile).length) return storedProfile;
-    }
-
-    var bootstrap = readStorage('tpk_bootstrap_lite', {});
-    if (bootstrap && bootstrap.profile && Object.keys(bootstrap.profile).length) {
-      return bootstrap.profile;
-    }
-
-    return readStorage('tpk_profile', {}) || {};
-  }
-
-  function getSession() {
-    var appState = getAppState();
-    if (appState && typeof appState.getSession === 'function') {
-      var stateSession = appState.getSession() || {};
-      if (stateSession && Object.keys(stateSession).length) return stateSession;
-    }
-
-    var bootstrap = readStorage('tpk_bootstrap_lite', {});
-    if (bootstrap && bootstrap.session && Object.keys(bootstrap.session).length) {
-      return bootstrap.session;
-    }
-
-    return {};
-  }
-
-  function getIdTim(profile, session) {
-    return pickFirstFilled([
-      profile && profile.id_tim,
-      session && session.id_tim
-    ], '');
-  }
-
-  function getBookKey(profile, session) {
-    return pickFirstFilled([
-      profile && profile.kode_kecamatan,
-      profile && profile.book_key,
-      session && session.kode_kecamatan,
-      session && session.book_key
-    ], '');
-  }
-
-  function getScopeCacheKey() {
-    var profile = getProfile();
-    var session = getSession();
-
-    var idUser = pickFirstFilled([
-      profile.id_user,
-      profile.username,
-      session.id_user,
-      session.username
-    ], 'anon');
-
-    var idTim = getIdTim(profile, session) || 'NO_TIM';
-    var bookKey = getBookKey(profile, session) || 'NO_BOOK';
-
-    return [idUser, idTim, bookKey].join('::');
-  }
-
-  function getItemId(item) {
-    return normalizeText(
-      (item && (item.id_sasaran || item.id)) || ''
-    );
-  }
-
-  function normalizeItem(item) {
-    var raw = item || {};
-
-    var nama = pickFirstFilled([raw.nama_sasaran, raw.nama], '');
-    var wilayah = pickFirstFilled([
-      raw.nama_wilayah,
-      raw.wilayah,
-      [raw.nama_dusun || raw.dusun_rw || raw.dusun || '', raw.nama_desa || raw.desa_kelurahan || raw.desa || '', raw.nama_kecamatan || raw.kecamatan || ''].filter(Boolean).join(' • ')
-    ], '-');
-
-    return Object.assign({}, raw, {
-      id_sasaran: pickFirstFilled([raw.id_sasaran, raw.id], ''),
-      nama_sasaran: nama,
-      jenis_sasaran: pickFirstFilled([raw.jenis_sasaran], ''),
-      status_sasaran: pickFirstFilled([raw.status_sasaran, raw.status], 'AKTIF'),
-      nik_sasaran: pickFirstFilled([raw.nik_sasaran, raw.nik], ''),
-      nomor_kk: pickFirstFilled([raw.nomor_kk], ''),
-      tanggal_lahir: pickFirstFilled([raw.tanggal_lahir], ''),
-      nama_wilayah: wilayah,
-      nama_kecamatan: pickFirstFilled([raw.nama_kecamatan, raw.kecamatan], ''),
-      nama_desa: pickFirstFilled([raw.nama_desa, raw.desa_kelurahan, raw.desa], ''),
-      nama_dusun: pickFirstFilled([raw.nama_dusun, raw.dusun_rw, raw.dusun], '')
-    });
-  }
-
-  function readCacheEnvelope() {
-    return readStorage(CACHE_KEY, null);
-  }
-
-  function readLocalCache() {
-    var envelope = readCacheEnvelope();
-    var scopeKey = getScopeCacheKey();
-
-    if (!envelope || envelope.scope_key !== scopeKey) {
-      return {
-        items: [],
-        isFresh: false,
-        cachedAt: '',
-        ageMs: 0
-      };
-    }
-
-    var items = Array.isArray(envelope.items) ? envelope.items.map(normalizeItem) : [];
-    var cachedAt = envelope.cached_at || '';
-    var ageMs = cachedAt ? (Date.now() - new Date(cachedAt).getTime()) : Number.MAX_SAFE_INTEGER;
-    var isFresh = ageMs >= 0 && ageMs <= CACHE_TTL_MS;
-
-    return {
-      items: items,
-      isFresh: isFresh,
-      cachedAt: cachedAt,
-      ageMs: ageMs
-    };
-  }
-
-  function saveLocalCache(items) {
-    writeStorage(CACHE_KEY, {
-      scope_key: getScopeCacheKey(),
-      cached_at: new Date().toISOString(),
-      items: Array.isArray(items) ? items.map(normalizeItem) : []
-    });
-  }
-
-  function setSelectedSasaran(item) {
-    var safeItem = normalizeItem(item || {});
-    var storage = getStorage();
-    var keys = getStorageKeys();
-    var appState = getAppState();
-
-    if (appState && typeof appState.setSelectedSasaran === 'function') {
-      appState.setSelectedSasaran(safeItem);
-    }
-
-    if (storage && typeof storage.set === 'function') {
-      storage.set(keys.SELECTED_SASARAN || SELECTED_KEY, safeItem);
-    }
-
-    try {
-      localStorage.setItem(SELECTED_KEY, JSON.stringify(safeItem));
-    } catch (err) {}
-  }
-
-  function saveDetailPreview(item) {
-    var safeItem = normalizeItem(item || {});
-    var id = getItemId(safeItem);
-    if (!id) return;
-
-    var scopeKey = getScopeCacheKey();
-    var map = readStorage(DETAIL_CACHE_KEY, {});
-    map = map && typeof map === 'object' ? map : {};
-    map[scopeKey] = map[scopeKey] || {};
-    map[scopeKey][id] = {
-      cached_at: new Date().toISOString(),
-      detail: safeItem
-    };
-
-    writeStorage(DETAIL_CACHE_KEY, map);
-  }
-
-  function getSelectedFilters() {
-    return {
-      keyword: normalizeText(byId(FILTER_KEYWORD_ID) && byId(FILTER_KEYWORD_ID).value),
-      jenis_sasaran: normalizeUpper(byId(FILTER_JENIS_ID) && byId(FILTER_JENIS_ID).value),
-      status_sasaran: normalizeUpper(byId(FILTER_STATUS_ID) && byId(FILTER_STATUS_ID).value)
-    };
-  }
-
-  function applyAllFilters(items, filters) {
-    var list = Array.isArray(items) ? items.slice() : [];
-    var f = filters || {};
-
-    return list.filter(function (item) {
-      var safe = normalizeItem(item);
-
-      if (f.jenis_sasaran && normalizeUpper(safe.jenis_sasaran) !== f.jenis_sasaran) {
-        return false;
-      }
-
-      if (f.status_sasaran && normalizeUpper(safe.status_sasaran) !== f.status_sasaran) {
-        return false;
-      }
-
-      if (f.keyword) {
-        var haystack = [
-          safe.id_sasaran,
-          safe.nama_sasaran,
-          safe.nik_sasaran,
-          safe.nomor_kk,
-          safe.jenis_sasaran,
-          safe.nama_wilayah
-        ].join(' ').toLowerCase();
-
-        if (haystack.indexOf(f.keyword.toLowerCase()) === -1) {
-          return false;
-        }
-      }
-
-      return true;
-    });
+  function escapeHtml(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
   }
 
   function formatDate(value) {
@@ -337,353 +187,869 @@
     return raw;
   }
 
+  function formatDateTime(value) {
+    if (!isMeaningful(value)) return '-';
+
+    var parsed = new Date(value);
+    if (isNaN(parsed.getTime())) {
+      return String(value);
+    }
+
+    try {
+      return parsed.toLocaleString('id-ID');
+    } catch (err) {
+      return String(value);
+    }
+  }
+
+  function formatValue(value, keyHint) {
+    if (value === undefined || value === null || value === '') return '-';
+
+    if (typeof value === 'boolean') {
+      return value ? 'YA' : 'TIDAK';
+    }
+
+    if (Array.isArray(value)) {
+      if (!value.length) return '-';
+      return value.map(function (item) {
+        return formatValue(item);
+      }).join(', ');
+    }
+
+    if (typeof value === 'object') {
+      try {
+        return JSON.stringify(value);
+      } catch (err) {
+        return '[object]';
+      }
+    }
+
+    var text = normalizeText(value);
+    if (!text) return '-';
+
+    var key = String(keyHint || '').toLowerCase();
+
+    if (
+      key.indexOf('tanggal') >= 0 ||
+      key === 'updated_at' ||
+      key === 'tanggal_lahir' ||
+      key === 'tanggal_register' ||
+      key === 'submit_at'
+    ) {
+      return key === 'updated_at' || key === 'submit_at'
+        ? formatDateTime(text)
+        : formatDate(text);
+    }
+
+    if (
+      key === 'nama_sasaran' ||
+      key === 'nama_kepala_keluarga' ||
+      key === 'nama_ibu_kandung'
+    ) {
+      return normalizeUpperDisplay(text);
+    }
+
+    return text;
+  }
+
+  function humanizeKey(key) {
+    var map = {
+      nama_kepala_keluarga: 'Nama Kepala Keluarga',
+      nama_ibu_kandung: 'Nama Ibu Kandung',
+      alamat: 'Alamat Lengkap',
+      data_pasangan: 'Data Pasangan',
+      domisili_setelah_menikah: 'Domisili Setelah Menikah',
+      kehamilan_ke: 'Kehamilan Ke',
+      kehamilan_diinginkan: 'Kehamilan Diinginkan',
+      bb_sebelum_hamil: 'Berat Badan Sebelum Hamil',
+      tanggal_persalinan: 'Tanggal Persalinan',
+      jumlah_anak_kandung: 'Jumlah Anak Kandung',
+      tempat_persalinan: 'Tempat Persalinan',
+      penolong_persalinan: 'Penolong Persalinan',
+      cara_persalinan: 'Cara Persalinan',
+      anak_ke: 'Anak Ke',
+      berat_badan_lahir: 'Berat Badan Lahir',
+      panjang_badan_lahir: 'Panjang Badan Lahir',
+      sumber_air_minum_utama: 'Sumber Air Minum Utama',
+      sumber_air_minum_utama_lainnya: 'Sumber Air Minum Utama Lainnya',
+      fasilitas_bab: 'Fasilitas BAB',
+      fasilitas_bab_lainnya: 'Fasilitas BAB Lainnya',
+      keterangan_tambahan_awal: 'Keterangan Tambahan',
+      registered_by: 'Diregistrasi Oleh',
+      updated_by: 'Diperbarui Oleh'
+    };
+
+    if (map[key]) return map[key];
+
+    return String(key || '')
+      .replace(/[_\-]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .replace(/\b\w/g, function (ch) { return ch.toUpperCase(); });
+  }
+
+  function getProfile() {
+    var state = getState();
+    if (state && typeof state.getProfile === 'function') {
+      var fromState = state.getProfile() || {};
+      if (fromState && Object.keys(fromState).length) return fromState;
+    }
+
+    var keys = getStorageKeys();
+    if (keys.PROFILE) {
+      var fromStorage = readStorage(keys.PROFILE, {});
+      if (fromStorage && Object.keys(fromStorage).length) return fromStorage;
+    }
+
+    var bootstrap = readStorage('tpk_bootstrap_lite', {});
+    if (bootstrap && bootstrap.profile && Object.keys(bootstrap.profile).length) {
+      return bootstrap.profile;
+    }
+
+    return readStorage('tpk_profile', {}) || {};
+  }
+
+  function getScopeKey() {
+    var profile = getProfile() || {};
+    var idUser = pickFirstMeaningful([profile.id_user, profile.username], 'anon');
+    var idTim = pickFirstMeaningful([profile.id_tim], 'NO_TIM');
+    var bookKey = pickFirstMeaningful([profile.kode_kecamatan, profile.book_key], 'NO_BOOK');
+    return [idUser, idTim, bookKey].join('::');
+  }
+
+  function getSelectedSasaran() {
+    var state = getState();
+    if (state && typeof state.getSelectedSasaran === 'function') {
+      var fromState = state.getSelectedSasaran() || {};
+      if (fromState && Object.keys(fromState).length) return fromState;
+    }
+
+    var storage = getStorage();
+    var keys = getStorageKeys();
+
+    if (storage && typeof storage.get === 'function') {
+      var fromStorage = storage.get(keys.SELECTED_SASARAN || SELECTED_KEY, {}) || {};
+      if (fromStorage && Object.keys(fromStorage).length) return fromStorage;
+    }
+
+    try {
+      return JSON.parse(localStorage.getItem(SELECTED_KEY) || '{}');
+    } catch (err) {
+      return {};
+    }
+  }
+
+  function setSelectedSasaran(item) {
+    var safeItem = item && typeof item === 'object' ? item : {};
+    var state = getState();
+    var storage = getStorage();
+    var keys = getStorageKeys();
+
+    if (state && typeof state.setSelectedSasaran === 'function') {
+      state.setSelectedSasaran(safeItem);
+    }
+
+    if (storage && typeof storage.set === 'function') {
+      storage.set(keys.SELECTED_SASARAN || SELECTED_KEY, safeItem);
+    }
+
+    try {
+      localStorage.setItem(SELECTED_KEY, JSON.stringify(safeItem));
+    } catch (err) {}
+  }
+
+  function getItemId(item) {
+    return normalizeText((item && (item.id_sasaran || item.id)) || '');
+  }
+
   function getStatusBadgeClass(status) {
-    var value = normalizeUpper(status);
+    var value = String(status || '').trim().toUpperCase();
+
     if (value === 'AKTIF') return 'badge-success-soft';
+    if (value === 'NONAKTIF') return 'badge-danger-soft';
     if (value === 'SELESAI') return 'badge-success';
     if (value === 'PERLU_REVIEW') return 'badge-warning';
-    if (value === 'NONAKTIF') return 'badge-danger-soft';
     if (value === 'RUJUK') return 'badge-warning';
     return 'badge-neutral';
   }
 
-  function setMeta(text) {
-    var el = byId(META_ID);
-    if (el) {
-      el.textContent = text || '';
+  function extractPayloadMap(raw) {
+    var parsed = safeJsonParse(
+      (raw && (raw.payload_json || raw.data_laporan)) || {},
+      {}
+    );
+
+    var merged = {};
+
+    function mergeObject(obj) {
+      if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return;
+      Object.keys(obj).forEach(function (key) {
+        if (obj[key] !== undefined && obj[key] !== null && obj[key] !== '') {
+          merged[key] = obj[key];
+        }
+      });
+    }
+
+    mergeObject(parsed.baseline_snapshot);
+    mergeObject(parsed.answers);
+    mergeObject(parsed.dynamic_fields);
+    mergeObject(parsed.extra_payload);
+    mergeObject(parsed);
+
+    return merged;
+  }
+
+  function normalizeDetail(raw) {
+    raw = raw || {};
+
+    var extra = extractPayloadMap(raw);
+
+    var kecamatan = pickFirstMeaningful([
+      raw.nama_kecamatan,
+      raw.kecamatan,
+      extra.nama_kecamatan,
+      extra.kecamatan
+    ], '');
+
+    var desa = pickFirstMeaningful([
+      raw.desa_kelurahan,
+      raw.nama_desa,
+      raw.desa,
+      extra.desa_kelurahan,
+      extra.nama_desa,
+      extra.desa
+    ], '');
+
+    var dusun = pickFirstMeaningful([
+      raw.dusun_rw,
+      raw.nama_dusun,
+      raw.dusun,
+      extra.dusun_rw,
+      extra.nama_dusun,
+      extra.dusun
+    ], '');
+
+    var wilayah = pickFirstMeaningful([
+      raw.nama_wilayah,
+      raw.wilayah,
+      extra.nama_wilayah,
+      extra.wilayah,
+      [dusun, desa, kecamatan].filter(Boolean).join(' • ')
+    ], '-');
+
+    return {
+      id_sasaran: pickFirstMeaningful([raw.id_sasaran, raw.id, extra.id_sasaran], ''),
+      nama_sasaran: pickFirstMeaningful([raw.nama_sasaran, extra.nama_sasaran], ''),
+      status_sasaran: pickFirstMeaningful([raw.status_sasaran, raw.status, extra.status_sasaran], 'AKTIF'),
+      jenis_sasaran: pickFirstMeaningful([raw.jenis_sasaran, extra.jenis_sasaran], ''),
+      nik_sasaran: pickFirstMeaningful([raw.nik_sasaran, raw.nik, extra.nik_sasaran, extra.nik], ''),
+      nomor_kk: pickFirstMeaningful([raw.nomor_kk, extra.nomor_kk], ''),
+      tanggal_lahir: pickFirstMeaningful([raw.tanggal_lahir, extra.tanggal_lahir], ''),
+      updated_at: pickFirstMeaningful([raw.updated_at, raw.tanggal_register, extra.updated_at], ''),
+      nama_wilayah: wilayah,
+      nama_kecamatan: kecamatan,
+      nama_desa: desa,
+      nama_dusun: dusun,
+      alamat: pickFirstMeaningful([raw.alamat, extra.alamat], ''),
+      nama_kepala_keluarga: pickFirstMeaningful([raw.nama_kepala_keluarga, extra.nama_kepala_keluarga], ''),
+      nama_ibu_kandung: pickFirstMeaningful([raw.nama_ibu_kandung, extra.nama_ibu_kandung], ''),
+      data_pasangan: pickFirstMeaningful([raw.data_pasangan, extra.data_pasangan], ''),
+      domisili_setelah_menikah: pickFirstMeaningful([raw.domisili_setelah_menikah, extra.domisili_setelah_menikah], ''),
+      kehamilan_ke: pickFirstMeaningful([raw.kehamilan_ke, extra.kehamilan_ke], ''),
+      kehamilan_diinginkan: pickFirstMeaningful([raw.kehamilan_diinginkan, extra.kehamilan_diinginkan], ''),
+      bb_sebelum_hamil: pickFirstMeaningful([raw.bb_sebelum_hamil, extra.bb_sebelum_hamil], ''),
+      tanggal_persalinan: pickFirstMeaningful([raw.tanggal_persalinan, extra.tanggal_persalinan], ''),
+      jumlah_anak_kandung: pickFirstMeaningful([raw.jumlah_anak_kandung, extra.jumlah_anak_kandung], ''),
+      tempat_persalinan: pickFirstMeaningful([raw.tempat_persalinan, extra.tempat_persalinan], ''),
+      penolong_persalinan: pickFirstMeaningful([raw.penolong_persalinan, extra.penolong_persalinan], ''),
+      cara_persalinan: pickFirstMeaningful([raw.cara_persalinan, extra.cara_persalinan], ''),
+      anak_ke: pickFirstMeaningful([raw.anak_ke, extra.anak_ke], ''),
+      berat_badan_lahir: pickFirstMeaningful([raw.berat_badan_lahir, extra.berat_badan_lahir], ''),
+      panjang_badan_lahir: pickFirstMeaningful([raw.panjang_badan_lahir, extra.panjang_badan_lahir], ''),
+      sumber_air_minum_utama: pickFirstMeaningful([raw.sumber_air_minum_utama, extra.sumber_air_minum_utama], ''),
+      sumber_air_minum_utama_lainnya: pickFirstMeaningful([raw.sumber_air_minum_utama_lainnya, extra.sumber_air_minum_utama_lainnya], ''),
+      fasilitas_bab: pickFirstMeaningful([raw.fasilitas_bab, extra.fasilitas_bab], ''),
+      fasilitas_bab_lainnya: pickFirstMeaningful([raw.fasilitas_bab_lainnya, extra.fasilitas_bab_lainnya], ''),
+      keterangan_tambahan_awal: pickFirstMeaningful([raw.keterangan_tambahan_awal, extra.keterangan_tambahan_awal], ''),
+      registered_by: pickFirstMeaningful([raw.registered_by, extra.registered_by], ''),
+      updated_by: pickFirstMeaningful([raw.updated_by, extra.updated_by], ''),
+      id_tim: pickFirstMeaningful([raw.id_tim, extra.id_tim], ''),
+      nama_tim: pickFirstMeaningful([raw.nama_tim, extra.nama_tim], ''),
+      raw: raw,
+      extra_source: Object.assign({}, extra, raw)
+    };
+  }
+
+  function normalizeRiwayatItem(raw) {
+    raw = raw || {};
+
+    return {
+      id_pendampingan: raw.id_pendampingan || raw.id || '',
+      tanggal_pendampingan: raw.tanggal_pendampingan || raw.submit_at || raw.created_at || '',
+      status_kunjungan: raw.status_kunjungan || raw.status || '',
+      catatan_umum: raw.catatan_umum || raw.ringkasan || raw.catatan || '',
+      raw: raw
+    };
+  }
+
+  function normalizeRiwayatResponse(result) {
+    var data = (result && result.data) || {};
+
+    if (Array.isArray(data)) return data.map(normalizeRiwayatItem);
+    if (Array.isArray(data.items)) return data.items.map(normalizeRiwayatItem);
+    if (Array.isArray(data.list)) return data.list.map(normalizeRiwayatItem);
+    if (data && typeof data === 'object' && (data.id_pendampingan || data.id)) return [normalizeRiwayatItem(data)];
+
+    return [];
+  }
+
+  function getCacheMap() {
+    var scopeKey = getScopeKey();
+    var raw = readStorage(DETAIL_CACHE_KEY, {});
+    raw = raw && typeof raw === 'object' ? raw : {};
+    raw[scopeKey] = raw[scopeKey] || {};
+    return {
+      scopeKey: scopeKey,
+      data: raw
+    };
+  }
+
+  function getCachedEntry(idSasaran) {
+    var id = String(idSasaran || '').trim();
+    if (!id) return null;
+
+    var map = getCacheMap();
+    var entry = map.data[map.scopeKey][id];
+    if (!entry) return null;
+
+    var cachedAt = entry.cached_at || '';
+    var ageMs = cachedAt ? (Date.now() - new Date(cachedAt).getTime()) : Number.MAX_SAFE_INTEGER;
+
+    return {
+      detail: entry.detail || null,
+      riwayat: Array.isArray(entry.riwayat) ? entry.riwayat : [],
+      cachedAt: cachedAt,
+      detailFresh: ageMs >= 0 && ageMs <= DETAIL_CACHE_TTL_MS,
+      riwayatFresh: ageMs >= 0 && ageMs <= RIWAYAT_CACHE_TTL_MS
+    };
+  }
+
+  function setCachedEntry(idSasaran, detail, riwayat) {
+    var id = String(idSasaran || '').trim();
+    if (!id) return;
+
+    var map = getCacheMap();
+    var prev = map.data[map.scopeKey][id] || {};
+
+    map.data[map.scopeKey][id] = {
+      cached_at: new Date().toISOString(),
+      detail: detail || prev.detail || null,
+      riwayat: Array.isArray(riwayat) ? riwayat : (prev.riwayat || [])
+    };
+
+    writeStorage(DETAIL_CACHE_KEY, map.data);
+  }
+
+  function renderHeader(detail) {
+    var safe = detail || {};
+    var status = safe.status_sasaran || 'AKTIF';
+
+    setText('detail-nama-sasaran', formatValue(safe.nama_sasaran, 'nama_sasaran'));
+    setText('detail-id-sasaran', 'ID Sasaran: ' + (safe.id_sasaran || '-'));
+    setText('detail-jenis', formatValue(safe.jenis_sasaran, 'jenis_sasaran'));
+    setText('detail-nik', formatValue(safe.nik_sasaran, 'nik_sasaran'));
+    setText('detail-kk', formatValue(safe.nomor_kk, 'nomor_kk'));
+    setText('detail-tanggal-lahir', formatValue(safe.tanggal_lahir, 'tanggal_lahir'));
+    setText('detail-wilayah', formatValue(safe.nama_wilayah, 'wilayah'));
+    setText('detail-updated-at', formatValue(safe.updated_at, 'updated_at'));
+
+    var badge = byId('detail-status-badge');
+    if (badge) {
+      badge.textContent = formatValue(status, 'status_sasaran');
+      badge.className = 'badge ' + getStatusBadgeClass(status);
     }
   }
 
-  function setEmpty(message) {
-    var container = byId(CONTAINER_ID);
-    if (!container) return;
+  function collectExtraEntries(detail) {
+    var safe = detail || {};
+    var src = safe.extra_source || {};
+    var entries = [];
+    var used = {};
 
-    container.innerHTML = '<p class="muted-text">' + String(message || 'Belum ada data sasaran.') + '</p>';
+    function pushEntry(key, explicitValue) {
+      var value = explicitValue !== undefined ? explicitValue : src[key];
+      if (!isMeaningful(value)) return;
+
+      var uniqueKey = String(key).toUpperCase();
+      if (used[uniqueKey]) return;
+      used[uniqueKey] = true;
+
+      entries.push({
+        key: key,
+        label: humanizeKey(key),
+        value: formatValue(value, key)
+      });
+    }
+
+    [
+      'nama_kepala_keluarga',
+      'nama_ibu_kandung',
+      'alamat',
+      'data_pasangan',
+      'domisili_setelah_menikah',
+      'kehamilan_ke',
+      'kehamilan_diinginkan',
+      'bb_sebelum_hamil',
+      'tanggal_persalinan',
+      'jumlah_anak_kandung',
+      'tempat_persalinan',
+      'penolong_persalinan',
+      'cara_persalinan',
+      'anak_ke',
+      'berat_badan_lahir',
+      'panjang_badan_lahir',
+      'sumber_air_minum_utama',
+      'sumber_air_minum_utama_lainnya',
+      'fasilitas_bab',
+      'fasilitas_bab_lainnya',
+      'keterangan_tambahan_awal',
+      'registered_by',
+      'updated_by'
+    ].forEach(function (key) {
+      pushEntry(key, safe[key]);
+    });
+
+    var skipKeys = {
+      id: true,
+      id_sasaran: true,
+      nama_sasaran: true,
+      status_sasaran: true,
+      status: true,
+      jenis_sasaran: true,
+      nik: true,
+      nik_sasaran: true,
+      nomor_kk: true,
+      tanggal_lahir: true,
+      updated_at: true,
+      tanggal_register: true,
+      nama_wilayah: true,
+      wilayah: true,
+      kecamatan: true,
+      nama_kecamatan: true,
+      desa: true,
+      nama_desa: true,
+      desa_kelurahan: true,
+      dusun: true,
+      dusun_rw: true,
+      nama_dusun: true,
+      data_laporan: true,
+      payload_json: true,
+      raw: true,
+      extra_source: true,
+      answers: true,
+      dynamic_fields: true,
+      extra_payload: true,
+      baseline_snapshot: true,
+      is_duplicate_flag: true,
+      duplicate_level: true,
+      duplicate_note: true,
+      unique_key: true,
+      lokasi_gps: true,
+      client_submit_id: true,
+      sync_source: true,
+      umur_tahun_saat_register: true,
+      umur_bulan_saat_register: true,
+      nama_tim: true,
+      id_tim: true
+    };
+
+    Object.keys(src).sort().forEach(function (key) {
+      if (skipKeys[key]) return;
+      pushEntry(key);
+    });
+
+    return entries;
   }
 
-  function setLoading(message) {
-    var container = byId(CONTAINER_ID);
-    if (!container) return;
+  function renderExtraFields(detail) {
+    var entries = collectExtraEntries(detail);
 
-    container.innerHTML = '<p class="muted-text">' + String(message || 'Memuat data sasaran...') + '</p>';
-  }
-
-  function renderList(items) {
-    var container = byId(CONTAINER_ID);
-    if (!container) return;
-
-    var list = Array.isArray(items) ? items.map(normalizeItem) : [];
-
-    if (!list.length) {
-      setEmpty('Belum ada data sasaran.');
+    if (!entries.length) {
+      setHTML(
+        'detail-extra-fields',
+        '<div><span class="label">Belum ada</span><strong>-</strong></div>'
+      );
       return;
     }
 
-    container.innerHTML = list.map(function (item) {
-      var id = getItemId(item);
+    var html = entries.map(function (entry) {
       return [
-        '<article class="card sasaran-item" data-id-sasaran="', id, '">',
-          '<div class="section-header row-between">',
+        '<div>',
+          '<span class="label">', escapeHtml(entry.label), '</span>',
+          '<strong>', escapeHtml(entry.value), '</strong>',
+        '</div>'
+      ].join('');
+    }).join('');
+
+    setHTML('detail-extra-fields', html);
+  }
+
+  function renderRiwayat(items) {
+    var safeItems = Array.isArray(items) ? items : [];
+
+    if (!safeItems.length) {
+      setHTML(
+        'detail-riwayat-ringkas',
+        '<p class="muted-text">Belum ada riwayat pendampingan untuk sasaran ini.</p>'
+      );
+      return;
+    }
+
+    var html = safeItems.slice(0, 5).map(function (item) {
+      var tanggal = formatValue(item.tanggal_pendampingan, 'tanggal_pendampingan');
+      var status = formatValue(item.status_kunjungan || '-', 'status_kunjungan');
+      var catatan = formatValue(item.catatan_umum || '-', 'catatan_umum');
+
+      return [
+        '<article class="list-card">',
+          '<div class="list-card-header row-between">',
             '<div>',
-              '<h3 style="margin:0 0 6px;">', normalizeUpper(item.nama_sasaran || '-'), '</h3>',
-              '<p class="muted-text" style="margin:0;">ID Sasaran: ', item.id_sasaran || '-', '</p>',
+              '<h4 style="margin:0 0 4px;">', escapeHtml(tanggal), '</h4>',
+              '<p class="muted-text" style="margin:0;">ID Pendampingan: ', escapeHtml(item.id_pendampingan || '-'), '</p>',
             '</div>',
-            '<span class="badge ', getStatusBadgeClass(item.status_sasaran), '">', item.status_sasaran || '-', '</span>',
+            '<span class="badge badge-neutral">', escapeHtml(status), '</span>',
           '</div>',
-
-          '<div class="profile-grid">',
-            '<div><span class="label">Jenis Sasaran</span><strong>', item.jenis_sasaran || '-', '</strong></div>',
-            '<div><span class="label">Tanggal Lahir</span><strong>', formatDate(item.tanggal_lahir), '</strong></div>',
-            '<div><span class="label">NIK</span><strong>', item.nik_sasaran || '-', '</strong></div>',
-            '<div><span class="label">No. KK</span><strong>', item.nomor_kk || '-', '</strong></div>',
-            '<div style="grid-column:1 / -1;"><span class="label">Wilayah</span><strong>', item.nama_wilayah || '-', '</strong></div>',
-          '</div>',
-
-          '<div class="section-actions action-grid-2">',
-            '<button class="btn btn-secondary btn-sasaran-detail" data-id-sasaran="', id, '">Detail</button>',
-            '<button class="btn btn-primary btn-sasaran-pendampingan" data-id-sasaran="', id, '">Lapor Pendampingan</button>',
+          '<div style="margin-top:10px;">',
+            '<span class="label">Catatan Umum</span>',
+            '<strong>', escapeHtml(catatan), '</strong>',
           '</div>',
         '</article>'
       ].join('');
     }).join('');
+
+    setHTML('detail-riwayat-ringkas', html);
   }
 
-  function toast(message, type) {
-    if (window.UI && typeof window.UI.showToast === 'function') {
-      window.UI.showToast(message, type || 'info');
+  function renderLoadingPreview(selected) {
+    var safe = normalizeDetail(selected || {});
+    renderHeader(safe);
+
+    setHTML(
+      'detail-extra-fields',
+      '<div><span class="label">Memuat</span><strong>Data tambahan sedang dimuat...</strong></div>'
+    );
+
+    setHTML(
+      'detail-riwayat-ringkas',
+      '<p class="muted-text">Riwayat pendampingan sedang dimuat...</p>'
+    );
+  }
+
+  function isDetailScreenActive() {
+    var screen = byId('sasaran-detail-screen');
+    return !!(screen && !screen.classList.contains('hidden'));
+  }
+
+  function autoOpenSelectedIfNeeded() {
+    if (!isDetailScreenActive()) return;
+    if (currentDetail && getItemId(currentDetail)) return;
+
+    var selected = getSelectedSasaran() || {};
+    var id = getItemId(selected);
+    if (!id) return;
+
+    if (window.SasaranDetailView && typeof window.SasaranDetailView.open === 'function') {
+      window.SasaranDetailView.open(id, {
+        skipRoute: true,
+        selected: selected,
+        silent: true
+      });
+    }
+  }
+
+  async function fetchDetail(idSasaran) {
+    var api = getApi();
+    if (!api || typeof api.post !== 'function') {
+      throw new Error('Api.post belum tersedia.');
+    }
+
+    var action = getActionName('GET_SASARAN_DETAIL', 'getSasaranDetail');
+    var result = await api.post(action, {
+      id_sasaran: idSasaran
+    }, {
+      includeAuth: true,
+      timeoutMs: 8000
+    });
+
+    if (!result || result.ok === false) {
+      throw new Error((result && result.message) || 'Gagal memuat detail sasaran.');
+    }
+
+    return normalizeDetail(result.data || {});
+  }
+
+  async function fetchRiwayat(idSasaran) {
+    var api = getApi();
+    if (!api || typeof api.post !== 'function') {
+      throw new Error('Api.post belum tersedia.');
+    }
+
+    var action = getActionName('GET_RIWAYAT_PENDAMPINGAN_SASARAN', 'getRiwayatPendampinganSasaran');
+    var result = await api.post(action, {
+      id_sasaran: idSasaran,
+      limit: 5
+    }, {
+      includeAuth: true,
+      timeoutMs: 6000
+    });
+
+    if (!result || result.ok === false) {
+      throw new Error((result && result.message) || 'Gagal memuat riwayat pendampingan.');
+    }
+
+    return normalizeRiwayatResponse(result);
+  }
+
+  function openPendampinganFromDetail() {
+    var selected = currentDetail || getSelectedSasaran() || {};
+    var idSasaran = getItemId(selected);
+
+    if (!idSasaran) {
+      showToast('Data sasaran belum tersedia.', 'warning');
       return;
     }
 
-    try {
-      window.alert(message);
-    } catch (err) {}
+    setSelectedSasaran(selected);
+
+    if (window.PendampinganView && typeof window.PendampinganView.openCreate === 'function') {
+      window.PendampinganView.openCreate(selected);
+      return;
+    }
+
+    var router = getRouter();
+    if (router && typeof router.go === 'function') {
+      router.go('pendampingan', {
+        onRouteReady: function () {
+          if (window.PendampinganView && typeof window.PendampinganView.openCreate === 'function') {
+            window.PendampinganView.openCreate(selected);
+          }
+        }
+      });
+    }
   }
 
-  var SasaranListView = {
-    _initialized: false,
-    _loading: false,
-    _lastItems: [],
-    _lastRenderedItems: [],
-    _itemMap: {},
+  function openEditSasaranFromDetail() {
+    var selected = currentDetail || getSelectedSasaran() || {};
+    var idSasaran = getItemId(selected);
 
+    if (!idSasaran) {
+      showToast('Data sasaran untuk edit tidak ditemukan.', 'warning');
+      return;
+    }
+
+    setSelectedSasaran(selected);
+
+    if (window.RegistrasiView && typeof window.RegistrasiView.openEdit === 'function') {
+      window.RegistrasiView.openEdit(selected);
+      return;
+    }
+
+    if (window.RegistrasiForm && typeof window.RegistrasiForm.openEdit === 'function') {
+      window.RegistrasiForm.openEdit(selected);
+      return;
+    }
+
+    var router = getRouter();
+    if (router && typeof router.go === 'function') {
+      router.go('registrasi');
+    }
+  }
+
+  var SasaranDetailView = {
     init: function () {
-      if (this._initialized) return;
-      this._initialized = true;
-
-      var refreshBtn = byId(BTN_REFRESH_ID);
-      var backBtn = byId(BTN_BACK_ID);
-      var keywordEl = byId(FILTER_KEYWORD_ID);
-      var jenisEl = byId(FILTER_JENIS_ID);
-      var statusEl = byId(FILTER_STATUS_ID);
-      var container = byId(CONTAINER_ID);
-
-      if (refreshBtn && refreshBtn.dataset.bound !== '1') {
-        refreshBtn.dataset.bound = '1';
-        refreshBtn.addEventListener('click', this.load.bind(this, true));
+      if (isInitialized) {
+        autoOpenSelectedIfNeeded();
+        return;
       }
 
-      if (backBtn && backBtn.dataset.bound !== '1') {
-        backBtn.dataset.bound = '1';
-        backBtn.addEventListener('click', function () {
+      isInitialized = true;
+
+      var btnBack = byId('btn-back-list-from-detail');
+      var btnPendampingan = byId('btn-go-to-pendampingan');
+      var btnEdit = byId('btn-go-to-edit-sasaran');
+
+      if (btnBack && btnBack.dataset.bound !== '1') {
+        btnBack.dataset.bound = '1';
+        btnBack.addEventListener('click', function (event) {
+          event.preventDefault();
           var router = getRouter();
           if (router && typeof router.go === 'function') {
-            router.go('dashboard');
+            router.go('sasaranList');
           }
         });
       }
 
-      [keywordEl, jenisEl, statusEl].forEach(function (el) {
-        if (!el || el.dataset.bound === '1') return;
-        el.dataset.bound = '1';
-
-        var evt = el.id === FILTER_KEYWORD_ID ? 'input' : 'change';
-        el.addEventListener(evt, function () {
-          SasaranListView.renderLocal();
+      if (btnPendampingan && btnPendampingan.dataset.bound !== '1') {
+        btnPendampingan.dataset.bound = '1';
+        btnPendampingan.addEventListener('click', function (event) {
+          event.preventDefault();
+          openPendampinganFromDetail();
         });
+      }
+
+      if (btnEdit && btnEdit.dataset.bound !== '1') {
+        btnEdit.dataset.bound = '1';
+        btnEdit.addEventListener('click', function (event) {
+          event.preventDefault();
+          openEditSasaranFromDetail();
+        });
+      }
+
+      autoOpenSelectedIfNeeded();
+    },
+
+    open: async function (idSasaran, options) {
+      this.init();
+
+      options = options || {};
+      var selected = options.selected || getSelectedSasaran() || {};
+      var resolvedId = String(idSasaran || selected.id_sasaran || selected.id || '').trim();
+
+      if (!resolvedId) {
+        showToast('ID sasaran tidak ditemukan.', 'warning');
+        var routerToList = getRouter();
+        if (routerToList && typeof routerToList.go === 'function') {
+          routerToList.go('sasaranList');
+        }
+        return;
+      }
+
+      if (!options.skipRoute) {
+        var router = getRouter();
+        if (router && typeof router.go === 'function') {
+          router.go('sasaranDetail', {
+            onRouteReady: function () {
+              if (window.SasaranDetailView && typeof window.SasaranDetailView.open === 'function') {
+                window.SasaranDetailView.open(resolvedId, {
+                  skipRoute: true,
+                  selected: selected,
+                  silent: true
+                });
+              }
+            }
+          });
+          return;
+        }
+      }
+
+      var previewSelected = Object.assign({}, selected, {
+        id_sasaran: selected.id_sasaran || selected.id || resolvedId,
+        id: selected.id || selected.id_sasaran || resolvedId
       });
 
-      if (container && container.dataset.bound !== '1') {
-        container.dataset.bound = '1';
+      setSelectedSasaran(previewSelected);
+      currentDetail = normalizeDetail(previewSelected);
 
-        container.addEventListener('click', function (event) {
-          var detailBtn = event.target.closest('.btn-sasaran-detail');
-          var penBtn = event.target.closest('.btn-sasaran-pendampingan');
-          var card = event.target.closest('.sasaran-item');
+      var cached = getCachedEntry(resolvedId);
+      if (cached && cached.detail) {
+        currentDetail = normalizeDetail(cached.detail);
+        renderHeader(currentDetail);
+        renderExtraFields(currentDetail);
 
-          if (detailBtn) {
-            event.preventDefault();
-            event.stopPropagation();
-            SasaranListView.openDetail(detailBtn.getAttribute('data-id-sasaran'));
-            return;
-          }
-
-          if (penBtn) {
-            event.preventDefault();
-            event.stopPropagation();
-            SasaranListView.openPendampingan(penBtn.getAttribute('data-id-sasaran'));
-            return;
-          }
-
-          if (card) {
-            SasaranListView.openDetail(card.getAttribute('data-id-sasaran'));
-          }
-        });
-      }
-
-      var cached = readLocalCache();
-      if (cached.items.length) {
-        this._lastItems = cached.items.slice();
-        this.rebuildItemMap();
-        this.renderLocal();
-
-        if (cached.isFresh) {
-          setMeta('Menampilkan ' + cached.items.length + ' data dari cache lokal.');
+        if (cached.riwayat && cached.riwayat.length) {
+          renderRiwayat(cached.riwayat);
         } else {
-          setMeta('Menampilkan ' + cached.items.length + ' data cache lama • menyegarkan data...');
-          this.load(false);
+          setHTML('detail-riwayat-ringkas', '<p class="muted-text">Riwayat pendampingan sedang dimuat...</p>');
+        }
+
+        if (cached.detailFresh && cached.riwayatFresh && !options.forceRefresh) {
+          return;
         }
       } else {
-        this.load(true);
-      }
-    },
-
-    rebuildItemMap: function () {
-      var map = {};
-      this._lastItems.forEach(function (item) {
-        var normalized = normalizeItem(item);
-        var id = getItemId(normalized);
-        if (id) map[id] = normalized;
-      });
-      this._itemMap = map;
-    },
-
-    buildPayload: function () {
-      var profile = getProfile();
-      var session = getSession();
-
-      return {
-        id_tim: getIdTim(profile, session),
-        book_key: getBookKey(profile, session)
-      };
-    },
-
-    load: async function (forceRefresh) {
-      var api = getApi();
-      if (!api || typeof api.post !== 'function') {
-        setMeta('Gagal memuat data sasaran.');
-        setEmpty('API belum tersedia.');
-        return;
+        renderLoadingPreview(previewSelected);
       }
 
-      var payload = this.buildPayload();
+      var requestToken = ++currentRequestToken;
 
-      if (!payload.id_tim) {
-        setMeta('Gagal memuat data sasaran.');
-        setEmpty('id_tim tidak ditemukan pada profil/session.');
-        return;
-      }
-
-      var cached = readLocalCache();
-      var hasMemory = this._lastItems.length > 0;
-      var hasFreshCache = cached.items.length > 0 && cached.isFresh;
-
-      if (!forceRefresh && hasFreshCache) {
-        this._lastItems = cached.items.slice();
-        this.rebuildItemMap();
-        this.renderLocal();
-        setMeta('Menampilkan ' + this._lastRenderedItems.length + ' data dari cache lokal.');
-        return;
-      }
-
-      if (!forceRefresh && hasMemory) {
-        this.renderLocal();
-      } else if (!forceRefresh && cached.items.length) {
-        this._lastItems = cached.items.slice();
-        this.rebuildItemMap();
-        this.renderLocal();
-      } else {
-        setLoading('Memuat data sasaran...');
-      }
-
-      if (this._loading) return;
-      this._loading = true;
+      var detail = currentDetail;
+      var riwayat = cached && Array.isArray(cached.riwayat) ? cached.riwayat : [];
 
       try {
-        var result = await api.post('getSasaranByTim', payload, {
-          includeAuth: true,
-          timeoutMs: 10000
-        });
+        detail = await fetchDetail(resolvedId);
+        if (requestToken !== currentRequestToken) return;
 
-        if (!result || result.ok === false) {
-          if (this._lastItems.length) {
-            setMeta('Menampilkan cache lokal • ' + ((result && result.message) || 'Gagal menyegarkan data.'));
-            return;
-          }
-
-          setMeta('Gagal memuat data sasaran.');
-          setEmpty((result && result.message) || 'Gagal memuat data sasaran.');
-          return;
-        }
-
-        var data = result.data || {};
-        var items = Array.isArray(data.items) ? data.items : (Array.isArray(data) ? data : []);
-
-        this._lastItems = items.map(normalizeItem);
-        saveLocalCache(this._lastItems);
-        this.rebuildItemMap();
-        this.renderLocal();
+        currentDetail = detail;
+        setSelectedSasaran(detail);
+        renderHeader(detail);
+        renderExtraFields(detail);
       } catch (err) {
-        if (this._lastItems.length) {
-          setMeta('Menampilkan cache lokal • ' + (err && err.message ? err.message : 'Gagal terhubung ke server.'));
-          return;
+        if (requestToken !== currentRequestToken) return;
+
+        if (!(cached && cached.detail)) {
+          setHTML(
+            'detail-extra-fields',
+            '<div><span class="label">Gagal memuat</span><strong>' + escapeHtml((err && err.message) || 'Detail sasaran belum dapat dimuat.') + '</strong></div>'
+          );
         }
-
-        setMeta('Gagal memuat data sasaran.');
-        setEmpty(err && err.message ? err.message : 'Gagal terhubung ke server.');
-      } finally {
-        this._loading = false;
       }
+
+      try {
+        riwayat = await fetchRiwayat(resolvedId);
+        if (requestToken !== currentRequestToken) return;
+        renderRiwayat(riwayat);
+      } catch (err2) {
+        if (requestToken !== currentRequestToken) return;
+
+        if (!riwayat.length) {
+          setHTML(
+            'detail-riwayat-ringkas',
+            '<p class="muted-text">Riwayat pendampingan belum dapat dimuat.</p>'
+          );
+        }
+      }
+
+      setCachedEntry(resolvedId, detail, riwayat);
     },
 
-    renderLocal: function () {
-      var filters = getSelectedFilters();
-      var items = applyAllFilters(this._lastItems, filters);
-      this._lastRenderedItems = items.slice();
-      renderList(items);
-
-      var label = 'Menampilkan ' + String(items.length) + ' data';
-      if (filters.jenis_sasaran) label += ' • Jenis: ' + filters.jenis_sasaran;
-      if (filters.status_sasaran) label += ' • Status: ' + filters.status_sasaran;
-      if (filters.keyword) label += ' • Kata kunci: ' + filters.keyword;
-      setMeta(label);
-    },
-
-    findItemById: function (idSasaran) {
-      var id = String(idSasaran || '').trim();
-      if (!id) return null;
-      return this._itemMap[id] || null;
-    },
-
-    openDetail: function (idSasaran) {
-      var item = this.findItemById(idSasaran);
-      if (!item) return;
-
-      setSelectedSasaran(item);
-      saveDetailPreview(item);
-
-      if (window.SasaranDetailView && typeof window.SasaranDetailView.open === 'function') {
-        window.SasaranDetailView.open(idSasaran, {
-          selected: item
-        });
-        return;
-      }
-
-      var router = getRouter();
-      if (router && typeof router.go === 'function') {
-        router.go('sasaranDetail', {
-          onRouteReady: function () {
-            if (window.SasaranDetailView && typeof window.SasaranDetailView.open === 'function') {
-              window.SasaranDetailView.open(idSasaran, {
-                skipRoute: true,
-                selected: item
-              });
-            }
-          }
-        });
-      }
-    },
-
-    openPendampingan: function (idSasaran) {
-      var item = this.findItemById(idSasaran);
-      if (!item) {
-        toast('Data sasaran tidak ditemukan.', 'warning');
-        return;
-      }
-
-      setSelectedSasaran(item);
-      saveDetailPreview(item);
-
-      if (window.PendampinganView && typeof window.PendampinganView.openCreate === 'function') {
-        window.PendampinganView.openCreate(item);
-        return;
-      }
-
-      var router = getRouter();
-      if (router && typeof router.go === 'function') {
-        router.go('pendampingan', {
-          onRouteReady: function () {
-            if (window.PendampinganView && typeof window.PendampinganView.openCreate === 'function') {
-              window.PendampinganView.openCreate(item);
-            }
-          }
-        });
-      }
+    openById: function (idSasaran, options) {
+      return this.open(idSasaran, options || {});
     },
 
     refresh: function () {
-      return this.load(true);
+      var selected = currentDetail || getSelectedSasaran() || {};
+      var idSasaran = getItemId(selected);
+
+      if (!idSasaran) {
+        showToast('Tidak ada sasaran yang dipilih.', 'warning');
+        return;
+      }
+
+      return this.open(idSasaran, {
+        skipRoute: true,
+        selected: selected,
+        forceRefresh: true
+      });
+    },
+
+    getCurrentDetail: function () {
+      return currentDetail || {};
+    },
+
+    getCurrentItem: function () {
+      return currentDetail || {};
     }
   };
 
-  window.SasaranListView = SasaranListView;
+  window.SasaranDetailView = SasaranDetailView;
+  window.SasaranDetail = SasaranDetailView;
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () {
+      if (window.SasaranDetailView && typeof window.SasaranDetailView.init === 'function') {
+        window.SasaranDetailView.init();
+      }
+    });
+  } else {
+    window.SasaranDetailView.init();
+  }
 })(window, document);
