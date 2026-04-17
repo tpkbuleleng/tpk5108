@@ -1,3 +1,33 @@
+(function (window) {
+  'use strict';
+
+  function cleanSensitiveUrl() {
+    try {
+      var url = new URL(window.location.href);
+      var keys = ['username', 'password', 'id_user', 'kata_sandi'];
+
+      var changed = false;
+      keys.forEach(function (key) {
+        if (url.searchParams.has(key)) {
+          url.searchParams.delete(key);
+          changed = true;
+        }
+      });
+
+      if (changed) {
+        var cleanUrl = url.pathname + (url.search || '') + (url.hash || '');
+        window.history.replaceState({}, document.title, cleanUrl);
+      }
+    } catch (err) {
+      console.warn('Gagal membersihkan URL sensitif:', err);
+    }
+  }
+
+  cleanSensitiveUrl();
+
+  window.TPKCleanSensitiveUrl = cleanSensitiveUrl;
+})(window);
+
 (function (window, document) {
   'use strict';
 
