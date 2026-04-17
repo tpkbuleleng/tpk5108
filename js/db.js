@@ -1,252 +1,263 @@
 (function (window) {
   'use strict';
 
-  const DB_NAME = 'TPK_VNEXT_DB';
-  const DB_VERSION = 1;
-  let dbPromise = null;
+  var DB_NAME = 'TPK_VNEXT_DB';
+  var DB_VERSION = 1;
+  var dbPromise = null;
+
+  var STORES = {
+    META: 'meta',
+    BOOTSTRAP_CACHE: 'bootstrap_cache',
+    SASARAN_CACHE: 'sasaran_cache',
+    DRAFT_REGISTRASI: 'draft_registrasi',
+    DRAFT_PENDAMPINGAN: 'draft_pendampingan',
+    SYNC_QUEUE: 'sync_queue',
+    SYNC_RESULT_LOG: 'sync_result_log',
+    AUDIT_LOG_LOCAL: 'audit_log_local'
+  };
+
+  var KEY_FIELDS = {};
+  KEY_FIELDS[STORES.META] = 'key';
+  KEY_FIELDS[STORES.BOOTSTRAP_CACHE] = 'cache_key';
+  KEY_FIELDS[STORES.SASARAN_CACHE] = 'id_sasaran';
+  KEY_FIELDS[STORES.DRAFT_REGISTRASI] = 'draft_id';
+  KEY_FIELDS[STORES.DRAFT_PENDAMPINGAN] = 'draft_id';
+  KEY_FIELDS[STORES.SYNC_QUEUE] = 'queue_id';
+  KEY_FIELDS[STORES.SYNC_RESULT_LOG] = 'result_id';
+  KEY_FIELDS[STORES.AUDIT_LOG_LOCAL] = 'event_id';
 
   function nowIso() {
     return new Date().toISOString();
   }
 
-  function makeId(prefix) {
-    const part = Math.random().toString(36).slice(2, 8).toUpperCase();
-    return `${prefix || 'ID'}-${Date.now()}-${part}`;
+  function randomId(prefix) {
+    var value = '';
+    if (window.crypto && window.crypto.randomUUID) {
+      value = window.crypto.randomUUID();
+    } else {
+      value = 'id-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10);
+    }
+    return (prefix || 'ID') + '-' + value;
   }
 
-  function openDb() {
+  function createStore(db, storeName, keyPath) {
+    if (db.objectStoreNames.contains(storeName)) return db.transaction(storeName, 'readwrite').objectStore(storeName);
+    return db.createObjectStore(storeName, { keyPath: keyPath });
+  }
+
+  function ensureIndexes(store, indexes) {
+    (indexes || []).forEach(function (index) {
+      if (!store.indexNames.contains(index.name)) {
+        store.createIndex(index.name, index.keyPath, index.options || {});
+      }
+    });
+  }
+
+  function upgrade(db) {
+    var meta = createStore(db, STORES.META, 'key');
+    ensureIndexes(meta, []);
+
+    var bootstrap = createStore(db, STORES.BOOTSTRAP_CACHE, 'cache_key');
+    ensureIndexes(bootstrap, [{ name: 'expires_at', keyPath: 'expires_at' }]);
+
+    var sasaran = createStore(db, STORES.SASARAN_CACHE, 'id_sasaran');
+    ensureIndexes(sasaran, [
+      { name: 'id_tim', keyPath: 'id_tim' },
+      { name: 'updated_at', keyPath: 'updated_at' },
+      { name: 'sync_state', keyPath: 'sync_state' }
+    ]);
+
+    var draftReg = createStore(db, STORES.DRAFT_REGISTRASI, 'draft_id');
+    ensureIndexes(draftReg, [
+      { name: 'id_user', keyPath: 'id_user' },
+      { name: 'id_tim', keyPath: 'id_tim' },
+      { name: 'updated_at', keyPath: 'updated_at' }
+    ]);
+
+    var draftPend = createStore(db, STORES.DRAFT_PENDAMPINGAN, 'draft_id');
+    ensureIndexes(draftPend, [
+      { name: 'id_user', keyPath: 'id_user' },
+      { name: 'id_tim', keyPath: 'id_tim' },
+      { name: 'id_sasaran', keyPath: 'id_sasaran' },
+      { name: 'updated_at', keyPath: 'updated_at' }
+    ]);
+
+    var queue = createStore(db, STORES.SYNC_QUEUE, 'queue_id');
+    ensureIndexes(queue, [
+      { name: 'status', keyPath: 'status' },
+      { name: 'created_at', keyPath: 'created_at' },
+      { name: 'action', keyPath: 'action' },
+      { name: 'client_submit_id', keyPath: 'client_submit_id' }
+    ]);
+
+    var resultLog = createStore(db, STORES.SYNC_RESULT_LOG, 'result_id');
+    ensureIndexes(resultLog, [
+      { name: 'queue_id', keyPath: 'queue_id' },
+      { name: 'created_at', keyPath: 'created_at' }
+    ]);
+
+    var audit = createStore(db, STORES.AUDIT_LOG_LOCAL, 'event_id');
+    ensureIndexes(audit, [
+      { name: 'event_type', keyPath: 'event_type' },
+      { name: 'created_at', keyPath: 'created_at' }
+    ]);
+  }
+
+  function open() {
     if (dbPromise) return dbPromise;
-
-    dbPromise = new Promise((resolve, reject) => {
-      const request = indexedDB.open(DB_NAME, DB_VERSION);
-
-      request.onerror = function () {
-        reject(request.error || new Error('Failed to open IndexedDB'));
-      };
-
+    dbPromise = new Promise(function (resolve, reject) {
+      if (!('indexedDB' in window)) {
+        reject(new Error('IndexedDB tidak didukung browser ini.'));
+        return;
+      }
+      var request = window.indexedDB.open(DB_NAME, DB_VERSION);
       request.onupgradeneeded = function (event) {
-        const db = event.target.result;
-
-        createStore(db, 'meta', 'key');
-        createStore(db, 'bootstrap_cache', 'cache_key', [
-          ['updated_at', 'updated_at', false],
-          ['expires_at', 'expires_at', false]
-        ]);
-        createStore(db, 'sasaran_cache', 'id_sasaran', [
-          ['by_tim', 'id_tim', false],
-          ['by_status', 'status_sasaran', false],
-          ['updated_at', 'updated_at', false]
-        ]);
-        createStore(db, 'draft_registrasi', 'draft_id', [
-          ['by_user', 'id_user', false],
-          ['by_tim', 'id_tim', false],
-          ['updated_at', 'updated_at', false]
-        ]);
-        createStore(db, 'draft_pendampingan', 'draft_id', [
-          ['by_user', 'id_user', false],
-          ['by_tim', 'id_tim', false],
-          ['by_sasaran', 'id_sasaran', false],
-          ['updated_at', 'updated_at', false]
-        ]);
-        createStore(db, 'sync_queue', 'queue_id', [
-          ['by_status', 'status', false],
-          ['by_action', 'action', false],
-          ['by_user', 'id_user', false],
-          ['by_tim', 'id_tim', false],
-          ['created_at', 'created_at', false],
-          ['updated_at', 'updated_at', false],
-          ['by_client_submit_id', 'client_submit_id', true]
-        ]);
-        createStore(db, 'sync_result_log', 'result_id', [
-          ['by_queue_id', 'queue_id', false],
-          ['created_at', 'created_at', false]
-        ]);
-        createStore(db, 'audit_log_local', 'event_id', [
-          ['event_type', 'event_type', false],
-          ['created_at', 'created_at', false]
-        ]);
+        upgrade(event.target.result);
       };
-
-      request.onsuccess = function () {
-        const db = request.result;
-        db.onversionchange = function () {
-          db.close();
-          dbPromise = null;
-        };
-        resolve(db);
+      request.onsuccess = function (event) {
+        resolve(event.target.result);
+      };
+      request.onerror = function () {
+        reject(request.error || new Error('Gagal membuka IndexedDB.'));
       };
     });
-
     return dbPromise;
   }
 
-  function createStore(db, storeName, keyPath, indexes) {
-    if (db.objectStoreNames.contains(storeName)) return;
-    const store = db.createObjectStore(storeName, { keyPath });
-    (indexes || []).forEach(([indexName, path, unique]) => {
-      store.createIndex(indexName, path, { unique: !!unique });
-    });
-  }
-
-  function txComplete(transaction) {
-    return new Promise((resolve, reject) => {
-      transaction.oncomplete = function () { resolve(true); };
-      transaction.onerror = function () { reject(transaction.error || new Error('Transaction failed')); };
-      transaction.onabort = function () { reject(transaction.error || new Error('Transaction aborted')); };
-    });
-  }
-
-  async function withStore(storeName, mode, runner) {
-    const db = await openDb();
-    const transaction = db.transaction(storeName, mode);
-    const store = transaction.objectStore(storeName);
-    const result = await runner(store, transaction);
-    await txComplete(transaction);
-    return result;
-  }
-
-  function idbRequest(request) {
-    return new Promise((resolve, reject) => {
-      request.onsuccess = function () { resolve(request.result); };
-      request.onerror = function () { reject(request.error || new Error('IndexedDB request failed')); };
-    });
-  }
-
-  async function getAllByIndex(storeName, indexName, value) {
-    return withStore(storeName, 'readonly', async (store) => {
-      const index = store.index(indexName);
-      return idbRequest(index.getAll(value));
-    });
-  }
-
-  async function getAll(storeName) {
-    return withStore(storeName, 'readonly', async (store) => idbRequest(store.getAll()));
-  }
-
-  const TpkDb = {
-    DB_NAME,
-    DB_VERSION,
-    STORES: {
-      META: 'meta',
-      BOOTSTRAP: 'bootstrap_cache',
-      SASARAN_CACHE: 'sasaran_cache',
-      DRAFT_REGISTRASI: 'draft_registrasi',
-      DRAFT_PENDAMPINGAN: 'draft_pendampingan',
-      SYNC_QUEUE: 'sync_queue',
-      SYNC_RESULT_LOG: 'sync_result_log',
-      AUDIT_LOG: 'audit_log_local'
-    },
-
-    nowIso,
-    makeId,
-
-    async open() {
-      return openDb();
-    },
-
-    async put(storeName, record) {
-      return withStore(storeName, 'readwrite', async (store) => {
-        const next = { ...(record || {}) };
-        if (!next.updated_at) next.updated_at = nowIso();
-        store.put(next);
-        return next;
-      });
-    },
-
-    async bulkPut(storeName, records) {
-      return withStore(storeName, 'readwrite', async (store) => {
-        const items = (records || []).map((record) => {
-          const next = { ...(record || {}) };
-          if (!next.updated_at) next.updated_at = nowIso();
-          store.put(next);
-          return next;
-        });
-        return items;
-      });
-    },
-
-    async get(storeName, key) {
-      return withStore(storeName, 'readonly', async (store) => idbRequest(store.get(key)));
-    },
-
-    async getAll(storeName) {
-      return getAll(storeName);
-    },
-
-    async getAllByIndex(storeName, indexName, value) {
-      return getAllByIndex(storeName, indexName, value);
-    },
-
-    async delete(storeName, key) {
-      return withStore(storeName, 'readwrite', async (store) => {
-        store.delete(key);
-        return true;
-      });
-    },
-
-    async clear(storeName) {
-      return withStore(storeName, 'readwrite', async (store) => {
-        store.clear();
-        return true;
-      });
-    },
-
-    async count(storeName) {
-      return withStore(storeName, 'readonly', async (store) => idbRequest(store.count()));
-    },
-
-    async update(storeName, key, updater) {
-      return withStore(storeName, 'readwrite', async (store) => {
-        const current = await idbRequest(store.get(key));
-        const next = typeof updater === 'function'
-          ? updater(current ? { ...current } : null)
-          : { ...(current || {}), ...(updater || {}) };
-
-        if (!next) {
-          return null;
+  function withStore(storeName, mode, executor) {
+    return open().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var tx = db.transaction(storeName, mode || 'readonly');
+        var store = tx.objectStore(storeName);
+        var result;
+        try {
+          result = executor(store, tx, resolve, reject);
+        } catch (err) {
+          reject(err);
+          return;
         }
-        if (!next.updated_at) next.updated_at = nowIso();
-        store.put(next);
-        return next;
+        tx.onabort = function () {
+          reject(tx.error || new Error('Transaction aborted: ' + storeName));
+        };
+        tx.onerror = function () {
+          reject(tx.error || new Error('Transaction error: ' + storeName));
+        };
+        if (result && typeof result.onsuccess === 'function') {
+          result.onsuccess = function (event) { resolve(event.target.result); };
+          result.onerror = function () { reject(result.error || new Error('IndexedDB request failed.')); };
+        }
+      });
+    });
+  }
+
+  function getKeyField(storeName) {
+    return KEY_FIELDS[storeName] || 'id';
+  }
+
+  function sortByCreatedAtAsc(items) {
+    return (items || []).slice().sort(function (a, b) {
+      return String(a.created_at || '').localeCompare(String(b.created_at || ''));
+    });
+  }
+
+  var TpkDb = {
+    STORES: STORES,
+    open: open,
+    nowIso: nowIso,
+    randomId: randomId,
+
+    requestPersistentStorage: async function () {
+      if (!navigator.storage || typeof navigator.storage.persist !== 'function') return false;
+      try {
+        return await navigator.storage.persist();
+      } catch (err) {
+        return false;
+      }
+    },
+
+    get: function (storeName, key) {
+      return withStore(storeName, 'readonly', function (store) {
+        return store.get(key);
       });
     },
 
-    async findOneByIndex(storeName, indexName, value) {
-      return withStore(storeName, 'readonly', async (store) => {
-        const index = store.index(indexName);
-        return idbRequest(index.get(value));
+    getAll: function (storeName) {
+      return withStore(storeName, 'readonly', function (store) {
+        return store.getAll();
       });
     },
 
-    async getPendingQueue(limit) {
-      const items = await this.getAllByIndex(this.STORES.SYNC_QUEUE, 'by_status', 'PENDING');
-      const ordered = items.sort((a, b) => String(a.created_at || '').localeCompare(String(b.created_at || '')));
-      return typeof limit === 'number' ? ordered.slice(0, limit) : ordered;
+    getAllByIndex: function (storeName, indexName, value) {
+      return withStore(storeName, 'readonly', function (store) {
+        var index = store.index(indexName);
+        return index.getAll(value);
+      });
     },
 
-    async putAudit(eventType, eventDetail) {
-      return this.put(this.STORES.AUDIT_LOG, {
-        event_id: makeId('AUD'),
+    put: function (storeName, value) {
+      return withStore(storeName, 'readwrite', function (store) {
+        return store.put(value);
+      });
+    },
+
+    delete: function (storeName, key) {
+      return withStore(storeName, 'readwrite', function (store) {
+        return store.delete(key);
+      });
+    },
+
+    clear: function (storeName) {
+      return withStore(storeName, 'readwrite', function (store) {
+        return store.clear();
+      });
+    },
+
+    count: function (storeName) {
+      return withStore(storeName, 'readonly', function (store) {
+        return store.count();
+      });
+    },
+
+    setMeta: function (key, value) {
+      return this.put(STORES.META, {
+        key: key,
+        value: value,
+        updated_at: nowIso()
+      });
+    },
+
+    getMeta: async function (key, fallbackValue) {
+      var row = await this.get(STORES.META, key);
+      return row && Object.prototype.hasOwnProperty.call(row, 'value') ? row.value : fallbackValue;
+    },
+
+    putAudit: function (eventType, eventDetail) {
+      return this.put(STORES.AUDIT_LOG_LOCAL, {
+        event_id: randomId('AUD'),
         event_type: eventType || 'UNKNOWN',
         event_detail: eventDetail || '',
-        created_at: nowIso(),
-        updated_at: nowIso()
+        created_at: nowIso()
       });
     },
 
-    async setMeta(key, value) {
-      return this.put(this.STORES.META, {
-        key,
-        value,
-        updated_at: nowIso()
-      });
+    buildRecord: function (storeName, data) {
+      var keyField = getKeyField(storeName);
+      var record = Object.assign({}, data || {});
+      if (!record[keyField]) {
+        record[keyField] = randomId(keyField.toUpperCase());
+      }
+      if (!record.updated_at) {
+        record.updated_at = nowIso();
+      }
+      return record;
     },
 
-    async getMeta(key, fallbackValue) {
-      const row = await this.get(this.STORES.META, key);
-      return row ? row.value : fallbackValue;
+    listQueueByStatus: async function (status) {
+      var rows = await this.getAllByIndex(STORES.SYNC_QUEUE, 'status', status);
+      return sortByCreatedAtAsc(rows);
     }
   };
 
   window.TpkDb = TpkDb;
+  TpkDb.requestPersistentStorage().catch(function () {});
 })(window);
