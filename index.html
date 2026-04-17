@@ -412,17 +412,36 @@
 
         <div id="auth-root"></div>
 
-        <form id="login-form" class="tpk-login__fallback" autocomplete="on">
-          <div class="tpk-login__field">
-            <label for="username">Username / ID Kader</label>
-            <input id="username" name="username" type="text" inputmode="text" autocomplete="username" placeholder="Masukkan username atau ID kader">
-          </div>
-          <div class="tpk-login__field">
-            <label for="password">Kata Sandi</label>
-            <input id="password" name="password" type="password" autocomplete="current-password" placeholder="Masukkan kata sandi">
-          </div>
-          <button id="btn-login" class="tpk-btn tpk-btn--primary" type="submit">Masuk</button>
-        </form>
+        <form id="loginForm" class="tpk-login__fallback" autocomplete="on">
+  <div id="loginMessage" class="hidden"></div>
+
+  <div class="tpk-login__field">
+    <label for="loginIdUser">Username / ID Kader</label>
+    <input
+      id="loginIdUser"
+      name="username"
+      type="text"
+      inputmode="text"
+      autocomplete="username"
+      placeholder="Masukkan username atau ID kader"
+    >
+  </div>
+
+  <div class="tpk-login__field">
+    <label for="loginPassword">Kata Sandi</label>
+    <input
+      id="loginPassword"
+      name="password"
+      type="password"
+      autocomplete="current-password"
+      placeholder="Masukkan kata sandi"
+    >
+  </div>
+
+  <button id="loginSubmitBtn" class="tpk-btn tpk-btn--primary" type="submit">
+    Masuk
+  </button>
+</form>
       </div>
     </section>
 
