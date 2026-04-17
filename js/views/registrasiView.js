@@ -150,6 +150,33 @@
     }
   }
 
+  async function openSasaranDetailById(idSasaran) {
+    const targetId = safeTrim(idSasaran);
+    if (!targetId) return false;
+
+    if (window.SasaranDetail && isFunction(window.SasaranDetail.openById)) {
+      await window.SasaranDetail.openById(targetId);
+      return true;
+    }
+
+    if (window.SasaranDetailView && isFunction(window.SasaranDetailView.openById)) {
+      await window.SasaranDetailView.openById(targetId);
+      return true;
+    }
+
+    if (window.SasaranDetailView && isFunction(window.SasaranDetailView.open)) {
+      await window.SasaranDetailView.open(targetId, { skipRoute: false });
+      return true;
+    }
+
+    if (window.Router && isFunction(window.Router.go)) {
+      window.Router.go('sasaranDetail');
+      return true;
+    }
+
+    return false;
+  }
+
   function getProfile() {
     if (window.Session && isFunction(window.Session.getProfile)) {
       return window.Session.getProfile() || {};
@@ -597,6 +624,9 @@
       if (idLabel) {
         idLabel.value = isEdit ? firstNonEmpty(editItem.id_sasaran, editItem.id) : '';
       }
+
+      const jenisEl = byId('reg-jenis-sasaran');
+      setReadonly(jenisEl, isEdit);
     },
 
     resetForm() {
@@ -700,6 +730,13 @@
     },
 
     async handleJenisChange() {
+      if (getMode() === 'edit') {
+        this.applyGenderLockByJenis();
+        this.applyJenisSpecificStaticFields();
+        this.renderValidation();
+        return;
+      }
+
       const jenis = byId('reg-jenis-sasaran') ? byId('reg-jenis-sasaran').value : '';
       await this.loadDynamicFields(jenis);
       this.updateConditionalDynamicFields();
@@ -1205,6 +1242,10 @@
 
       Object.assign(answers, this.collectDynamicFields());
 
+      if (mode === 'edit') {
+        answers.jenis_sasaran = firstNonEmpty(editItem.jenis_sasaran, answers.jenis_sasaran);
+      }
+
       return {
         id_sasaran: firstNonEmpty(
           byId('reg-id-sasaran') && byId('reg-id-sasaran').value,
@@ -1428,10 +1469,16 @@
     },
 
     buildPayload(data, mode) {
+      const lockedJenis = mode === 'edit'
+        ? firstNonEmpty(getEditItem().jenis_sasaran, data.answers.jenis_sasaran)
+        : data.answers.jenis_sasaran;
+
       const payload = {
-        form_id: data.form_id || mapJenisToFormId(data.answers.jenis_sasaran),
-        jenis_sasaran: data.answers.jenis_sasaran,
-        answers: Object.assign({}, data.answers),
+        form_id: data.form_id || mapJenisToFormId(lockedJenis),
+        jenis_sasaran: lockedJenis,
+        answers: Object.assign({}, data.answers, {
+          jenis_sasaran: lockedJenis
+        }),
         sync_source: 'ONLINE'
       };
 
@@ -1521,9 +1568,8 @@
         );
 
         if (mode === 'edit') {
-          if (window.SasaranDetail && isFunction(window.SasaranDetail.openById) && targetId) {
-            await window.SasaranDetail.openById(targetId);
-          } else {
+          const opened = await openSasaranDetailById(targetId);
+          if (!opened) {
             goToSasaranList();
           }
           notify('Perubahan data sasaran berhasil disimpan.', 'success');
@@ -1544,11 +1590,12 @@
     async handleBack() {
       const mode = getMode();
       const editItem = getEditItem();
-      const targetId = firstNonEmpty(editItem.id_sasaran, editItem.id);
+      const selected = getSelectedSasaran();
+      const targetId = firstNonEmpty(editItem.id_sasaran, editItem.id, selected.id_sasaran, selected.id);
 
-      if (mode === 'edit' && window.SasaranDetail && isFunction(window.SasaranDetail.openById) && targetId) {
-        await window.SasaranDetail.openById(targetId);
-        return;
+      if (mode === 'edit') {
+        const opened = await openSasaranDetailById(targetId);
+        if (opened) return;
       }
 
       goToSasaranList();
@@ -2173,21 +2220,26 @@
     RegistrasiForm.handleBack = async function () {
       const mode = getMode();
       const editItem = getEditItem();
-      const targetId = firstNonEmpty(editItem.id_sasaran, editItem.id);
+      const selected = getSelectedSasaran();
+      const targetId = firstNonEmpty(editItem.id_sasaran, editItem.id, selected.id_sasaran, selected.id);
       const returnRoute = readReturnRouteV4();
       clearReturnRouteV4();
-      if (mode === 'edit' && window.SasaranDetail && isFunction(window.SasaranDetail.openById) && targetId) {
-        await window.SasaranDetail.openById(targetId);
-        return;
+
+      if (mode === 'edit') {
+        const openedEditDetail = await openSasaranDetailById(targetId);
+        if (openedEditDetail) return;
       }
+
       if (returnRoute === 'sasaranList') {
         goToSasaranList();
         return;
       }
-      if (returnRoute === 'sasaranDetail' && window.SasaranDetail && isFunction(window.SasaranDetail.openById) && targetId) {
-        await window.SasaranDetail.openById(targetId);
-        return;
+
+      if (returnRoute === 'sasaranDetail') {
+        const openedReturnDetail = await openSasaranDetailById(targetId);
+        if (openedReturnDetail) return;
       }
+
       goToDashboardV4();
     };
   })();
@@ -2554,8 +2606,7 @@
     });
   };
 
-    window.RegistrasiForm = RegistrasiForm;
-  window.RegistrasiView = RegistrasiForm;
+  window.RegistrasiForm = RegistrasiForm;
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', function () {
