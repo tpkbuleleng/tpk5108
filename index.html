@@ -1,1040 +1,521 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="theme-color" content="#0B57D0" />
-  <meta name="description" content="TPK Kabupaten Buleleng" />
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b5ed7">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="TPK Kabupaten Buleleng - PWA pendataan sasaran dan pendampingan.">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="TPK Buleleng">
   <title>TPK Kabupaten Buleleng</title>
 
-  <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="icon" href="./assets/img/logo.png" />
-  <link rel="stylesheet" href="./app.css" />
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./assets/img/logo.png">
+  <link rel="apple-touch-icon" href="./assets/img/logo.png">
+  <link rel="stylesheet" href="./app.css">
+
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      min-height: 100%;
+      background: #f4f7fb;
+    }
+
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      color: #1f2937;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .app-root {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .shell-screen {
+      min-height: 100vh;
+      width: 100%;
+    }
+
+    .tpk-splash {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      box-sizing: border-box;
+      background: linear-gradient(180deg, #0b5ed7 0%, #0a4db2 100%);
+      color: #fff;
+      text-align: center;
+    }
+
+    .tpk-splash__card {
+      width: 100%;
+      max-width: 420px;
+    }
+
+    .tpk-splash__logo {
+      width: 84px;
+      height: 84px;
+      object-fit: contain;
+      margin: 0 auto 16px;
+      display: block;
+      background: rgba(255,255,255,.12);
+      border-radius: 18px;
+      padding: 10px;
+      box-sizing: border-box;
+    }
+
+    .tpk-splash__title {
+      margin: 0 0 8px;
+      font-size: 1.45rem;
+      line-height: 1.25;
+      font-weight: 700;
+    }
+
+    .tpk-splash__subtitle {
+      margin: 0;
+      opacity: .92;
+      font-size: .95rem;
+      line-height: 1.5;
+    }
+
+    .tpk-login {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      box-sizing: border-box;
+      background: #eff4fb;
+    }
+
+    .tpk-login__card {
+      width: 100%;
+      max-width: 460px;
+      background: #fff;
+      border-radius: 20px;
+      box-shadow: 0 10px 30px rgba(15, 23, 42, .08);
+      padding: 22px;
+      box-sizing: border-box;
+      border: 1px solid rgba(11, 94, 215, .08);
+    }
+
+    .tpk-login__brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+
+    .tpk-login__brand img {
+      width: 56px;
+      height: 56px;
+      object-fit: contain;
+      flex: 0 0 auto;
+    }
+
+    .tpk-login__brand-text h1 {
+      margin: 0 0 4px;
+      font-size: 1.15rem;
+      line-height: 1.25;
+      color: #0b5ed7;
+    }
+
+    .tpk-login__brand-text p {
+      margin: 0;
+      color: #64748b;
+      font-size: .92rem;
+    }
+
+    .tpk-login__fallback {
+      display: grid;
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .tpk-login__field {
+      display: grid;
+      gap: 6px;
+    }
+
+    .tpk-login__field label {
+      font-size: .92rem;
+      font-weight: 600;
+      color: #334155;
+    }
+
+    .tpk-login__field input {
+      width: 100%;
+      min-height: 44px;
+      border-radius: 12px;
+      border: 1px solid #cbd5e1;
+      background: #fff;
+      box-sizing: border-box;
+      padding: 10px 12px;
+      font-size: 1rem;
+    }
+
+    .tpk-btn {
+      min-height: 44px;
+      border: 0;
+      border-radius: 12px;
+      padding: 10px 14px;
+      font-size: .95rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .tpk-btn--primary {
+      background: #0b5ed7;
+      color: #fff;
+    }
+
+    .tpk-btn--ghost {
+      background: #eaf2ff;
+      color: #0b5ed7;
+    }
+
+    .tpk-app {
+      min-height: 100vh;
+      background: #f4f7fb;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .tpk-header {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: #0b5ed7;
+      color: #fff;
+      box-shadow: 0 6px 18px rgba(15, 23, 42, .14);
+    }
+
+    .tpk-header__top {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px 10px;
+    }
+
+    .tpk-header__logo {
+      width: 42px;
+      height: 42px;
+      object-fit: contain;
+      border-radius: 10px;
+      background: rgba(255,255,255,.12);
+      padding: 4px;
+      box-sizing: border-box;
+    }
+
+    .tpk-header__title {
+      min-width: 0;
+      text-align: center;
+    }
+
+    .tpk-header__title h1 {
+      margin: 0;
+      font-size: 1rem;
+      line-height: 1.25;
+      font-weight: 700;
+    }
+
+    .tpk-header__title p {
+      margin: 2px 0 0;
+      font-size: .82rem;
+      opacity: .95;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .tpk-header__meta {
+      text-align: right;
+      font-size: .78rem;
+      line-height: 1.35;
+    }
+
+    .tpk-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 28px;
+      min-width: 76px;
+      border-radius: 999px;
+      padding: 0 10px;
+      font-weight: 700;
+      font-size: .82rem;
+      background: rgba(255,255,255,.14);
+      color: #fff;
+      box-sizing: border-box;
+    }
+
+    .tpk-badge.online,
+    .tpk-badge.is-online {
+      background: rgba(25, 135, 84, .92);
+    }
+
+    .tpk-badge.offline,
+    .tpk-badge.is-offline {
+      background: rgba(220, 53, 69, .92);
+    }
+
+    .tpk-header__actions {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      padding: 0 16px 12px;
+    }
+
+    .tpk-header__actions .tpk-btn {
+      min-height: 40px;
+      padding: 8px 10px;
+      border-radius: 10px;
+      font-size: .88rem;
+      font-weight: 700;
+      background: rgba(255,255,255,.14);
+      color: #fff;
+    }
+
+    .tpk-header__actions .tpk-btn--sync {
+      background: #8fd3ff;
+      color: #0b3b91;
+    }
+
+    .tpk-header__actions .tpk-btn--warn {
+      background: #dce9ff;
+      color: #0b3b91;
+    }
+
+    .tpk-header__actions .tpk-btn--danger {
+      background: rgba(255,255,255,.2);
+      color: #fff;
+    }
+
+    .tpk-nav {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 8px;
+      padding: 14px 16px 0;
+    }
+
+    .tpk-nav__link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      min-height: 40px;
+      padding: 8px 10px;
+      border-radius: 12px;
+      background: #fff;
+      color: #0f172a;
+      text-decoration: none;
+      font-weight: 700;
+      font-size: .9rem;
+      border: 1px solid rgba(11,94,215,.08);
+      box-shadow: 0 4px 12px rgba(15, 23, 42, .04);
+    }
+
+    .tpk-nav__link.active {
+      background: #0b5ed7;
+      color: #fff;
+      border-color: #0b5ed7;
+    }
+
+    .tpk-main {
+      flex: 1 1 auto;
+      padding: 14px 16px 24px;
+      box-sizing: border-box;
+    }
+
+    .tpk-card {
+      background: #fff;
+      border-radius: 18px;
+      border: 1px solid rgba(11,94,215,.08);
+      box-shadow: 0 8px 24px rgba(15, 23, 42, .05);
+      padding: 16px;
+      box-sizing: border-box;
+    }
+
+    .tpk-placeholder {
+      color: #64748b;
+      font-size: .95rem;
+      line-height: 1.6;
+    }
+
+    .tpk-footer {
+      padding: 0 16px 20px;
+      color: #64748b;
+      font-size: .82rem;
+      text-align: center;
+    }
+
+    #toast-root,
+    #notifier-root {
+      position: fixed;
+      inset: auto 16px 16px 16px;
+      z-index: 999;
+      pointer-events: none;
+    }
+
+    @media (max-width: 768px) {
+      .tpk-header__top {
+        grid-template-columns: auto 1fr;
+      }
+
+      .tpk-header__meta {
+        grid-column: 1 / -1;
+        text-align: left;
+      }
+
+      .tpk-nav {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .tpk-header__actions {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+  </style>
 </head>
 <body>
-  <div id="app-shell">
-    <!-- SPLASH -->
-    <section id="splash-screen" class="screen active splash-screen" data-screen="splash">
-      <div class="splash-card">
-        <img
-          src="./assets/img/logo.png"
-          alt="Logo TPK"
-          class="splash-logo"
-        />
-        <h1>TPK KABUPATEN BULELENG</h1>
-        <p class="version-text">Versi <span id="app-version">-</span></p>
-        <div class="loader"></div>
-        <p id="splash-status" class="muted-text">Menyiapkan aplikasi...</p>
+  <div class="app-root" id="app-root">
+    <section id="view-splash" class="shell-screen tpk-splash">
+      <div class="tpk-splash__card">
+        <img class="tpk-splash__logo" src="./assets/img/logo.png" alt="Logo TPK Kabupaten Buleleng">
+        <h1 class="tpk-splash__title">TPK Kabupaten Buleleng</h1>
+        <p class="tpk-splash__subtitle">Memuat aplikasi pendataan sasaran dan pendampingan…</p>
       </div>
     </section>
 
-    <!-- LOGIN -->
-    <section id="login-screen" class="screen hidden login-page" data-screen="login">
-      <section class="login-card" aria-labelledby="loginTitle">
-        <img
-          id="loginLogo"
-          class="login-logo"
-          src="./assets/img/logo.png"
-          alt="Logo TPK Kabupaten Buleleng"
-          loading="eager"
-          decoding="async"
-        />
-
-        <h1 id="loginTitle" class="login-title">Masuk Aplikasi</h1>
-
-        <p class="login-subtitle">
-          Silakan login menggunakan ID Kader dan password Anda
-        </p>
-
-        <form id="loginForm" novalidate>
-          <div class="form-group">
-            <label for="loginIdUser">ID Kader</label>
-            <input
-              id="loginIdUser"
-              name="id_user"
-              type="text"
-              autocomplete="username"
-              autocapitalize="characters"
-              spellcheck="false"
-              placeholder="Contoh: TPK10001"
-              required
-            />
+    <section id="view-login" class="shell-screen tpk-login hidden" aria-label="Halaman Login">
+      <div class="tpk-login__card">
+        <div class="tpk-login__brand">
+          <img src="./assets/img/logo.png" alt="Logo TPK Kabupaten Buleleng">
+          <div class="tpk-login__brand-text">
+            <h1>TPK Kabupaten Buleleng</h1>
+            <p>Login kader dan petugas untuk mengakses aplikasi.</p>
           </div>
+        </div>
 
-          <div class="form-group">
-            <label for="loginPassword">Password</label>
+        <div id="auth-root"></div>
 
-            <div class="password-wrap">
-              <input
-                id="loginPassword"
-                name="password"
-                type="password"
-                autocomplete="current-password"
-                spellcheck="false"
-                placeholder="Masukkan password"
-                required
-              />
-              <button
-                type="button"
-                id="togglePasswordBtn"
-                class="password-toggle-btn"
-                aria-label="Lihat password"
-                title="Lihat password"
-              >
-                👁
-              </button>
-            </div>
-
-            <small class="input-hint">
-              Masukkan password sesuai akun yang terdaftar.
-            </small>
+        <form id="login-form" class="tpk-login__fallback" autocomplete="on">
+          <div class="tpk-login__field">
+            <label for="username">Username / ID Kader</label>
+            <input id="username" name="username" type="text" inputmode="text" autocomplete="username" placeholder="Masukkan username atau ID kader">
           </div>
-
-          <button type="submit" id="loginSubmitBtn" class="btn btn-primary">
-            Masuk
-          </button>
-
-          <div
-            id="loginMessage"
-            class="login-message hidden"
-            role="alert"
-            aria-live="polite"
-          ></div>
+          <div class="tpk-login__field">
+            <label for="password">Kata Sandi</label>
+            <input id="password" name="password" type="password" autocomplete="current-password" placeholder="Masukkan kata sandi">
+          </div>
+          <button id="btn-login" class="tpk-btn tpk-btn--primary" type="submit">Masuk</button>
         </form>
-      </section>
+      </div>
     </section>
 
-    <!-- DASHBOARD -->
-    <section id="dashboard-screen" class="screen hidden" data-screen="dashboard">
-      <header class="topbar topbar-dashboard">
-        <div class="topbar-dashboard__brand">
-          <img src="./assets/img/logo.png" alt="Logo TPK" class="topbar-logo" />
-
-          <div class="topbar-dashboard__brand-text">
-            <h1 class="topbar-title">TPK Kabupaten Buleleng</h1>
-            <p class="topbar-subtitle">
-              Dashboard Kecamatan <span id="header-kecamatan">-</span>
-            </p>
-          </div>
-        </div>
-
-        <div class="topbar-dashboard__actions">
-          <span id="network-badge" class="badge topbar-dashboard__status-badge">
-            Online
-          </span>
-
-          <button
-            id="btn-sync-now-header"
-            class="btn btn-sm topbar-dashboard__btn topbar-dashboard__btn--sync"
-            type="button"
-          >
-            Sinkronkan
-          </button>
-
-          <button
-            id="btn-settings"
-            class="btn btn-sm topbar-dashboard__btn topbar-dashboard__btn--settings"
-            type="button"
-          >
-            Pengaturan
-          </button>
-
-          <button
-            id="btn-logout"
-            class="btn btn-sm topbar-dashboard__btn topbar-dashboard__btn--logout"
-            type="button"
-          >
-            Keluar
-          </button>
-        </div>
-      </header>
-
-      <main class="page-content">
-        <section class="card card-compact">
-          <div class="section-header section-header-compact">
-            <h3>Profil Pengguna</h3>
-          </div>
-
-          <div class="profile-grid profile-grid-4">
-            <div>
-              <span class="label">Nama Pengguna</span>
-              <strong id="profile-nama">-</strong>
+    <section id="view-app" class="shell-screen tpk-app hidden" aria-label="Aplikasi Utama">
+      <div id="app-shell">
+        <header class="tpk-header">
+          <div class="tpk-header__top">
+            <img class="tpk-header__logo" src="./assets/img/logo.png" alt="Logo TPK Kabupaten Buleleng">
+            <div class="tpk-header__title">
+              <h1 id="app-title">TPK Kabupaten Buleleng</h1>
+              <p id="app-subtitle">Dashboard Kecamatan</p>
             </div>
-
-            <div>
-              <span class="label">Unsur TPK</span>
-              <strong id="profile-unsur">-</strong>
-            </div>
-
-            <div>
-              <span class="label">ID Pengguna</span>
-              <strong id="profile-id">-</strong>
-            </div>
-
-            <div>
-              <span class="label">Nomor Tim</span>
-              <strong id="profile-tim">-</strong>
-            </div>
-          </div>
-        </section>
-
-        <section class="card card-compact">
-          <div class="section-header section-header-compact">
-            <h3>Wilayah Tugas</h3>
-          </div>
-
-          <div class="wilayah-grid wilayah-grid-2">
-            <div>
-              <span class="label">Desa/Kelurahan</span>
-              <strong id="profile-desa">-</strong>
-            </div>
-
-            <div class="wilayah-grid-span">
-              <span class="label">Dusun/RW</span>
-              <strong id="profile-dusun">-</strong>
-            </div>
-          </div>
-        </section>
-
-        <section class="stats-grid">
-          <article class="card stat-card">
-            <span class="label">Jumlah Sasaran</span>
-            <strong id="stat-sasaran">0</strong>
-          </article>
-
-          <article class="card stat-card">
-            <span class="label">Pendampingan Bulan Ini</span>
-            <strong id="stat-pendampingan">0</strong>
-          </article>
-
-          <article class="card stat-card">
-            <span class="label">Draft Pending</span>
-            <strong id="stat-draft">0</strong>
-          </article>
-        </section>
-
-        <section class="card card-compact">
-          <div class="section-header section-header-compact">
-            <h3>Menu Utama</h3>
-            <p class="muted-text">Menu akan menyesuaikan hak akses pengguna</p>
-          </div>
-          <div id="menu-grid" class="menu-grid"></div>
-        </section>
-      </main>
-
-      <footer class="app-footer">
-        <span>TPK Kabupaten Buleleng - Versi aplikasi <span id="footer-app-version">-</span></span>
-      </footer>
-    </section>
-
-    <!-- DAFTAR SASARAN -->
-    <section id="sasaran-list-screen" class="screen hidden" data-screen="sasaran-list">
-      <header class="topbar">
-        <div>
-          <h2 class="topbar-title">Daftar Sasaran</h2>
-          <p class="topbar-subtitle">Sasaran sesuai tim dan wilayah kerja</p>
-        </div>
-        <div class="topbar-actions">
-          <button id="btn-back-dashboard-from-list" class="btn btn-secondary btn-sm">Kembali</button>
-        </div>
-      </header>
-
-      <main class="page-content">
-        <section class="card">
-          <div class="section-header">
-            <h3>Filter &amp; Pencarian</h3>
-          </div>
-
-          <div class="filters-grid">
-            <div class="form-group">
-              <label for="filter-keyword-sasaran">Cari Nama / ID Sasaran</label>
-              <input id="filter-keyword-sasaran" type="text" placeholder="Ketik nama atau ID sasaran" />
-            </div>
-
-            <div class="form-group">
-              <label for="filter-jenis-sasaran">Jenis Sasaran</label>
-              <select id="filter-jenis-sasaran">
-                <option value="">Semua Jenis</option>
-                <option value="CATIN">CATIN</option>
-                <option value="BUMIL">BUMIL</option>
-                <option value="BUFAS">BUFAS</option>
-                <option value="BADUTA">BADUTA</option>
-              </select>
-            </div>
-
-            <div class="form-group">
-              <label for="filter-status-sasaran">Status</label>
-              <select id="filter-status-sasaran">
-                <option value="">Semua Status</option>
-                <option value="AKTIF">AKTIF</option>
-                <option value="NONAKTIF">NONAKTIF</option>
-                <option value="SELESAI">SELESAI</option>
-                <option value="RUJUK">RUJUK</option>
-                <option value="PERLU_REVIEW">PERLU_REVIEW</option>
-              </select>
+            <div class="tpk-header__meta">
+              <div id="network-status" class="tpk-badge online">Online</div>
+              <div id="header-profile-name">-</div>
             </div>
           </div>
 
-          <div class="section-actions">
-            <button id="btn-refresh-sasaran" class="btn btn-primary">Refresh Data</button>
+          <div class="tpk-header__actions">
+            <button id="btn-sync-header" class="tpk-btn tpk-btn--sync" type="button">Sinkronkan</button>
+            <button id="btn-update-app" class="tpk-btn tpk-btn--warn" type="button">Perbarui Aplikasi</button>
+            <button id="btn-open-sync" class="tpk-btn" type="button" data-route-link="sync">Sinkronisasi</button>
+            <button id="btn-logout" class="tpk-btn tpk-btn--danger" type="button">Keluar</button>
           </div>
-        </section>
+        </header>
 
-        <section class="card">
-          <div class="section-header row-between">
-            <div>
-              <h3>Data Sasaran</h3>
-              <p id="sasaran-list-meta" class="muted-text">Belum ada data dimuat.</p>
+        <nav class="tpk-nav" aria-label="Navigasi utama">
+          <a href="#rekap" class="tpk-nav__link" data-route-link="rekap">Rekap Saya</a>
+          <a href="#sasaran" class="tpk-nav__link" data-route-link="sasaran">Daftar Sasaran</a>
+          <a href="#registrasi" class="tpk-nav__link" data-route-link="registrasi">Registrasi</a>
+          <a href="#pendampingan" class="tpk-nav__link" data-route-link="pendampingan">Pendampingan</a>
+          <a href="#profile" class="tpk-nav__link" data-route-link="profile">Profil</a>
+        </nav>
+
+        <main class="tpk-main" id="main-content">
+          <div class="tpk-card" id="app-content">
+            <div id="content-root"></div>
+            <div id="view-root"></div>
+            <div id="screen-root"></div>
+            <div id="konten-app"></div>
+            <div id="screen-container"></div>
+            <div id="module-root" class="tpk-placeholder">
+              Konten halaman akan ditampilkan di sini oleh modul router / view aktif.
             </div>
           </div>
+        </main>
 
-          <div id="sasaran-list-container" class="list-stack">
-            <p class="muted-text">Belum ada data sasaran.</p>
-          </div>
-        </section>
-      </main>
-    </section>
-
-    <!-- DETAIL SASARAN -->
-    <section id="sasaran-detail-screen" class="screen hidden" data-screen="sasaran-detail">
-      <header class="topbar">
-        <div>
-          <h2 class="topbar-title">Detail Sasaran</h2>
-          <p class="topbar-subtitle">Informasi lengkap sasaran terpilih</p>
-        </div>
-        <div class="topbar-actions">
-          <button id="btn-back-list-from-detail" class="btn btn-secondary btn-sm">Kembali</button>
-        </div>
-      </header>
-
-      <main class="page-content">
-        <section class="card">
-          <div class="section-header row-between">
-            <div>
-              <h3 id="detail-nama-sasaran">-</h3>
-              <p id="detail-id-sasaran" class="muted-text">ID Sasaran: -</p>
-            </div>
-            <span id="detail-status-badge" class="badge badge-warning">-</span>
-          </div>
-
-          <div class="profile-grid">
-            <div><span class="label">Jenis Sasaran</span><strong id="detail-jenis">-</strong></div>
-            <div><span class="label">NIK</span><strong id="detail-nik">-</strong></div>
-            <div><span class="label">No. KK</span><strong id="detail-kk">-</strong></div>
-            <div><span class="label">Tanggal Lahir</span><strong id="detail-tanggal-lahir">-</strong></div>
-            <div><span class="label">Wilayah</span><strong id="detail-wilayah">-</strong></div>
-            <div><span class="label">Terakhir Diperbarui</span><strong id="detail-updated-at">-</strong></div>
-          </div>
-        </section>
-
-        <section class="card">
-          <div class="section-header">
-            <h3>Informasi Tambahan</h3>
-          </div>
-          <div id="detail-extra-fields" class="profile-grid">
-            <div><span class="label">Belum ada</span><strong>-</strong></div>
-          </div>
-        </section>
-
-        <section class="card">
-          <div class="section-header">
-            <h3>Riwayat Ringkas Pendampingan</h3>
-          </div>
-          <div id="detail-riwayat-ringkas" class="list-stack">
-            <p class="muted-text">Riwayat belum dimuat.</p>
-          </div>
-
-          <div class="section-actions action-grid-2">
-            <button id="btn-go-to-pendampingan" class="btn btn-primary">Buat Pendampingan</button>
-            <button id="btn-go-to-edit-sasaran" class="btn btn-secondary">Edit Data Sasaran</button>
-          </div>
-        </section>
-      </main>
-    </section>
-
-    <!-- REGISTRASI -->
-    <section id="registrasi-screen" class="screen hidden" data-screen="registrasi">
-      <header class="topbar">
-        <div>
-          <h2 id="registrasi-screen-title" class="topbar-title">Registrasi Sasaran</h2>
-          <p id="registrasi-screen-subtitle" class="topbar-subtitle">Input data sasaran baru</p>
-        </div>
-        <div class="topbar-actions">
-          <button id="btn-back-from-registrasi" class="btn btn-secondary btn-sm">Kembali</button>
-        </div>
-      </header>
-
-      <main class="page-content">
-        <section class="card">
-          <div class="section-header row-between">
-            <div>
-              <h3>Mode Form</h3>
-              <p id="registrasi-mode-info" class="muted-text">Mode registrasi baru</p>
-            </div>
-            <span id="registrasi-mode-badge" class="badge badge-success-soft">CREATE</span>
-          </div>
-        </section>
-
-        <section class="card">
-          <div class="section-header">
-            <h3>Identitas Dasar</h3>
-          </div>
-
-          <form id="registrasi-form" novalidate>
-            <div class="filters-grid">
-              <div class="form-group">
-                <label for="reg-jenis-sasaran">Jenis Sasaran *</label>
-                <select id="reg-jenis-sasaran" name="jenis_sasaran" required>
-                  <option value="">Pilih jenis sasaran</option>
-                  <option value="CATIN">CATIN</option>
-                  <option value="BUMIL">BUMIL</option>
-                  <option value="BUFAS">BUFAS</option>
-                  <option value="BADUTA">BADUTA</option>
-                </select>
-              </div>
-
-              <div class="form-group">
-                <label for="reg-nama-sasaran">Nama Sasaran *</label>
-                <input id="reg-nama-sasaran" name="nama_sasaran" type="text" placeholder="Masukkan nama sasaran" required />
-              </div>
-
-              <div class="form-group">
-                <label for="reg-nama-kepala-keluarga">Nama Kepala Keluarga *</label>
-                <input
-                  id="reg-nama-kepala-keluarga"
-                  name="nama_kepala_keluarga"
-                  type="text"
-                  placeholder="Masukkan nama kepala keluarga"
-                  required
-                />
-              </div>
-
-              <div class="form-group hidden" id="group-reg-nama-ibu-kandung">
-                <label for="reg-nama-ibu-kandung">Nama Ibu Kandung *</label>
-                <input
-                  id="reg-nama-ibu-kandung"
-                  name="nama_ibu_kandung"
-                  type="text"
-                  placeholder="Masukkan nama ibu kandung"
-                />
-              </div>
-
-              <div class="form-group">
-                <label for="reg-nik">NIK *</label>
-                <input id="reg-nik" name="nik" type="text" inputmode="numeric" maxlength="16" placeholder="16 digit NIK" required />
-                <small class="field-hint">Jika tidak diketahui, gunakan 16 digit angka 9.</small>
-              </div>
-
-              <div class="form-group">
-                <label for="reg-no-kk">Nomor KK *</label>
-                <input id="reg-no-kk" name="nomor_kk" type="text" inputmode="numeric" maxlength="16" placeholder="16 digit Nomor KK" required />
-                <small class="field-hint">Jika tidak diketahui, gunakan 16 digit angka 9.</small>
-              </div>
-
-              <div class="form-group">
-                <label for="reg-jenis-kelamin">Jenis Kelamin</label>
-                <select id="reg-jenis-kelamin" name="jenis_kelamin">
-                  <option value="">Pilih jenis kelamin</option>
-                  <option value="L">Laki-laki</option>
-                  <option value="P">Perempuan</option>
-                </select>
-              </div>
-
-              <div class="form-group">
-                <label for="reg-tanggal-lahir">Tanggal Lahir</label>
-                <input id="reg-tanggal-lahir" name="tanggal_lahir" type="date" />
-              </div>
-            </div>
-
-            <div class="section-header top-space">
-              <h3>Wilayah &amp; Alamat</h3>
-            </div>
-
-            <div class="filters-grid">
-              <div class="form-group">
-                <label for="reg-kecamatan">Kecamatan *</label>
-                <select id="reg-kecamatan" name="nama_kecamatan" required></select>
-              </div>
-
-              <div class="form-group">
-                <label for="reg-desa">Desa/Kelurahan *</label>
-                <select id="reg-desa" name="nama_desa" required></select>
-              </div>
-
-              <div class="form-group">
-                <label for="reg-dusun">Dusun/RW *</label>
-                <select id="reg-dusun" name="nama_dusun" required></select>
-              </div>
-
-              <div class="form-group form-group-span-2">
-                <label for="reg-alamat">Alamat Lengkap</label>
-                <textarea id="reg-alamat" name="alamat" rows="3" placeholder="Alamat lengkap sasaran"></textarea>
-              </div>
-            </div>
-
-            <div class="section-header top-space row-between">
-              <div>
-                <h3>Pertanyaan Khusus</h3>
-                <p class="muted-text">Field khusus akan berubah sesuai jenis sasaran</p>
-              </div>
-            </div>
-
-            <div id="registrasi-dynamic-fields" class="dynamic-form-container">
-              <p class="muted-text">Pilih jenis sasaran untuk memuat pertanyaan khusus.</p>
-            </div>
-
-            <div class="section-header top-space">
-              <h3>Validasi Ringkas</h3>
-            </div>
-            <div id="registrasi-validation-box" class="validation-box">
-              <p class="muted-text">Validasi akan tampil di sini sebelum submit.</p>
-            </div>
-
-            <div class="sticky-submit-bar">
-              <button type="button" id="btn-save-reg-draft" class="btn btn-secondary">Simpan Draft</button>
-              <button type="button" id="btn-reset-registrasi" class="btn btn-secondary">Reset</button>
-              <button type="submit" id="btn-submit-registrasi" class="btn btn-primary">Submit Registrasi</button>
-            </div>
-          </form>
-        </section>
-      </main>
-    </section>
-
-    <!-- PENDAMPINGAN -->
-    <section id="pendampingan-screen" class="screen hidden" data-screen="pendampingan">
-      <header class="topbar">
-        <div>
-          <h2 class="topbar-title">Lapor Pendampingan</h2>
-          <p class="topbar-subtitle">Input laporan pendampingan sasaran terpilih</p>
-        </div>
-        <div class="topbar-actions">
-          <button id="btn-back-from-pendampingan" class="btn btn-secondary btn-sm">Kembali</button>
-        </div>
-      </header>
-
-      <main class="page-content">
-        <section class="card">
-          <div class="section-header row-between">
-            <div>
-              <h3>Mode Form</h3>
-              <p id="pendampingan-mode-info" class="muted-text">Mode input baru</p>
-            </div>
-            <span id="pendampingan-mode-badge" class="badge badge-success-soft">CREATE</span>
-          </div>
-        </section>
-
-        <section class="card">
-          <div class="section-header row-between">
-            <div>
-              <h3 id="pendampingan-nama-sasaran">-</h3>
-              <p id="pendampingan-id-sasaran" class="muted-text">ID Sasaran: -</p>
-            </div>
-            <span id="pendampingan-status-badge" class="badge badge-neutral">-</span>
-          </div>
-
-          <div class="profile-grid">
-            <div><span class="label">Jenis Sasaran</span><strong id="pendampingan-jenis">-</strong></div>
-            <div><span class="label">Wilayah</span><strong id="pendampingan-wilayah">-</strong></div>
-            <div><span class="label">Kader</span><strong id="pendampingan-kader">-</strong></div>
-            <div><span class="label">Tim</span><strong id="pendampingan-tim">-</strong></div>
-          </div>
-        </section>
-
-        <section class="card">
-          <form id="pendampingan-form" novalidate>
-            <div class="section-header">
-              <h3>Identitas Laporan</h3>
-            </div>
-
-            <div class="filters-grid">
-              <div class="form-group">
-                <label for="pen-tanggal">Tanggal Pendampingan *</label>
-                <input id="pen-tanggal" name="tanggal_pendampingan" type="date" required />
-              </div>
-
-              <div class="form-group">
-                <label for="pen-status-kunjungan">Status Kunjungan</label>
-                <select id="pen-status-kunjungan" name="status_kunjungan">
-                  <option value="">Pilih status</option>
-                  <option value="HADIR">HADIR</option>
-                  <option value="TIDAK_BERTEMU">TIDAK_BERTEMU</option>
-                  <option value="DITUNDA">DITUNDA</option>
-                  <option value="RUJUK">RUJUK</option>
-                </select>
-              </div>
-
-              <div class="form-group form-group-span-2">
-                <label for="pen-catatan-umum">Catatan Umum</label>
-                <textarea id="pen-catatan-umum" name="catatan_umum" rows="3" placeholder="Catatan umum hasil pendampingan"></textarea>
-              </div>
-            </div>
-
-            <div id="edit-reason-group" class="form-group hidden top-space">
-              <label for="pen-edit-reason">Alasan Edit *</label>
-              <textarea id="pen-edit-reason" rows="2" placeholder="Jelaskan alasan perubahan"></textarea>
-            </div>
-
-            <div class="section-header top-space row-between">
-              <div>
-                <h3>Pertanyaan Pendampingan</h3>
-                <p class="muted-text">Field dinamis sesuai jenis sasaran</p>
-              </div>
-            </div>
-
-            <div id="pendampingan-dynamic-fields" class="dynamic-form-container">
-              <p class="muted-text">Field pendampingan akan dimuat otomatis.</p>
-            </div>
-
-            <div class="section-header top-space">
-              <h3>Validasi Ringkas</h3>
-            </div>
-            <div id="pendampingan-validation-box" class="validation-box">
-              <p class="muted-text">Validasi pendampingan akan tampil di sini.</p>
-            </div>
-
-            <div class="sticky-submit-bar">
-              <button type="button" id="btn-save-pen-draft" class="btn btn-secondary">Simpan Draft</button>
-              <button type="button" id="btn-reset-pendampingan" class="btn btn-secondary">Reset</button>
-              <button type="submit" id="btn-submit-pendampingan" class="btn btn-primary">Submit Pendampingan</button>
-            </div>
-          </form>
-        </section>
-      </main>
-    </section>
-
-    <!-- SYNC SCREEN -->
-    <section id="sync-screen" class="screen hidden" data-screen="sync">
-      <header class="topbar">
-        <div>
-          <h2 class="topbar-title">Draft Offline &amp; Sinkronisasi</h2>
-          <p class="topbar-subtitle">Kelola draft yang belum tersinkron ke backend</p>
-        </div>
-        <div class="topbar-actions">
-          <button id="btn-back-from-sync" class="btn btn-secondary btn-sm">Kembali</button>
-        </div>
-      </header>
-
-      <main class="page-content">
-        <section class="card">
-          <div class="section-header row-between">
-            <div>
-              <h3>Ringkasan Sinkronisasi</h3>
-              <p id="sync-screen-meta" class="muted-text">Belum ada data antrean.</p>
-            </div>
-          </div>
-
-          <div class="stats-grid">
-            <article class="card stat-card">
-              <span class="label">Total Draft</span>
-              <strong id="sync-total-count">0</strong>
-            </article>
-            <article class="card stat-card">
-              <span class="label">Pending</span>
-              <strong id="sync-pending-count">0</strong>
-            </article>
-            <article class="card stat-card">
-              <span class="label">Gagal</span>
-              <strong id="sync-failed-count">0</strong>
-            </article>
-          </div>
-
-          <div class="section-actions action-grid-2 top-space">
-            <button id="btn-sync-all-screen" class="btn btn-primary">Sinkronkan Semua</button>
-            <button id="btn-refresh-sync-screen" class="btn btn-secondary">Refresh Daftar</button>
-          </div>
-        </section>
-
-        <section class="card">
-          <div class="section-header">
-            <h3>Filter Draft</h3>
-          </div>
-
-          <div class="filters-grid">
-            <div class="form-group">
-              <label for="sync-filter-action">Jenis Draft</label>
-              <select id="sync-filter-action">
-                <option value="">Semua</option>
-                <option value="registerSasaran">Registrasi Sasaran</option>
-                <option value="submitPendampingan">Pendampingan</option>
-              </select>
-            </div>
-
-            <div class="form-group">
-              <label for="sync-filter-status">Status</label>
-              <select id="sync-filter-status">
-                <option value="">Semua</option>
-                <option value="PENDING">PENDING</option>
-                <option value="FAILED">FAILED</option>
-              </select>
-            </div>
-
-            <div class="form-group">
-              <label for="sync-filter-keyword">Cari ID / Nama</label>
-              <input id="sync-filter-keyword" type="text" placeholder="Cari client_submit_id / id_sasaran / nama" />
-            </div>
-          </div>
-        </section>
-
-        <section class="card">
-          <div class="section-header">
-            <h3>Daftar Draft</h3>
-          </div>
-          <div id="sync-list-container" class="list-stack">
-            <p class="muted-text">Belum ada draft offline.</p>
-          </div>
-        </section>
-      </main>
-    </section>
-
-    <!-- REKAP KADER -->
-    <section id="rekap-kader-screen" class="screen hidden" data-screen="rekap-kader">
-      <header class="topbar">
-        <div>
-          <h2 class="topbar-title">Rekap Saya</h2>
-          <p class="topbar-subtitle">Ringkasan aktivitas kader dan tim</p>
-        </div>
-        <div class="topbar-actions">
-          <button id="btn-back-from-rekap" class="btn btn-secondary btn-sm">Kembali</button>
-        </div>
-      </header>
-
-      <main class="page-content">
-        <section class="card">
-          <div class="section-header row-between">
-            <div>
-              <h3>Filter Rekap</h3>
-              <p class="muted-text">Pilih periode untuk melihat ringkasan aktivitas</p>
-            </div>
-          </div>
-
-          <div class="filters-grid">
-            <div class="form-group">
-              <label for="rekap-filter-bulan">Bulan</label>
-              <input id="rekap-filter-bulan" type="month" />
-            </div>
-
-            <div class="form-group">
-              <label>&nbsp;</label>
-              <button id="btn-load-rekap" class="btn btn-primary btn-block">Muat Rekap</button>
-            </div>
-          </div>
-        </section>
-
-        <section class="stats-grid">
-          <article class="card stat-card">
-            <span class="label">Sasaran Aktif</span>
-            <strong id="rekap-stat-sasaran-aktif">0</strong>
-          </article>
-          <article class="card stat-card">
-            <span class="label">Pendampingan Periode</span>
-            <strong id="rekap-stat-pendampingan">0</strong>
-          </article>
-          <article class="card stat-card">
-            <span class="label">Draft Pending</span>
-            <strong id="rekap-stat-draft">0</strong>
-          </article>
-          <article class="card stat-card">
-            <span class="label">Sasaran Ditindaklanjuti</span>
-            <strong id="rekap-stat-followup">0</strong>
-          </article>
-        </section>
-
-        <section class="card">
-          <div class="section-header">
-            <h3>Ringkasan</h3>
-          </div>
-          <div id="rekap-summary-box" class="list-stack">
-            <p class="muted-text">Rekap belum dimuat.</p>
-          </div>
-        </section>
-
-        <section class="card">
-          <div class="section-header">
-            <h3>Aktivitas Terbaru</h3>
-          </div>
-          <div id="rekap-activity-list" class="list-stack">
-            <p class="muted-text">Belum ada aktivitas terbaru.</p>
-          </div>
-        </section>
-      </main>
+        <footer class="tpk-footer">
+          <div id="app-version-label">TPK Kabupaten Buleleng</div>
+        </footer>
+      </div>
     </section>
   </div>
 
-  <div id="toast-container" class="toast-container"></div>
+  <div id="toast-root" aria-live="polite" aria-atomic="true"></div>
+  <div id="notifier-root" aria-live="polite" aria-atomic="true"></div>
 
-  <!-- MODAL PENGATURAN -->
-  <div id="settings-modal" class="modal-overlay hidden" aria-hidden="true">
-    <div class="modal-panel">
-      <div class="modal-header">
-        <div class="modal-title-wrap">
-          <h3>Pengaturan Aplikasi</h3>
-          <p>Atur tampilan dan pembaruan aplikasi</p>
-        </div>
-        <button type="button" class="modal-close" id="btn-close-settings" aria-label="Tutup pengaturan">✕</button>
-      </div>
-
-      <div class="modal-body">
-        <section class="setting-group">
-          <h4>Perbarui Aplikasi</h4>
-          <p>Muat ulang aplikasi untuk mengambil tampilan dan file terbaru.</p>
-          <div class="setting-actions">
-            <button type="button" class="btn btn-primary" id="btn-refresh-app">Perbarui Aplikasi</button>
-          </div>
-        </section>
-
-        <section class="setting-group">
-          <h4>Ukuran Teks</h4>
-          <p>Pilih ukuran tampilan yang paling nyaman dibaca.</p>
-          <div class="setting-select">
-            <select id="setting-font-size">
-              <option value="standard">Standar</option>
-              <option value="large">Besar</option>
-              <option value="xlarge">Sangat Besar</option>
-            </select>
-          </div>
-        </section>
-
-        <section class="setting-group">
-          <h4>Reset Cache Ringan</h4>
-          <p>Bersihkan cache ringan tampilan aplikasi tanpa menghapus draft utama.</p>
-          <div class="setting-actions">
-            <button type="button" class="btn btn-secondary" id="btn-reset-light-cache">Reset Cache Ringan</button>
-          </div>
-        </section>
-
-        <section class="setting-group">
-          <h4>Informasi Aplikasi</h4>
-          <p>Versi aplikasi saat ini: <strong id="settings-app-version">-</strong></p>
-        </section>
-      </div>
-    </div>
-  </div>
-
-  <!-- MODAL PROFIL -->
-  <div id="profile-modal" class="modal-overlay hidden" aria-hidden="true">
-    <div class="modal-panel">
-      <div class="modal-header">
-        <div class="modal-title-wrap">
-          <h3>Profil Pengguna</h3>
-          <p>Informasi akun dan wilayah tugas aktif</p>
-        </div>
-        <button type="button" class="modal-close" id="btn-close-profile" aria-label="Tutup profil">✕</button>
-      </div>
-
-      <div class="modal-body">
-        <div id="profile-view-mode">
-          <section class="profile-group">
-            <h4>Informasi Dasar</h4>
-            <div class="profile-mini-grid">
-              <div>
-                <span class="label">Nama Pengguna</span>
-                <strong id="modal-profile-nama">-</strong>
-              </div>
-              <div>
-                <span class="label">ID Pengguna</span>
-                <strong id="modal-profile-id">-</strong>
-              </div>
-              <div>
-                <span class="label">Unsur TPK</span>
-                <strong id="modal-profile-unsur">-</strong>
-              </div>
-              <div>
-                <span class="label">Nomor Tim</span>
-                <strong id="modal-profile-tim">-</strong>
-              </div>
-            </div>
-          </section>
-
-          <section class="profile-group">
-            <h4>Wilayah Tugas</h4>
-            <div class="profile-mini-grid">
-              <div>
-                <span class="label">Kecamatan</span>
-                <strong id="modal-profile-kecamatan">-</strong>
-              </div>
-              <div>
-                <span class="label">Desa/Kelurahan</span>
-                <strong id="modal-profile-desa">-</strong>
-              </div>
-              <div style="grid-column: 1 / -1;">
-                <span class="label">Dusun/RW</span>
-                <strong id="modal-profile-dusun">-</strong>
-              </div>
-            </div>
-          </section>
-
-          <section class="profile-group">
-            <h4>Informasi Tambahan</h4>
-            <div class="profile-mini-grid">
-              <div>
-                <span class="label">Status Kader</span>
-                <strong id="modal-profile-status-kader">-</strong>
-              </div>
-              <div>
-                <span class="label">Nomor WA</span>
-                <strong id="modal-profile-nomor-wa">-</strong>
-              </div>
-              <div>
-                <span class="label">Memiliki BPJSTK</span>
-                <strong id="modal-profile-bpjstk">-</strong>
-              </div>
-              <div>
-                <span class="label">Mengantar MBG 3B</span>
-                <strong id="modal-profile-mbg">-</strong>
-              </div>
-              <div>
-                <span class="label">Mendapat Insentif MBG 3B</span>
-                <strong id="modal-profile-mbg-insentif">-</strong>
-              </div>
-              <div>
-                <span class="label">Insentif per Sasaran</span>
-                <strong id="modal-profile-mbg-rupiah">-</strong>
-              </div>
-            </div>
-          </section>
-
-          <div class="modal-actions">
-            <button type="button" class="btn btn-primary" id="btn-profile-edit">Edit Profil</button>
-            <button type="button" class="btn btn-secondary" id="btn-close-profile-bottom">Tutup</button>
-          </div>
-        </div>
-
-        <div id="profile-edit-mode" class="hidden">
-          <section class="profile-group">
-            <h4>Edit Profil Kader</h4>
-            <form id="profile-edit-form" novalidate>
-              <div class="profile-edit-grid">
-                <div class="form-group">
-                  <label for="profile-status-kader">Status Kader *</label>
-                  <select id="profile-status-kader" name="status_kader_tpk" required>
-                    <option value="">Pilih status kader</option>
-                    <option value="BARU">Baru</option>
-                    <option value="LAMA">Lama</option>
-                  </select>
-                </div>
-
-                <div class="form-group">
-                  <label for="profile-nomor-wa">Nomor WA *</label>
-                  <input
-                    id="profile-nomor-wa"
-                    name="nomor_wa"
-                    type="text"
-                    inputmode="numeric"
-                    placeholder="Contoh: 081234567890"
-                    required
-                  />
-                </div>
-
-                <div class="form-group">
-                  <label for="profile-memiliki-bpjstk">Memiliki BPJSTK *</label>
-                  <select id="profile-memiliki-bpjstk" name="memiliki_bpjstk" required>
-                    <option value="">Pilih jawaban</option>
-                    <option value="YA">Ya</option>
-                    <option value="TIDAK">Tidak</option>
-                  </select>
-                </div>
-
-                <div class="form-group">
-                  <label for="profile-mengantar-mbg">Mengantar MBG 3B *</label>
-                  <select id="profile-mengantar-mbg" name="mengantar_mbg_3b" required>
-                    <option value="">Pilih jawaban</option>
-                    <option value="YA">Ya</option>
-                    <option value="TIDAK">Tidak</option>
-                  </select>
-                </div>
-
-                <div class="form-group span-2 hidden" id="group-profile-mbg-insentif">
-                  <label for="profile-mendapat-insentif-mbg">Mendapat Insentif pengantaran MBG 3B *</label>
-                  <select id="profile-mendapat-insentif-mbg" name="mendapat_insentif_mbg_3b">
-                    <option value="">Pilih jawaban</option>
-                    <option value="YA">Ya</option>
-                    <option value="TIDAK">Tidak</option>
-                  </select>
-                </div>
-
-                <div class="form-group span-2 hidden" id="group-profile-insentif-rupiah">
-                  <label for="profile-insentif-rupiah">Insentif MBG 3B per Sasaran dalam setiap Pengantaran *</label>
-                  <input
-                    id="profile-insentif-rupiah"
-                    name="insentif_mbg_3b_per_sasaran"
-                    type="text"
-                    inputmode="numeric"
-                    placeholder="Contoh: Rp 2.500"
-                  />
-                </div>
-              </div>
-
-              <div id="profile-edit-message" class="login-message hidden" role="alert" aria-live="polite"></div>
-
-              <div class="modal-actions">
-                <button type="button" class="btn btn-secondary" id="btn-profile-cancel-edit">Batal</button>
-                <button type="submit" class="btn btn-primary" id="btn-profile-save">Simpan Perubahan</button>
-              </div>
-            </form>
-          </section>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- MODAL BANTUAN -->
-  <div id="help-modal" class="modal-overlay hidden" aria-hidden="true">
-    <div class="modal-panel">
-      <div class="modal-header">
-        <div class="modal-title-wrap">
-          <h3>Bantuan Penggunaan</h3>
-          <p>Panduan singkat penggunaan aplikasi kader</p>
-        </div>
-        <button type="button" class="modal-close" id="btn-close-help" aria-label="Tutup bantuan">✕</button>
-      </div>
-
-      <div class="modal-body">
-        <section class="help-group">
-          <h4>Langkah Dasar</h4>
-          <ul class="help-list">
-            <li>Gunakan <strong>Registrasi Sasaran</strong> untuk menambah sasaran baru.</li>
-            <li>Gunakan <strong>Daftar Sasaran</strong> untuk melihat dan memilih sasaran.</li>
-            <li>Gunakan <strong>Lapor Pendampingan</strong> setelah memilih sasaran.</li>
-            <li>Gunakan <strong>Draft &amp; Sinkronisasi</strong> saat bekerja offline.</li>
-          </ul>
-        </section>
-
-        <section class="help-group">
-          <h4>Saat Internet Lemah</h4>
-          <ul class="help-list">
-            <li>Data dapat disimpan sebagai draft lebih dahulu.</li>
-            <li>Saat koneksi kembali stabil, tekan <strong>Sinkronkan</strong>.</li>
-            <li>Periksa halaman <strong>Draft Offline &amp; Sinkronisasi</strong> bila ada data yang belum terkirim.</li>
-          </ul>
-        </section>
-
-        <section class="help-group">
-          <h4>Pembaruan Aplikasi</h4>
-          <ul class="help-list">
-            <li>Buka <strong>Pengaturan</strong> lalu tekan <strong>Perbarui Aplikasi</strong>.</li>
-            <li>Gunakan <strong>Reset Cache Ringan</strong> hanya bila tampilan terasa tidak ikut berubah.</li>
-          </ul>
-        </section>
-
-        <div class="modal-actions">
-          <button type="button" class="btn btn-secondary" id="btn-close-help-bottom">Tutup</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Core -->
-  <script src="./js/config.js"></script>
-  <script src="./js/utils.js"></script>
+  <!-- Urutan script mengikuti paket integrasi Tahap 1 versi plug-and-play -->
+  <script src="./js/app-config.js"></script>
   <script src="./js/storage.js"></script>
   <script src="./js/state.js"></script>
+  <script src="./js/db.js"></script>
+  <script src="./js/queueRepo.js"></script>
+  <script src="./js/syncManager.js"></script>
+  <script src="./js/session.js"></script>
+  <script src="./js/notifier.js"></script>
+  <script src="./js/validators.js"></script>
+  <script src="./js/ui-helpers.js"></script>
+  <script src="./js/client-id.js"></script>
   <script src="./js/api.js"></script>
   <script src="./js/auth.js"></script>
-  <script src="./js/router.js"></script>
   <script src="./js/bootstrap.js"></script>
-  <script src="./js/ui.js"></script>
-
-  <!-- Views dimuat lazy oleh router.js saat route dibuka -->
+  <script src="./js/router.js"></script>
+  <script src="./js/menu.js"></script>
+  <script src="./js/dynamic-form.js"></script>
+  <script src="./js/sasaran-state.js"></script>
+  <script src="./js/sasaran-service.js"></script>
+  <script src="./js/sasaran-list.js"></script>
+  <script src="./js/sasaran-detail.js"></script>
+  <script src="./js/registrasi-state.js"></script>
+  <script src="./js/form-mapper.js"></script>
+  <script src="./js/draft-manager.js"></script>
+  <script src="./js/registrasi-service.js"></script>
+  <script src="./js/registrasi-form.js"></script>
+  <script src="./js/pendampingan-state.js"></script>
+  <script src="./js/pendampingan-draft.js"></script>
+  <script src="./js/pendampingan-service.js"></script>
+  <script src="./js/pendampingan-form.js"></script>
+  <script src="./js/sync-ui.js"></script>
+  <script src="./js/sync-screen.js"></script>
+  <script src="./js/dashboard-service.js"></script>
+  <script src="./js/rekap-kader-service.js"></script>
+  <script src="./js/rekap-kader-screen.js"></script>
   <script src="./js/app.js"></script>
 </body>
 </html>
