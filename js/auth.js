@@ -520,7 +520,10 @@
         applyProfileToUi(mergedImmediateProfile);
       }
 
-      openDashboard();
+      if (window.TPKCleanSensitiveUrl) {
+  window.TPKCleanSensitiveUrl();
+}
+openDashboard();
 
       if (window.DashboardView && typeof window.DashboardView.refresh === 'function') {
         window.DashboardView.refresh();
