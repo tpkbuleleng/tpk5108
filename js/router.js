@@ -18,13 +18,13 @@
       { src: './js/views/dashboardView.js', globalName: 'DashboardView' }
     ],
     sasaranList: [
-      { src: './js/views/sasaranListView.js?v=20260412-01', globalName: 'SasaranListView' }
+      { src: './js/views/sasaranListView.js?v=20260417-01', globalName: 'SasaranListView' }
     ],
     sasaranDetail: [
       { src: './js/views/sasaranDetailView.js?v=20260416-03', globalName: 'SasaranDetailView' }
     ],
     registrasi: [
-      { src: './js/views/registrasiView.js?v=20260411-03', globalName: 'RegistrasiView' }
+      { src: './js/views/registrasiView.js?v=20260417-01', globalName: 'RegistrasiView' }
     ],
     pendampingan: [
       { src: './js/views/pendampinganView.js?v=20260417-02', globalName: 'PendampinganView' }
