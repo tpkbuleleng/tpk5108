@@ -1,54 +1,81 @@
 /* eslint-disable no-restricted-globals */
 'use strict';
 
-const APP_VERSION = '2.1.0-vnext-stage1';
-const SHELL_CACHE = `tpk-shell-${APP_VERSION}`;
-const RUNTIME_CACHE = `tpk-runtime-${APP_VERSION}`;
-const OFFLINE_URL = '/index.html';
+var APP_VERSION = 'tpk-vnext-stage1-plug-20260417-01';
+var SHELL_CACHE = 'tpk-shell-' + APP_VERSION;
+var RUNTIME_CACHE = 'tpk-runtime-' + APP_VERSION;
+var OFFLINE_FALLBACKS = ['/', '/index.html'];
 
-const PRECACHE_URLS = [
+var PRECACHE_CANDIDATES = [
   '/',
   '/index.html',
   '/app.css',
   '/manifest.webmanifest',
+  '/manifest.json',
   '/js/app.js',
+  '/js/app-config.js',
   '/js/config.js',
-  '/js/router.js',
-  '/js/state.js',
   '/js/storage.js',
-  '/js/db.js',
-  '/js/queueRepo.js',
-  '/js/syncManager.js',
+  '/js/session.js',
+  '/js/notifier.js',
+  '/js/ui-helpers.js',
+  '/js/client-id.js',
   '/js/api.js',
   '/js/auth.js',
   '/js/bootstrap.js',
-  '/js/ui.js',
-  '/js/ui-helpers.js',
-  '/js/utils.js'
+  '/js/router.js',
+  '/js/state.js',
+  '/js/db.js',
+  '/js/queueRepo.js',
+  '/js/syncManager.js',
+  '/assets/js/app.js',
+  '/assets/js/app-config.js',
+  '/assets/js/storage.js',
+  '/assets/js/session.js',
+  '/assets/js/notifier.js',
+  '/assets/js/ui-helpers.js',
+  '/assets/js/client-id.js',
+  '/assets/js/api.js',
+  '/assets/js/auth.js',
+  '/assets/js/bootstrap.js',
+  '/assets/js/router.js',
+  '/assets/js/state.js',
+  '/assets/js/db.js',
+  '/assets/js/queueRepo.js',
+  '/assets/js/syncManager.js',
+  '/assets/css/style.css',
+  '/logo.png',
+  '/assets/img/logo.png'
 ];
 
-self.addEventListener('install', (event) => {
-  event.waitUntil((async () => {
-    const cache = await caches.open(SHELL_CACHE);
-    await cache.addAll(PRECACHE_URLS);
+self.addEventListener('install', function (event) {
+  event.waitUntil((async function () {
+    var cache = await caches.open(SHELL_CACHE);
+    for (var i = 0; i < PRECACHE_CANDIDATES.length; i += 1) {
+      try {
+        await cache.add(new Request(PRECACHE_CANDIDATES[i], { cache: 'reload' }));
+      } catch (err) {
+        // Abaikan file yang memang tidak ada pada struktur aktif.
+      }
+    }
     await self.skipWaiting();
   })());
 });
 
-self.addEventListener('activate', (event) => {
-  event.waitUntil((async () => {
-    const keys = await caches.keys();
-    await Promise.all(
-      keys
-        .filter((key) => key !== SHELL_CACHE && key !== RUNTIME_CACHE)
-        .map((key) => caches.delete(key))
-    );
+self.addEventListener('activate', function (event) {
+  event.waitUntil((async function () {
+    var keys = await caches.keys();
+    await Promise.all(keys.filter(function (key) {
+      return key !== SHELL_CACHE && key !== RUNTIME_CACHE;
+    }).map(function (key) {
+      return caches.delete(key);
+    }));
 
-    if ('navigationPreload' in self.registration) {
+    if (self.registration && self.registration.navigationPreload) {
       try {
         await self.registration.navigationPreload.enable();
       } catch (err) {
-        // Ignore unsupported or failed preload enable.
+        // no-op
       }
     }
 
@@ -57,25 +84,24 @@ self.addEventListener('activate', (event) => {
   })());
 });
 
-self.addEventListener('message', (event) => {
-  const data = event.data || {};
-  if (data && data.type === 'SKIP_WAITING') {
+self.addEventListener('message', function (event) {
+  var data = event.data || {};
+  if (data.type === 'SKIP_WAITING') {
     self.skipWaiting();
+    return;
   }
-  if (data && data.type === 'CLEAR_RUNTIME_CACHE') {
+  if (data.type === 'CLEAR_RUNTIME_CACHE') {
     event.waitUntil(caches.delete(RUNTIME_CACHE));
   }
 });
 
-self.addEventListener('fetch', (event) => {
-  const request = event.request;
-  const url = new URL(request.url);
+self.addEventListener('fetch', function (event) {
+  var request = event.request;
+  if (request.method !== 'GET') return;
 
-  if (request.method !== 'GET') {
-    return;
-  }
+  var url = new URL(request.url);
 
-  if (isApiRequest(url) || isPrivateDataRequest(url)) {
+  if (isApiRequest(url) || isPrivateDataRequest(url) || !isCacheableOrigin(url)) {
     event.respondWith(fetch(request));
     return;
   }
@@ -95,52 +121,61 @@ self.addEventListener('fetch', (event) => {
 
 async function handleNavigationRequest(event) {
   try {
-    const preloadResponse = await event.preloadResponse;
-    if (preloadResponse) {
-      return preloadResponse;
-    }
+    var preloadResponse = await event.preloadResponse;
+    if (preloadResponse) return preloadResponse;
 
-    const networkResponse = await fetch(event.request);
-    const cache = await caches.open(RUNTIME_CACHE);
-    cache.put(event.request, networkResponse.clone());
+    var networkResponse = await fetch(event.request);
+    var runtime = await caches.open(RUNTIME_CACHE);
+    runtime.put(event.request, networkResponse.clone());
     return networkResponse;
   } catch (err) {
-    const cached = await caches.match(event.request);
-    if (cached) return cached;
-    const shellFallback = await caches.match(OFFLINE_URL);
-    return shellFallback || Response.error();
+    var cachedPage = await caches.match(event.request);
+    if (cachedPage) return cachedPage;
+
+    for (var i = 0; i < OFFLINE_FALLBACKS.length; i += 1) {
+      var fallback = await caches.match(OFFLINE_FALLBACKS[i]);
+      if (fallback) return fallback;
+    }
+
+    return new Response('Offline', { status: 503, statusText: 'Offline' });
   }
 }
 
 async function cacheFirst(request) {
-  const cached = await caches.match(request);
+  var cached = await caches.match(request);
   if (cached) return cached;
 
-  const response = await fetch(request);
-  const cache = await caches.open(RUNTIME_CACHE);
-  cache.put(request, response.clone());
+  var response = await fetch(request);
+  if (response && response.ok) {
+    var runtime = await caches.open(RUNTIME_CACHE);
+    runtime.put(request, response.clone());
+  }
   return response;
 }
 
 async function networkFirst(request) {
   try {
-    const response = await fetch(request);
-    const cache = await caches.open(RUNTIME_CACHE);
-    cache.put(request, response.clone());
+    var response = await fetch(request);
+    if (response && response.ok) {
+      var runtime = await caches.open(RUNTIME_CACHE);
+      runtime.put(request, response.clone());
+    }
     return response;
   } catch (err) {
-    const cached = await caches.match(request);
-    return cached || Response.error();
+    var cached = await caches.match(request);
+    if (cached) return cached;
+    throw err;
   }
 }
 
 function isApiRequest(url) {
-  return /googleapis\.com|script\.google\.com|script\.googleusercontent\.com/i.test(url.hostname)
-    || url.pathname.indexOf('/api/') === 0;
+  return /script\.google\.com|script\.googleusercontent\.com|googleapis\.com/i.test(url.hostname) ||
+    url.pathname.indexOf('/api/') === 0;
 }
 
 function isPrivateDataRequest(url) {
-  const blockedPatterns = [
+  var lower = url.pathname.toLowerCase();
+  var blocked = [
     '/login',
     '/logout',
     '/session',
@@ -149,29 +184,23 @@ function isPrivateDataRequest(url) {
     '/sasaran',
     '/pendampingan',
     '/submit',
-    '/update'
+    '/update',
+    '/sync'
   ];
-  return blockedPatterns.some((pattern) => url.pathname.toLowerCase().indexOf(pattern) >= 0);
+  return blocked.some(function (pattern) { return lower.indexOf(pattern) >= 0; });
+}
+
+function isCacheableOrigin(url) {
+  return url.origin === self.location.origin;
 }
 
 function isStaticAsset(url) {
-  return (
-    url.origin === self.location.origin &&
-    (
-      url.pathname.endsWith('.css') ||
-      url.pathname.endsWith('.js') ||
-      url.pathname.endsWith('.png') ||
-      url.pathname.endsWith('.jpg') ||
-      url.pathname.endsWith('.jpeg') ||
-      url.pathname.endsWith('.svg') ||
-      url.pathname.endsWith('.webp') ||
-      url.pathname.endsWith('.woff2') ||
-      url.pathname.endsWith('.ico')
-    )
-  );
+  return /\.(?:css|js|png|jpg|jpeg|svg|webp|woff2|ico|json)$/i.test(url.pathname);
 }
 
 async function notifyClients(payload) {
-  const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-  clients.forEach((client) => client.postMessage(payload));
+  var clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+  clients.forEach(function (client) {
+    client.postMessage(payload);
+  });
 }
