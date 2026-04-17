@@ -30,6 +30,10 @@
     return window.Api || null;
   }
 
+    function getRouter() {
+    return window.Router || null;
+  }
+
   function getState() {
     return window.AppState || null;
   }
