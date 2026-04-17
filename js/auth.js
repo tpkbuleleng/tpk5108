@@ -578,6 +578,9 @@ openDashboard();
       if (passwordInput) passwordInput.value = '';
 
       cleanSensitiveUrlParams();
+      if (window.TPKCleanSensitiveUrl) {
+  window.TPKCleanSensitiveUrl();
+}
       openLoginScreen();
       return true;
     } finally {
