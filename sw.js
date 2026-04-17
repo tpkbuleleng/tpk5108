@@ -1,94 +1,171 @@
-const APP_SHELL_CACHE = 'tpk-shell-v2-1-2';
-const STATIC_CACHE = 'tpk-static-v2-1-2';
-const APP_SHELL_ASSETS = [
-  './',
-  './index.html',
-  './app.css',
-  './manifest.webmanifest',
-  './js/config.js',
-  './js/utils.js',
-  './js/storage.js',
-  './js/state.js',
-  './js/api.js',
-  './js/auth.js',
-  './js/router.js',
-  './js/bootstrap.js',
-  './js/ui.js',
-  './js/app.js',
-  './assets/img/logo.png',
-  './assets/img/logo-192.png'
+/* eslint-disable no-restricted-globals */
+/*!
+ * sw.js — Spesifikasi Implementasi Tahap 1
+ * Project: TPK Kabupaten Buleleng
+ *
+ * TUJUAN
+ * - Menjadikan service worker disiplin:
+ *   1) cache app shell
+ *   2) cache asset statis
+ *   3) network-first untuk navigasi
+ *   4) bypass total untuk endpoint privat / POST / login / submit
+ *
+ * BUKAN TUJUAN
+ * - menyimpan response API privat
+ * - menyimpan token / session
+ * - cache data sasaran / detail / pendampingan
+ *
+ * CATATAN
+ * - Versi cache sebaiknya ikut APP_VERSION frontend.
+ * - Jangan auto refresh tab saat user sedang isi form.
+ */
+
+const APP_VERSION = 'TPK-VNEXT-STAGE1';
+const APP_SHELL_CACHE = `tpk-app-shell-${APP_VERSION}`;
+const STATIC_CACHE = `tpk-static-${APP_VERSION}`;
+// const RUNTIME_SAFE_CACHE = `tpk-runtime-safe-${APP_VERSION}`; // disiapkan bila kelak perlu ref publik.
+
+const APP_SHELL_FILES = [
+  '/',
+  '/index.html',
+  '/app.css',
+  '/manifest.webmanifest',
+  // Tambahkan icon/logo inti yang benar-benar ada:
+  // '/assets/logo.png',
+  // Tambahkan file JS inti bila path statis final sudah pasti:
+  // '/js/app.js',
+  // '/js/config.js',
+  // '/js/router.js'
 ];
 
-self.addEventListener('install', function(event) {
+const PRIVATE_PATH_PATTERNS = [
+  '/exec',                 // umum untuk GAS web app route
+  '/api/',                 // kalau ada proxy / future endpoint
+  'action=login',
+  'action=submit',
+  'action=update',
+  'action=getMySession',
+  'action=getMyProfile',
+  'action=submitPendampingan',
+  'action=submitRegistrasiSasaran'
+];
+
+self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(APP_SHELL_CACHE)
-      .then(function(cache) {
-        return cache.addAll(APP_SHELL_ASSETS);
-      })
-      .then(function() {
-        return self.skipWaiting();
+      .then((cache) => cache.addAll(APP_SHELL_FILES))
+      .then(() => self.skipWaiting())
+      .catch((err) => {
+        console.warn('[SW install] gagal precache:', err);
       })
   );
 });
 
-self.addEventListener('activate', function(event) {
-  event.waitUntil(
-    caches.keys().then(function(keys) {
-      return Promise.all(
-        keys
-          .filter(function(key) {
-            return key !== APP_SHELL_CACHE && key !== STATIC_CACHE;
-          })
-          .map(function(key) {
-            return caches.delete(key);
-          })
-      );
-    }).then(function() {
-      return self.clients.claim();
-    })
-  );
+self.addEventListener('activate', (event) => {
+  event.waitUntil((async () => {
+    const keys = await caches.keys();
+    await Promise.all(
+      keys.map((key) => {
+        if (![APP_SHELL_CACHE, STATIC_CACHE].includes(key)) {
+          return caches.delete(key);
+        }
+        return Promise.resolve(false);
+      })
+    );
+
+    if (self.registration.navigationPreload) {
+      try {
+        await self.registration.navigationPreload.enable();
+      } catch (err) {
+        console.warn('[SW activate] navigation preload gagal:', err);
+      }
+    }
+
+    await self.clients.claim();
+  })());
 });
 
-self.addEventListener('fetch', function(event) {
-  var request = event.request;
-  if (request.method !== 'GET') return;
+self.addEventListener('message', (event) => {
+  const data = event.data || {};
+  if (data && data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
 
-  var url = new URL(request.url);
+/**
+ * Rule 1:
+ * - Semua POST dibypass ke network.
+ */
+function isBypassRequest(request) {
+  if (!request || request.method !== 'GET') return true;
 
-  if (url.origin !== self.location.origin) {
+  const url = new URL(request.url);
+
+  // Hanya cache same-origin asset statis.
+  // GAS beda origin dan endpoint privat sebaiknya dilewatkan langsung.
+  if (PRIVATE_PATH_PATTERNS.some((token) => url.href.includes(token))) return true;
+
+  return false;
+}
+
+function isNavigationRequest(request) {
+  return request.mode === 'navigate';
+}
+
+function isStaticAsset(request) {
+  const url = new URL(request.url);
+  return ['style', 'script', 'image', 'font'].includes(request.destination)
+    || url.pathname.endsWith('.css')
+    || url.pathname.endsWith('.js')
+    || url.pathname.endsWith('.png')
+    || url.pathname.endsWith('.jpg')
+    || url.pathname.endsWith('.jpeg')
+    || url.pathname.endsWith('.svg')
+    || url.pathname.endsWith('.webp')
+    || url.pathname.endsWith('.woff2');
+}
+
+async function networkFirstNavigation(event) {
+  try {
+    const preload = await event.preloadResponse;
+    if (preload) return preload;
+
+    const fresh = await fetch(event.request);
+    const cache = await caches.open(APP_SHELL_CACHE);
+    cache.put('/index.html', fresh.clone());
+    return fresh;
+  } catch (err) {
+    const cached = await caches.match('/index.html');
+    if (cached) return cached;
+    throw err;
+  }
+}
+
+async function cacheFirstStatic(request) {
+  const cached = await caches.match(request);
+  if (cached) return cached;
+
+  const response = await fetch(request);
+  if (response && response.ok) {
+    const cache = await caches.open(STATIC_CACHE);
+    cache.put(request, response.clone());
+  }
+  return response;
+}
+
+self.addEventListener('fetch', (event) => {
+  const { request } = event;
+
+  if (isBypassRequest(request)) {
+    return; // biarkan network biasa
+  }
+
+  if (isNavigationRequest(request)) {
+    event.respondWith(networkFirstNavigation(event));
     return;
   }
 
-  if (url.pathname.indexOf('/exec') !== -1 || url.hostname.indexOf('script.google') !== -1 || url.hostname.indexOf('googleusercontent.com') !== -1) {
-    return;
-  }
-
-  if (request.mode === 'navigate') {
-    event.respondWith(
-      fetch(request).catch(function() {
-        return caches.match('./index.html');
-      })
-    );
-    return;
-  }
-
-  if (/\.(png|jpg|jpeg|webp|svg|gif|css|js|html|webmanifest)$/i.test(url.pathname)) {
-    event.respondWith(
-      caches.match(request).then(function(cached) {
-        var networkFetch = fetch(request).then(function(response) {
-          if (response && response.ok) {
-            var clone = response.clone();
-            caches.open(STATIC_CACHE).then(function(cache) {
-              cache.put(request, clone);
-            });
-          }
-          return response;
-        }).catch(function() {
-          return cached;
-        });
-
-        return cached || networkFetch;
-      })
-    );
+  if (isStaticAsset(request)) {
+    event.respondWith(cacheFirstStatic(request));
   }
 });
