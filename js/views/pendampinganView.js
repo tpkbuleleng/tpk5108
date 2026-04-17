@@ -1,21 +1,22 @@
 (function (window, document) {
   'use strict';
 
-  window.__PENDAMPINGAN_VIEW_BUILD = '20260416-02';
+  window.__PENDAMPINGAN_VIEW_BUILD = '20260417-01';
   console.log('PendampinganView build aktif:', window.__PENDAMPINGAN_VIEW_BUILD);
 
   var PENDAMPINGAN_DRAFT_KEY = 'tpk_pendampingan_draft';
   var LOCAL_SELECTED_SASARAN_KEY = 'tpk_selected_sasaran';
   var PENDAMPINGAN_FORM_CACHE_KEY = 'tpk_pendampingan_form_cache_v1';
   var PENDAMPINGAN_FORM_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
-  var DETAIL_CACHE_KEY = 'tpk_sasaran_detail_cache_v1';
 
   var PENDAMPINGAN_FORM_CACHE = {};
   var currentMode = 'create';
   var currentEditItem = {};
   var currentDynamicFields = [];
+  var currentJenisSasaran = '';
   var isInitialized = false;
   var currentOpenToken = 0;
+  var currentFormLoadToken = 0;
 
   function byId(id) {
     return document.getElementById(id);
@@ -162,10 +163,6 @@
     return normalizeSpaces(value).toUpperCase();
   }
 
-  function normalizeName(value) {
-    return normalizeUpper(value || '-');
-  }
-
   function parseJsonSafely(raw, fallback) {
     if (!raw) return fallback;
     if (typeof raw === 'object') return raw;
@@ -201,34 +198,6 @@
     return safePrefix + '-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8).toUpperCase();
   }
 
-  function getProfile() {
-    var state = getState();
-    if (state && typeof state.getProfile === 'function') {
-      return state.getProfile() || {};
-    }
-
-    var storage = getStorage();
-    var keys = getStorageKeys();
-    if (storage && typeof storage.get === 'function' && keys.PROFILE) {
-      return storage.get(keys.PROFILE, {}) || {};
-    }
-
-    try {
-      return JSON.parse(localStorage.getItem('tpk_profile') || '{}');
-    } catch (err) {
-      return {};
-    }
-  }
-
-  function getScopeCacheKey() {
-    var profile = getProfile() || {};
-    return [
-      normalizeSpaces(profile.id_user || profile.username || 'anon'),
-      normalizeSpaces(profile.id_tim || 'NO_TIM'),
-      normalizeUpper(profile.kode_kecamatan || profile.book_key || 'NO_BOOK')
-    ].join('::');
-  }
-
   function readStorage(key, fallback) {
     var storage = getStorage();
     if (storage && typeof storage.get === 'function') {
@@ -236,9 +205,7 @@
     }
 
     try {
-      var raw = localStorage.getItem(key);
-      if (!raw) return fallback;
-      return parseJsonSafely(raw, fallback);
+      return JSON.parse(localStorage.getItem(key) || 'null') || fallback;
     } catch (err) {
       return fallback;
     }
@@ -248,12 +215,32 @@
     var storage = getStorage();
     if (storage && typeof storage.set === 'function') {
       storage.set(key, value);
-      return;
     }
 
     try {
       localStorage.setItem(key, JSON.stringify(value));
     } catch (err) {}
+  }
+
+  function getProfile() {
+    var state = getState();
+    if (state && typeof state.getProfile === 'function') {
+      var fromState = state.getProfile() || {};
+      if (fromState && Object.keys(fromState).length) return fromState;
+    }
+
+    var storage = getStorage();
+    var keys = getStorageKeys();
+    if (storage && typeof storage.get === 'function' && keys.PROFILE) {
+      var fromStorage = storage.get(keys.PROFILE, {}) || {};
+      if (fromStorage && Object.keys(fromStorage).length) return fromStorage;
+    }
+
+    try {
+      return JSON.parse(localStorage.getItem('tpk_profile') || '{}');
+    } catch (err) {
+      return {};
+    }
   }
 
   function getSelectedSasaran() {
@@ -277,26 +264,8 @@
     }
   }
 
-  function normalizeSelectedSasaran(item) {
-    var raw = item && typeof item === 'object' ? item : {};
-    return Object.assign({}, raw, {
-      id_sasaran: raw.id_sasaran || raw.id || '',
-      id: raw.id || raw.id_sasaran || '',
-      nama_sasaran: raw.nama_sasaran || raw.nama || '',
-      jenis_sasaran: raw.jenis_sasaran || '',
-      status_sasaran: raw.status_sasaran || raw.status || 'AKTIF',
-      nama_kecamatan: raw.nama_kecamatan || raw.kecamatan || '',
-      nama_desa: raw.nama_desa || raw.desa_kelurahan || raw.desa || '',
-      nama_dusun: raw.nama_dusun || raw.dusun_rw || raw.dusun || '',
-      nama_wilayah:
-        raw.nama_wilayah ||
-        raw.wilayah ||
-        [raw.nama_dusun || raw.dusun_rw || raw.dusun || '', raw.nama_desa || raw.desa_kelurahan || raw.desa || '', raw.nama_kecamatan || raw.kecamatan || ''].filter(Boolean).join(' • ')
-    });
-  }
-
   function setSelectedSasaran(item) {
-    var safeItem = normalizeSelectedSasaran(item || {});
+    var safeItem = item && typeof item === 'object' ? item : {};
     var state = getState();
     var storage = getStorage();
     var keys = getStorageKeys();
@@ -312,19 +281,6 @@
     try {
       localStorage.setItem(LOCAL_SELECTED_SASARAN_KEY, JSON.stringify(safeItem));
     } catch (err) {}
-  }
-
-  function getCachedDetailPreview(idSasaran) {
-    var id = normalizeSpaces(idSasaran);
-    if (!id) return null;
-
-    var scopeKey = getScopeCacheKey();
-    var raw = readStorage(DETAIL_CACHE_KEY, {});
-    raw = raw && typeof raw === 'object' ? raw : {};
-    var scopeMap = raw[scopeKey] || {};
-    var entry = scopeMap[id];
-    if (!entry || !entry.detail) return null;
-    return normalizeSelectedSasaran(entry.detail);
   }
 
   function setMode(mode) {
@@ -445,19 +401,49 @@
     return formIds[key] || formIds.UMUM || 'FRM0001';
   }
 
+  function getFormCacheLocal(formKey) {
+    try {
+      var raw = JSON.parse(localStorage.getItem(PENDAMPINGAN_FORM_CACHE_KEY) || '{}');
+      var entry = raw[formKey];
+      if (!entry || !entry.cached_at) return null;
+
+      var age = Date.now() - new Date(entry.cached_at).getTime();
+      if (age < 0 || age > PENDAMPINGAN_FORM_CACHE_TTL_MS) return null;
+
+      return Array.isArray(entry.fields) ? entry.fields : null;
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function setFormCacheLocal(formKey, fields) {
+    try {
+      var raw = JSON.parse(localStorage.getItem(PENDAMPINGAN_FORM_CACHE_KEY) || '{}');
+      raw[formKey] = {
+        cached_at: new Date().toISOString(),
+        fields: Array.isArray(fields) ? fields : []
+      };
+      localStorage.setItem(PENDAMPINGAN_FORM_CACHE_KEY, JSON.stringify(raw));
+    } catch (err) {}
+  }
+
   function normalizeDynamicField(field, index) {
     var raw = field || {};
-    var id = raw.id || raw.question_code || raw.key || raw.name || raw.field_id || ('field_' + index);
+    var id = raw.id || raw.question_code || raw.key || raw.name || raw.field_id || raw.store_key || ('field_' + index);
     var type = String(raw.type || raw.input_type || raw.component || raw.field_type || 'text').toLowerCase();
 
     if (type === 'string') type = 'text';
     if (type === 'dropdown') type = 'select';
+    if (type === 'integer' || type === 'decimal') type = 'number';
 
     return {
       id: String(id),
       label: String(raw.label || raw.question || raw.title || raw.question_label || id),
       type: type,
-      required: raw.required === true || raw.is_required === true || String(raw.required_runtime || '').toUpperCase() === 'TRUE',
+      required:
+        raw.required === true ||
+        raw.is_required === true ||
+        String(raw.required_runtime || '').toUpperCase() === 'TRUE',
       placeholder: String(raw.placeholder || ''),
       help_text: String(raw.help_text || ''),
       options: Array.isArray(raw.options)
@@ -471,10 +457,12 @@
 
   function normalizeDynamicFieldsResponse(data, jenisSasaran) {
     if (Array.isArray(data)) return data;
+
     if (Array.isArray(data && data.fields)) return data.fields;
+
     if (Array.isArray(data && data.questions)) {
       return data.questions.filter(function (q) {
-        var code = String(q.question_code || '').toUpperCase();
+        var code = String(q.question_code || q.store_key || '').toUpperCase();
         return [
           'INFORMASI_KUNJUNGAN',
           'TANGGAL_KUNJUNGAN',
@@ -483,7 +471,19 @@
         ].indexOf(code) === -1;
       });
     }
+
     if (Array.isArray(data && data.items)) return data.items;
+
+    if (Array.isArray(data && data.sections)) {
+      var out = [];
+      data.sections.forEach(function (section) {
+        (section.questions || []).forEach(function (q) {
+          out.push(q);
+        });
+      });
+      return out;
+    }
+
     return getFallbackFields(jenisSasaran);
   }
 
@@ -514,31 +514,6 @@
     };
 
     return map[key] || [];
-  }
-
-  function readFormCacheLocal(key) {
-    var scopeKey = getScopeCacheKey();
-    var raw = readStorage(PENDAMPINGAN_FORM_CACHE_KEY, {});
-    raw = raw && typeof raw === 'object' ? raw : {};
-    var entry = raw[scopeKey] && raw[scopeKey][key];
-    if (!entry || !entry.cached_at) return null;
-
-    var age = Date.now() - new Date(entry.cached_at).getTime();
-    if (age < 0 || age > PENDAMPINGAN_FORM_CACHE_TTL_MS) return null;
-
-    return Array.isArray(entry.fields) ? entry.fields : null;
-  }
-
-  function saveFormCacheLocal(key, fields) {
-    var scopeKey = getScopeCacheKey();
-    var raw = readStorage(PENDAMPINGAN_FORM_CACHE_KEY, {});
-    raw = raw && typeof raw === 'object' ? raw : {};
-    raw[scopeKey] = raw[scopeKey] || {};
-    raw[scopeKey][key] = {
-      cached_at: new Date().toISOString(),
-      fields: Array.isArray(fields) ? fields : []
-    };
-    writeStorage(PENDAMPINGAN_FORM_CACHE_KEY, raw);
   }
 
   function renderDynamicFieldInputs(fields, values) {
@@ -705,110 +680,167 @@
   }
 
   function isPendampinganScreenActive() {
-    var router = window.Router;
+    var router = getRouter();
     if (router && typeof router.getCurrentRoute === 'function') {
       return router.getCurrentRoute() === 'pendampingan';
     }
 
     var screen = byId('pendampingan-screen');
-    return !!(screen && screen.classList.contains('active'));
+    return !!(screen && !screen.classList.contains('hidden'));
   }
 
-  function getCurrentSelectedId() {
-    var selected = getSelectedSasaran() || {};
-    return normalizeSpaces(selected.id_sasaran || selected.id);
+  function goToPendampinganRoute(onReady) {
+    if (isPendampinganScreenActive()) {
+      if (typeof onReady === 'function') onReady();
+      return;
+    }
+
+    var router = getRouter();
+    if (!router || typeof router.go !== 'function') {
+      if (typeof onReady === 'function') onReady();
+      return;
+    }
+
+    router.go('pendampingan', {
+      onRouteReady: function () {
+        if (typeof onReady === 'function') onReady();
+      }
+    });
+  }
+
+  function buildOpenSignature(mode, targetId, jenis) {
+    return [mode || 'create', targetId || '', jenis || ''].join('::');
+  }
+
+  function normalizeHeaderItem(baseItem) {
+    var selected = baseItem || {};
+    var profile = getProfile() || {};
+
+    return {
+      id_sasaran: selected.id_sasaran || selected.id || '',
+      id: selected.id || selected.id_sasaran || '',
+      nama_sasaran: selected.nama_sasaran || selected.nama || '',
+      jenis_sasaran: selected.jenis_sasaran || '',
+      status_sasaran: selected.status_sasaran || selected.status || 'AKTIF',
+      nama_wilayah:
+        selected.nama_wilayah ||
+        selected.wilayah ||
+        [selected.nama_dusun, selected.nama_desa, selected.nama_kecamatan].filter(Boolean).join(' / ') ||
+        '-',
+      nama_kecamatan: selected.nama_kecamatan || '',
+      nama_desa: selected.nama_desa || '',
+      nama_dusun: selected.nama_dusun || '',
+      nama_kader: profile.nama_kader || profile.nama || '',
+      nama_tim: profile.nama_tim || profile.id_tim || ''
+    };
   }
 
   var PendampinganView = {
+    _isOpening: false,
+    _lastOpenSignature: '',
+
     init: function () {
-      if (isInitialized) {
-        this.autoOpenSelectedIfNeeded();
-        return;
-      }
+      if (isInitialized) return;
       isInitialized = true;
       this.bindEvents();
       this.bindAutosave();
-      this.autoOpenSelectedIfNeeded();
-    },
-
-    autoOpenSelectedIfNeeded: function () {
-      if (!isPendampinganScreenActive()) return;
-      if (getMode() === 'edit') return;
-
-      var selected = getSelectedSasaran() || {};
-      var selectedId = normalizeSpaces(selected.id_sasaran || selected.id);
-      if (!selectedId) return;
-
-      this.openCreate(selected, {
-        skipRoute: true,
-        silent: true
-      });
     },
 
     openCreate: async function (selectedItem, options) {
       this.init();
-      options = options || {};
 
-      var selected = normalizeSelectedSasaran(selectedItem || getSelectedSasaran());
-      var selectedId = normalizeSpaces(selected.id_sasaran || selected.id);
-      if (!selectedId) {
-        var fromCache = getCachedDetailPreview(selectedId) || getCachedDetailPreview(getCurrentSelectedId());
-        if (fromCache) {
-          selected = normalizeSelectedSasaran(fromCache);
-          selectedId = normalizeSpaces(selected.id_sasaran || selected.id);
-        }
-      }
+      var opts = options || {};
+      var selected = selectedItem || getSelectedSasaran();
 
-      if (!selectedId) {
+      if (!selected || !(selected.id_sasaran || selected.id)) {
         showToast('Pilih sasaran terlebih dahulu.', 'warning');
+
         if (window.Router && typeof window.Router.go === 'function') {
           window.Router.go('sasaranList');
         }
         return;
       }
 
-      if (!options.skipRoute && window.Router && typeof window.Router.go === 'function') {
-        var selectedClone = normalizeSelectedSasaran(selected);
-        window.Router.go('pendampingan', {
-          onRouteReady: function () {
-            if (window.PendampinganView && typeof window.PendampinganView.openCreate === 'function') {
-              window.PendampinganView.openCreate(selectedClone, {
-                skipRoute: true,
-                silent: true
-              });
-            }
+      var selectedId = selected.id_sasaran || selected.id || '';
+      var jenis = selected.jenis_sasaran || '';
+      var signature = buildOpenSignature('create', selectedId, jenis);
+
+      if (!opts.skipRoute && !isPendampinganScreenActive()) {
+        goToPendampinganRoute(function () {
+          if (window.PendampinganView && typeof window.PendampinganView.openCreate === 'function') {
+            window.PendampinganView.openCreate(selected, {
+              skipRoute: true,
+              force: opts.force === true
+            });
           }
         });
         return;
       }
 
+      if (this._isOpening && this._lastOpenSignature === signature && !opts.force) {
+        return;
+      }
+
+      this._isOpening = true;
+      this._lastOpenSignature = signature;
+
       var openToken = ++currentOpenToken;
-      setSelectedSasaran(selected);
-      setMode('create');
-      clearEditItem();
 
-      this.resetForm();
-      this.applyModeUI();
-      this.renderHeader(selected);
-      this.prefillIdentity();
-      this.renderValidation();
+      try {
+        setSelectedSasaran(selected);
+        setMode('create');
+        clearEditItem();
 
-      await this.loadDynamicFields(selected.jenis_sasaran || '', {});
-      if (openToken !== currentOpenToken) return;
+        this.resetForm();
+        this.applyModeUI();
+        this.renderHeader(normalizeHeaderItem(selected));
+        this.prefillIdentity();
 
-      this.tryLoadDraftForSelected();
-      this.renderValidation();
+        await this.loadDynamicFields(jenis, {
+          openToken: openToken
+        });
+
+        if (openToken !== currentOpenToken) return;
+
+        this.tryLoadDraftForSelected();
+        this.renderValidation();
+      } finally {
+        if (openToken === currentOpenToken) {
+          this._isOpening = false;
+        }
+      }
     },
 
     openEditById: async function (idPendampingan, options) {
       this.init();
-      options = options || {};
 
+      var opts = options || {};
       if (!idPendampingan) {
         showToast('ID pendampingan tidak ditemukan.', 'warning');
         return;
       }
 
+      var signature = buildOpenSignature('edit', idPendampingan, '');
+      if (!opts.skipRoute && !isPendampinganScreenActive()) {
+        goToPendampinganRoute(function () {
+          if (window.PendampinganView && typeof window.PendampinganView.openEditById === 'function') {
+            window.PendampinganView.openEditById(idPendampingan, {
+              skipRoute: true,
+              force: opts.force === true
+            });
+          }
+        });
+        return;
+      }
+
+      if (this._isOpening && this._lastOpenSignature === signature && !opts.force) {
+        return;
+      }
+
+      this._isOpening = true;
+      this._lastOpenSignature = signature;
+
+      var openToken = ++currentOpenToken;
       var api = getApi();
       var action = getActionName('GET_PENDAMPINGAN_BY_ID', 'getPendampinganById');
 
@@ -821,8 +853,10 @@
           id_pendampingan: idPendampingan
         }, {
           includeAuth: true,
-          timeoutMs: 8000
+          timeoutMs: 12000
         });
+
+        if (openToken !== currentOpenToken) return;
 
         if (!result || result.ok === false) {
           throw new Error((result && result.message) || 'Gagal memuat detail pendampingan.');
@@ -838,7 +872,7 @@
         setEditItem(item);
 
         var selected = getSelectedSasaran() || {};
-        var headerItem = normalizeSelectedSasaran({
+        var headerItem = normalizeHeaderItem({
           id_sasaran: item.id_sasaran || '',
           id: item.id_sasaran || '',
           nama_sasaran: item.nama_sasaran || '',
@@ -847,7 +881,7 @@
           nama_wilayah:
             item.nama_wilayah ||
             selected.nama_wilayah ||
-            [selected.nama_dusun, selected.nama_desa, selected.nama_kecamatan].filter(Boolean).join(' • '),
+            [selected.nama_dusun, selected.nama_desa, selected.nama_kecamatan].filter(Boolean).join(' / '),
           nama_kecamatan: item.nama_kecamatan || selected.nama_kecamatan || '',
           nama_desa: item.nama_desa || selected.nama_desa || '',
           nama_dusun: item.nama_dusun || selected.nama_dusun || ''
@@ -855,31 +889,31 @@
 
         setSelectedSasaran(headerItem);
 
-        if (!options.skipRoute && window.Router && typeof window.Router.go === 'function') {
-          window.Router.go('pendampingan', {
-            onRouteReady: function () {
-              if (window.PendampinganView && typeof window.PendampinganView.openEditById === 'function') {
-                window.PendampinganView.openEditById(idPendampingan, { skipRoute: true });
-              }
-            }
-          });
-          return;
-        }
-
         this.resetForm();
         this.applyModeUI();
         this.renderHeader(headerItem);
-        await this.loadDynamicFields(item.jenis_sasaran || '', item.extra_fields || parseJsonSafely(item.extra_fields_json, {}));
+
+        await this.loadDynamicFields(item.jenis_sasaran || '', {
+          openToken: openToken,
+          force: false
+        });
+
+        if (openToken !== currentOpenToken) return;
+
         this.fillForm(item);
         this.fillDynamicFields(item.extra_fields || parseJsonSafely(item.extra_fields_json, {}));
         this.renderValidation();
       } catch (err) {
         showToast((err && err.message) || 'Gagal membuka mode edit pendampingan.', 'error');
+      } finally {
+        if (openToken === currentOpenToken) {
+          this._isOpening = false;
+        }
       }
     },
 
     openEdit: async function (idPendampingan, options) {
-      return this.openEditById(idPendampingan, options);
+      return this.openEditById(idPendampingan, options || {});
     },
 
     applyModeUI: function () {
@@ -906,21 +940,21 @@
 
     renderHeader: function (item) {
       var profile = getProfile();
-      var safeItem = normalizeSelectedSasaran(item || {});
+      var safeItem = item || {};
       var status = safeItem.status_sasaran || safeItem.status || '-';
 
       var wilayah =
         safeItem.nama_wilayah ||
         safeItem.wilayah ||
-        [safeItem.nama_dusun, safeItem.nama_desa, safeItem.nama_kecamatan].filter(Boolean).join(' • ') ||
+        [safeItem.nama_dusun, safeItem.nama_desa, safeItem.nama_kecamatan].filter(Boolean).join(' / ') ||
         '-';
 
-      setText('pendampingan-nama-sasaran', normalizeName(safeItem.nama_sasaran || safeItem.nama || '-'));
+      setText('pendampingan-nama-sasaran', safeItem.nama_sasaran || safeItem.nama || '-');
       setText('pendampingan-id-sasaran', 'ID Sasaran: ' + (safeItem.id_sasaran || safeItem.id || '-'));
       setText('pendampingan-jenis', safeItem.jenis_sasaran || '-');
       setText('pendampingan-wilayah', wilayah);
       setText('pendampingan-kader', profile.nama_kader || profile.nama || '-');
-      setText('pendampingan-tim', profile.nama_tim || profile.nomor_tim || profile.id_tim || '-');
+      setText('pendampingan-tim', profile.nama_tim || profile.id_tim || '-');
 
       var badge = byId('pendampingan-status-badge');
       if (badge) {
@@ -936,11 +970,14 @@
       }
     },
 
-    loadDynamicFields: async function (jenisSasaran, initialValues) {
+    loadDynamicFields: async function (jenisSasaran, options) {
+      var opts = options || {};
       var key = String(jenisSasaran || '').toUpperCase();
-      var values = initialValues && typeof initialValues === 'object' ? initialValues : {};
+      var formId = getFormIdByJenis(key);
+      var formKey = formId + ':' + key;
 
       if (!key) {
+        currentJenisSasaran = '';
         currentDynamicFields = [];
         setHTML(
           'pendampingan-dynamic-fields',
@@ -949,50 +986,87 @@
         return;
       }
 
-      if (PENDAMPINGAN_FORM_CACHE[key]) {
-        renderDynamicFieldInputs(PENDAMPINGAN_FORM_CACHE[key], values);
+      if (!opts.force && currentJenisSasaran === key && currentDynamicFields.length) {
         return;
       }
 
-      var cachedLocal = readFormCacheLocal(key);
-      if (cachedLocal && cachedLocal.length) {
-        PENDAMPINGAN_FORM_CACHE[key] = cachedLocal;
-        renderDynamicFieldInputs(cachedLocal, values);
+      currentJenisSasaran = key;
+      var formLoadToken = ++currentFormLoadToken;
+
+      if (!opts.force && PENDAMPINGAN_FORM_CACHE[formKey]) {
+        renderDynamicFieldInputs(PENDAMPINGAN_FORM_CACHE[formKey], {});
         return;
       }
+
+      var cachedLocal = !opts.force ? getFormCacheLocal(formKey) : null;
+      if (cachedLocal && cachedLocal.length) {
+        PENDAMPINGAN_FORM_CACHE[formKey] = cachedLocal;
+        renderDynamicFieldInputs(cachedLocal, {});
+        return;
+      }
+
+      setHTML(
+        'pendampingan-dynamic-fields',
+        '<p class="muted-text">Field pendampingan sedang dimuat...</p>'
+      );
 
       var api = getApi();
-      var action = getActionName('GET_FORM_DEFINITION', 'getFormDefinition');
+      if (!api || typeof api.post !== 'function') {
+        var fallbackNoApi = getFallbackFields(key);
+        PENDAMPINGAN_FORM_CACHE[formKey] = fallbackNoApi;
+        setFormCacheLocal(formKey, fallbackNoApi);
+        renderDynamicFieldInputs(fallbackNoApi, {});
+        return;
+      }
+
+      var fields = null;
+      var specificAction = getActionName('GET_PENDAMPINGAN_FORM_DEFINITION', 'getPendampinganFormDefinition');
+      var generalAction = getActionName('GET_FORM_DEFINITION', 'getFormDefinition');
 
       try {
-        if (!api || typeof api.post !== 'function') {
-          throw new Error('Api.post belum tersedia.');
-        }
-
-        setHTML(
-          'pendampingan-dynamic-fields',
-          '<p class="muted-text">Memuat pertanyaan pendampingan...</p>'
-        );
-
-        var result = await api.post(action, {
+        var result = await api.post(specificAction, {
           jenis_sasaran: key,
-          form_id: getFormIdByJenis(key),
-          form_type: 'PENDAMPINGAN'
+          form_id: formId
         }, {
           includeAuth: true,
-          timeoutMs: 8000
+          timeoutMs: 12000
         });
 
-        var fields = normalizeDynamicFieldsResponse(result && result.data, key);
-        PENDAMPINGAN_FORM_CACHE[key] = fields;
-        saveFormCacheLocal(key, fields);
-        renderDynamicFieldInputs(fields, values);
-      } catch (err) {
-        var fallback = getFallbackFields(key);
-        PENDAMPINGAN_FORM_CACHE[key] = fallback;
-        saveFormCacheLocal(key, fallback);
-        renderDynamicFieldInputs(fallback, values);
+        if (formLoadToken !== currentFormLoadToken) return;
+
+        if (result && result.ok !== false) {
+          fields = normalizeDynamicFieldsResponse(result && result.data, key);
+        }
+      } catch (err) {}
+
+      if (!fields || !fields.length) {
+        try {
+          var result2 = await api.post(generalAction, {
+            jenis_sasaran: key,
+            form_id: formId,
+            form_type: 'PENDAMPINGAN'
+          }, {
+            includeAuth: true,
+            timeoutMs: 12000
+          });
+
+          if (formLoadToken !== currentFormLoadToken) return;
+
+          if (result2 && result2.ok !== false) {
+            fields = normalizeDynamicFieldsResponse(result2 && result2.data, key);
+          }
+        } catch (err2) {}
       }
+
+      if (!fields || !fields.length) {
+        fields = getFallbackFields(key);
+      }
+
+      PENDAMPINGAN_FORM_CACHE[formKey] = fields;
+      setFormCacheLocal(formKey, fields);
+
+      if (formLoadToken !== currentFormLoadToken) return;
+      renderDynamicFieldInputs(fields, {});
     },
 
     fillForm: function (item) {
@@ -1019,7 +1093,7 @@
     },
 
     collectFormData: function () {
-      var selected = normalizeSelectedSasaran(getSelectedSasaran() || {});
+      var selected = getSelectedSasaran() || {};
       var profile = getProfile() || {};
       var editItem = getEditItem() || {};
       var mode = getMode();
@@ -1124,6 +1198,7 @@
       if (form) form.reset();
 
       currentDynamicFields = [];
+      currentJenisSasaran = '';
 
       setHTML(
         'pendampingan-dynamic-fields',
@@ -1180,7 +1255,9 @@
         ['btn-back-from-pendampingan', function () {
           var selected = getSelectedSasaran();
           if (selected && (selected.id_sasaran || selected.id) && window.SasaranDetailView && typeof window.SasaranDetailView.open === 'function') {
-            window.SasaranDetailView.open(selected.id_sasaran || selected.id);
+            window.SasaranDetailView.open(selected.id_sasaran || selected.id, {
+              skipRoute: false
+            });
             return;
           }
 
@@ -1198,7 +1275,6 @@
           self.applyModeUI();
           self.prefillIdentity();
           self.renderValidation();
-          self.loadDynamicFields((getSelectedSasaran() || {}).jenis_sasaran || '', {});
         }]
       ].forEach(function (entry) {
         var btn = byId(entry[0]);
@@ -1315,7 +1391,7 @@
           includeAuth: true,
           clientSubmitId: payload.client_submit_id || '',
           syncSource: 'ONLINE',
-          timeoutMs: 10000
+          timeoutMs: 15000
         });
 
         if (!result || result.ok === false) {
@@ -1331,7 +1407,6 @@
 
         if (selectedId && window.SasaranDetailView && typeof window.SasaranDetailView.open === 'function') {
           await window.SasaranDetailView.open(selectedId, {
-            selected: currentSelected,
             forceRefresh: true
           });
         } else if (window.Router && typeof window.Router.go === 'function') {
