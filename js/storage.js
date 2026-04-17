@@ -1,205 +1,204 @@
+/*!
+ * storage.js — Spesifikasi Implementasi Tahap 1
+ * Project: TPK Kabupaten Buleleng
+ *
+ * TUJUAN
+ * - Menjadi wrapper localStorage yang aman, ringan, dan terkontrol.
+ * - Menyimpan hanya data kecil / preferensi UI / pointer sesi ringan.
+ * - Tidak dipakai untuk draft besar, queue, cache daftar, atau payload operasional.
+ *
+ * YANG BOLEH DISIMPAN DI SINI
+ * - device_id
+ * - preferensi UI (dark mode, ukuran teks, tab aktif tertentu)
+ * - pointer sesi ringan / flag bootstrap
+ * - cache key kecil / timestamp
+ *
+ * YANG TIDAK BOLEH DISIMPAN DI SINI
+ * - daftar sasaran besar
+ * - payload registrasi / pendampingan
+ * - queue sinkronisasi
+ * - audit log lokal
+ * - cache bootstrap besar
+ *
+ * KEBIJAKAN
+ * - Semua key diberi namespace APP.
+ * - Semua operasi JSON aman terhadap parse error.
+ * - Ada fungsi clearSensitive() dan clearAllTPK() untuk logout/reset.
+ * - Wajib graceful bila storage penuh / browser private mode.
+ */
+
 (function (window) {
   'use strict';
 
-  var BOOTSTRAP_LITE_KEY = 'tpk_bootstrap_lite';
+  const StorageHelper = {
+    /**
+     * Namespace final disarankan dibentuk dari APP_CONFIG.APP_CODE atau APP_NAME pendek.
+     * Contoh:
+     *   TPK::ui.text_scale
+     *   TPK::session.pointer
+     */
+    namespace: 'TPK',
 
-  function getConfig() {
-    return window.APP_CONFIG || {};
-  }
+    /**
+     * Public key map minimal untuk konsistensi.
+     * Integrasikan dengan APP_CONFIG.STORAGE_KEYS bila sudah ada.
+     */
+    KEYS: {
+      DEVICE_ID: 'device_id',
+      SESSION_POINTER: 'session.pointer',
+      UI_PREFS: 'ui.prefs',
+      UI_TEXT_SCALE: 'ui.text_scale',
+      UI_DARK_MODE: 'ui.dark_mode',
+      BOOTSTRAP_STAMP: 'bootstrap.stamp',
+      APP_VERSION_SEEN: 'app.version_seen'
+    },
 
-  function getStorageKeys() {
-    return getConfig().STORAGE_KEYS || {};
-  }
+    /**
+     * @param {string} key
+     * @returns {string}
+     */
+    toKey(key) {
+      return `${this.namespace}::${key}`;
+    },
 
-  function isDebugEnabled() {
-    return !!getConfig().DEBUG;
-  }
-
-  function debugWarn() {
-    if (!isDebugEnabled()) return;
-    try {
-      console.warn.apply(console, arguments);
-    } catch (err) {}
-  }
-
-  function normalizeKey(key) {
-    return String(key || '').trim();
-  }
-
-  function safeParse(raw, fallback) {
-    if (raw === null || raw === undefined || raw === '') {
-      return fallback;
-    }
-
-    try {
-      return JSON.parse(raw);
-    } catch (err) {
-      return fallback;
-    }
-  }
-
-  function safeStringify(value) {
-    return JSON.stringify(value);
-  }
-
-  function getBootstrapLiteKey() {
-    return BOOTSTRAP_LITE_KEY;
-  }
-
-  const Storage = {
-    isAvailable() {
+    /**
+     * Set value string.
+     * Harus dibungkus try/catch agar aman bila quota exceeded.
+     * @param {string} key
+     * @param {string} value
+     * @returns {boolean}
+     */
+    set(key, value) {
       try {
-        const testKey = '__tpk_storage_test__';
-        window.localStorage.setItem(testKey, '1');
-        window.localStorage.removeItem(testKey);
+        window.localStorage.setItem(this.toKey(key), String(value));
         return true;
       } catch (err) {
+        console.warn('[StorageHelper.set] gagal:', key, err);
         return false;
       }
     },
 
-    get(key, fallback) {
-      const normalizedKey = normalizeKey(key);
-      const defaultValue = arguments.length >= 2 ? fallback : null;
-
+    /**
+     * Get raw string.
+     * @param {string} key
+     * @param {string|null} fallback
+     * @returns {string|null}
+     */
+    get(key, fallback = null) {
       try {
-        if (!normalizedKey || !this.isAvailable()) {
-          return defaultValue;
-        }
-
-        const raw = window.localStorage.getItem(normalizedKey);
-        return safeParse(raw, defaultValue);
+        const value = window.localStorage.getItem(this.toKey(key));
+        return value == null ? fallback : value;
       } catch (err) {
-        debugWarn('Storage.get gagal:', normalizedKey, err && err.message ? err.message : err);
-        return defaultValue;
+        console.warn('[StorageHelper.get] gagal:', key, err);
+        return fallback;
       }
     },
 
-    set(key, value) {
-      const normalizedKey = normalizeKey(key);
-
+    /**
+     * Set JSON safely.
+     * @param {string} key
+     * @param {any} value
+     * @returns {boolean}
+     */
+    setJSON(key, value) {
       try {
-        if (!normalizedKey || !this.isAvailable()) {
-          return value;
-        }
-
-        window.localStorage.setItem(normalizedKey, safeStringify(value));
-        return value;
+        return this.set(key, JSON.stringify(value));
       } catch (err) {
-        debugWarn('Storage.set gagal:', normalizedKey, err && err.message ? err.message : err);
-        return value;
+        console.warn('[StorageHelper.setJSON] gagal:', key, err);
+        return false;
       }
     },
 
+    /**
+     * Get JSON safely.
+     * @param {string} key
+     * @param {any} fallback
+     * @returns {any}
+     */
+    getJSON(key, fallback = null) {
+      const raw = this.get(key, null);
+      if (raw == null || raw === '') return fallback;
+      try {
+        return JSON.parse(raw);
+      } catch (err) {
+        console.warn('[StorageHelper.getJSON] parse gagal:', key, err);
+        return fallback;
+      }
+    },
+
+    /**
+     * Remove one key.
+     * @param {string} key
+     * @returns {boolean}
+     */
     remove(key) {
-      const normalizedKey = normalizeKey(key);
-
       try {
-        if (!normalizedKey || !this.isAvailable()) {
-          return;
-        }
-
-        window.localStorage.removeItem(normalizedKey);
+        window.localStorage.removeItem(this.toKey(key));
+        return true;
       } catch (err) {
-        debugWarn('Storage.remove gagal:', normalizedKey, err && err.message ? err.message : err);
-      }
-    },
-
-    has(key) {
-      const normalizedKey = normalizeKey(key);
-
-      try {
-        if (!normalizedKey || !this.isAvailable()) {
-          return false;
-        }
-
-        return window.localStorage.getItem(normalizedKey) !== null;
-      } catch (err) {
+        console.warn('[StorageHelper.remove] gagal:', key, err);
         return false;
       }
     },
 
-    getProfile(fallback) {
-      const keys = getStorageKeys();
-      return this.get(keys.PROFILE || 'tpk_profile', fallback || {});
+    /**
+     * Check existence.
+     * @param {string} key
+     * @returns {boolean}
+     */
+    has(key) {
+      return this.get(key, null) != null;
     },
 
-    setProfile(value) {
-      const keys = getStorageKeys();
-      return this.set(keys.PROFILE || 'tpk_profile', value || {});
+    /**
+     * Clear hanya key sensitif yang memang tersimpan ringan.
+     * Dipanggil saat logout.
+     */
+    clearSensitive() {
+      this.remove(this.KEYS.SESSION_POINTER);
+      this.remove(this.KEYS.BOOTSTRAP_STAMP);
     },
 
-    getBootstrapLite(fallback) {
-      return this.get(getBootstrapLiteKey(), fallback || {});
+    /**
+     * Clear semua namespace TPK saja, tanpa menyentuh aplikasi lain.
+     * Dipakai untuk "Reset cache ringan" versi baru yang lebih terkendali.
+     */
+    clearAllTPK() {
+      try {
+        const keysToRemove = [];
+        for (let i = 0; i < window.localStorage.length; i += 1) {
+          const key = window.localStorage.key(i);
+          if (key && key.startsWith(`${this.namespace}::`)) {
+            keysToRemove.push(key);
+          }
+        }
+        keysToRemove.forEach((key) => window.localStorage.removeItem(key));
+        return true;
+      } catch (err) {
+        console.warn('[StorageHelper.clearAllTPK] gagal:', err);
+        return false;
+      }
     },
 
-    setBootstrapLite(value) {
-      return this.set(getBootstrapLiteKey(), value || {});
-    },
-
-    removeBootstrapLite() {
-      this.remove(getBootstrapLiteKey());
-    },
-
-    clearSession() {
-      const keys = getStorageKeys();
-
-      [
-        keys.SESSION_TOKEN,
-        keys.PROFILE,
-        getBootstrapLiteKey()
-      ].filter(Boolean).forEach((key) => this.remove(key));
-    },
-
-    clearDrafts() {
-      const keys = getStorageKeys();
-
-      [
-        keys.SYNC_QUEUE,
-        keys.REGISTRASI_DRAFT,
-        keys.PENDAMPINGAN_DRAFT,
-        'tpk_registrasi_draft',
-        'tpk_pendampingan_draft'
-      ].filter(Boolean).forEach((key) => this.remove(key));
-    },
-
-    clearRuntimeCache() {
-      const keys = getStorageKeys();
-
-      [
-        keys.APP_BOOTSTRAP,
-        keys.SELECTED_SASARAN,
-        keys.SASARAN_CACHE,
-        keys.BOOTSTRAP,
-        keys.DASHBOARD_CACHE,
-        keys.EDIT_PENDAMPINGAN,
-        getBootstrapLiteKey(),
-        'tpk_dashboard_cache',
-        'tpk_edit_pendampingan'
-      ].filter(Boolean).forEach((key) => this.remove(key));
-    },
-
-    clearSyncData() {
-      const keys = getStorageKeys();
-
-      [
-        keys.SYNC_QUEUE,
-        keys.LAST_SYNC_AT
-      ].filter(Boolean).forEach((key) => this.remove(key));
-    },
-
-    clearAppData() {
-      this.clearSession();
-      this.clearDrafts();
-      this.clearRuntimeCache();
-      this.clearSyncData();
-    },
-
-    getBootstrapLiteKey() {
-      return getBootstrapLiteKey();
+    /**
+     * Debug helper.
+     * Jangan tampilkan nilai sensitif ke UI produksi.
+     */
+    dumpKeys() {
+      const out = [];
+      try {
+        for (let i = 0; i < window.localStorage.length; i += 1) {
+          const key = window.localStorage.key(i);
+          if (key && key.startsWith(`${this.namespace}::`)) {
+            out.push(key);
+          }
+        }
+      } catch (err) {
+        console.warn('[StorageHelper.dumpKeys] gagal:', err);
+      }
+      return out;
     }
   };
 
-  window.Storage = Storage;
-  window.StorageHelper = Storage;
+  window.StorageHelper = StorageHelper;
 })(window);
