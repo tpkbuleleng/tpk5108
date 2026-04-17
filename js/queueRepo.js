@@ -1,29 +1,11 @@
-/*!
- * queueRepo.js — Spesifikasi Implementasi Tahap 1
- * Project: TPK Kabupaten Buleleng
- *
- * TUJUAN
- * - Menjadi satu-satunya pintu mutasi sync_queue.
- * - Menstandarkan schema item queue.
- * - Menyediakan operasi add / get pending / mark processing / success / fail / conflict.
- *
- * STATUS FINAL
- * - PENDING
- * - PROCESSING
- * - SUCCESS
- * - FAILED
- * - CONFLICT
- * - DUPLICATE
- *
- * CATATAN
- * - Registrasi dan pendampingan jangan menulis langsung ke IndexedDB.
- * - Semuanya lewat QueueRepo agar format seragam.
- */
-
 (function (window) {
   'use strict';
 
-  const STATUS = {
+  if (!window.TpkDb) {
+    throw new Error('queueRepo.js requires db.js to be loaded first.');
+  }
+
+  const QUEUE_STATUS = {
     PENDING: 'PENDING',
     PROCESSING: 'PROCESSING',
     SUCCESS: 'SUCCESS',
@@ -32,189 +14,171 @@
     DUPLICATE: 'DUPLICATE'
   };
 
-  function nowIso() {
-    return new Date().toISOString();
-  }
-
-  function createId(prefix) {
-    return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-  }
-
   const QueueRepo = {
-    STATUS,
+    STATUS: QUEUE_STATUS,
 
-    /**
-     * Schema item queue final tahap 1.
-     */
-    createItem(input) {
-      return {
-        queue_id: input.queue_id || createId('Q'),
-        action: input.action || '',
-        entity_type: input.entity_type || '',
-        entity_id_local: input.entity_id_local || null,
-        client_submit_id: input.client_submit_id || null,
-        payload: input.payload || {},
-        status: input.status || STATUS.PENDING,
-        retry_count: Number(input.retry_count || 0),
-        last_error: input.last_error || null,
-        created_at: input.created_at || nowIso(),
-        updated_at: input.updated_at || nowIso(),
-        id_user: input.id_user || null,
-        id_tim: input.id_tim || null,
-        device_id: input.device_id || null,
-        app_version: input.app_version || null
+    async enqueue(item) {
+      const now = window.TpkDb.nowIso();
+      const payload = item && item.payload ? item.payload : {};
+      const queueItem = {
+        queue_id: (item && item.queue_id) || window.TpkDb.makeId('QUE'),
+        action: (item && item.action) || '',
+        entity_type: (item && item.entity_type) || '',
+        entity_id_local: (item && item.entity_id_local) || '',
+        client_submit_id: (item && item.client_submit_id) || window.TpkDb.makeId('SUB'),
+        payload,
+        status: QUEUE_STATUS.PENDING,
+        retry_count: Number((item && item.retry_count) || 0),
+        last_error: '',
+        created_at: (item && item.created_at) || now,
+        updated_at: now,
+        id_user: (item && item.id_user) || '',
+        id_tim: (item && item.id_tim) || '',
+        device_id: (item && item.device_id) || '',
+        app_version: (item && item.app_version) || ''
       };
-    },
 
-    async add(input) {
-      const item = this.createItem(input);
-      await window.LocalDb.put(window.LocalDb.STORES.SYNC_QUEUE, item);
-      return item;
+      const existing = await window.TpkDb.findOneByIndex(
+        window.TpkDb.STORES.SYNC_QUEUE,
+        'by_client_submit_id',
+        queueItem.client_submit_id
+      );
+      if (existing) return existing;
+
+      const saved = await window.TpkDb.put(window.TpkDb.STORES.SYNC_QUEUE, queueItem);
+      await window.TpkDb.putAudit('QUEUE_ENQUEUED', JSON.stringify({
+        queue_id: saved.queue_id,
+        action: saved.action,
+        client_submit_id: saved.client_submit_id
+      }));
+      return saved;
     },
 
     async getById(queueId) {
-      return window.LocalDb.get(window.LocalDb.STORES.SYNC_QUEUE, queueId);
+      return window.TpkDb.get(window.TpkDb.STORES.SYNC_QUEUE, queueId);
     },
 
-    async getAll() {
-      return window.LocalDb.getAll(window.LocalDb.STORES.SYNC_QUEUE);
+    async listByStatus(status) {
+      return window.TpkDb.getAllByIndex(window.TpkDb.STORES.SYNC_QUEUE, 'by_status', status);
     },
 
-    async getByStatus(status) {
-      return window.LocalDb.getAllByIndex(window.LocalDb.STORES.SYNC_QUEUE, 'status', status);
-    },
-
-    /**
-     * Ambil batch PENDING tertua.
-     * Tahap 1 cukup sort in-memory.
-     * Tahap 2 bisa ditingkatkan dengan cursor/pagination.
-     */
-    async getPendingBatch(limit = 10) {
-      const rows = await this.getByStatus(STATUS.PENDING);
-      return (rows || [])
-        .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)))
-        .slice(0, limit);
+    async getPending(limit) {
+      return window.TpkDb.getPendingQueue(limit);
     },
 
     async markProcessing(queueId) {
-      const item = await this.getById(queueId);
-      if (!item) return null;
-
-      item.status = STATUS.PROCESSING;
-      item.updated_at = nowIso();
-
-      await window.LocalDb.put(window.LocalDb.STORES.SYNC_QUEUE, item);
-      return item;
+      return this.updateStatus(queueId, QUEUE_STATUS.PROCESSING, { last_error: '' });
     },
 
-    async markSuccess(queueId, resultMeta = {}) {
-      const item = await this.getById(queueId);
-      if (!item) return null;
-
-      item.status = STATUS.SUCCESS;
-      item.last_error = null;
-      item.updated_at = nowIso();
-
-      await window.LocalDb.put(window.LocalDb.STORES.SYNC_QUEUE, item);
-      await this.logResult(queueId, STATUS.SUCCESS, resultMeta);
-      return item;
+    async markSuccess(queueId, responseSummary) {
+      const updated = await this.updateStatus(queueId, QUEUE_STATUS.SUCCESS, { last_error: '' });
+      await this.appendResultLog(queueId, QUEUE_STATUS.SUCCESS, responseSummary);
+      return updated;
     },
 
-    async markDuplicate(queueId, resultMeta = {}) {
-      const item = await this.getById(queueId);
-      if (!item) return null;
-
-      item.status = STATUS.DUPLICATE;
-      item.last_error = null;
-      item.updated_at = nowIso();
-
-      await window.LocalDb.put(window.LocalDb.STORES.SYNC_QUEUE, item);
-      await this.logResult(queueId, STATUS.DUPLICATE, resultMeta);
-      return item;
+    async markFailed(queueId, errorMessage) {
+      const current = await this.getById(queueId);
+      const retryCount = Number((current && current.retry_count) || 0) + 1;
+      const updated = await this.updateStatus(queueId, QUEUE_STATUS.FAILED, {
+        retry_count: retryCount,
+        last_error: String(errorMessage || 'Unknown error')
+      });
+      await this.appendResultLog(queueId, QUEUE_STATUS.FAILED, errorMessage);
+      return updated;
     },
 
-    async markConflict(queueId, resultMeta = {}) {
-      const item = await this.getById(queueId);
-      if (!item) return null;
-
-      item.status = STATUS.CONFLICT;
-      item.updated_at = nowIso();
-      item.last_error = resultMeta?.message || 'Conflict detected';
-
-      await window.LocalDb.put(window.LocalDb.STORES.SYNC_QUEUE, item);
-      await this.logResult(queueId, STATUS.CONFLICT, resultMeta);
-      return item;
+    async markConflict(queueId, message) {
+      const updated = await this.updateStatus(queueId, QUEUE_STATUS.CONFLICT, {
+        last_error: String(message || 'Conflict detected')
+      });
+      await this.appendResultLog(queueId, QUEUE_STATUS.CONFLICT, message);
+      return updated;
     },
 
-    async markFailed(queueId, errorMessage, resultMeta = {}) {
-      const item = await this.getById(queueId);
-      if (!item) return null;
-
-      item.status = STATUS.FAILED;
-      item.retry_count = Number(item.retry_count || 0) + 1;
-      item.last_error = errorMessage || 'Unknown sync error';
-      item.updated_at = nowIso();
-
-      await window.LocalDb.put(window.LocalDb.STORES.SYNC_QUEUE, item);
-      await this.logResult(queueId, STATUS.FAILED, Object.assign({}, resultMeta, {
-        message: item.last_error
-      }));
-      return item;
+    async markDuplicate(queueId, message) {
+      const updated = await this.updateStatus(queueId, QUEUE_STATUS.DUPLICATE, {
+        last_error: String(message || 'Duplicate request')
+      });
+      await this.appendResultLog(queueId, QUEUE_STATUS.DUPLICATE, message);
+      return updated;
     },
 
-    async retry(queueId) {
-      const item = await this.getById(queueId);
-      if (!item) return null;
+    async requeue(queueId, message) {
+      const current = await this.getById(queueId);
+      const retryCount = Number((current && current.retry_count) || 0) + 1;
+      return this.updateStatus(queueId, QUEUE_STATUS.PENDING, {
+        retry_count: retryCount,
+        last_error: String(message || '')
+      });
+    },
 
-      item.status = STATUS.PENDING;
-      item.updated_at = nowIso();
-      await window.LocalDb.put(window.LocalDb.STORES.SYNC_QUEUE, item);
-      return item;
+    async updateStatus(queueId, status, patch) {
+      const updated = await window.TpkDb.update(window.TpkDb.STORES.SYNC_QUEUE, queueId, (current) => {
+        if (!current) return null;
+        return {
+          ...current,
+          ...(patch || {}),
+          status,
+          updated_at: window.TpkDb.nowIso()
+        };
+      });
+      if (updated) {
+        await window.TpkDb.putAudit('QUEUE_STATUS_UPDATED', JSON.stringify({
+          queue_id: queueId,
+          status: updated.status,
+          last_error: updated.last_error || ''
+        }));
+      }
+      return updated;
+    },
+
+    async appendResultLog(queueId, status, summary) {
+      return window.TpkDb.put(window.TpkDb.STORES.SYNC_RESULT_LOG, {
+        result_id: window.TpkDb.makeId('QLOG'),
+        queue_id: queueId,
+        status,
+        response_code: status,
+        message: typeof summary === 'string' ? summary : JSON.stringify(summary || {}),
+        created_at: window.TpkDb.nowIso(),
+        updated_at: window.TpkDb.nowIso()
+      });
+    },
+
+    async getCounts() {
+      const items = await window.TpkDb.getAll(window.TpkDb.STORES.SYNC_QUEUE);
+      return items.reduce((acc, item) => {
+        const key = String(item.status || '').toUpperCase();
+        if (!acc[key]) acc[key] = 0;
+        acc[key] += 1;
+        return acc;
+      }, {
+        PENDING: 0,
+        PROCESSING: 0,
+        SUCCESS: 0,
+        FAILED: 0,
+        CONFLICT: 0,
+        DUPLICATE: 0
+      });
     },
 
     async remove(queueId) {
-      return window.LocalDb.delete(window.LocalDb.STORES.SYNC_QUEUE, queueId);
+      return window.TpkDb.delete(window.TpkDb.STORES.SYNC_QUEUE, queueId);
     },
 
-    async countSummary() {
-      const rows = await this.getAll();
-      const out = {
-        total: 0,
-        pending: 0,
-        processing: 0,
-        success: 0,
-        failed: 0,
-        conflict: 0,
-        duplicate: 0
-      };
-
-      (rows || []).forEach((row) => {
-        out.total += 1;
-        switch (row.status) {
-          case STATUS.PENDING: out.pending += 1; break;
-          case STATUS.PROCESSING: out.processing += 1; break;
-          case STATUS.SUCCESS: out.success += 1; break;
-          case STATUS.FAILED: out.failed += 1; break;
-          case STATUS.CONFLICT: out.conflict += 1; break;
-          case STATUS.DUPLICATE: out.duplicate += 1; break;
-          default: break;
-        }
+    async pruneCompleted(maxAgeDays) {
+      const days = Number(maxAgeDays || 7);
+      const cutoffMs = Date.now() - (days * 24 * 60 * 60 * 1000);
+      const items = await window.TpkDb.getAll(window.TpkDb.STORES.SYNC_QUEUE);
+      const completed = items.filter((item) => {
+        const status = String(item.status || '').toUpperCase();
+        const stamp = new Date(item.updated_at || item.created_at || 0).getTime();
+        return ['SUCCESS', 'DUPLICATE'].includes(status) && stamp > 0 && stamp < cutoffMs;
       });
 
-      return out;
-    },
-
-    async logResult(queueId, status, resultMeta = {}) {
-      const record = {
-        result_id: createId('R'),
-        queue_id: queueId,
-        status,
-        response_code: resultMeta.code || null,
-        message: resultMeta.message || null,
-        created_at: nowIso()
-      };
-      await window.LocalDb.put(window.LocalDb.STORES.SYNC_RESULT_LOG, record);
-      return record;
+      for (const item of completed) {
+        await this.remove(item.queue_id);
+      }
+      return completed.length;
     }
   };
 

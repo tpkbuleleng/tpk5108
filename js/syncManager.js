@@ -1,99 +1,113 @@
-/*!
- * syncManager.js — Spesifikasi Implementasi Tahap 1
- * Project: TPK Kabupaten Buleleng
- *
- * TUJUAN
- * - Menjadi mesin sinkronisasi tunggal untuk queue offline.
- * - Tidak membiarkan 2 proses sync berjalan bersamaan.
- * - Menstandarkan cara membaca hasil backend:
- *   SUCCESS / DUPLICATE / CONFLICT / VALIDATION_ERROR / FAILED
- *
- * DEPENDENSI
- * - AppState
- * - QueueRepo
- * - Api (atau wrapper API aktif TPK)
- * - LocalDb (untuk audit tambahan bila diperlukan)
- *
- * ATURAN
- * - Jangan auto sync bila user belum login.
- * - Jangan sync saat offline.
- * - Batch kecil dulu, misal 3–10 item.
- * - Item gagal tidak boleh memblokir seluruh antrean.
- */
-
 (function (window) {
   'use strict';
 
+  if (!window.QueueRepo || !window.TpkDb) {
+    throw new Error('syncManager.js requires db.js and queueRepo.js to be loaded first.');
+  }
+
   const DEFAULT_BATCH_SIZE = 5;
-  const MAX_RETRY = 3;
+  let isSyncing = false;
+  let autoSyncBound = false;
+
+  function getBatchSize() {
+    const configValue = window.APP_CONFIG && window.APP_CONFIG.SYNC_BATCH_SIZE;
+    const value = Number(configValue || DEFAULT_BATCH_SIZE);
+    return Number.isFinite(value) && value > 0 ? value : DEFAULT_BATCH_SIZE;
+  }
+
+  function isOnline() {
+    return typeof navigator === 'undefined' ? true : navigator.onLine !== false;
+  }
+
+  function normalizeError(err) {
+    if (!err) return 'Unknown sync error';
+    if (typeof err === 'string') return err;
+    return err.message || 'Unknown sync error';
+  }
+
+  async function updateCountsState() {
+    if (!window.AppState) return;
+    const counts = await window.QueueRepo.getCounts();
+    window.AppState.setSync({
+      pending_count: counts.PENDING || 0,
+      processing_count: counts.PROCESSING || 0,
+      success_count: counts.SUCCESS || 0,
+      failed_count: counts.FAILED || 0,
+      conflict_count: counts.CONFLICT || 0,
+      duplicate_count: counts.DUPLICATE || 0
+    });
+  }
 
   const SyncManager = {
-    _isRunning: false,
-    _unbindOnlineHandler: null,
+    async initAutoSync() {
+      if (autoSyncBound) return;
+      autoSyncBound = true;
 
-    isRunning() {
-      return this._isRunning;
-    },
-
-    init() {
-      const handleOnline = () => {
-        this.syncNow({ reason: 'online' }).catch((err) => {
-          console.warn('[SyncManager.init] sync online gagal:', err);
+      window.addEventListener('online', () => {
+        this.start({ reason: 'online' }).catch((err) => {
+          console.warn('[SyncManager] Auto sync failed:', err);
         });
-      };
+      });
 
-      window.addEventListener('online', handleOnline);
-      this._unbindOnlineHandler = () => window.removeEventListener('online', handleOnline);
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible' && isOnline()) {
+          this.start({ reason: 'visibility' }).catch((err) => {
+            console.warn('[SyncManager] Visibility sync failed:', err);
+          });
+        }
+      });
+
+      await updateCountsState();
     },
 
-    destroy() {
-      if (this._unbindOnlineHandler) {
-        this._unbindOnlineHandler();
-        this._unbindOnlineHandler = null;
-      }
+    isSyncing() {
+      return isSyncing;
     },
 
-    canSync() {
-      const session = window.AppState?.session?.getState?.() || {};
-      return Boolean(session.is_authenticated) && window.navigator.onLine === true;
-    },
-
-    async syncNow(options = {}) {
-      if (this._isRunning) {
-        return { ok: false, skipped: true, reason: 'already_running' };
+    async start(options) {
+      if (isSyncing) {
+        return { ok: false, message: 'Sync already running' };
+      }
+      if (!isOnline()) {
+        await updateCountsState();
+        return { ok: false, message: 'Device is offline' };
+      }
+      if (!window.Api || typeof window.Api.post !== 'function') {
+        return { ok: false, message: 'Api.post is not available' };
       }
 
-      if (!this.canSync()) {
-        return { ok: false, skipped: true, reason: 'not_ready' };
+      isSyncing = true;
+      if (window.AppState) {
+        window.AppState.setSync({
+          is_syncing: true,
+          last_error: ''
+        });
       }
 
-      this._isRunning = true;
-      window.AppState?.sync?.setState({
-        is_syncing: true,
-        last_error: null
-      }, 'sync:start');
-
+      const results = [];
       try {
-        const batchSize = Number(options.batchSize || DEFAULT_BATCH_SIZE);
-        const items = await window.QueueRepo.getPendingBatch(batchSize);
+        const limit = Number((options && options.batchSize) || getBatchSize());
+        const queueItems = await window.QueueRepo.getPending(limit);
 
-        if (!items.length) {
-          await this.refreshSyncSummary();
-          return { ok: true, processed: 0, message: 'Tidak ada queue pending' };
-        }
-
-        const results = [];
-        for (const item of items) {
-          const result = await this.processOne(item);
+        for (const item of queueItems) {
+          const result = await this.processItem(item);
           results.push(result);
+
+          if (result && result.stopSync === true) {
+            break;
+          }
         }
 
-        await this.refreshSyncSummary();
+        await window.QueueRepo.pruneCompleted(7);
+        await updateCountsState();
 
-        window.AppState?.sync?.setState({
-          is_syncing: false,
-          last_sync_at: new Date().toISOString()
-        }, 'sync:done');
+        if (window.AppState) {
+          window.AppState.setSync({
+            is_syncing: false,
+            last_sync_at: window.TpkDb.nowIso(),
+            last_error: ''
+          });
+        }
 
         return {
           ok: true,
@@ -101,123 +115,102 @@
           results
         };
       } catch (err) {
-        window.AppState?.sync?.setState({
-          is_syncing: false,
-          last_error: String(err?.message || err || 'Sync gagal')
-        }, 'sync:error');
+        const message = normalizeError(err);
+        if (window.AppState) {
+          window.AppState.setSync({
+            is_syncing: false,
+            last_error: message
+          });
+        }
+        await window.TpkDb.putAudit('SYNC_FATAL_ERROR', message);
         throw err;
       } finally {
-        this._isRunning = false;
+        isSyncing = false;
       }
     },
 
-    async processOne(item) {
+    async processItem(item) {
       await window.QueueRepo.markProcessing(item.queue_id);
 
-      try {
-        const response = await this.dispatchQueueItem(item);
-
-        // Normalisasi status bisnis dari backend TPK.
-        const status = this.normalizeBusinessStatus(response);
-
-        if (status === 'SUCCESS') {
-          await window.QueueRepo.markSuccess(item.queue_id, {
-            code: response?.code || 200,
-            message: response?.message || 'Sukses'
-          });
-          return { queue_id: item.queue_id, status };
-        }
-
-        if (status === 'DUPLICATE') {
-          await window.QueueRepo.markDuplicate(item.queue_id, {
-            code: response?.code || 200,
-            message: response?.message || 'Duplicate aman'
-          });
-          return { queue_id: item.queue_id, status };
-        }
-
-        if (status === 'CONFLICT') {
-          await window.QueueRepo.markConflict(item.queue_id, {
-            code: response?.code || 409,
-            message: response?.message || 'Conflict'
-          });
-          return { queue_id: item.queue_id, status };
-        }
-
-        const failMessage = response?.message || 'Validasi/backend menolak data';
-        await this.handleFailure(item, failMessage, response?.code || 400);
-        return { queue_id: item.queue_id, status: 'FAILED' };
-      } catch (err) {
-        await this.handleFailure(item, String(err?.message || err || 'Sync error'), 0);
-        return { queue_id: item.queue_id, status: 'FAILED' };
-      }
-    },
-
-    async handleFailure(item, message, code) {
-      const current = await window.QueueRepo.getById(item.queue_id);
-      const retryCount = Number(current?.retry_count || 0);
-
-      if (retryCount >= MAX_RETRY) {
-        await window.QueueRepo.markFailed(item.queue_id, message, { code, message });
-        return;
-      }
-
-      await window.QueueRepo.markFailed(item.queue_id, message, { code, message });
-      // Tahap 1: tetap FAILED setelah percobaan gagal.
-      // Tahap 2: bisa dibedakan retryable vs non-retryable.
-    },
-
-    /**
-     * Mapping action queue ke endpoint backend.
-     * Contoh action:
-     * - submitRegistrasiSasaran
-     * - submitPendampingan
-     * - updateSasaran
-     * - updatePendampingan
-     */
-    async dispatchQueueItem(item) {
-      if (!window.Api || typeof window.Api.post !== 'function') {
-        throw new Error('Api.post belum tersedia');
-      }
-
-      const payload = Object.assign({}, item.payload || {});
       const meta = {
-        client_submit_id: item.client_submit_id || '',
-        device_id: item.device_id || '',
-        app_version: item.app_version || '',
-        sync_source: 'OFFLINE_QUEUE'
+        client_submit_id: item.client_submit_id,
+        device_id: item.device_id || (window.StorageHelper && window.StorageHelper.getDeviceId ? window.StorageHelper.getDeviceId() : ''),
+        app_version: item.app_version || (window.APP_CONFIG && window.APP_CONFIG.APP_VERSION) || '',
+        sync_source: 'OFFLINE_QUEUE',
+        request_time: window.TpkDb.nowIso()
       };
 
-      // Integrasi dengan Api.post aktif TPK.
-      // Bila signature/meta disusun otomatis oleh api.js, cukup kirim payload + overrides.
-      return window.Api.post(item.action, payload, meta);
+      try {
+        const response = await window.Api.post(item.action, item.payload, meta);
+        const status = String((response && response.status) || '').toLowerCase();
+        const code = Number((response && response.code) || 0);
+
+        if (status === 'success' || code === 200) {
+          await window.QueueRepo.markSuccess(item.queue_id, {
+            code: response.code,
+            message: response.message || 'Sync success'
+          });
+          await this.afterSuccess(item, response);
+          return { ok: true, queue_id: item.queue_id, status: 'SUCCESS', response };
+        }
+
+        if (status === 'duplicate') {
+          await window.QueueRepo.markDuplicate(item.queue_id, response.message || 'Duplicate request');
+          return { ok: true, queue_id: item.queue_id, status: 'DUPLICATE', response };
+        }
+
+        if (status === 'conflict' || code === 409) {
+          await window.QueueRepo.markConflict(item.queue_id, response.message || 'Conflict');
+          return { ok: false, queue_id: item.queue_id, status: 'CONFLICT', response };
+        }
+
+        if (status === 'validation_error' || code === 422 || code === 400) {
+          await window.QueueRepo.markFailed(item.queue_id, response.message || 'Validation error');
+          return { ok: false, queue_id: item.queue_id, status: 'FAILED', response };
+        }
+
+        if (code === 401 || code === 403) {
+          await window.QueueRepo.markFailed(item.queue_id, response.message || 'Unauthorized');
+          if (window.AppState) {
+            window.AppState.setSync({ last_error: response.message || 'Unauthorized sync request' });
+          }
+          return { ok: false, queue_id: item.queue_id, status: 'FAILED', stopSync: true, response };
+        }
+
+        await window.QueueRepo.requeue(item.queue_id, response.message || 'Retry later');
+        return { ok: false, queue_id: item.queue_id, status: 'REQUEUED', response };
+      } catch (err) {
+        const message = normalizeError(err);
+
+        if (/network|failed to fetch|offline/i.test(message)) {
+          await window.QueueRepo.requeue(item.queue_id, message);
+          return { ok: false, queue_id: item.queue_id, status: 'REQUEUED', stopSync: true, error: message };
+        }
+
+        await window.QueueRepo.markFailed(item.queue_id, message);
+        return { ok: false, queue_id: item.queue_id, status: 'FAILED', error: message };
+      } finally {
+        await updateCountsState();
+      }
     },
 
-    normalizeBusinessStatus(response) {
-      if (!response) return 'FAILED';
+    async afterSuccess(item, response) {
+      await window.TpkDb.putAudit('SYNC_ITEM_SUCCESS', JSON.stringify({
+        queue_id: item.queue_id,
+        action: item.action,
+        entity_type: item.entity_type,
+        message: response && response.message ? response.message : ''
+      }));
 
-      const code = Number(response.code || 0);
-      const rawStatus = String(response.status || '').toUpperCase();
-      const rawMessage = String(response.message || '').toUpperCase();
+      if (!item.entity_type) return;
 
-      if (rawStatus === 'SUCCESS' || code === 200) return 'SUCCESS';
-      if (rawStatus === 'DUPLICATE' || code === 208) return 'DUPLICATE';
-      if (rawStatus === 'CONFLICT' || code === 409) return 'CONFLICT';
-      if (rawStatus === 'VALIDATION_ERROR' || code === 422) return 'FAILED';
-      if (rawMessage.includes('DUPLICATE')) return 'DUPLICATE';
-      if (rawMessage.includes('CONFLICT')) return 'CONFLICT';
+      if (item.entity_type === 'REGISTRASI' && item.entity_id_local) {
+        await window.TpkDb.delete(window.TpkDb.STORES.DRAFT_REGISTRASI, item.entity_id_local);
+      }
 
-      return 'FAILED';
-    },
-
-    async refreshSyncSummary() {
-      const summary = await window.QueueRepo.countSummary();
-      window.AppState?.sync?.setState({
-        pending_count: summary.pending,
-        failed_count: summary.failed,
-        conflict_count: summary.conflict
-      }, 'sync:summary');
-      return summary;
+      if (item.entity_type === 'PENDAMPINGAN' && item.entity_id_local) {
+        await window.TpkDb.delete(window.TpkDb.STORES.DRAFT_PENDAMPINGAN, item.entity_id_local);
+      }
     }
   };
 
