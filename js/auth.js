@@ -1,20 +1,51 @@
+
 (function (window, document) {
   'use strict';
 
   var isLoginSubmitting = false;
   var isLogoutInProgress = false;
+  var delegatedBound = false;
 
-  function qs(id) {
+  function byId(id) {
     return document.getElementById(id);
   }
 
-  function qsAny(ids) {
-    var list = Array.isArray(ids) ? ids : [ids];
+  function firstMatch(selectors) {
+    var list = selectors || [];
     for (var i = 0; i < list.length; i += 1) {
-      var el = qs(list[i]);
+      var el = document.querySelector(list[i]);
       if (el) return el;
     }
     return null;
+  }
+
+  function getLoginForm() {
+    return firstMatch(['#loginForm', '#login-form']);
+  }
+
+  function getLoginUserInput() {
+    return firstMatch(['#loginIdUser', '#username', 'input[name="username"]']);
+  }
+
+  function getLoginPasswordInput() {
+    return firstMatch(['#loginPassword', '#password', 'input[name="password"]']);
+  }
+
+  function getLoginSubmitButton() {
+    return firstMatch(['#loginSubmitBtn', '#btn-login', '#login-form button[type="submit"]', '#loginForm button[type="submit"]']);
+  }
+
+  function getLogoutButtons() {
+    var nodes = Array.prototype.slice.call(document.querySelectorAll(
+      '#btn-logout, [data-action="logout"], button, a'
+    ));
+    return nodes.filter(function (node) {
+      if (!node) return false;
+      if (node.id === 'btn-logout') return true;
+      if ((node.getAttribute('data-action') || '').toLowerCase() === 'logout') return true;
+      var text = String(node.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
+      return text === 'keluar' || text === 'logout';
+    });
   }
 
   function getConfig() {
@@ -33,12 +64,6 @@
     return window.AppState || null;
   }
 
-  function setText(id, value) {
-    var el = qs(id);
-    if (!el) return;
-    el.textContent = (value === undefined || value === null || value === '') ? '-' : String(value);
-  }
-
   function normalizeDisplayText(value) {
     var text = String(value == null ? '' : value).replace(/\s+/g, ' ').trim();
     if (!text) return '';
@@ -49,6 +74,18 @@
     return text;
   }
 
+  function setText(id, value) {
+    var el = byId(id);
+    if (!el) return;
+    el.textContent = (value === undefined || value === null || value === '') ? '-' : String(value);
+  }
+
+  function setTextAliases(ids, value) {
+    (ids || []).forEach(function (id) {
+      setText(id, value);
+    });
+  }
+
   function parseWilayahDisplay(profile) {
     var data = profile || {};
     var wilayah = normalizeDisplayText(data.wilayah_tugas || data.wilayah || '');
@@ -57,7 +94,7 @@
     var kecamatan = normalizeDisplayText(data.nama_kecamatan || data.kecamatan || '');
 
     if (wilayah) {
-      var parts = wilayah.split(/\s*,\s*/).map(function(part) {
+      var parts = wilayah.split(/\s*,\s*/).map(function (part) {
         return String(part || '').trim();
       }).filter(Boolean);
 
@@ -71,12 +108,6 @@
       desa: desa || '-',
       dusun: dusun || '-'
     };
-  }
-
-  function setTextAliases(ids, value) {
-    (ids || []).forEach(function(id) {
-      setText(id, value);
-    });
   }
 
   function getDisplayNomorTim(data) {
@@ -101,17 +132,6 @@
     return 'tpk_bootstrap_lite';
   }
 
-  function getStoredBootstrapLite() {
-    var storage = getStorage();
-    if (storage && typeof storage.getBootstrapLite === 'function') {
-      return storage.getBootstrapLite({}) || {};
-    }
-    if (storage && typeof storage.get === 'function') {
-      return storage.get(getBootstrapLiteStorageKey(), {}) || {};
-    }
-    return {};
-  }
-
   function mergeProfileData(existingProfile, incomingProfile) {
     var existing = existingProfile && typeof existingProfile === 'object' ? existingProfile : {};
     var incoming = incomingProfile && typeof incomingProfile === 'object' ? incomingProfile : {};
@@ -130,6 +150,17 @@
     return merged;
   }
 
+  function getStoredBootstrapLite() {
+    var storage = getStorage();
+    if (storage && typeof storage.getBootstrapLite === 'function') {
+      return storage.getBootstrapLite({}) || {};
+    }
+    if (storage && typeof storage.get === 'function') {
+      return storage.get(getBootstrapLiteStorageKey(), {}) || {};
+    }
+    return {};
+  }
+
   function getStoredProfile() {
     var appState = getAppState();
     if (appState && typeof appState.getProfile === 'function') {
@@ -138,22 +169,19 @@
         return profileFromState;
       }
     }
-
     var storage = getStorage();
     var keys = getStorageKeys();
     var bootstrapLite = getStoredBootstrapLite();
     var bootstrapProfile = bootstrapLite && bootstrapLite.profile ? bootstrapLite.profile : {};
     var profileFromStorage = {};
-
     if (storage && typeof storage.get === 'function' && keys.PROFILE) {
       profileFromStorage = storage.get(keys.PROFILE, {}) || {};
     }
-
     return mergeProfileData(profileFromStorage, bootstrapProfile);
   }
 
   function showMessage(message, type) {
-    var box = qs('loginMessage');
+    var box = byId('loginMessage');
     if (!box) return;
     box.textContent = message || '';
     box.classList.remove('hidden', 'error', 'success');
@@ -161,7 +189,7 @@
   }
 
   function clearMessage() {
-    var box = qs('loginMessage');
+    var box = byId('loginMessage');
     if (!box) return;
     box.textContent = '';
     box.classList.add('hidden');
@@ -176,31 +204,6 @@
     try { console.log('[TOAST]', type || 'info', message); } catch (err) {}
   }
 
-  function getLoginForm() {
-    return qsAny(['loginForm', 'login-form']);
-  }
-
-  function getLoginIdInput() {
-    return qsAny(['loginIdUser', 'username']);
-  }
-
-  function getLoginPasswordInput() {
-    return qsAny(['loginPassword', 'password']);
-  }
-
-  function getLoginSubmitButton() {
-    return qsAny(['loginSubmitBtn', 'btn-login']);
-  }
-
-  function getLogoutButton() {
-    return qs('btn-logout') ||
-      document.querySelector('[data-action="logout"]') ||
-      Array.prototype.find.call(document.querySelectorAll('button, a'), function (el) {
-        return String(el.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase() === 'keluar';
-      }) ||
-      null;
-  }
-
   function setLoading(isLoading) {
     var btn = getLoginSubmitButton();
     if (!btn) return;
@@ -209,10 +212,12 @@
   }
 
   function setLogoutLoading(isLoading) {
-    var btn = getLogoutButton();
-    if (!btn) return;
-    btn.disabled = !!isLoading;
-    btn.textContent = isLoading ? 'Keluar...' : 'Keluar';
+    getLogoutButtons().forEach(function (btn) {
+      btn.disabled = !!isLoading;
+      if (btn.tagName === 'BUTTON' || btn.tagName === 'A') {
+        btn.textContent = isLoading ? 'Keluar...' : 'Keluar';
+      }
+    });
   }
 
   function normalizeIdUser(value) {
@@ -230,18 +235,16 @@
   }
 
   function setupLogo() {
-    var logo = qs('loginLogo');
+    var logo = byId('loginLogo');
     if (!logo) return;
     var config = getConfig();
-    var logoUrl = config.ASSETS && config.ASSETS.LOGO_URL
-      ? config.ASSETS.LOGO_URL
-      : './assets/img/logo.png';
+    var logoUrl = config.ASSETS && config.ASSETS.LOGO_URL ? config.ASSETS.LOGO_URL : './assets/img/logo.png';
     logo.src = logoUrl;
   }
 
   function setupPasswordToggle() {
     var passwordInput = getLoginPasswordInput();
-    var toggleBtn = qs('togglePasswordBtn');
+    var toggleBtn = byId('togglePasswordBtn');
     if (!passwordInput || !toggleBtn || toggleBtn.dataset.bound === '1') return;
     toggleBtn.dataset.bound = '1';
     toggleBtn.addEventListener('click', function () {
@@ -252,32 +255,16 @@
     });
   }
 
-  function stripSensitiveQueryParams() {
-    try {
-      var url = new URL(window.location.href);
-      var before = url.search;
-      ['username', 'password', 'id_user', 'pass'].forEach(function (key) {
-        url.searchParams.delete(key);
-      });
-      if (url.search !== before) {
-        var next = url.pathname + (url.search ? url.search : '') + (url.hash || '');
-        window.history.replaceState({}, document.title, next);
-      }
-    } catch (err) {}
-  }
-
   function saveProfile(profile) {
     var storage = getStorage();
     var appState = getAppState();
     var keys = getStorageKeys();
     var data = profile || {};
-
     if (storage && typeof storage.setProfile === 'function') {
       storage.setProfile(data);
     } else if (storage && typeof storage.set === 'function' && keys.PROFILE) {
       storage.set(keys.PROFILE, data);
     }
-
     if (appState && typeof appState.setProfile === 'function') {
       appState.setProfile(data);
     }
@@ -380,6 +367,7 @@
   function applyProfileToUi(profile) {
     var data = profile || {};
     var wilayah = parseWilayahDisplay(data);
+
     setText('profile-nama', data.nama_kader || data.nama_user || data.nama || '-');
     setText('profile-unsur', data.unsur_tpk || data.unsur || '-');
     setText('profile-id', data.id_user || '-');
@@ -394,7 +382,6 @@
   }
 
   function openDashboard() {
-    stripSensitiveQueryParams();
     if (window.Router && typeof window.Router.go === 'function') {
       window.Router.go('dashboard');
       return;
@@ -408,7 +395,7 @@
       screen.classList.remove('active');
       screen.classList.add('hidden');
     });
-    var dashboard = qs('dashboard-screen');
+    var dashboard = byId('dashboard-screen');
     if (dashboard) {
       dashboard.classList.remove('hidden');
       dashboard.classList.add('active');
@@ -416,7 +403,6 @@
   }
 
   function openLoginScreen() {
-    stripSensitiveQueryParams();
     if (window.Router && typeof window.Router.go === 'function') {
       window.Router.go('login');
       return;
@@ -430,18 +416,38 @@
       screen.classList.remove('active');
       screen.classList.add('hidden');
     });
-    var login = qs('login-screen');
+    var login = byId('login-screen');
     if (login) {
       login.classList.remove('hidden');
       login.classList.add('active');
     }
   }
 
+  function cleanSensitiveUrlParams() {
+    try {
+      var url = new URL(window.location.href);
+      var changed = false;
+      ['username', 'password', 'id_user', 'kata_sandi'].forEach(function (key) {
+        if (url.searchParams.has(key)) {
+          url.searchParams.delete(key);
+          changed = true;
+        }
+      });
+      if (changed) {
+        var clean = url.pathname + (url.search ? url.search : '') + (url.hash ? url.hash : '');
+        window.history.replaceState({}, document.title, clean);
+      }
+    } catch (err) {}
+  }
+
   async function submitLogin(idUser, password) {
     if (!window.Api || typeof window.Api.login !== 'function') {
       throw new Error('Api.login belum tersedia.');
     }
-    return window.Api.login({ id_user: idUser, password: password });
+    return window.Api.login({
+      id_user: idUser,
+      password: password
+    });
   }
 
   function hydrateDashboardAfterLogin(loginResult) {
@@ -463,20 +469,22 @@
   }
 
   async function handleLoginSubmit(event) {
-    if (event && typeof event.preventDefault === 'function') event.preventDefault();
-    if (isLoginSubmitting) return;
+    if (event && typeof event.preventDefault === 'function') {
+      event.preventDefault();
+    }
+    if (isLoginSubmitting) return false;
 
     clearMessage();
 
-    var idInput = getLoginIdInput();
-    var passwordInput = getLoginPasswordInput();
-    var idUser = normalizeIdUser(idInput && idInput.value);
-    var password = normalizePassword(passwordInput && passwordInput.value);
+    var userInput = getLoginUserInput();
+    var passInput = getLoginPasswordInput();
+    var idUser = normalizeIdUser(userInput && userInput.value);
+    var password = normalizePassword(passInput && passInput.value);
 
     var validationMessage = validateLoginForm(idUser, password);
     if (validationMessage) {
       showMessage(validationMessage, 'error');
-      return;
+      return false;
     }
 
     try {
@@ -486,20 +494,14 @@
       var result = await submitLogin(idUser, password);
 
       if (!result || result.ok === false) {
-        console.log('LOGIN_RESULT', result);
-        console.log('LOGIN_STAGE', result && result.data ? result.data.stage : '');
-        console.log('LOGIN_ERROR_DETAIL', result && result.data ? result.data.error : '');
         showMessage(
-          (result && result.message
-            ? result.message + (result.code ? ' [' + result.code + ']' : '')
-            : 'Login gagal. Periksa kembali ID dan password.'),
+          (result && result.message ? result.message + (result.code ? ' [' + result.code + ']' : '') : 'Login gagal. Periksa kembali ID dan password.'),
           'error'
         );
-        return;
+        return false;
       }
 
-      if (passwordInput) passwordInput.value = '';
-      stripSensitiveQueryParams();
+      cleanSensitiveUrlParams();
 
       var wajibGantiPassword = !!(result.data && result.data.wajib_ganti_password);
       var bootstrapLite = extractBootstrapLite(result);
@@ -531,6 +533,7 @@
       if (wajibGantiPassword) {
         showToast('Login berhasil. Akun ini masih perlu ganti password.', 'warning');
       }
+      return true;
     } catch (error) {
       console.error('LOGIN_ERROR', error);
       showMessage('Koneksi ke backend gagal atau respons tidak valid.', 'error');
@@ -540,6 +543,7 @@
           detail: error && error.message ? error.message : String(error)
         });
       }
+      return false;
     } finally {
       setLoading(false);
       isLoginSubmitting = false;
@@ -547,7 +551,8 @@
   }
 
   async function logout() {
-    if (isLogoutInProgress) return;
+    if (isLogoutInProgress) return false;
+
     isLogoutInProgress = true;
     setLogoutLoading(true);
 
@@ -565,9 +570,13 @@
       clearLocalSession();
       resetProfileUi();
       clearMessage();
+
       var passwordInput = getLoginPasswordInput();
       if (passwordInput) passwordInput.value = '';
+
+      cleanSensitiveUrlParams();
       openLoginScreen();
+      return true;
     } finally {
       Promise.resolve(logoutPromise)
         .catch(function (err) {
@@ -580,39 +589,73 @@
     }
   }
 
-  function bindLogoutButtons() {
-    document.addEventListener('click', function (event) {
-      var target = event.target && event.target.closest
-        ? event.target.closest('#btn-logout, [data-action="logout"], button, a')
-        : null;
-      if (!target) return;
-      var text = String(target.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
-      if (target.id === 'btn-logout' || target.getAttribute('data-action') === 'logout' || text === 'keluar') {
+  function bindStaticLogoutButtons() {
+    getLogoutButtons().forEach(function (btn) {
+      if (!btn || btn.dataset.authBound === '1') return;
+      btn.dataset.authBound = '1';
+      btn.addEventListener('click', function (event) {
         event.preventDefault();
+        event.stopPropagation();
         logout();
-      }
+      });
     });
   }
 
+  function bindDelegatedAuthHandlers() {
+    if (delegatedBound) return;
+    delegatedBound = true;
+
+    document.addEventListener('submit', function (event) {
+      var form = event.target;
+      if (!form) return;
+      if (form.id === 'loginForm' || form.id === 'login-form') {
+        handleLoginSubmit(event);
+      }
+    }, true);
+
+    document.addEventListener('click', function (event) {
+      var node = event.target && event.target.closest ? event.target.closest('#btn-logout, [data-action="logout"], button, a') : null;
+      if (!node) return;
+
+      var text = String(node.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
+      var isLogoutNode = node.id === 'btn-logout'
+        || (node.getAttribute('data-action') || '').toLowerCase() === 'logout'
+        || text === 'keluar'
+        || text === 'logout';
+
+      if (!isLogoutNode) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      logout();
+    }, true);
+  }
+
   function initLoginPage() {
-    stripSensitiveQueryParams();
-    var form = getLoginForm();
+    cleanSensitiveUrlParams();
     setupLogo();
     setupPasswordToggle();
-    bindLogoutButtons();
+    bindStaticLogoutButtons();
+    bindDelegatedAuthHandlers();
 
-    if (!form || form.dataset.bound === '1') return;
-    form.dataset.bound = '1';
-    form.addEventListener('submit', handleLoginSubmit);
+    var form = getLoginForm();
+    if (form && form.dataset.bound !== '1') {
+      form.dataset.bound = '1';
+      form.addEventListener('submit', handleLoginSubmit);
+    }
   }
 
   var Auth = {
     init: initLoginPage,
     login: submitLogin,
     logout: logout,
-    clearLocalSession: clearLocalSession
+    clearLocalSession: clearLocalSession,
+    cleanSensitiveUrlParams: cleanSensitiveUrlParams
   };
 
   window.Auth = Auth;
+
   document.addEventListener('DOMContentLoaded', initLoginPage);
+  window.addEventListener('load', initLoginPage);
+  window.addEventListener('hashchange', bindStaticLogoutButtons);
 })(window, document);
