@@ -8,16 +8,21 @@
     return document.getElementById(id);
   }
 
+  function qsAny(ids) {
+    var list = Array.isArray(ids) ? ids : [ids];
+    for (var i = 0; i < list.length; i += 1) {
+      var el = qs(list[i]);
+      if (el) return el;
+    }
+    return null;
+  }
+
   function getConfig() {
     return window.APP_CONFIG || {};
   }
 
   function getStorageKeys() {
     return getConfig().STORAGE_KEYS || {};
-  }
-
-  function getActions() {
-    return getConfig().API_ACTIONS || {};
   }
 
   function getStorage() {
@@ -33,7 +38,6 @@
     if (!el) return;
     el.textContent = (value === undefined || value === null || value === '') ? '-' : String(value);
   }
-
 
   function normalizeDisplayText(value) {
     var text = String(value == null ? '' : value).replace(/\s+/g, ' ').trim();
@@ -77,24 +81,18 @@
 
   function getDisplayNomorTim(data) {
     data = data || {};
-
     var explicitNomor = data.nomor_tim || data.nomor_tim_display || data.nomor_tim_lokal || '';
     if (explicitNomor !== undefined && explicitNomor !== null && String(explicitNomor).trim() !== '') {
       return String(explicitNomor).trim();
     }
-
     var namaTim = String(data.nama_tim || '').trim();
     if (namaTim) {
       var match = namaTim.match(/(\d+)\s*$/);
-      if (match && match[1]) {
-        return match[1];
-      }
+      if (match && match[1]) return match[1];
       return namaTim;
     }
-
     return data.id_tim || '-';
   }
-
 
   function getBootstrapLiteStorageKey() {
     if (window.Storage && typeof window.Storage.getBootstrapLiteKey === 'function') {
@@ -112,6 +110,24 @@
       return storage.get(getBootstrapLiteStorageKey(), {}) || {};
     }
     return {};
+  }
+
+  function mergeProfileData(existingProfile, incomingProfile) {
+    var existing = existingProfile && typeof existingProfile === 'object' ? existingProfile : {};
+    var incoming = incomingProfile && typeof incomingProfile === 'object' ? incomingProfile : {};
+    var merged = Object.assign({}, existing);
+
+    Object.keys(incoming).forEach(function (key) {
+      var value = incoming[key];
+      if (value === undefined || value === null) return;
+      if (typeof value === 'string') {
+        var clean = value.trim();
+        if (!clean || clean === '-') return;
+      }
+      merged[key] = value;
+    });
+
+    return merged;
   }
 
   function getStoredProfile() {
@@ -136,31 +152,9 @@
     return mergeProfileData(profileFromStorage, bootstrapProfile);
   }
 
-  function mergeProfileData(existingProfile, incomingProfile) {
-    var existing = existingProfile && typeof existingProfile === 'object' ? existingProfile : {};
-    var incoming = incomingProfile && typeof incomingProfile === 'object' ? incomingProfile : {};
-    var merged = Object.assign({}, existing);
-
-    Object.keys(incoming).forEach(function (key) {
-      var value = incoming[key];
-
-      if (value === undefined || value === null) return;
-
-      if (typeof value === 'string') {
-        var clean = value.trim();
-        if (!clean || clean === '-') return;
-      }
-
-      merged[key] = value;
-    });
-
-    return merged;
-  }
-
   function showMessage(message, type) {
     var box = qs('loginMessage');
     if (!box) return;
-
     box.textContent = message || '';
     box.classList.remove('hidden', 'error', 'success');
     box.classList.add(type === 'success' ? 'success' : 'error');
@@ -169,7 +163,6 @@
   function clearMessage() {
     var box = qs('loginMessage');
     if (!box) return;
-
     box.textContent = '';
     box.classList.add('hidden');
     box.classList.remove('error', 'success');
@@ -180,23 +173,44 @@
       window.UI.showToast(message, type || 'info');
       return;
     }
-    try {
-      console.log('[TOAST]', type || 'info', message);
-    } catch (err) {}
+    try { console.log('[TOAST]', type || 'info', message); } catch (err) {}
+  }
+
+  function getLoginForm() {
+    return qsAny(['loginForm', 'login-form']);
+  }
+
+  function getLoginIdInput() {
+    return qsAny(['loginIdUser', 'username']);
+  }
+
+  function getLoginPasswordInput() {
+    return qsAny(['loginPassword', 'password']);
+  }
+
+  function getLoginSubmitButton() {
+    return qsAny(['loginSubmitBtn', 'btn-login']);
+  }
+
+  function getLogoutButton() {
+    return qs('btn-logout') ||
+      document.querySelector('[data-action="logout"]') ||
+      Array.prototype.find.call(document.querySelectorAll('button, a'), function (el) {
+        return String(el.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase() === 'keluar';
+      }) ||
+      null;
   }
 
   function setLoading(isLoading) {
-    var btn = qs('loginSubmitBtn');
+    var btn = getLoginSubmitButton();
     if (!btn) return;
-
     btn.disabled = !!isLoading;
     btn.textContent = isLoading ? 'Memproses...' : 'Masuk';
   }
 
   function setLogoutLoading(isLoading) {
-    var btn = qs('btn-logout');
+    var btn = getLogoutButton();
     if (!btn) return;
-
     btn.disabled = !!isLoading;
     btn.textContent = isLoading ? 'Keluar...' : 'Keluar';
   }
@@ -218,36 +232,38 @@
   function setupLogo() {
     var logo = qs('loginLogo');
     if (!logo) return;
-
     var config = getConfig();
     var logoUrl = config.ASSETS && config.ASSETS.LOGO_URL
       ? config.ASSETS.LOGO_URL
       : './assets/img/logo.png';
-
     logo.src = logoUrl;
   }
 
   function setupPasswordToggle() {
-    var passwordInput = qs('loginPassword');
+    var passwordInput = getLoginPasswordInput();
     var toggleBtn = qs('togglePasswordBtn');
-
     if (!passwordInput || !toggleBtn || toggleBtn.dataset.bound === '1') return;
-
     toggleBtn.dataset.bound = '1';
-
     toggleBtn.addEventListener('click', function () {
       var isPassword = passwordInput.getAttribute('type') === 'password';
-
       passwordInput.setAttribute('type', isPassword ? 'text' : 'password');
-      toggleBtn.setAttribute(
-        'aria-label',
-        isPassword ? 'Sembunyikan password' : 'Lihat password'
-      );
-      toggleBtn.setAttribute(
-        'title',
-        isPassword ? 'Sembunyikan password' : 'Lihat password'
-      );
+      toggleBtn.setAttribute('aria-label', isPassword ? 'Sembunyikan password' : 'Lihat password');
+      toggleBtn.setAttribute('title', isPassword ? 'Sembunyikan password' : 'Lihat password');
     });
+  }
+
+  function stripSensitiveQueryParams() {
+    try {
+      var url = new URL(window.location.href);
+      var before = url.search;
+      ['username', 'password', 'id_user', 'pass'].forEach(function (key) {
+        url.searchParams.delete(key);
+      });
+      if (url.search !== before) {
+        var next = url.pathname + (url.search ? url.search : '') + (url.hash || '');
+        window.history.replaceState({}, document.title, next);
+      }
+    } catch (err) {}
   }
 
   function saveProfile(profile) {
@@ -270,14 +286,11 @@
   function saveBootstrapLite(bootstrapLite) {
     var storage = getStorage();
     var data = bootstrapLite && typeof bootstrapLite === 'object' ? bootstrapLite : {};
-
     if (!storage) return;
-
     if (typeof storage.setBootstrapLite === 'function') {
       storage.setBootstrapLite(data);
       return;
     }
-
     if (typeof storage.set === 'function') {
       storage.set(getBootstrapLiteStorageKey(), data);
     }
@@ -323,11 +336,9 @@
   function extractImmediateProfile(loginResult) {
     var data = (loginResult && loginResult.data) || {};
     var bootstrapLite = extractBootstrapLite(loginResult);
-
     if (bootstrapLite.profile && typeof bootstrapLite.profile === 'object') return bootstrapLite.profile;
     if (data.profile && typeof data.profile === 'object') return data.profile;
     if (data.session && typeof data.session === 'object') return data.session;
-
     return {};
   }
 
@@ -343,7 +354,6 @@
       if (refreshResult && refreshResult.ok) {
         var refreshData = refreshResult.data || {};
         var refreshedBootstrapLite = refreshData.bootstrap_lite || {};
-
         if (refreshedBootstrapLite && Object.keys(refreshedBootstrapLite).length) {
           saveBootstrapLite(refreshedBootstrapLite);
           if (window.AppBootstrap && typeof window.AppBootstrap.applyBootstrapLite === 'function') {
@@ -351,7 +361,6 @@
           }
           return refreshedBootstrapLite.profile || refreshData.profile || refreshData.session || {};
         }
-
         if (refreshData.profile && typeof refreshData.profile === 'object') {
           return refreshData.profile;
         }
@@ -371,7 +380,6 @@
   function applyProfileToUi(profile) {
     var data = profile || {};
     var wilayah = parseWilayahDisplay(data);
-
     setText('profile-nama', data.nama_kader || data.nama_user || data.nama || '-');
     setText('profile-unsur', data.unsur_tpk || data.unsur || '-');
     setText('profile-id', data.id_user || '-');
@@ -386,22 +394,20 @@
   }
 
   function openDashboard() {
+    stripSensitiveQueryParams();
     if (window.Router && typeof window.Router.go === 'function') {
       window.Router.go('dashboard');
       return;
     }
-
     if (window.AppBootstrap && typeof window.AppBootstrap.openScreen === 'function') {
       window.AppBootstrap.openScreen('dashboard-screen');
       return;
     }
-
     var screens = document.querySelectorAll('.screen');
     screens.forEach(function (screen) {
       screen.classList.remove('active');
       screen.classList.add('hidden');
     });
-
     var dashboard = qs('dashboard-screen');
     if (dashboard) {
       dashboard.classList.remove('hidden');
@@ -410,22 +416,20 @@
   }
 
   function openLoginScreen() {
+    stripSensitiveQueryParams();
     if (window.Router && typeof window.Router.go === 'function') {
       window.Router.go('login');
       return;
     }
-
     if (window.AppBootstrap && typeof window.AppBootstrap.openScreen === 'function') {
       window.AppBootstrap.openScreen('login-screen');
       return;
     }
-
     var screens = document.querySelectorAll('.screen');
     screens.forEach(function (screen) {
       screen.classList.remove('active');
       screen.classList.add('hidden');
     });
-
     var login = qs('login-screen');
     if (login) {
       login.classList.remove('hidden');
@@ -437,24 +441,18 @@
     if (!window.Api || typeof window.Api.login !== 'function') {
       throw new Error('Api.login belum tersedia.');
     }
-
-    return window.Api.login({
-      id_user: idUser,
-      password: password
-    });
+    return window.Api.login({ id_user: idUser, password: password });
   }
 
   function hydrateDashboardAfterLogin(loginResult) {
     Promise.resolve().then(async function () {
       try {
         var resolvedProfile = await resolveProfileAfterLogin(loginResult);
-
         if (resolvedProfile && Object.keys(resolvedProfile).length) {
           var mergedProfile = mergeProfileData(getStoredProfile(), resolvedProfile);
           saveProfile(mergedProfile);
           applyProfileToUi(mergedProfile);
         }
-
         if (window.DashboardView && typeof window.DashboardView.refresh === 'function') {
           window.DashboardView.refresh();
         }
@@ -465,13 +463,15 @@
   }
 
   async function handleLoginSubmit(event) {
-    event.preventDefault();
+    if (event && typeof event.preventDefault === 'function') event.preventDefault();
     if (isLoginSubmitting) return;
 
     clearMessage();
 
-    var idUser = normalizeIdUser(qs('loginIdUser') && qs('loginIdUser').value);
-    var password = normalizePassword(qs('loginPassword') && qs('loginPassword').value);
+    var idInput = getLoginIdInput();
+    var passwordInput = getLoginPasswordInput();
+    var idUser = normalizeIdUser(idInput && idInput.value);
+    var password = normalizePassword(passwordInput && passwordInput.value);
 
     var validationMessage = validateLoginForm(idUser, password);
     if (validationMessage) {
@@ -486,18 +486,20 @@
       var result = await submitLogin(idUser, password);
 
       if (!result || result.ok === false) {
-  console.log('LOGIN_RESULT', result);
-  console.log('LOGIN_STAGE', result && result.data ? result.data.stage : '');
-  console.log('LOGIN_ERROR_DETAIL', result && result.data ? result.data.error : '');
+        console.log('LOGIN_RESULT', result);
+        console.log('LOGIN_STAGE', result && result.data ? result.data.stage : '');
+        console.log('LOGIN_ERROR_DETAIL', result && result.data ? result.data.error : '');
+        showMessage(
+          (result && result.message
+            ? result.message + (result.code ? ' [' + result.code + ']' : '')
+            : 'Login gagal. Periksa kembali ID dan password.'),
+          'error'
+        );
+        return;
+      }
 
-  showMessage(
-    (result && result.message
-      ? result.message + (result.code ? ' [' + result.code + ']' : '')
-      : 'Login gagal. Periksa kembali ID dan password.'),
-    'error'
-  );
-  return;
-}
+      if (passwordInput) passwordInput.value = '';
+      stripSensitiveQueryParams();
 
       var wajibGantiPassword = !!(result.data && result.data.wajib_ganti_password);
       var bootstrapLite = extractBootstrapLite(result);
@@ -531,12 +533,7 @@
       }
     } catch (error) {
       console.error('LOGIN_ERROR', error);
-
-      showMessage(
-        'Koneksi ke backend gagal atau respons tidak valid.',
-        'error'
-      );
-
+      showMessage('Koneksi ke backend gagal atau respons tidak valid.', 'error');
       if (window.Api && typeof window.Api.reportClientError === 'function') {
         window.Api.reportClientError('LOGIN_ERROR', {
           source: 'auth.js',
@@ -551,7 +548,6 @@
 
   async function logout() {
     if (isLogoutInProgress) return;
-
     isLogoutInProgress = true;
     setLogoutLoading(true);
 
@@ -569,10 +565,8 @@
       clearLocalSession();
       resetProfileUi();
       clearMessage();
-
-      var passwordInput = qs('loginPassword');
+      var passwordInput = getLoginPasswordInput();
       if (passwordInput) passwordInput.value = '';
-
       openLoginScreen();
     } finally {
       Promise.resolve(logoutPromise)
@@ -587,26 +581,27 @@
   }
 
   function bindLogoutButtons() {
-    ['btn-logout'].forEach(function (id) {
-      var btn = qs(id);
-      if (!btn || btn.dataset.bound === '1') return;
-
-      btn.dataset.bound = '1';
-      btn.addEventListener('click', function (event) {
+    document.addEventListener('click', function (event) {
+      var target = event.target && event.target.closest
+        ? event.target.closest('#btn-logout, [data-action="logout"], button, a')
+        : null;
+      if (!target) return;
+      var text = String(target.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
+      if (target.id === 'btn-logout' || target.getAttribute('data-action') === 'logout' || text === 'keluar') {
         event.preventDefault();
         logout();
-      });
+      }
     });
   }
 
   function initLoginPage() {
-    var form = qs('loginForm');
+    stripSensitiveQueryParams();
+    var form = getLoginForm();
     setupLogo();
     setupPasswordToggle();
     bindLogoutButtons();
 
     if (!form || form.dataset.bound === '1') return;
-
     form.dataset.bound = '1';
     form.addEventListener('submit', handleLoginSubmit);
   }
@@ -619,6 +614,5 @@
   };
 
   window.Auth = Auth;
-
   document.addEventListener('DOMContentLoaded', initLoginPage);
 })(window, document);
