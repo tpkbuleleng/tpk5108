@@ -464,7 +464,14 @@
             <button id="btn-sync-header" class="tpk-btn tpk-btn--sync" type="button">Sinkronkan</button>
             <button id="btn-update-app" class="tpk-btn tpk-btn--warn" type="button">Perbarui Aplikasi</button>
             <button id="btn-open-sync" class="tpk-btn" type="button" data-route-link="sync">Sinkronisasi</button>
-            <button id="btn-logout" class="tpk-btn tpk-btn--danger" type="button">Keluar</button>
+            <button
+  id="btn-logout"
+  class="tpk-btn tpk-btn--danger"
+  type="button"
+  onclick="event.preventDefault(); event.stopPropagation(); if (window.Auth && typeof window.Auth.logout === 'function') { window.Auth.logout(); } return false;"
+>
+  Keluar
+</button>
           </div>
         </header>
 
