@@ -1,268 +1,205 @@
 (function (window) {
   'use strict';
 
-  var DEFAULT_KEYS = {
-    SESSION_TOKEN: 'tpk_session_token',
-    PROFILE: 'tpk_profile',
-    BOOTSTRAP: 'tpk_bootstrap',
-    PERMISSIONS: 'tpk_permissions',
-    DEVICE_ID: 'tpk_device_id',
-    LAST_SYNC_AT: 'tpk_last_sync_at',
-    SYNC_QUEUE: 'tpk_sync_queue',
-    APP_STATE: 'tpk_app_state',
-    UI_PREFS: 'tpk_ui_prefs',
-    CACHE_VERSION: 'tpk_cache_version',
-    SW_PENDING_UPDATE: 'tpk_sw_pending_update'
-  };
+  var BOOTSTRAP_LITE_KEY = 'tpk_bootstrap_lite';
+
+  function getConfig() {
+    return window.APP_CONFIG || {};
+  }
 
   function getStorageKeys() {
-    var cfgKeys = window.APP_CONFIG && window.APP_CONFIG.STORAGE_KEYS;
-    return Object.assign({}, DEFAULT_KEYS, cfgKeys || {});
+    return getConfig().STORAGE_KEYS || {};
   }
 
-  function getStorage(type) {
+  function isDebugEnabled() {
+    return !!getConfig().DEBUG;
+  }
+
+  function debugWarn() {
+    if (!isDebugEnabled()) return;
     try {
-      if (type === 'session') return window.sessionStorage;
-      return window.localStorage;
-    } catch (err) {
-      return null;
-    }
+      console.warn.apply(console, arguments);
+    } catch (err) {}
   }
 
-  function safeParse(raw, fallbackValue) {
-    if (raw === null || raw === undefined || raw === '') return fallbackValue;
+  function normalizeKey(key) {
+    return String(key || '').trim();
+  }
+
+  function safeParse(raw, fallback) {
+    if (raw === null || raw === undefined || raw === '') {
+      return fallback;
+    }
+
     try {
       return JSON.parse(raw);
     } catch (err) {
-      return fallbackValue;
+      return fallback;
     }
   }
 
-  function safeString(value) {
-    return value === null || value === undefined ? '' : String(value);
+  function safeStringify(value) {
+    return JSON.stringify(value);
   }
 
-  function hasOwn(obj, key) {
-    return Object.prototype.hasOwnProperty.call(obj || {}, key);
+  function getBootstrapLiteKey() {
+    return BOOTSTRAP_LITE_KEY;
   }
 
-  var StorageHelper = {
-    getStorageKeys: getStorageKeys,
-
-    resolveKey: function (logicalName, fallbackKey) {
-      var keys = getStorageKeys();
-      if (hasOwn(keys, logicalName)) return keys[logicalName];
-      return fallbackKey || logicalName;
-    },
-
-    isAvailable: function (type) {
-      var storage = getStorage(type);
-      if (!storage) return false;
+  const Storage = {
+    isAvailable() {
       try {
-        var key = '__tpk_storage_test__';
-        storage.setItem(key, '1');
-        storage.removeItem(key);
+        const testKey = '__tpk_storage_test__';
+        window.localStorage.setItem(testKey, '1');
+        window.localStorage.removeItem(testKey);
         return true;
       } catch (err) {
         return false;
       }
     },
 
-    getRawByKey: function (key, fallbackValue, type) {
-      var storage = getStorage(type);
-      if (!storage || !key) return fallbackValue;
+    get(key, fallback) {
+      const normalizedKey = normalizeKey(key);
+      const defaultValue = arguments.length >= 2 ? fallback : null;
+
       try {
-        var value = storage.getItem(key);
-        return value === null ? fallbackValue : value;
+        if (!normalizedKey || !this.isAvailable()) {
+          return defaultValue;
+        }
+
+        const raw = window.localStorage.getItem(normalizedKey);
+        return safeParse(raw, defaultValue);
       } catch (err) {
-        return fallbackValue;
+        debugWarn('Storage.get gagal:', normalizedKey, err && err.message ? err.message : err);
+        return defaultValue;
       }
     },
 
-    setRawByKey: function (key, value, type) {
-      var storage = getStorage(type);
-      if (!storage || !key) return false;
+    set(key, value) {
+      const normalizedKey = normalizeKey(key);
+
       try {
-        storage.setItem(key, safeString(value));
-        return true;
+        if (!normalizedKey || !this.isAvailable()) {
+          return value;
+        }
+
+        window.localStorage.setItem(normalizedKey, safeStringify(value));
+        return value;
       } catch (err) {
-        console.warn('[StorageHelper] gagal menyimpan key:', key, err);
+        debugWarn('Storage.set gagal:', normalizedKey, err && err.message ? err.message : err);
+        return value;
+      }
+    },
+
+    remove(key) {
+      const normalizedKey = normalizeKey(key);
+
+      try {
+        if (!normalizedKey || !this.isAvailable()) {
+          return;
+        }
+
+        window.localStorage.removeItem(normalizedKey);
+      } catch (err) {
+        debugWarn('Storage.remove gagal:', normalizedKey, err && err.message ? err.message : err);
+      }
+    },
+
+    has(key) {
+      const normalizedKey = normalizeKey(key);
+
+      try {
+        if (!normalizedKey || !this.isAvailable()) {
+          return false;
+        }
+
+        return window.localStorage.getItem(normalizedKey) !== null;
+      } catch (err) {
         return false;
       }
     },
 
-    removeByKey: function (key, type) {
-      var storage = getStorage(type);
-      if (!storage || !key) return false;
-      try {
-        storage.removeItem(key);
-        return true;
-      } catch (err) {
-        console.warn('[StorageHelper] gagal menghapus key:', key, err);
-        return false;
-      }
+    getProfile(fallback) {
+      const keys = getStorageKeys();
+      return this.get(keys.PROFILE || 'tpk_profile', fallback || {});
     },
 
-    getRaw: function (logicalName, fallbackValue, type) {
-      return this.getRawByKey(this.resolveKey(logicalName), fallbackValue, type);
+    setProfile(value) {
+      const keys = getStorageKeys();
+      return this.set(keys.PROFILE || 'tpk_profile', value || {});
     },
 
-    setRaw: function (logicalName, value, type) {
-      return this.setRawByKey(this.resolveKey(logicalName), value, type);
+    getBootstrapLite(fallback) {
+      return this.get(getBootstrapLiteKey(), fallback || {});
     },
 
-    get: function (logicalName, fallbackValue, type) {
-      var raw = this.getRaw(logicalName, null, type);
-      return safeParse(raw, fallbackValue);
+    setBootstrapLite(value) {
+      return this.set(getBootstrapLiteKey(), value || {});
     },
 
-    set: function (logicalName, value, type) {
-      try {
-        return this.setRaw(logicalName, JSON.stringify(value), type);
-      } catch (err) {
-        console.warn('[StorageHelper] gagal stringify key:', logicalName, err);
-        return false;
-      }
+    removeBootstrapLite() {
+      this.remove(getBootstrapLiteKey());
     },
 
-    remove: function (logicalName, type) {
-      return this.removeByKey(this.resolveKey(logicalName), type);
+    clearSession() {
+      const keys = getStorageKeys();
+
+      [
+        keys.SESSION_TOKEN,
+        keys.PROFILE,
+        getBootstrapLiteKey()
+      ].filter(Boolean).forEach((key) => this.remove(key));
     },
 
-    getSessionToken: function () {
-      return safeString(this.getRaw('SESSION_TOKEN', '')).trim();
+    clearDrafts() {
+      const keys = getStorageKeys();
+
+      [
+        keys.SYNC_QUEUE,
+        keys.REGISTRASI_DRAFT,
+        keys.PENDAMPINGAN_DRAFT,
+        'tpk_registrasi_draft',
+        'tpk_pendampingan_draft'
+      ].filter(Boolean).forEach((key) => this.remove(key));
     },
 
-    hasSessionToken: function () {
-      return !!this.getSessionToken();
+    clearRuntimeCache() {
+      const keys = getStorageKeys();
+
+      [
+        keys.APP_BOOTSTRAP,
+        keys.SELECTED_SASARAN,
+        keys.SASARAN_CACHE,
+        keys.BOOTSTRAP,
+        keys.DASHBOARD_CACHE,
+        keys.EDIT_PENDAMPINGAN,
+        getBootstrapLiteKey(),
+        'tpk_dashboard_cache',
+        'tpk_edit_pendampingan'
+      ].filter(Boolean).forEach((key) => this.remove(key));
     },
 
-    rememberSessionToken: function (token) {
-      return this.setRaw('SESSION_TOKEN', safeString(token || '').trim());
+    clearSyncData() {
+      const keys = getStorageKeys();
+
+      [
+        keys.SYNC_QUEUE,
+        keys.LAST_SYNC_AT
+      ].filter(Boolean).forEach((key) => this.remove(key));
     },
 
-    clearSessionToken: function () {
-      return this.remove('SESSION_TOKEN');
+    clearAppData() {
+      this.clearSession();
+      this.clearDrafts();
+      this.clearRuntimeCache();
+      this.clearSyncData();
     },
 
-    getProfile: function () {
-      return this.get('PROFILE', null);
-    },
-
-    rememberProfile: function (profile) {
-      return this.set('PROFILE', profile || null);
-    },
-
-    clearProfile: function () {
-      return this.remove('PROFILE');
-    },
-
-    getBootstrapCache: function () {
-      return this.get('BOOTSTRAP', null);
-    },
-
-    setBootstrapCache: function (payload) {
-      return this.set('BOOTSTRAP', payload || null);
-    },
-
-    getPermissionsCache: function () {
-      return this.get('PERMISSIONS', []);
-    },
-
-    setPermissionsCache: function (payload) {
-      return this.set('PERMISSIONS', Array.isArray(payload) ? payload : []);
-    },
-
-    getDeviceId: function () {
-      return safeString(this.getRaw('DEVICE_ID', '')).trim();
-    },
-
-    rememberDeviceId: function (deviceId) {
-      return this.setRaw('DEVICE_ID', safeString(deviceId || '').trim());
-    },
-
-    getLastSyncAt: function () {
-      return safeString(this.getRaw('LAST_SYNC_AT', '')).trim();
-    },
-
-    touchLastSyncAt: function (isoString) {
-      return this.setRaw('LAST_SYNC_AT', isoString || new Date().toISOString());
-    },
-
-    getUiPrefs: function () {
-      return this.get('UI_PREFS', {});
-    },
-
-    setUiPrefs: function (prefs) {
-      return this.set('UI_PREFS', prefs || {});
-    },
-
-    getLegacySyncQueue: function () {
-      return this.get('SYNC_QUEUE', []);
-    },
-
-    setLegacySyncQueue: function (queue) {
-      return this.set('SYNC_QUEUE', Array.isArray(queue) ? queue : []);
-    },
-
-    clearSensitiveSessionData: function () {
-      var removed = 0;
-      ['SESSION_TOKEN', 'PROFILE', 'BOOTSTRAP', 'PERMISSIONS', 'APP_STATE'].forEach(function (logicalName) {
-        if (StorageHelper.remove(logicalName)) removed += 1;
-      });
-      return removed;
-    },
-
-    resetLightCache: function () {
-      var removed = 0;
-      ['BOOTSTRAP', 'PERMISSIONS', 'APP_STATE', 'SW_PENDING_UPDATE'].forEach(function (logicalName) {
-        if (StorageHelper.remove(logicalName)) removed += 1;
-      });
-      return removed;
-    },
-
-    clearAllAppData: function (options) {
-      var keepDeviceId = !options || options.keepDeviceId !== false;
-      var keepUiPrefs = !options || options.keepUiPrefs !== false;
-      var keys = getStorageKeys();
-      var storage = getStorage();
-      if (!storage) return 0;
-      var targets = Object.keys(keys).map(function (k) { return keys[k]; });
-      if (keepDeviceId) targets = targets.filter(function (k) { return k !== keys.DEVICE_ID; });
-      if (keepUiPrefs) targets = targets.filter(function (k) { return k !== keys.UI_PREFS; });
-      var removed = 0;
-      targets.forEach(function (key) {
-        if (StorageHelper.removeByKey(key)) removed += 1;
-      });
-      return removed;
+    getBootstrapLiteKey() {
+      return getBootstrapLiteKey();
     }
   };
 
-  function getSessionToken() {
-    return StorageHelper.getSessionToken();
-  }
-
-  function hasSessionToken() {
-    return StorageHelper.hasSessionToken();
-  }
-
-  function getProfileFromStorage() {
-    return StorageHelper.getProfile();
-  }
-
-  function saveProfileToStorage(profile) {
-    return StorageHelper.rememberProfile(profile);
-  }
-
-  function clearSensitiveSessionData() {
-    return StorageHelper.clearSensitiveSessionData();
-  }
-
-  window.StorageHelper = StorageHelper;
-  window.getStorageKeys = getStorageKeys;
-  window.getSessionToken = getSessionToken;
-  window.hasSessionToken = hasSessionToken;
-  window.getProfileFromStorage = getProfileFromStorage;
-  window.saveProfileToStorage = saveProfileToStorage;
-  window.clearSensitiveSessionData = clearSensitiveSessionData;
+  window.Storage = Storage;
+  window.StorageHelper = Storage;
 })(window);

@@ -1,262 +1,331 @@
 (function (window) {
   'use strict';
 
-  var STATE_KEY = 'APP_STATE';
-  var subscribers = [];
-
-  var DEFAULT_STATE = {
-    session: {
-      token: '',
-      id_user: '',
-      role: '',
-      device_id: '',
-      is_authenticated: false,
-      session_expired_at: '',
-      last_validated_at: ''
-    },
-    bootstrap: {
-      profile: null,
-      permissions: [],
-      refs: null,
-      wilayah: null,
-      last_loaded_at: '',
-      cache_expires_at: ''
-    },
-    sync: {
-      is_syncing: false,
-      pending_count: 0,
-      processing_count: 0,
-      success_count: 0,
-      failed_count: 0,
-      conflict_count: 0,
-      duplicate_count: 0,
-      last_sync_at: '',
-      last_error: ''
-    },
-    ui: {
-      active_screen: 'login-screen',
-      text_size: 'normal',
-      dark_mode: false,
-      filters: {},
-      dialogs: {},
-      scroll_keys: {},
-      has_pending_update: false
-    }
-  };
-
   function clone(value) {
-    return JSON.parse(JSON.stringify(value));
-  }
+    if (value === undefined) return undefined;
+    if (value === null) return null;
 
-  function mergeDeep(target, source) {
-    var out = Array.isArray(target) ? target.slice() : Object.assign({}, target || {});
-    Object.keys(source || {}).forEach(function (key) {
-      var sv = source[key];
-      var tv = out[key];
-      if (sv && typeof sv === 'object' && !Array.isArray(sv)) {
-        out[key] = mergeDeep(tv && typeof tv === 'object' ? tv : {}, sv);
-      } else {
-        out[key] = sv;
+    try {
+      if (typeof structuredClone === 'function') {
+        return structuredClone(value);
       }
-    });
-    return out;
-  }
+    } catch (err) {}
 
-  function buildInitialState() {
-    var stored = window.StorageHelper ? window.StorageHelper.get(STATE_KEY, null) : null;
-    var base = mergeDeep(clone(DEFAULT_STATE), stored && typeof stored === 'object' ? stored : {});
-
-    if (window.StorageHelper) {
-      var token = window.StorageHelper.getSessionToken();
-      var deviceId = window.StorageHelper.getDeviceId();
-      var profile = window.StorageHelper.getProfile();
-      var bootstrap = window.StorageHelper.getBootstrapCache();
-      var uiPrefs = window.StorageHelper.getUiPrefs();
-
-      if (token) {
-        base.session.token = token;
-        base.session.is_authenticated = true;
-      }
-      if (deviceId) {
-        base.session.device_id = deviceId;
-      }
-      if (profile) {
-        base.bootstrap.profile = profile;
-        base.session.id_user = base.session.id_user || profile.id_user || profile.username || '';
-        base.session.role = base.session.role || profile.role_akses || profile.role || '';
-      }
-      if (bootstrap && typeof bootstrap === 'object') {
-        base.bootstrap = mergeDeep(base.bootstrap, bootstrap);
-      }
-      if (uiPrefs && typeof uiPrefs === 'object') {
-        base.ui = mergeDeep(base.ui, uiPrefs);
-      }
+    try {
+      return JSON.parse(JSON.stringify(value));
+    } catch (err) {
+      return value;
     }
-
-    return base;
   }
 
-  var state = buildInitialState();
+  function getConfig() {
+    return window.APP_CONFIG || {};
+  }
 
-  function persistState() {
-    if (!window.StorageHelper) return false;
+  function getStorageKeys() {
+    return getConfig().STORAGE_KEYS || {};
+  }
 
-    var persistable = {
-      session: {
-        token: state.session.token,
-        id_user: state.session.id_user,
-        role: state.session.role,
-        device_id: state.session.device_id,
-        is_authenticated: state.session.is_authenticated,
-        session_expired_at: state.session.session_expired_at,
-        last_validated_at: state.session.last_validated_at
-      },
-      bootstrap: {
-        profile: state.bootstrap.profile,
-        permissions: state.bootstrap.permissions,
-        refs: state.bootstrap.refs,
-        wilayah: state.bootstrap.wilayah,
-        last_loaded_at: state.bootstrap.last_loaded_at,
-        cache_expires_at: state.bootstrap.cache_expires_at
+  function getStorage() {
+    return window.Storage || null;
+  }
+
+  function safeGetFromStorage(key, fallbackValue) {
+    var storage = getStorage();
+    if (!storage || typeof storage.get !== 'function' || !key) {
+      return clone(fallbackValue);
+    }
+    return storage.get(key, clone(fallbackValue));
+  }
+
+  function safeSetToStorage(key, value) {
+    var storage = getStorage();
+    if (!storage || typeof storage.set !== 'function' || !key) return;
+    storage.set(key, value);
+  }
+
+  function safeRemoveFromStorage(key) {
+    var storage = getStorage();
+    if (!storage || typeof storage.remove !== 'function' || !key) return;
+    storage.remove(key);
+  }
+
+  function createInitialState() {
+    var keys = getStorageKeys();
+
+    return {
+      profile: safeGetFromStorage(keys.PROFILE, {}),
+      currentRoute: '',
+      currentScreenId: '',
+      bootstrap: safeGetFromStorage(keys.APP_BOOTSTRAP, {}),
+      selectedSasaran: safeGetFromStorage(keys.SELECTED_SASARAN, {}),
+      sasaranList: [],
+      sasaranDetail: {},
+      dashboardSummary: {},
+      rekapData: {},
+      permissions: {},
+      network: {
+        online: typeof navigator !== 'undefined' ? !!navigator.onLine : true,
+        label: typeof navigator !== 'undefined' && navigator.onLine ? 'Online' : 'Offline'
       },
       sync: {
-        pending_count: state.sync.pending_count,
-        processing_count: state.sync.processing_count,
-        success_count: state.sync.success_count,
-        failed_count: state.sync.failed_count,
-        conflict_count: state.sync.conflict_count,
-        duplicate_count: state.sync.duplicate_count,
-        last_sync_at: state.sync.last_sync_at,
-        last_error: state.sync.last_error
+        queue: safeGetFromStorage(keys.SYNC_QUEUE, []),
+        lastSyncAt: safeGetFromStorage(keys.LAST_SYNC_AT, ''),
+        isSyncing: false
       },
-      ui: {
-        active_screen: state.ui.active_screen,
-        text_size: state.ui.text_size,
-        dark_mode: state.ui.dark_mode,
-        filters: state.ui.filters,
-        dialogs: state.ui.dialogs,
-        scroll_keys: state.ui.scroll_keys,
-        has_pending_update: state.ui.has_pending_update
+      forms: {
+        registrasiMode: 'create',
+        pendampinganMode: 'create'
       }
     };
-
-    window.StorageHelper.set(STATE_KEY, persistable);
-    window.StorageHelper.rememberSessionToken(state.session.token || '');
-    window.StorageHelper.rememberDeviceId(state.session.device_id || '');
-    window.StorageHelper.rememberProfile(state.bootstrap.profile || null);
-    window.StorageHelper.setBootstrapCache({
-      profile: state.bootstrap.profile,
-      permissions: state.bootstrap.permissions,
-      refs: state.bootstrap.refs,
-      wilayah: state.bootstrap.wilayah,
-      last_loaded_at: state.bootstrap.last_loaded_at,
-      cache_expires_at: state.bootstrap.cache_expires_at
-    });
-    window.StorageHelper.setUiPrefs({
-      text_size: state.ui.text_size,
-      dark_mode: state.ui.dark_mode,
-      active_screen: state.ui.active_screen,
-      filters: state.ui.filters,
-      dialogs: state.ui.dialogs,
-      scroll_keys: state.ui.scroll_keys,
-      has_pending_update: state.ui.has_pending_update
-    });
-    return true;
   }
 
-  function notify(domain) {
-    var snapshot = clone(state);
-    subscribers.slice().forEach(function (cb) {
+  var state = createInitialState();
+  var subscribers = [];
+  var nextSubscriberId = 1;
+
+  function notify(change) {
+    subscribers.forEach(function (entry) {
       try {
-        cb(snapshot, domain);
+        entry.handler({
+          change: clone(change || {}),
+          state: clone(state)
+        });
       } catch (err) {
-        console.warn('[AppState] subscriber error:', err);
+        try {
+          console.warn('AppState subscriber error:', err);
+        } catch (e) {}
       }
     });
-    window.dispatchEvent(new CustomEvent('tpk:state-changed', { detail: { domain: domain, state: snapshot } }));
   }
 
-  function patchDomain(domain, patch) {
-    if (!domain || !state[domain]) return clone(state);
-    state[domain] = mergeDeep(state[domain], patch || {});
-    persistState();
-    notify(domain);
-    return clone(state);
+  function update(key, value, options) {
+    state[key] = clone(value);
+    notify({
+      type: 'update',
+      key: key,
+      value: clone(value),
+      options: clone(options || {})
+    });
+    return clone(state[key]);
+  }
+
+  function mergeObject(key, patch, options) {
+    var current = state[key] && typeof state[key] === 'object' ? state[key] : {};
+    var nextValue = Object.assign({}, current, patch || {});
+    return update(key, nextValue, options);
   }
 
   var AppState = {
-    get: function () {
+    init: function () {
+      state = createInitialState();
+      notify({ type: 'init' });
+      return this.getState();
+    },
+
+    reset: function () {
+      state = createInitialState();
+      notify({ type: 'reset' });
+      return this.getState();
+    },
+
+    getState: function () {
       return clone(state);
     },
 
-    getDomain: function (domain) {
-      return clone(state[domain] || {});
-    },
-
-    setSession: function (patch) {
-      return patchDomain('session', patch);
-    },
-
-    setBootstrap: function (patch) {
-      return patchDomain('bootstrap', patch);
-    },
-
-    setSync: function (patch) {
-      return patchDomain('sync', patch);
-    },
-
-    setUi: function (patch) {
-      return patchDomain('ui', patch);
-    },
-
-    rememberAuth: function (sessionToken, profile, extra) {
-      var mergedProfile = profile || state.bootstrap.profile || null;
-      this.setSession({
-        token: sessionToken || '',
-        id_user: (mergedProfile && (mergedProfile.id_user || mergedProfile.username)) || '',
-        role: (mergedProfile && (mergedProfile.role_akses || mergedProfile.role)) || '',
-        is_authenticated: !!sessionToken,
-        device_id: (window.StorageHelper && window.StorageHelper.getDeviceId()) || state.session.device_id || ''
-      });
-      this.setBootstrap(Object.assign({
-        profile: mergedProfile,
-        last_loaded_at: new Date().toISOString()
-      }, extra || {}));
-      return this.get();
-    },
-
-    clearSession: function () {
-      state.session = clone(DEFAULT_STATE.session);
-      state.bootstrap.profile = null;
-      state.bootstrap.permissions = [];
-      state.bootstrap.refs = null;
-      state.bootstrap.wilayah = null;
-      persistState();
-      notify('session');
-      return this.get();
-    },
-
-    reset: function (options) {
-      var keepUi = !options || options.keepUi !== false;
-      var nextState = clone(DEFAULT_STATE);
-      if (keepUi) {
-        nextState.ui = mergeDeep(nextState.ui, state.ui);
+    subscribe: function (handler) {
+      if (typeof handler !== 'function') {
+        return function () {};
       }
-      state = nextState;
-      persistState();
-      notify('reset');
-      return this.get();
+
+      var id = nextSubscriberId++;
+      subscribers.push({ id: id, handler: handler });
+
+      return function unsubscribe() {
+        subscribers = subscribers.filter(function (entry) {
+          return entry.id !== id;
+        });
+      };
     },
 
-    subscribe: function (callback) {
-      if (typeof callback !== 'function') return function () {};
-      subscribers.push(callback);
-      return function unsubscribe() {
-        subscribers = subscribers.filter(function (fn) { return fn !== callback; });
-      };
+    setProfile: function (profile) {
+      var keys = getStorageKeys();
+      var value = profile && typeof profile === 'object' ? profile : {};
+      update('profile', value, { persist: true });
+      safeSetToStorage(keys.PROFILE, value);
+      return clone(value);
+    },
+
+    getProfile: function () {
+      return clone(state.profile || {});
+    },
+
+    clearProfile: function () {
+      var keys = getStorageKeys();
+      update('profile', {}, { persist: true, cleared: true });
+      safeRemoveFromStorage(keys.PROFILE);
+      return {};
+    },
+
+    setPermissions: function (permissions) {
+      return update('permissions', permissions && typeof permissions === 'object' ? permissions : {});
+    },
+
+    getPermissions: function () {
+      return clone(state.permissions || {});
+    },
+
+    setCurrentRoute: function (routeName) {
+      return update('currentRoute', String(routeName || ''));
+    },
+
+    getCurrentRoute: function () {
+      return String(state.currentRoute || '');
+    },
+
+    setCurrentScreenId: function (screenId) {
+      return update('currentScreenId', String(screenId || ''));
+    },
+
+    getCurrentScreenId: function () {
+      return String(state.currentScreenId || '');
+    },
+
+    setBootstrap: function (bootstrapData) {
+      var keys = getStorageKeys();
+      var value = bootstrapData && typeof bootstrapData === 'object' ? bootstrapData : {};
+      update('bootstrap', value, { persist: true });
+      safeSetToStorage(keys.APP_BOOTSTRAP, value);
+      return clone(value);
+    },
+
+    getBootstrap: function () {
+      return clone(state.bootstrap || {});
+    },
+
+    clearBootstrap: function () {
+      var keys = getStorageKeys();
+      update('bootstrap', {}, { persist: true, cleared: true });
+      safeRemoveFromStorage(keys.APP_BOOTSTRAP);
+      return {};
+    },
+
+    setSelectedSasaran: function (sasaran) {
+      var keys = getStorageKeys();
+      var value = sasaran && typeof sasaran === 'object' ? sasaran : {};
+      update('selectedSasaran', value, { persist: true });
+      safeSetToStorage(keys.SELECTED_SASARAN, value);
+      return clone(value);
+    },
+
+    getSelectedSasaran: function () {
+      return clone(state.selectedSasaran || {});
+    },
+
+    clearSelectedSasaran: function () {
+      var keys = getStorageKeys();
+      update('selectedSasaran', {}, { persist: true, cleared: true });
+      safeRemoveFromStorage(keys.SELECTED_SASARAN);
+      return {};
+    },
+
+    setSasaranList: function (items) {
+      return update('sasaranList', Array.isArray(items) ? items : []);
+    },
+
+    getSasaranList: function () {
+      return clone(state.sasaranList || []);
+    },
+
+    setSasaranDetail: function (detail) {
+      return update('sasaranDetail', detail && typeof detail === 'object' ? detail : {});
+    },
+
+    getSasaranDetail: function () {
+      return clone(state.sasaranDetail || {});
+    },
+
+    setDashboardSummary: function (summary) {
+      return update('dashboardSummary', summary && typeof summary === 'object' ? summary : {});
+    },
+
+    getDashboardSummary: function () {
+      return clone(state.dashboardSummary || {});
+    },
+
+    setRekapData: function (rekapData) {
+      return update('rekapData', rekapData && typeof rekapData === 'object' ? rekapData : {});
+    },
+
+    getRekapData: function () {
+      return clone(state.rekapData || {});
+    },
+
+    setNetworkStatus: function (isOnline, label) {
+      var online = !!isOnline;
+      return update('network', {
+        online: online,
+        label: label || (online ? 'Online' : 'Offline')
+      });
+    },
+
+    getNetworkStatus: function () {
+      return clone(state.network || { online: true, label: 'Online' });
+    },
+
+    setSyncQueue: function (queue) {
+      var keys = getStorageKeys();
+      var value = Array.isArray(queue) ? queue : [];
+      mergeObject('sync', { queue: value }, { persist: true });
+      safeSetToStorage(keys.SYNC_QUEUE, value);
+      return clone(value);
+    },
+
+    getSyncQueue: function () {
+      return clone((state.sync && state.sync.queue) || []);
+    },
+
+    setLastSyncAt: function (timestamp) {
+      var keys = getStorageKeys();
+      var value = String(timestamp || '');
+      mergeObject('sync', { lastSyncAt: value }, { persist: true });
+      safeSetToStorage(keys.LAST_SYNC_AT, value);
+      return value;
+    },
+
+    getLastSyncAt: function () {
+      return String((state.sync && state.sync.lastSyncAt) || '');
+    },
+
+    setSyncing: function (isSyncing) {
+      mergeObject('sync', { isSyncing: !!isSyncing });
+      return !!isSyncing;
+    },
+
+    isSyncing: function () {
+      return !!(state.sync && state.sync.isSyncing);
+    },
+
+    setRegistrasiMode: function (mode) {
+      var nextMode = String(mode || 'create').toLowerCase();
+      mergeObject('forms', { registrasiMode: nextMode });
+      return nextMode;
+    },
+
+    getRegistrasiMode: function () {
+      return String((state.forms && state.forms.registrasiMode) || 'create');
+    },
+
+    setPendampinganMode: function (mode) {
+      var nextMode = String(mode || 'create').toLowerCase();
+      mergeObject('forms', { pendampinganMode: nextMode });
+      return nextMode;
+    },
+
+    getPendampinganMode: function () {
+      return String((state.forms && state.forms.pendampinganMode) || 'create');
     }
   };
 
   window.AppState = AppState;
-  persistState();
 })(window);
