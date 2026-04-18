@@ -4,6 +4,7 @@
   var loadedScripts = {};
   var currentRoute = '';
   var routeLinksBound = false;
+  var legacyMenuPrepared = false;
 
   var routeMap = {
     login: { file: './js/views/loginView.js', globals: ['LoginView'], methods: ['mount', 'render', 'show', 'init'] },
@@ -22,33 +23,32 @@
     login: 'login',
     dashboard: 'dashboard',
     home: 'dashboard',
-
     rekap: 'rekap',
     rekapkader: 'rekap',
     rekapsaya: 'rekap',
-
     sasaran: 'sasaran',
     sasaranlist: 'sasaran',
     daftarsasaran: 'sasaran',
-
     sasarandetail: 'sasarandetail',
     detailsasaran: 'sasarandetail',
-
     registrasi: 'registrasi',
-
     pendampingan: 'pendampingan',
-
     sync: 'sync',
     sinkronisasi: 'sync',
-    sinkronkan: 'sync',
-
-    profile: 'profile',
-    profil: 'profile'
+    profil: 'profile',
+    profile: 'profile'
   };
 
-  function byId(id) {
-    return document.getElementById(id);
-  }
+  var legacyMatchers = [
+    { route: 'profile', test: /\bprofil\b/i },
+    { route: 'sync', test: /\bsinkronisasi\b/i },
+    { route: 'rekap', test: /\brekap\s*saya\b/i },
+    { route: 'sasaran', test: /\bdaftar\s*sasaran\b/i },
+    { route: 'registrasi', test: /\bregistrasi\b/i },
+    { route: 'pendampingan', test: /\bpendampingan\b/i }
+  ];
+
+  function byId(id) { return document.getElementById(id); }
 
   function getSessionToken() {
     try {
@@ -56,28 +56,16 @@
         return String(window.Api.getSessionToken() || '').trim();
       }
     } catch (err) {}
-
     try {
       if (window.Storage && typeof window.Storage.get === 'function' && window.APP_CONFIG && window.APP_CONFIG.STORAGE_KEYS) {
         return String(window.Storage.get(window.APP_CONFIG.STORAGE_KEYS.SESSION_TOKEN, '') || '').trim();
       }
     } catch (err2) {}
-
     return '';
   }
 
   function getRootContainer() {
-    return (
-      byId('module-root') ||
-      byId('content-root') ||
-      byId('view-root') ||
-      byId('screen-root') ||
-      byId('konten-app') ||
-      byId('screen-container') ||
-      byId('app-content') ||
-      byId('content-area') ||
-      document.body
-    );
+    return byId('module-root') || byId('content-root') || byId('view-root') || byId('screen-root') || byId('konten-app') || byId('screen-container') || byId('app-content') || byId('content-area') || document.body;
   }
 
   function setRootContent(html) {
@@ -92,13 +80,8 @@
     return routeAliases[value] || value;
   }
 
-  function getDefaultRoute() {
-    return getSessionToken() ? 'dashboard' : 'login';
-  }
-
-  function routeExists(name) {
-    return !!routeMap[name];
-  }
+  function getDefaultRoute() { return getSessionToken() ? 'dashboard' : 'login'; }
+  function routeExists(name) { return !!routeMap[name]; }
 
   function loadScript(url) {
     if (!url) return Promise.resolve();
@@ -109,54 +92,12 @@
       var script = document.createElement('script');
       script.src = url;
       script.async = true;
-      script.onload = function () {
-        loadedScripts[url] = true;
-        resolve();
-      };
-      script.onerror = function () {
-        loadedScripts[url] = false;
-        reject(new Error('Gagal memuat script: ' + url));
-      };
+      script.onload = function () { loadedScripts[url] = true; resolve(); };
+      script.onerror = function () { loadedScripts[url] = false; reject(new Error('Gagal memuat script: ' + url)); };
       document.body.appendChild(script);
     });
 
     return loadedScripts[url];
-  }
-
-  function createProfileFallback() {
-    return {
-      render: function (root) {
-        var appState = window.AppState;
-        var profile = {};
-        try {
-          if (appState && typeof appState.getProfile === 'function') {
-            profile = appState.getProfile() || {};
-          }
-        } catch (err) {}
-
-        var rows = [
-          ['Nama', profile.nama_kader || profile.nama_user || profile.nama || '-'],
-          ['ID User', profile.id_user || '-'],
-          ['Unsur TPK', profile.unsur_tpk || profile.unsur || '-'],
-          ['Nomor Tim', profile.nomor_tim || profile.nomor_tim_display || profile.id_tim || '-'],
-          ['Kecamatan', profile.nama_kecamatan || profile.kecamatan || '-'],
-          ['Desa/Kelurahan', profile.desa_kelurahan || profile.nama_desa || '-'],
-          ['Dusun/RW', profile.dusun_rw || profile.nama_dusun || '-']
-        ];
-
-        var html = '<div class="tpk-card"><h3>Profil Saya</h3><table style="width:100%;border-collapse:collapse;">' +
-          rows.map(function (row) {
-            return '<tr><td style="padding:8px 10px;font-weight:600;width:180px;">' + row[0] + '</td><td style="padding:8px 10px;">' + row[1] + '</td></tr>';
-          }).join('') +
-          '</table></div>';
-
-        if (root && typeof root.innerHTML !== 'undefined') {
-          root.innerHTML = html;
-          return root;
-        }
-        return html;
-      }
-    };
   }
 
   function getViewObject(config) {
@@ -164,11 +105,6 @@
     for (var i = 0; i < names.length; i += 1) {
       if (window[names[i]]) return window[names[i]];
     }
-
-    if (config === routeMap.profile) {
-      return window.ProfileView || createProfileFallback();
-    }
-
     return null;
   }
 
@@ -178,45 +114,27 @@
 
     var ctx = { route: routeName, root: root, config: config };
 
-    if (method === 'mount') {
-      return fn.call(viewObj, root, ctx);
-    }
-
+    if (method === 'mount') return fn.call(viewObj, root, ctx);
     if (method === 'render') {
       var result = fn.call(viewObj, root, ctx, routeName);
-      if (typeof result === 'string') {
-        setRootContent(result);
-      }
+      if (typeof result === 'string') setRootContent(result);
       if (typeof viewObj.afterRender === 'function') {
-        return Promise.resolve(result).then(function () {
-          return viewObj.afterRender(root, ctx);
-        });
+        return Promise.resolve(result).then(function () { return viewObj.afterRender(root, ctx); });
       }
       return result;
     }
-
-    if (method === 'show') {
-      return fn.call(viewObj, routeName, root, ctx);
-    }
-
-    if (method === 'init') {
-      return fn.call(viewObj, routeName, root, ctx);
-    }
-
     return fn.call(viewObj, routeName, root, ctx);
   }
 
   function callView(viewObj, methods, routeName, config) {
     var names = Array.isArray(methods) ? methods : [methods];
     var root = getRootContainer();
-
     for (var i = 0; i < names.length; i += 1) {
       var method = names[i];
       if (viewObj && typeof viewObj[method] === 'function') {
         return invokeViewMethod(viewObj, method, routeName, root, config);
       }
     }
-
     return undefined;
   }
 
@@ -249,7 +167,41 @@
     } catch (err) {}
   }
 
+  function detectRouteFromElement(el) {
+    if (!el) return '';
+    var explicit = normalizeRoute(el.getAttribute('data-route-link') || el.getAttribute('data-route') || el.getAttribute('href'));
+    if (explicit && routeExists(explicit)) return explicit;
+
+    var tokens = [
+      el.id || '',
+      el.name || '',
+      el.getAttribute('aria-label') || '',
+      el.getAttribute('title') || '',
+      el.textContent || ''
+    ].join(' ').replace(/\s+/g, ' ').trim();
+
+    for (var i = 0; i < legacyMatchers.length; i += 1) {
+      if (legacyMatchers[i].test.test(tokens)) return legacyMatchers[i].route;
+    }
+    return '';
+  }
+
+  function prepareLegacyMenuLinks() {
+    if (legacyMenuPrepared) return;
+    legacyMenuPrepared = true;
+
+    var candidates = Array.prototype.slice.call(document.querySelectorAll('button, a, [role="button"], .menu-button, .nav-button'));
+    candidates.forEach(function (el) {
+      if (el.hasAttribute('data-route-link')) return;
+      var route = detectRouteFromElement(el);
+      if (!route) return;
+      el.setAttribute('data-route-link', route);
+    });
+  }
+
   async function go(route) {
+    prepareLegacyMenuLinks();
+
     var routeName = normalizeRoute(route) || getDefaultRoute();
     if (!routeExists(routeName)) {
       renderPlaceholder(routeName);
@@ -281,15 +233,14 @@
     }
   }
 
-  function current() {
-    return currentRoute || normalizeRoute(window.location.hash) || getDefaultRoute();
-  }
+  function current() { return currentRoute || normalizeRoute(window.location.hash) || getDefaultRoute(); }
 
   function bindRouteLinks() {
     if (routeLinksBound) return;
     routeLinksBound = true;
 
     document.addEventListener('click', function (event) {
+      prepareLegacyMenuLinks();
       var trigger = event.target.closest('[data-route-link]');
       if (!trigger) return;
 
@@ -302,6 +253,7 @@
   }
 
   function init() {
+    prepareLegacyMenuLinks();
     bindRouteLinks();
     go(normalizeRoute(window.location.hash) || getDefaultRoute());
   }
@@ -313,7 +265,7 @@
     getCurrentRoute: current,
     loadScript: loadScript,
     bindRouteLinks: bindRouteLinks,
-
+    prepareLegacyMenuLinks: prepareLegacyMenuLinks,
     toLogin: function () { return go('login'); },
     toDashboard: function () { return go('dashboard'); },
     toRekapKader: function () { return go('rekap'); },
@@ -326,8 +278,6 @@
   };
 
   Object.defineProperty(window.Router, 'currentRoute', {
-    get: function () {
-      return current();
-    }
+    get: function () { return current(); }
   });
 })(window, document);
