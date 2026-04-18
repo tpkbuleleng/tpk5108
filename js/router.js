@@ -1,274 +1,362 @@
 (function (window, document) {
   'use strict';
 
-  var DEFAULT_ROUTE = 'rekap';
-  var routeHandlers = {};
-  var initialized = false;
+  function qs(selector, root) {
+    return (root || document).querySelector(selector);
+  }
 
-  function hasToken() {
-    if (window.StorageHelper && typeof window.StorageHelper.hasSessionToken === 'function') {
-      return window.StorageHelper.hasSessionToken();
-    }
+  function qsa(selector, root) {
+    return Array.prototype.slice.call((root || document).querySelectorAll(selector));
+  }
+
+  function safeCall(fn, fallback) {
     try {
-      return !!(window.localStorage.getItem('SESSION_TOKEN') || window.localStorage.getItem('tpk_session_token'));
+      return fn();
+    } catch (err) {
+      console.warn('[Router] Error:', err);
+      return fallback;
+    }
+  }
+
+  function getModuleRoot() {
+    return qs('#module-root')
+      || qs('#content-root')
+      || qs('#view-root')
+      || qs('#screen-root')
+      || qs('#konten-app')
+      || qs('#screen-container')
+      || qs('#app-content')
+      || qs('main');
+  }
+
+  function hasSessionToken() {
+    try {
+      if (window.Api && typeof window.Api.getSessionToken === 'function') {
+        return !!String(window.Api.getSessionToken() || '').trim();
+      }
+    } catch (err) {}
+
+    try {
+      if (window.Storage && typeof window.Storage.getSessionToken === 'function') {
+        return !!String(window.Storage.getSessionToken() || '').trim();
+      }
+    } catch (err) {}
+
+    try {
+      return !!String(localStorage.getItem('tpk_session_token') || '').trim();
     } catch (err) {
       return false;
     }
   }
 
-  function getProfile() {
-    if (window.StorageHelper && typeof window.StorageHelper.getProfile === 'function') {
-      return window.StorageHelper.getProfile();
-    }
-    try {
-      var raw = window.localStorage.getItem('USER_PROFILE') || window.localStorage.getItem('tpk_profile');
-      return raw ? JSON.parse(raw) : null;
-    } catch (err) {
-      return null;
-    }
-  }
+  function normalizeRoute(route) {
+    var raw = String(route || '').trim().replace(/^#/, '').toLowerCase();
 
-  function normalizeRoute(routeName) {
-    var value = String(routeName || '').replace(/^#/, '').trim().toLowerCase();
-    if (!value) return DEFAULT_ROUTE;
+    if (!raw) return hasSessionToken() ? 'dashboard' : 'login';
 
     var aliases = {
-      dashboard: 'rekap',
-      home: 'rekap',
-      beranda: 'rekap',
-      daftar: 'sasaran',
-      'daftar-sasaran': 'sasaran',
-      'sasaran-list': 'sasaran',
-      'sinkronisasi': 'sync',
-      draft: 'sync'
+      home: 'dashboard',
+      utama: 'dashboard',
+      sync: 'sync',
+      sinkronkan: 'sync',
+      sinkronisasi: 'sync',
+      sasaranlist: 'sasaran',
+      daftar-sasaran: 'sasaran',
+      daftar_sasaran: 'sasaran',
+      rekap-saya: 'rekap',
+      rekap_saya: 'rekap',
+      pendampinganform: 'pendampingan',
+      registrasiform: 'registrasi',
+      profil: 'profile'
     };
 
-    return aliases[value] || value;
+    return aliases[raw] || raw;
   }
 
-  function getHashRoute() {
-    return normalizeRoute(window.location.hash || DEFAULT_ROUTE);
-  }
-
-  function setHash(routeName, replaceState) {
-    var nextHash = '#' + normalizeRoute(routeName);
-    if (replaceState) {
-      if (window.location.hash !== nextHash) {
-        window.history.replaceState(null, '', nextHash);
-      }
-    } else if (window.location.hash !== nextHash) {
-      window.location.hash = nextHash;
-    }
-  }
-
-  function hideEl(el) {
-    if (!el) return;
-    el.classList.add('hidden');
-    el.classList.remove('active');
-    el.style.display = 'none';
-  }
-
-  function showEl(el, displayValue) {
-    if (!el) return;
-    el.classList.remove('hidden');
-    el.classList.add('active');
-    el.style.display = displayValue || '';
-  }
-
-  function getShellElements() {
+  function getRouteMap() {
     return {
-      splash: document.getElementById('view-splash') || document.getElementById('screen-splash'),
-      login: document.getElementById('view-login') || document.getElementById('screen-login'),
-      app: document.getElementById('view-app') || document.getElementById('screen-app') || document.getElementById('app-shell')
+      login: {
+        key: 'login',
+        hash: '#login',
+        title: 'Login',
+        viewName: 'LoginView',
+        requiresAuth: false
+      },
+      dashboard: {
+        key: 'dashboard',
+        hash: '#dashboard',
+        title: 'Dashboard',
+        viewName: 'DashboardView',
+        requiresAuth: true
+      },
+      rekap: {
+        key: 'rekap',
+        hash: '#rekap',
+        title: 'Rekap Saya',
+        viewName: 'RekapKaderView',
+        requiresAuth: true
+      },
+      sasaran: {
+        key: 'sasaran',
+        hash: '#sasaran',
+        title: 'Daftar Sasaran',
+        viewName: 'SasaranListView',
+        requiresAuth: true
+      },
+      'sasaran-detail': {
+        key: 'sasaran-detail',
+        hash: '#sasaran-detail',
+        title: 'Detail Sasaran',
+        viewName: 'SasaranDetailView',
+        requiresAuth: true
+      },
+      registrasi: {
+        key: 'registrasi',
+        hash: '#registrasi',
+        title: 'Registrasi',
+        viewName: 'RegistrasiView',
+        requiresAuth: true
+      },
+      pendampingan: {
+        key: 'pendampingan',
+        hash: '#pendampingan',
+        title: 'Pendampingan',
+        viewName: 'PendampinganView',
+        requiresAuth: true
+      },
+      sync: {
+        key: 'sync',
+        hash: '#sync',
+        title: 'Sinkronisasi',
+        viewName: 'SyncView',
+        requiresAuth: true
+      },
+      profile: {
+        key: 'profile',
+        hash: '#profile',
+        title: 'Profil',
+        viewName: 'DashboardView',
+        requiresAuth: true
+      }
     };
   }
 
-  function showShell(mode) {
-    var shell = getShellElements();
-    hideEl(shell.splash);
-    if (mode === 'login') {
-      showEl(shell.login, '');
-      hideEl(shell.app);
+  function parseHash(hashValue) {
+    var raw = String(hashValue || window.location.hash || '').replace(/^#/, '');
+    var parts = raw.split('?');
+    var route = normalizeRoute(parts[0]);
+    var params = {};
+
+    if (parts[1]) {
+      parts[1].split('&').forEach(function (pair) {
+        var bits = pair.split('=');
+        var key = decodeURIComponent(bits[0] || '').trim();
+        if (!key) return;
+        params[key] = decodeURIComponent(bits.slice(1).join('=') || '');
+      });
+    }
+
+    return { route: route, params: params };
+  }
+
+  function buildHash(routeKey, params) {
+    var map = getRouteMap();
+    var def = map[normalizeRoute(routeKey)] || map.dashboard;
+    var search = new URLSearchParams(params || {}).toString();
+    return def.hash + (search ? ('?' + search) : '');
+  }
+
+  function updateTitle(routeDef) {
+    try {
+      if (routeDef && routeDef.title) {
+        document.title = routeDef.title + ' - TPK Kabupaten Buleleng';
+      }
+    } catch (err) {}
+  }
+
+  function updateNav(routeKey) {
+    qsa('[data-route-link]').forEach(function (el) {
+      var match = normalizeRoute(el.getAttribute('data-route-link')) === normalizeRoute(routeKey);
+      el.classList.toggle('is-active', !!match);
+      el.setAttribute('aria-current', match ? 'page' : 'false');
+    });
+  }
+
+  function toggleShell(isLoginRoute) {
+    var header = qs('.tpk-header');
+    var nav = qs('.tpk-nav');
+    var main = qs('#main-content') || qs('.tpk-main');
+    var loginSection = qs('#login-screen') || qs('#loginScreen') || qs('.tpk-login') || qs('.login-screen');
+
+    if (header) header.style.display = isLoginRoute ? 'none' : '';
+    if (nav) nav.style.display = isLoginRoute ? 'none' : '';
+    if (main) main.style.display = isLoginRoute ? 'none' : '';
+    if (loginSection) loginSection.style.display = isLoginRoute ? '' : 'none';
+  }
+
+  function renderPlaceholder(routeDef, note) {
+    var root = getModuleRoot();
+    if (!root) return;
+
+    root.innerHTML = ''
+      + '<div class="tpk-card tpk-card--placeholder" style="padding:16px;">'
+      + '<strong>' + (routeDef && routeDef.title ? routeDef.title : 'Modul') + '</strong>'
+      + '<div style="margin-top:8px;color:#5c708f;">'
+      + (note || 'Modul belum siap dimuat.')
+      + '</div>'
+      + '</div>';
+  }
+
+  function tryViewMethod(view, methodName, ctx) {
+    if (!view || typeof view[methodName] !== 'function') return { handled: false };
+    var result = safeCall(function () {
+      return view[methodName](ctx);
+    });
+    return { handled: true, result: result };
+  }
+
+  function renderView(routeDef, params) {
+    if (!routeDef) return;
+
+    if (routeDef.key === 'login') {
+      toggleShell(true);
+      updateTitle(routeDef);
+      updateNav(routeDef.key);
       return;
     }
-    if (mode === 'app') {
-      hideEl(shell.login);
-      showEl(shell.app, '');
+
+    toggleShell(false);
+
+    var root = getModuleRoot();
+    if (!root) return;
+
+    var view = window[routeDef.viewName];
+    if (!view) {
+      renderPlaceholder(routeDef, 'File view dimuat tetapi objek global belum ditemukan: ' + routeDef.viewName);
       return;
     }
-    showEl(shell.splash, '');
-    hideEl(shell.login);
-    hideEl(shell.app);
+
+    var ctx = {
+      route: routeDef.key,
+      params: params || {},
+      root: root
+    };
+
+    var methods = ['init', 'mount', 'render', 'show', 'open'];
+    var handled = false;
+    var result;
+
+    for (var i = 0; i < methods.length; i += 1) {
+      var out = tryViewMethod(view, methods[i], ctx);
+      if (out.handled) {
+        handled = true;
+        result = out.result;
+        if (methods[i] === 'render' || methods[i] === 'mount') break;
+      }
+    }
+
+    if (!handled) {
+      renderPlaceholder(routeDef, 'Objek view ditemukan, tetapi tidak memiliki method init/mount/render/show/open.');
+      return;
+    }
+
+    if (typeof result === 'string') {
+      root.innerHTML = result;
+    } else if (result && result.nodeType === 1) {
+      root.innerHTML = '';
+      root.appendChild(result);
+    }
+
+    if (typeof view.afterRender === 'function') {
+      safeCall(function () { view.afterRender(ctx); });
+    }
+
+    updateTitle(routeDef);
+    updateNav(routeDef.key);
   }
 
-  function callLegacyRenderer(routeName, profile) {
-    if (typeof window.renderKonten === 'function') {
-      var legacyMap = {
-        rekap: 'rekap',
-        registrasi: 'registrasi',
-        pendampingan: 'pendampingan',
-        sasaran: 'daftar-sasaran',
-        sync: 'sinkronisasi',
-        profile: 'profil'
-      };
-      var legacyRoute = legacyMap[routeName] || 'rekap';
-      window.renderKonten(legacyRoute, profile || getProfile() || null);
-      return true;
+  function resolveRoute(routeKey) {
+    var map = getRouteMap();
+    var key = normalizeRoute(routeKey);
+    var def = map[key] || map.dashboard;
+
+    if (def.requiresAuth && !hasSessionToken()) {
+      return map.login;
     }
-
-    var candidates = {
-      rekap: [window.RekapView, window.RekapKaderScreen],
-      registrasi: [window.RegistrasiView, window.RegistrasiForm],
-      pendampingan: [window.PendampinganView, window.PendampinganForm],
-      sasaran: [window.SasaranListView, window.SasaranList],
-      sync: [window.SyncScreen, window.SyncView],
-      profile: [window.ProfileView]
-    }[routeName] || [];
-
-    for (var i = 0; i < candidates.length; i += 1) {
-      var candidate = candidates[i];
-      if (candidate && typeof candidate.render === 'function') {
-        candidate.render(profile || getProfile() || null);
-        return true;
-      }
-      if (candidate && typeof candidate.show === 'function') {
-        candidate.show(profile || getProfile() || null);
-        return true;
-      }
-      if (candidate && typeof candidate.init === 'function') {
-        candidate.init(profile || getProfile() || null);
-        return true;
-      }
-    }
-
-    return false;
+    return def;
   }
 
-  function updateUiRouteState(routeName) {
-    if (window.AppState && typeof window.AppState.setUi === 'function') {
-      window.AppState.setUi({ active_screen: routeName });
+  function go(routeKey, params, replace) {
+    var def = resolveRoute(routeKey);
+    var hash = buildHash(def.key, params);
+
+    if (replace) {
+      if (window.location.hash !== hash) {
+        window.history.replaceState({}, document.title, hash);
+      }
+      renderView(def, params || {});
+      return;
     }
 
-    var elements = document.querySelectorAll('[data-route-link]');
-    for (var i = 0; i < elements.length; i += 1) {
-      var el = elements[i];
-      var isActive = normalizeRoute(el.getAttribute('data-route-link')) === routeName;
-      el.classList.toggle('active', isActive);
-      if (isActive) {
-        el.setAttribute('aria-current', 'page');
-      } else {
-        el.removeAttribute('aria-current');
-      }
+    if (window.location.hash === hash) {
+      renderView(def, params || {});
+      return;
     }
+
+    window.location.hash = hash;
   }
 
-  async function resolveRoute(routeName, options) {
-    var route = normalizeRoute(routeName);
-    var opts = options || {};
-    var authed = hasToken();
-    var profile = getProfile();
-
-    if (!authed && route !== 'login') {
-      route = 'login';
-      setHash(route, true);
-    }
-
-    if (authed && route === 'login') {
-      route = DEFAULT_ROUTE;
-      setHash(route, true);
-    }
-
-    if (route === 'login') {
-      showShell('login');
-      updateUiRouteState('login');
-      if (routeHandlers.login) {
-        await Promise.resolve(routeHandlers.login({ route: route, profile: profile, authed: authed, options: opts }));
-      }
-      return route;
-    }
-
-    showShell('app');
-    updateUiRouteState(route);
-
-    if (routeHandlers[route]) {
-      await Promise.resolve(routeHandlers[route]({ route: route, profile: profile, authed: authed, options: opts }));
-      return route;
-    }
-
-    if (!callLegacyRenderer(route, profile)) {
-      callLegacyRenderer(DEFAULT_ROUTE, profile);
-      route = DEFAULT_ROUTE;
-      setHash(route, true);
-      updateUiRouteState(route);
-    }
-
-    return route;
+  function onHashChange() {
+    var parsed = parseHash(window.location.hash);
+    var def = resolveRoute(parsed.route);
+    renderView(def, parsed.params);
   }
 
-  var AppRouter = {
-    init: function () {
-      if (initialized) return Promise.resolve({ ok: true });
+  function bindLinkClicks() {
+    if (document.body.dataset.routerBound === '1') return;
+    document.body.dataset.routerBound = '1';
 
-      this.register('login', function () {
-        if (window.AuthView && typeof window.AuthView.showLogin === 'function') {
-          window.AuthView.showLogin();
+    document.addEventListener('click', function (event) {
+      var el = event.target && event.target.closest
+        ? event.target.closest('[data-route-link], a[href^="#"]')
+        : null;
+      if (!el) return;
+
+      var route = el.getAttribute('data-route-link');
+      if (!route) {
+        var href = el.getAttribute('href') || '';
+        if (href.indexOf('#') === 0) {
+          route = href.slice(1);
         }
-      });
-
-      this.register('rekap', function (ctx) { callLegacyRenderer('rekap', ctx.profile); });
-      this.register('registrasi', function (ctx) { callLegacyRenderer('registrasi', ctx.profile); });
-      this.register('pendampingan', function (ctx) { callLegacyRenderer('pendampingan', ctx.profile); });
-      this.register('sasaran', function (ctx) { callLegacyRenderer('sasaran', ctx.profile); });
-      this.register('sync', function (ctx) { callLegacyRenderer('sync', ctx.profile); });
-      this.register('profile', function (ctx) { callLegacyRenderer('profile', ctx.profile); });
-
-      window.addEventListener('hashchange', function () {
-        AppRouter.go(getHashRoute(), { fromHashChange: true, replaceState: true }).catch(function (err) {
-          console.warn('[AppRouter] hashchange gagal:', err);
-        });
-      });
-
-      document.addEventListener('click', function (event) {
-        var target = event.target.closest('[data-route-link]');
-        if (!target) return;
-        event.preventDefault();
-        AppRouter.go(target.getAttribute('data-route-link'));
-      });
-
-      initialized = true;
-      return this.go(getHashRoute(), { replaceState: true });
-    },
-
-    register: function (routeName, handler) {
-      routeHandlers[normalizeRoute(routeName)] = handler;
-      return this;
-    },
-
-    go: function (routeName, options) {
-      var opts = options || {};
-      var route = normalizeRoute(routeName);
-      if (!opts.fromHashChange) {
-        setHash(route, !!opts.replaceState);
       }
-      return resolveRoute(route, opts);
-    },
 
-    refresh: function () {
-      return resolveRoute(getHashRoute(), { replaceState: true, refreshOnly: true });
-    },
+      if (!route) return;
 
-    current: function () {
-      return getHashRoute();
-    },
+      event.preventDefault();
+      go(route);
+    });
+  }
 
-    goLogin: function () {
-      return this.go('login');
-    },
+  function init() {
+    bindLinkClicks();
+    window.addEventListener('hashchange', onHashChange);
 
-    goHome: function () {
-      return this.go(DEFAULT_ROUTE);
+    var parsed = parseHash(window.location.hash);
+    var def = resolveRoute(parsed.route);
+
+    if (!window.location.hash) {
+      go(def.key, parsed.params, true);
+      return;
     }
-  };
 
-  window.AppRouter = AppRouter;
+    renderView(def, parsed.params);
+  }
+
+  window.Router = {
+    init: init,
+    go: go,
+    refresh: onHashChange,
+    parseHash: parseHash,
+    resolveRoute: resolveRoute
+  };
 })(window, document);
