@@ -1,283 +1,408 @@
 (function (window, document) {
   'use strict';
 
-  var loadedScripts = {};
-  var currentRoute = '';
-  var routeLinksBound = false;
-  var legacyMenuPrepared = false;
-
-  var routeMap = {
-    login: { file: './js/views/loginView.js', globals: ['LoginView'], methods: ['mount', 'render', 'show', 'init'] },
-    dashboard: { file: './js/views/dashboardView.js', globals: ['DashboardView'], methods: ['mount', 'render', 'show', 'init', 'refresh'] },
-    rekap: { file: './js/views/rekapKaderView.js', globals: ['RekapKaderView'], methods: ['mount', 'render', 'show', 'init'] },
-    sasaran: { file: './js/views/sasaranListView.js', globals: ['SasaranListView'], methods: ['mount', 'render', 'show', 'init'] },
-    sasarandetail: { file: './js/views/sasaranDetailView.js', globals: ['SasaranDetailView'], methods: ['mount', 'render', 'show', 'init'] },
-    registrasi: { file: './js/views/registrasiView.js', globals: ['RegistrasiView', 'RegistrasiForm'], methods: ['mount', 'render', 'show', 'init'] },
-    pendampingan: { file: './js/views/pendampinganView.js', globals: ['PendampinganView'], methods: ['mount', 'render', 'show', 'init'] },
-    sync: { file: './js/views/syncView.js', globals: ['SyncView'], methods: ['mount', 'render', 'show', 'init'] },
-    profile: { file: './js/views/profileView.js', globals: ['ProfileView'], methods: ['mount', 'render', 'show', 'init'] }
+  var ROUTE_MAP = {
+    splash: 'splash-screen',
+    login: 'login-screen',
+    dashboard: 'dashboard-screen',
+    sasaranList: 'sasaran-list-screen',
+    sasaranDetail: 'sasaran-detail-screen',
+    registrasi: 'registrasi-screen',
+    pendampingan: 'pendampingan-screen',
+    sync: 'sync-screen',
+    rekapKader: 'rekap-kader-screen'
   };
 
-  var routeAliases = {
-    '': '',
-    login: 'login',
-    dashboard: 'dashboard',
-    home: 'dashboard',
-    rekap: 'rekap',
-    rekapkader: 'rekap',
-    rekapsaya: 'rekap',
-    sasaran: 'sasaran',
-    sasaranlist: 'sasaran',
-    daftarsasaran: 'sasaran',
-    sasarandetail: 'sasarandetail',
-    detailsasaran: 'sasarandetail',
-    registrasi: 'registrasi',
-    pendampingan: 'pendampingan',
-    sync: 'sync',
-    sinkronisasi: 'sync',
-    profil: 'profile',
-    profile: 'profile'
+  var ROUTE_ASSET_MAP = {
+    dashboard: [
+      { src: './js/views/dashboardView.js?v=20260418-stage1', globalName: 'DashboardView' }
+    ],
+    sasaranList: [
+      { src: './js/views/sasaranListView.js?v=20260412-01', globalName: 'SasaranListView' }
+    ],
+    sasaranDetail: [
+      { src: './js/views/sasaranDetailView.js?v=20260418-01', globalName: 'SasaranDetailView' }
+    ],
+    registrasi: [
+      { src: './js/views/registrasiView.js?v=20260418-01', globalName: 'RegistrasiView' }
+    ],
+    pendampingan: [
+      { src: './js/views/pendampinganView.js?v=20260417-01', globalName: 'PendampinganView' }
+    ],
+    sync: [
+      { src: './js/views/syncView.js?v=20260418-stage1', globalName: 'SyncView' }
+    ],
+    rekapKader: [
+      { src: './js/views/rekapKaderView.js?v=20260418-01', globalName: 'RekapKaderView' }
+    ]
   };
 
-  var legacyMatchers = [
-    { route: 'profile', test: /\bprofil\b/i },
-    { route: 'sync', test: /\bsinkronisasi\b/i },
-    { route: 'rekap', test: /\brekap\s*saya\b/i },
-    { route: 'sasaran', test: /\bdaftar\s*sasaran\b/i },
-    { route: 'registrasi', test: /\bregistrasi\b/i },
-    { route: 'pendampingan', test: /\bpendampingan\b/i }
-  ];
+  var scriptPromises = {};
+  var isDomBound = false;
 
-  function byId(id) { return document.getElementById(id); }
-
-  function getSessionToken() {
-    try {
-      if (window.Api && typeof window.Api.getSessionToken === 'function') {
-        return String(window.Api.getSessionToken() || '').trim();
-      }
-    } catch (err) {}
-    try {
-      if (window.Storage && typeof window.Storage.get === 'function' && window.APP_CONFIG && window.APP_CONFIG.STORAGE_KEYS) {
-        return String(window.Storage.get(window.APP_CONFIG.STORAGE_KEYS.SESSION_TOKEN, '') || '').trim();
-      }
-    } catch (err2) {}
-    return '';
+  function getAppState() {
+    return window.AppState || null;
   }
 
-  function getRootContainer() {
-    return byId('module-root') || byId('content-root') || byId('view-root') || byId('screen-root') || byId('konten-app') || byId('screen-container') || byId('app-content') || byId('content-area') || document.body;
+  function normalizeRouteName(routeName) {
+    var raw = String(routeName || '').trim();
+
+    var aliases = {
+      splash: 'splash',
+      login: 'login',
+      dashboard: 'dashboard',
+
+      profile: 'profile',
+      profil: 'profile',
+      settings: 'settings',
+      pengaturan: 'settings',
+      help: 'help',
+      bantuan: 'help',
+
+      'sasaran-list': 'sasaranList',
+      sasaranList: 'sasaranList',
+      sasaran_list: 'sasaranList',
+      sasaran: 'sasaranList',
+
+      'sasaran-detail': 'sasaranDetail',
+      sasaranDetail: 'sasaranDetail',
+      sasaran_detail: 'sasaranDetail',
+
+      registrasi: 'registrasi',
+      'registrasi-sasaran': 'registrasi',
+      registrasiSasaran: 'registrasi',
+      registrasi_sasaran: 'registrasi',
+
+      pendampingan: 'pendampingan',
+
+      sync: 'sync',
+      syncScreen: 'sync',
+      'sync-screen': 'sync',
+      sinkronisasi: 'sync',
+      draftSinkronisasi: 'sync',
+      draft_sinkronisasi: 'sync',
+
+      rekap: 'rekapKader',
+      rekapKader: 'rekapKader',
+      'rekap-kader': 'rekapKader',
+      rekap_kader: 'rekapKader',
+      'rekap-saya': 'rekapKader'
+    };
+
+    return aliases[raw] || raw;
   }
 
-  function setRootContent(html) {
-    var root = getRootContainer();
-    if (root) root.innerHTML = html || '';
+  function showScreen(screenId) {
+    if (!screenId) return false;
+
+    if (window.UI && typeof window.UI.showScreen === 'function') {
+      window.UI.showScreen(screenId);
+      return true;
+    }
+
+    var screens = document.querySelectorAll('.screen');
+    Array.prototype.forEach.call(screens, function (screen) {
+      screen.classList.remove('active');
+      screen.classList.add('hidden');
+    });
+
+    var target = document.getElementById(screenId);
+    if (!target) return false;
+
+    target.classList.remove('hidden');
+    target.classList.add('active');
+    return true;
   }
 
-  function normalizeRoute(route) {
-    var value = String(route || '').trim().toLowerCase();
-    if (!value) return '';
-    value = value.replace(/^#/, '').replace(/[^a-z0-9]+/g, '');
-    return routeAliases[value] || value;
+  function updateCurrentRoute(routeName, screenId) {
+    Router.currentRoute = routeName || '';
+    Router.currentScreenId = screenId || '';
+    Router.routeToken += 1;
+
+    var appState = getAppState();
+    if (appState && typeof appState.setCurrentRoute === 'function') {
+      appState.setCurrentRoute(routeName || '');
+    }
+    if (appState && typeof appState.setCurrentScreenId === 'function') {
+      appState.setCurrentScreenId(screenId || '');
+    }
+
+    return Router.routeToken;
   }
 
-  function getDefaultRoute() { return getSessionToken() ? 'dashboard' : 'login'; }
-  function routeExists(name) { return !!routeMap[name]; }
+  function getRouteAssets(routeName) {
+    return ROUTE_ASSET_MAP[routeName] || [];
+  }
 
-  function loadScript(url) {
-    if (!url) return Promise.resolve();
-    if (loadedScripts[url] === true) return Promise.resolve();
-    if (loadedScripts[url] && typeof loadedScripts[url].then === 'function') return loadedScripts[url];
+  function isGlobalReady(globalName) {
+    return !!(globalName && window[globalName]);
+  }
 
-    loadedScripts[url] = new Promise(function (resolve, reject) {
+  function hasScriptTag(src) {
+    return !!document.querySelector('script[data-lazy-src="' + src.replace(/"/g, '\\"') + '"]');
+  }
+
+  function loadScriptOnce(src, globalName) {
+    if (!src) return Promise.resolve();
+    if (isGlobalReady(globalName)) return Promise.resolve();
+
+    if (scriptPromises[src]) {
+      return scriptPromises[src];
+    }
+
+    if (hasScriptTag(src)) {
+      scriptPromises[src] = new Promise(function (resolve) {
+        var tries = 0;
+        function waitUntilReady() {
+          tries += 1;
+          if (isGlobalReady(globalName) || tries > 50) {
+            resolve();
+            return;
+          }
+          window.setTimeout(waitUntilReady, 100);
+        }
+        waitUntilReady();
+      });
+      return scriptPromises[src];
+    }
+
+    scriptPromises[src] = new Promise(function (resolve, reject) {
       var script = document.createElement('script');
-      script.src = url;
+      script.src = src;
       script.async = true;
-      script.onload = function () { loadedScripts[url] = true; resolve(); };
-      script.onerror = function () { loadedScripts[url] = false; reject(new Error('Gagal memuat script: ' + url)); };
+      script.defer = true;
+      script.dataset.lazySrc = src;
+      script.onload = function () { resolve(); };
+      script.onerror = function () { reject(new Error('Gagal memuat script: ' + src)); };
       document.body.appendChild(script);
     });
 
-    return loadedScripts[url];
+    return scriptPromises[src];
   }
 
-  function getViewObject(config) {
-    var names = (config && config.globals) || [];
-    for (var i = 0; i < names.length; i += 1) {
-      if (window[names[i]]) return window[names[i]];
-    }
-    return null;
+  function ensureRouteAssets(routeName) {
+    var assets = getRouteAssets(routeName);
+    if (!assets.length) return Promise.resolve();
+    return Promise.all(assets.map(function (asset) {
+      return loadScriptOnce(asset.src, asset.globalName);
+    }));
   }
 
-  function invokeViewMethod(viewObj, method, routeName, root, config) {
-    var fn = viewObj && viewObj[method];
-    if (typeof fn !== 'function') return undefined;
-
-    var ctx = { route: routeName, root: root, config: config };
-
-    if (method === 'mount') return fn.call(viewObj, root, ctx);
-    if (method === 'render') {
-      var result = fn.call(viewObj, root, ctx, routeName);
-      if (typeof result === 'string') setRootContent(result);
-      if (typeof viewObj.afterRender === 'function') {
-        return Promise.resolve(result).then(function () { return viewObj.afterRender(root, ctx); });
-      }
-      return result;
-    }
-    return fn.call(viewObj, routeName, root, ctx);
-  }
-
-  function callView(viewObj, methods, routeName, config) {
-    var names = Array.isArray(methods) ? methods : [methods];
-    var root = getRootContainer();
-    for (var i = 0; i < names.length; i += 1) {
-      var method = names[i];
-      if (viewObj && typeof viewObj[method] === 'function') {
-        return invokeViewMethod(viewObj, method, routeName, root, config);
-      }
-    }
-    return undefined;
-  }
-
-  function renderPlaceholder(routeName, message) {
-    setRootContent('<div class="tpk-card"><p>' + (message || ('Halaman ' + routeName + ' belum tersedia.')) + '</p></div>');
-  }
-
-  function updateActiveLinks(routeName) {
-    var links = Array.prototype.slice.call(document.querySelectorAll('[data-route-link]'));
-    links.forEach(function (link) {
-      var name = normalizeRoute(link.getAttribute('data-route-link'));
-      if (name === routeName) link.classList.add('is-active');
-      else link.classList.remove('is-active');
-    });
-  }
-
-  function handleError(routeName, err) {
-    console.error('Router error:', routeName, err);
-    renderPlaceholder(routeName, 'Gagal membuka halaman <b>' + routeName + '</b>.');
-  }
-
-  function setCurrentRoute(routeName) {
-    currentRoute = routeName || '';
+  function tryInitView(routeName, screenId) {
     try {
-      if (window.AppState && typeof window.AppState.setCurrentRoute === 'function') {
-        window.AppState.setCurrentRoute(currentRoute);
-      } else if (window.AppState) {
-        window.AppState.currentRoute = currentRoute;
-      }
-    } catch (err) {}
-  }
+      var target = document.getElementById(screenId);
+      if (!target) return;
 
-  function detectRouteFromElement(el) {
-    if (!el) return '';
-    var explicit = normalizeRoute(el.getAttribute('data-route-link') || el.getAttribute('data-route') || el.getAttribute('href'));
-    if (explicit && routeExists(explicit)) return explicit;
-
-    var tokens = [
-      el.id || '',
-      el.name || '',
-      el.getAttribute('aria-label') || '',
-      el.getAttribute('title') || '',
-      el.textContent || ''
-    ].join(' ').replace(/\s+/g, ' ').trim();
-
-    for (var i = 0; i < legacyMatchers.length; i += 1) {
-      if (legacyMatchers[i].test.test(tokens)) return legacyMatchers[i].route;
-    }
-    return '';
-  }
-
-  function prepareLegacyMenuLinks() {
-    if (legacyMenuPrepared) return;
-    legacyMenuPrepared = true;
-
-    var candidates = Array.prototype.slice.call(document.querySelectorAll('button, a, [role="button"], .menu-button, .nav-button'));
-    candidates.forEach(function (el) {
-      if (el.hasAttribute('data-route-link')) return;
-      var route = detectRouteFromElement(el);
-      if (!route) return;
-      el.setAttribute('data-route-link', route);
-    });
-  }
-
-  async function go(route) {
-    prepareLegacyMenuLinks();
-
-    var routeName = normalizeRoute(route) || getDefaultRoute();
-    if (!routeExists(routeName)) {
-      renderPlaceholder(routeName);
-      return;
-    }
-
-    setCurrentRoute(routeName);
-
-    try {
-      if (window.location.hash !== '#' + routeName) {
-        window.history.replaceState({}, document.title, '#' + routeName);
-      }
-    } catch (err) {}
-
-    updateActiveLinks(routeName);
-
-    var config = routeMap[routeName];
-    try {
-      await loadScript(config.file);
-      var viewObj = getViewObject(config);
-      if (!viewObj) {
-        renderPlaceholder(routeName, 'Halaman ' + routeName + ' belum tersedia.');
+      if (routeName === 'dashboard' && window.DashboardView && typeof window.DashboardView.init === 'function') {
+        window.DashboardView.init(target, { route: routeName, screenId: screenId });
         return;
       }
-      var result = callView(viewObj, config.methods, routeName, config);
-      await Promise.resolve(result);
-    } catch (err2) {
-      handleError(routeName, err2);
+      if (routeName === 'sasaranList' && window.SasaranListView && typeof window.SasaranListView.init === 'function') {
+        window.SasaranListView.init(target, { route: routeName, screenId: screenId });
+        return;
+      }
+      if (routeName === 'sasaranDetail' && window.SasaranDetailView && typeof window.SasaranDetailView.init === 'function') {
+        window.SasaranDetailView.init(target, { route: routeName, screenId: screenId });
+        return;
+      }
+      if (routeName === 'registrasi' && window.RegistrasiView && typeof window.RegistrasiView.init === 'function') {
+        window.RegistrasiView.init(target, { route: routeName, screenId: screenId });
+        return;
+      }
+      if (routeName === 'pendampingan' && window.PendampinganView && typeof window.PendampinganView.init === 'function') {
+        window.PendampinganView.init(target, { route: routeName, screenId: screenId });
+        return;
+      }
+      if (routeName === 'sync' && window.SyncView && typeof window.SyncView.init === 'function') {
+        window.SyncView.init(target, { route: routeName, screenId: screenId });
+        return;
+      }
+      if (routeName === 'rekapKader' && window.RekapKaderView && typeof window.RekapKaderView.init === 'function') {
+        window.RekapKaderView.init(target, { route: routeName, screenId: screenId });
+      }
+    } catch (err) {
+      console.error('Gagal init view untuk route:', routeName, err);
     }
   }
 
-  function current() { return currentRoute || normalizeRoute(window.location.hash) || getDefaultRoute(); }
+  function invokeDefaultRouteReady(routeName) {
+    try {
+      if (routeName === 'dashboard' && window.DashboardView && typeof window.DashboardView.refresh === 'function') {
+        window.DashboardView.refresh();
+        return;
+      }
+      if (routeName === 'sasaranList' && window.SasaranListView && typeof window.SasaranListView.load === 'function') {
+        window.SasaranListView.load();
+        return;
+      }
+      if (routeName === 'sync' && window.SyncView && typeof window.SyncView.refresh === 'function') {
+        window.SyncView.refresh();
+        return;
+      }
+      if (routeName === 'rekapKader' && window.RekapKaderView && typeof window.RekapKaderView.load === 'function') {
+        window.RekapKaderView.load();
+      }
+    } catch (err) {
+      console.error('Gagal menjalankan route ready hook:', routeName, err);
+    }
+  }
 
-  function bindRouteLinks() {
-    if (routeLinksBound) return;
-    routeLinksBound = true;
+  function finalizeRoute(routeName, screenId, token, options) {
+    var opts = options || {};
 
-    document.addEventListener('click', function (event) {
-      prepareLegacyMenuLinks();
-      var trigger = event.target.closest('[data-route-link]');
-      if (!trigger) return;
+    if (opts.scrollToTop !== false) {
+      try {
+        window.scrollTo({ top: 0, behavior: 'auto' });
+      } catch (err) {
+        window.scrollTo(0, 0);
+      }
+    }
 
-      var targetRoute = trigger.getAttribute('data-route-link');
-      if (!targetRoute) return;
+    Promise.resolve()
+      .then(function () {
+        return ensureRouteAssets(routeName);
+      })
+      .then(function () {
+        if (token !== Router.routeToken) return;
+        tryInitView(routeName, screenId);
+        invokeDefaultRouteReady(routeName);
+        if (typeof opts.onRouteReady === 'function') {
+          opts.onRouteReady({ route: routeName, screenId: screenId });
+        }
+      })
+      .catch(function (err) {
+        console.error('Gagal memuat asset route:', routeName, err);
+      });
+  }
 
-      event.preventDefault();
-      go(targetRoute);
+  function openDashboardModal(methodName, options) {
+    var opts = options || {};
+    var finish = function () {
+      if (window.DashboardView && typeof window.DashboardView[methodName] === 'function') {
+        window.DashboardView[methodName]();
+      }
+      if (typeof opts.onRouteReady === 'function') {
+        opts.onRouteReady({ route: 'dashboard', screenId: ROUTE_MAP.dashboard });
+      }
+    };
+
+    if (Router.getCurrentRoute() === 'dashboard') {
+      ensureRouteAssets('dashboard')
+        .then(function () {
+          tryInitView('dashboard', ROUTE_MAP.dashboard);
+          finish();
+        })
+        .catch(function (err) {
+          console.error('Gagal membuka modal dashboard:', methodName, err);
+        });
+      return true;
+    }
+
+    return Router.go('dashboard', {
+      scrollToTop: opts.scrollToTop,
+      onRouteReady: function () {
+        finish();
+      }
     });
   }
 
-  function init() {
-    prepareLegacyMenuLinks();
-    bindRouteLinks();
-    go(normalizeRoute(window.location.hash) || getDefaultRoute());
+  function bindRouteLinks() {
+    if (isDomBound) return;
+    isDomBound = true;
+
+    document.addEventListener('click', function (event) {
+      var trigger = event.target && event.target.closest
+        ? event.target.closest('[data-route-link]')
+        : null;
+      if (!trigger) return;
+
+      var routeName = trigger.getAttribute('data-route-link') || '';
+      if (!routeName) return;
+
+      event.preventDefault();
+      Router.go(routeName);
+    });
   }
 
-  window.Router = {
-    init: init,
-    go: go,
-    current: current,
-    getCurrentRoute: current,
-    loadScript: loadScript,
-    bindRouteLinks: bindRouteLinks,
-    prepareLegacyMenuLinks: prepareLegacyMenuLinks,
-    toLogin: function () { return go('login'); },
-    toDashboard: function () { return go('dashboard'); },
-    toRekapKader: function () { return go('rekap'); },
-    toSasaranList: function () { return go('sasaran'); },
-    toSasaranDetail: function () { return go('sasarandetail'); },
-    toRegistrasi: function () { return go('registrasi'); },
-    toPendampingan: function () { return go('pendampingan'); },
-    toSync: function () { return go('sync'); },
-    toProfile: function () { return go('profile'); }
+  var Router = {
+    currentRoute: '',
+    currentScreenId: '',
+    routeToken: 0,
+    routes: Object.freeze(Object.assign({}, ROUTE_MAP)),
+
+    init: function () {
+      bindRouteLinks();
+      return true;
+    },
+
+    go: function (routeName, options) {
+      var normalizedRoute = normalizeRouteName(routeName);
+      var opts = options || {};
+
+      if (normalizedRoute === 'profile') return openDashboardModal('openProfile', opts);
+      if (normalizedRoute === 'settings') return openDashboardModal('openSettings', opts);
+      if (normalizedRoute === 'help') return openDashboardModal('openHelp', opts);
+
+      var screenId = ROUTE_MAP[normalizedRoute];
+      if (!screenId) {
+        console.warn('Route tidak dikenali:', routeName);
+        return false;
+      }
+
+      var rendered = showScreen(screenId);
+      if (!rendered) {
+        console.warn('Screen tidak ditemukan:', screenId);
+        return false;
+      }
+
+      var token = updateCurrentRoute(normalizedRoute, screenId);
+      finalizeRoute(normalizedRoute, screenId, token, opts);
+      return true;
+    },
+
+    ensureRouteAssets: function (routeName) {
+      return ensureRouteAssets(normalizeRouteName(routeName));
+    },
+
+    preloadRoutes: function (routeNames) {
+      var routes = Array.isArray(routeNames) ? routeNames : [];
+      routes.forEach(function (routeName) {
+        ensureRouteAssets(normalizeRouteName(routeName)).catch(function (err) {
+          console.warn('Preload route gagal:', routeName, err && err.message ? err.message : err);
+        });
+      });
+    },
+
+    getCurrentRoute: function () {
+      return this.currentRoute || '';
+    },
+
+    getCurrentScreenId: function () {
+      return this.currentScreenId || '';
+    },
+
+    openProfileModal: function (options) { return this.go('profile', options); },
+    openSettingsModal: function (options) { return this.go('settings', options); },
+    openHelpModal: function (options) { return this.go('help', options); },
+
+    toSplash: function (options) { return this.go('splash', options); },
+    toLogin: function (options) { return this.go('login', options); },
+    toDashboard: function (options) { return this.go('dashboard', options); },
+    toSasaranList: function (options) { return this.go('sasaranList', options); },
+    toSasaranDetail: function (options) { return this.go('sasaranDetail', options); },
+    toRegistrasi: function (options) { return this.go('registrasi', options); },
+    toPendampingan: function (options) { return this.go('pendampingan', options); },
+    toSyncScreen: function (options) { return this.go('sync', options); },
+    toRekapKader: function (options) { return this.go('rekapKader', options); }
   };
 
-  Object.defineProperty(window.Router, 'currentRoute', {
-    get: function () { return current(); }
-  });
+  window.Router = Router;
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () {
+      Router.init();
+    }, { once: true });
+  } else {
+    Router.init();
+  }
 })(window, document);
