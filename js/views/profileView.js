@@ -1,128 +1,152 @@
 (function (window, document) {
   'use strict';
 
-  const VIEW_NAME = 'profile';
-  const FALLBACK_PROFILE_KEYS = ['USER_PROFILE', 'TPK_PROFILE', 'tpk_profile'];
-  const FALLBACK_SESSION_KEYS = ['SESSION_TOKEN', 'TPK_SESSION_TOKEN', 'tpk_session_token'];
+  function byId(id) {
+    return document.getElementById(id);
+  }
 
-  function getAppConfig() {
+  function getRoot(root) {
+    if (root && typeof root.querySelector === 'function') return root;
+    return byId('module-root')
+      || byId('content-root')
+      || byId('view-root')
+      || byId('screen-root')
+      || byId('konten-app')
+      || byId('screen-container')
+      || byId('app-content')
+      || byId('content-area')
+      || document.body;
+  }
+
+  function getUI() {
+    return window.UI || null;
+  }
+
+  function getApi() {
+    return window.Api || null;
+  }
+
+  function getState() {
+    return window.AppState || null;
+  }
+
+  function getStorage() {
+    return window.Storage || null;
+  }
+
+  function getConfig() {
     return window.APP_CONFIG || {};
   }
 
-  function getStorageKey(name, fallback) {
-    const cfg = getAppConfig();
-    const keys = cfg.STORAGE_KEYS || {};
-    return keys[name] || fallback;
+  function getStorageKeys() {
+    return getConfig().STORAGE_KEYS || {};
   }
 
-  function readLocal(key) {
-    try {
-      if (!key) return '';
-      return window.localStorage.getItem(key) || '';
-    } catch (err) {
-      return '';
-    }
-  }
-
-  function writeLocal(key, value) {
-    try {
-      if (!key) return;
-      window.localStorage.setItem(key, value);
-    } catch (err) {
-      // no-op
-    }
-  }
-
-  function readJsonLocal(candidates) {
-    const keys = Array.isArray(candidates) ? candidates : [candidates];
-    for (const key of keys) {
-      const raw = readLocal(key);
-      if (!raw) continue;
-      try {
-        return JSON.parse(raw);
-      } catch (err) {
-        // ignore malformed cache and continue
-      }
-    }
-    return null;
-  }
-
-  function getCachedProfile() {
-    const cfg = getAppConfig();
-    const profileKey = getStorageKey('tpk_profile', 'tpk_profile');
-
-    if (window.AppState && typeof window.AppState.get === 'function') {
-      const stateProfile = window.AppState.get('profile')
-        || window.AppState.get('userProfile')
-        || window.AppState.get('bootstrap.profile');
-      if (stateProfile && typeof stateProfile === 'object') return stateProfile;
-    }
-
-    if (window.State && typeof window.State.get === 'function') {
-      const stateProfile = window.State.get('profile')
-        || window.State.get('userProfile')
-        || window.State.get('bootstrap.profile');
-      if (stateProfile && typeof stateProfile === 'object') return stateProfile;
-    }
-
-    return readJsonLocal([profileKey].concat(FALLBACK_PROFILE_KEYS));
-  }
-
-  function saveProfileCache(profile) {
-    if (!profile || typeof profile !== 'object') return;
-
-    const cfg = getAppConfig();
-    const profileKey = getStorageKey('tpk_profile', 'tpk_profile');
-    const raw = JSON.stringify(profile);
-
-    writeLocal(profileKey, raw);
-    FALLBACK_PROFILE_KEYS.forEach((key) => writeLocal(key, raw));
-
-    if (window.AppState && typeof window.AppState.set === 'function') {
-      try { window.AppState.set('profile', profile); } catch (err) { /* no-op */ }
-    }
-    if (window.State && typeof window.State.set === 'function') {
-      try { window.State.set('profile', profile); } catch (err) { /* no-op */ }
-    }
-  }
-
-  function getSessionToken() {
-    const sessionKey = getStorageKey('tpk_session_token', 'tpk_session_token');
-    return readLocal(sessionKey) || FALLBACK_SESSION_KEYS.map(readLocal).find(Boolean) || '';
-  }
-
-  async function apiPost(action, payload, meta) {
-    const safePayload = payload || {};
-    const safeMeta = meta || {};
-
-    if (window.Api && typeof window.Api.post === 'function') {
-      return window.Api.post(action, safePayload, safeMeta);
-    }
-    if (typeof window.apiCall === 'function') {
-      return window.apiCall(action, safePayload, safeMeta);
-    }
-
-    throw new Error('Api.post / apiCall belum tersedia di window');
+  function escapeHtml(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
   }
 
   function safeText(value, fallback) {
     if (value === 0) return '0';
     if (value === false) return 'Tidak';
     if (value === true) return 'Ya';
-    if (value === null || value === undefined) return fallback || '-';
-    const str = String(value).trim();
-    return str || (fallback || '-');
+    if (value === undefined || value === null) return fallback || '-';
+    var text = String(value).replace(/\s+/g, ' ').trim();
+    return text || (fallback || '-');
   }
 
-  function ucWords(value) {
-    return safeText(value, '-').toLowerCase().replace(/\b\w/g, (m) => m.toUpperCase());
+  function setText(root, selector, value) {
+    var el = root.querySelector(selector);
+    if (el) el.textContent = safeText(value, '-');
+  }
+
+  function setHTML(root, selector, html) {
+    var el = root.querySelector(selector);
+    if (el) el.innerHTML = html || '';
+  }
+
+  function setStatus(root, message, type) {
+    var box = root.querySelector('[data-profile-status]');
+    if (!box) return;
+    box.textContent = safeText(message, '');
+    box.className = 'profile-status profile-status-' + (type || 'info');
+  }
+
+  function readJsonLocal(key) {
+    try {
+      return JSON.parse(localStorage.getItem(key) || 'null');
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function getProfileFromState() {
+    var state = getState();
+    if (state && typeof state.getProfile === 'function') {
+      var profile = state.getProfile() || {};
+      if (profile && Object.keys(profile).length) return profile;
+    }
+    return {};
+  }
+
+  function getProfileFromStorage() {
+    var storage = getStorage();
+    var keys = getStorageKeys();
+    if (storage && typeof storage.get === 'function' && keys.PROFILE) {
+      var profile = storage.get(keys.PROFILE, {}) || {};
+      if (profile && Object.keys(profile).length) return profile;
+    }
+
+    return readJsonLocal('tpk_profile')
+      || (readJsonLocal('tpk_bootstrap_lite') || {}).profile
+      || {};
+  }
+
+  function getCachedProfile() {
+    var fromState = getProfileFromState();
+    if (fromState && Object.keys(fromState).length) return fromState;
+    return getProfileFromStorage();
+  }
+
+  function persistProfile(profile) {
+    var safeProfile = profile && typeof profile === 'object' ? profile : {};
+    var state = getState();
+    var storage = getStorage();
+    var keys = getStorageKeys();
+
+    if (state && typeof state.setProfile === 'function') {
+      try { state.setProfile(safeProfile); } catch (err) {}
+    }
+
+    if (storage && typeof storage.set === 'function' && keys.PROFILE) {
+      try { storage.set(keys.PROFILE, safeProfile); } catch (err2) {}
+    }
+
+    try {
+      localStorage.setItem('tpk_profile', JSON.stringify(safeProfile));
+    } catch (err3) {}
+  }
+
+  function pickFirst(obj, keys, fallback) {
+    obj = obj || {};
+    for (var i = 0; i < keys.length; i += 1) {
+      var value = obj[keys[i]];
+      if (value === 0 || value === false || value === true) return value;
+      if (typeof value === 'string' && value.trim()) return value.trim();
+      if (value && typeof value !== 'string') return value;
+    }
+    return fallback || '';
   }
 
   function normalizeRole(value) {
-    const raw = safeText(value, '').toUpperCase().replace(/\s+/g, '_');
-    const map = {
+    var raw = String(value || '').trim().toUpperCase().replace(/\s+/g, '_');
+    var map = {
       KADER: 'Kader',
-      KADER_KB: 'Kader KB',
       PKB: 'PKB',
       ADMIN_KECAMATAN: 'Admin Kecamatan',
       ADMIN_KABUPATEN: 'Admin Kabupaten',
@@ -133,172 +157,159 @@
 
   function getDisplayNomorTim(data) {
     data = data || {};
-    return safeText(
-      data.nomor_tim
-      || data.nomor_tim_display
-      || data.nomor_tim_lokal
-      || data.nama_tim
-      || data.id_tim,
-      '-'
-    );
-  }
 
-  function pickFirst(obj, keys, fallback) {
-    if (!obj || typeof obj !== 'object') return fallback || '';
-    for (const key of keys) {
-      const value = obj[key];
-      if (value === 0 || value === false || value === true) return value;
-      if (typeof value === 'string' && value.trim()) return value.trim();
-      if (value && typeof value !== 'string') return value;
+    var explicitNomor = data.nomor_tim || data.nomor_tim_display || data.nomor_tim_lokal || '';
+    if (explicitNomor !== undefined && explicitNomor !== null && String(explicitNomor).trim() !== '') {
+      return String(explicitNomor).trim();
     }
-    return fallback || '';
+
+    var namaTim = String(data.nama_tim || '').trim();
+    if (namaTim) {
+      var match = namaTim.match(/(\d+)\s*$/);
+      if (match && match[1]) return match[1];
+      return namaTim;
+    }
+
+    return safeText(data.id_tim, '-');
   }
 
-  function getWilayahDisplay(profile) {
-    const kecamatan = pickFirst(profile, [
-      'nama_kecamatan', 'kecamatan', 'wilayah_kecamatan', 'scope_kecamatan'
-    ], '');
-    const desa = pickFirst(profile, [
-      'desa_kelurahan', 'nama_desa_kelurahan', 'nama_desa', 'desa', 'wilayah_desa_kelurahan', 'scope_desa_kelurahan'
-    ], '');
-    const dusun = pickFirst(profile, [
-      'dusun_rw', 'nama_dusun_rw', 'dusun', 'rw', 'wilayah_dusun_rw', 'scope_dusun_rw', 'wilayah_tugas_dusun_rw'
-    ], '');
+  function normalizeDisplayText(value) {
+    var text = String(value == null ? '' : value).replace(/\s+/g, ' ').trim();
+    if (!text) return '';
+    var upper = text.toUpperCase();
+    if (upper === '-' || upper === 'NULL' || upper === 'UNDEFINED' || upper === 'N/A' || upper === 'NA') {
+      return '';
+    }
+    return text;
+  }
+
+  function parseWilayahDisplay(profile) {
+    var data = profile || {};
+    var wilayah = normalizeDisplayText(data.wilayah_tugas || data.wilayah || '');
+    var desa = normalizeDisplayText(data.desa_kelurahan || data.nama_desa || data.desa || '');
+    var dusun = normalizeDisplayText(data.dusun_rw || data.nama_dusun || data.dusun || '');
+    var kecamatan = normalizeDisplayText(data.nama_kecamatan || data.kecamatan || '');
+
+    if (wilayah) {
+      var parts = wilayah.split(/\s*,\s*/).map(function (part) {
+        return String(part || '').trim();
+      }).filter(Boolean);
+
+      if (!kecamatan && parts[0]) kecamatan = parts[0];
+      if (!desa && parts[1]) desa = parts[1];
+      if (!dusun && parts.length > 2) dusun = parts.slice(2).join(', ');
+    }
 
     return {
-      kecamatan: safeText(kecamatan, '-'),
-      desa: safeText(desa, '-'),
-      dusun: safeText(dusun, '-')
+      kecamatan: kecamatan || '-',
+      desa: desa || '-',
+      dusun: dusun || '-'
     };
   }
 
   function formatDateTime(value) {
     if (!value) return '-';
-    const dt = new Date(value);
-    if (Number.isNaN(dt.getTime())) return safeText(value, '-');
-    const yy = dt.getFullYear();
-    const mm = String(dt.getMonth() + 1).padStart(2, '0');
-    const dd = String(dt.getDate()).padStart(2, '0');
-    const hh = String(dt.getHours()).padStart(2, '0');
-    const mi = String(dt.getMinutes()).padStart(2, '0');
-    return `${yy}-${mm}-${dd} ${hh}:${mi}`;
+    var dt = new Date(value);
+    if (isNaN(dt.getTime())) return safeText(value, '-');
+    try {
+      return dt.toLocaleString('id-ID');
+    } catch (err) {
+      return safeText(value, '-');
+    }
   }
 
-  function getRoot(root) {
-    if (root && typeof root.querySelector === 'function') return root;
-    return document.getElementById('content-area')
-      || document.getElementById('app-content')
-      || document.querySelector('[data-route-root]')
-      || document.body;
-  }
-
-  function setText(root, selector, value) {
-    const el = root.querySelector(selector);
-    if (el) el.textContent = safeText(value, '-');
-  }
-
-  function setStatus(root, text, type) {
-    const box = root.querySelector('[data-profile-status]');
-    if (!box) return;
-    box.textContent = safeText(text, '');
-    box.className = `profile-status profile-status-${type || 'info'}`;
-  }
-
-  function getProfileRows(profile) {
-    const wilayah = getWilayahDisplay(profile);
-    return [
-      ['Nama Pengguna', safeText(pickFirst(profile, ['nama_pengguna', 'nama_user', 'nama_lengkap', 'nama_kader'], '-'))],
-      ['ID Pengguna', safeText(pickFirst(profile, ['id_user', 'username', 'id_kader'], '-'))],
+  function renderProfileRows(root, profile) {
+    var wilayah = parseWilayahDisplay(profile || {});
+    var rows = [
+      ['Nama Kader', pickFirst(profile, ['nama_kader', 'nama_user', 'nama_lengkap', 'nama'], '-')],
+      ['ID User', pickFirst(profile, ['id_user', 'username', 'id_kader'], '-')],
       ['Unsur TPK', normalizeRole(pickFirst(profile, ['unsur_tpk', 'role_label', 'role_akses', 'role'], '-'))],
       ['Nomor Tim', getDisplayNomorTim(profile)],
       ['Kecamatan', wilayah.kecamatan],
       ['Desa/Kelurahan', wilayah.desa],
       ['Dusun/RW', wilayah.dusun],
-      ['Status Online', navigator.onLine ? 'Online' : 'Offline'],
-      ['Versi Aplikasi', safeText(getAppConfig().APP_VERSION || getAppConfig().appVersion, '-')],
-      ['Token Tersedia', getSessionToken() ? 'Ya' : 'Tidak'],
-      ['Cache Profil Diperbarui', formatDateTime(profile.updated_at || profile.cached_at || profile.fetched_at)]
+      ['Status Jaringan', navigator.onLine ? 'Online' : 'Offline'],
+      ['Versi Aplikasi', safeText(getConfig().APP_VERSION || getConfig().appVersion, '-')],
+      ['Cache Profil', formatDateTime(profile.updated_at || profile.cached_at || profile.fetched_at)]
     ];
+
+    setHTML(root, '[data-profile-table-body]', rows.map(function (row) {
+      return '<tr>' +
+        '<th style="text-align:left;vertical-align:top;padding:10px 12px;width:38%;">' + escapeHtml(row[0]) + '</th>' +
+        '<td style="padding:10px 12px;">' + escapeHtml(safeText(row[1], '-')) + '</td>' +
+      '</tr>';
+    }).join(''));
+
+    setText(root, '[data-profile-head-name]', pickFirst(profile, ['nama_kader', 'nama_user', 'nama_lengkap', 'nama'], '-'));
+    setText(root, '[data-profile-head-role]', normalizeRole(pickFirst(profile, ['unsur_tpk', 'role_label', 'role_akses', 'role'], '-')));
+    setText(root, '[data-profile-online-state]', navigator.onLine ? 'Online' : 'Offline');
   }
 
-  function renderRows(root, profile) {
-    const tbody = root.querySelector('[data-profile-table-body]');
-    if (!tbody) return;
-
-    const rows = getProfileRows(profile);
-    tbody.innerHTML = rows.map(([label, value]) => {
-      return `<tr>
-        <th style="text-align:left;vertical-align:top;padding:10px 12px;width:38%;">${label}</th>
-        <td style="padding:10px 12px;">${safeText(value, '-')}</td>
-      </tr>`;
-    }).join('');
-  }
-
-  function renderPermissionList(root, permissionData) {
-    const box = root.querySelector('[data-profile-permissions]');
-    if (!box) return;
-
-    const perms = [];
-    if (Array.isArray(permissionData)) perms.push(...permissionData);
-    if (permissionData && Array.isArray(permissionData.permissions)) perms.push(...permissionData.permissions);
-    if (permissionData && Array.isArray(permissionData.data)) perms.push(...permissionData.data);
+  function renderPermissions(root, permissionData) {
+    var perms = [];
+    if (Array.isArray(permissionData)) perms = permissionData.slice();
+    else if (permissionData && Array.isArray(permissionData.permissions)) perms = permissionData.permissions.slice();
+    else if (permissionData && Array.isArray(permissionData.data)) perms = permissionData.data.slice();
 
     if (!perms.length) {
-      box.innerHTML = '<div class="card"><div class="card-body">Belum ada daftar hak akses tambahan.</div></div>';
+      setHTML(root, '[data-profile-permissions]', '<div class="card"><div class="card-body">Belum ada daftar hak akses tambahan.</div></div>');
       return;
     }
 
-    box.innerHTML = `<div class="card"><div class="card-body"><ul style="margin:0;padding-left:18px;"></ul></div></div>`;
-    const ul = box.querySelector('ul');
-    perms.forEach((item) => {
-      const li = document.createElement('li');
-      li.textContent = safeText(item.label || item.name || item.code || item, '-');
-      ul.appendChild(li);
-    });
+    setHTML(root, '[data-profile-permissions]', '<div class="card"><div class="card-body"><ul style="margin:0;padding-left:18px;">' + perms.map(function (item) {
+      return '<li>' + escapeHtml(safeText(item.label || item.name || item.code || item, '-')) + '</li>';
+    }).join('') + '</ul></div></div>');
+  }
+
+  async function apiPost(action, payload, meta) {
+    var api = getApi();
+    if (!api || typeof api.post !== 'function') {
+      throw new Error('Api.post belum tersedia.');
+    }
+    return api.post(action, payload || {}, meta || {});
   }
 
   async function fetchProfileBundle() {
-    let profileRes = null;
-    let permissionRes = null;
-    let sessionRes = null;
+    var profileRes = null;
+    var permissionRes = null;
+    var sessionRes = null;
 
     try {
-      profileRes = await apiPost('getMyProfile', {});
+      profileRes = await apiPost('getMyProfile', {}, { includeAuth: true });
     } catch (err) {
-      profileRes = { ok: false, message: err && err.message ? err.message : 'Gagal memuat profil' };
+      profileRes = { ok: false, message: err && err.message ? err.message : 'Gagal memuat profil.' };
     }
 
     try {
-      permissionRes = await apiPost('getMyPermissions', {});
-    } catch (err) {
+      permissionRes = await apiPost('getMyPermissions', {}, { includeAuth: true });
+    } catch (err2) {
       permissionRes = null;
     }
 
     try {
-      sessionRes = await apiPost('bootstrapSession', {});
-    } catch (err) {
+      sessionRes = await apiPost('bootstrapSession', {}, { includeAuth: true });
+    } catch (err3) {
       sessionRes = null;
     }
 
-    return { profileRes, permissionRes, sessionRes };
+    return { profileRes: profileRes, permissionRes: permissionRes, sessionRes: sessionRes };
   }
 
-  function extractProfile(profileRes, sessionRes) {
-    return (profileRes && (profileRes.data || profileRes.profile))
-      || (sessionRes && sessionRes.data && (sessionRes.data.profile || sessionRes.data.session || sessionRes.data.user))
-      || (sessionRes && (sessionRes.profile || sessionRes.session || sessionRes.user))
+  function extractProfile(bundle) {
+    bundle = bundle || {};
+    return (bundle.profileRes && (bundle.profileRes.data || bundle.profileRes.profile))
+      || (bundle.sessionRes && bundle.sessionRes.data && (bundle.sessionRes.data.profile || bundle.sessionRes.data.session || bundle.sessionRes.data.user))
+      || (bundle.sessionRes && (bundle.sessionRes.profile || bundle.sessionRes.session || bundle.sessionRes.user))
       || null;
   }
 
   async function hydrate(root, options) {
-    const container = getRoot(root);
-    const opts = options || {};
-    const cachedProfile = getCachedProfile();
+    var container = getRoot(root);
+    var opts = options || {};
+    var cachedProfile = getCachedProfile();
 
-    if (cachedProfile) {
-      renderRows(container, cachedProfile);
-      setText(container, '[data-profile-head-name]', pickFirst(cachedProfile, ['nama_pengguna', 'nama_user', 'nama_lengkap', 'nama_kader'], '-'));
-      setText(container, '[data-profile-head-role]', normalizeRole(pickFirst(cachedProfile, ['unsur_tpk', 'role_label', 'role_akses', 'role'], '-')));
+    if (cachedProfile && Object.keys(cachedProfile).length) {
+      renderProfileRows(container, cachedProfile);
       setStatus(container, 'Profil cache dimuat.', 'muted');
     } else {
       setStatus(container, 'Belum ada cache profil. Menarik data terbaru...', 'info');
@@ -306,46 +317,42 @@
 
     if (opts.remote === false) return;
 
-    const refreshBtn = container.querySelector('[data-profile-refresh]');
-    const sessionBtn = container.querySelector('[data-profile-session-refresh]');
+    var refreshBtn = container.querySelector('[data-profile-refresh]');
+    var sessionBtn = container.querySelector('[data-profile-session-refresh]');
     if (refreshBtn) refreshBtn.disabled = true;
     if (sessionBtn) sessionBtn.disabled = true;
 
-    const bundle = await fetchProfileBundle();
-    const profile = extractProfile(bundle.profileRes, bundle.sessionRes);
+    var bundle = await fetchProfileBundle();
+    var profile = extractProfile(bundle);
 
     if (profile) {
       profile.fetched_at = new Date().toISOString();
-      saveProfileCache(profile);
-      renderRows(container, profile);
-      setText(container, '[data-profile-head-name]', pickFirst(profile, ['nama_pengguna', 'nama_user', 'nama_lengkap', 'nama_kader'], '-'));
-      setText(container, '[data-profile-head-role]', normalizeRole(pickFirst(profile, ['unsur_tpk', 'role_label', 'role_akses', 'role'], '-')));
+      persistProfile(profile);
+      renderProfileRows(container, profile);
       setStatus(container, 'Profil terbaru berhasil dimuat.', 'success');
     } else {
-      const message = (bundle.profileRes && bundle.profileRes.message)
-        || 'Profil belum bisa dimuat dari backend.';
-      setStatus(container, message, 'warning');
+      setStatus(container, (bundle.profileRes && bundle.profileRes.message) || 'Profil belum bisa dimuat dari backend.', 'warning');
     }
 
-    renderPermissionList(container, bundle.permissionRes && (bundle.permissionRes.data || bundle.permissionRes));
+    renderPermissions(container, bundle.permissionRes && (bundle.permissionRes.data || bundle.permissionRes));
 
     if (refreshBtn) refreshBtn.disabled = false;
     if (sessionBtn) sessionBtn.disabled = false;
   }
 
   async function handleSessionRefresh(root) {
-    const container = getRoot(root);
-    const btn = container.querySelector('[data-profile-session-refresh]');
+    var container = getRoot(root);
+    var btn = container.querySelector('[data-profile-session-refresh]');
     if (btn) btn.disabled = true;
 
     try {
-      const res = await apiPost('bootstrapSession', {});
-      const profile = (res && res.data && (res.data.profile || res.data.session || res.data.user))
+      var res = await apiPost('bootstrapSession', {}, { includeAuth: true });
+      var profile = (res && res.data && (res.data.profile || res.data.session || res.data.user))
         || res.profile || res.session || res.user || null;
 
       if (profile) {
         profile.fetched_at = new Date().toISOString();
-        saveProfileCache(profile);
+        persistProfile(profile);
       }
 
       await hydrate(container, { remote: true });
@@ -358,9 +365,9 @@
   }
 
   function bind(root) {
-    const container = getRoot(root);
+    var container = getRoot(root);
 
-    const refreshBtn = container.querySelector('[data-profile-refresh]');
+    var refreshBtn = container.querySelector('[data-profile-refresh]');
     if (refreshBtn && !refreshBtn.__bound) {
       refreshBtn.__bound = true;
       refreshBtn.addEventListener('click', function () {
@@ -368,7 +375,7 @@
       });
     }
 
-    const sessionBtn = container.querySelector('[data-profile-session-refresh]');
+    var sessionBtn = container.querySelector('[data-profile-session-refresh]');
     if (sessionBtn && !sessionBtn.__bound) {
       sessionBtn.__bound = true;
       sessionBtn.addEventListener('click', function () {
@@ -376,98 +383,106 @@
       });
     }
 
-    window.addEventListener('online', function () {
-      const liveRoot = getRoot(container);
-      setText(liveRoot, '[data-profile-online-state]', 'Online');
-    });
-
-    window.addEventListener('offline', function () {
-      const liveRoot = getRoot(container);
-      setText(liveRoot, '[data-profile-online-state]', 'Offline');
-    });
+    if (!window.__profileOnlineBound) {
+      window.__profileOnlineBound = true;
+      window.addEventListener('online', function () {
+        var liveRoot = getRoot(container);
+        setText(liveRoot, '[data-profile-online-state]', 'Online');
+      });
+      window.addEventListener('offline', function () {
+        var liveRoot = getRoot(container);
+        setText(liveRoot, '[data-profile-online-state]', 'Offline');
+      });
+    }
   }
 
   function template() {
-    return `
-      <section class="screen screen-profile" data-screen="profile" style="padding:12px;">
-        <div class="card" style="margin-bottom:12px;">
-          <div class="card-body" style="padding:16px;">
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;">
-              <div>
-                <div style="font-size:12px;opacity:.75;letter-spacing:.04em;">PROFIL PENGGUNA</div>
-                <h2 style="margin:6px 0 4px;">Profil</h2>
-                <div data-profile-head-name style="font-weight:700;">-</div>
-                <div data-profile-head-role style="opacity:.8;">-</div>
-              </div>
-              <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                <button type="button" class="btn btn-secondary" data-profile-session-refresh>Muat Ulang Sesi</button>
-                <button type="button" class="btn btn-primary" data-profile-refresh>Segarkan Profil</button>
-              </div>
-            </div>
-            <div data-profile-status class="profile-status profile-status-info" style="margin-top:12px;padding:10px 12px;border-radius:12px;background:rgba(13,110,253,.08);">Menyiapkan profil...</div>
-          </div>
-        </div>
+    return '' +
+      '<section class="screen screen-profile" data-screen="profile" style="padding:12px;">' +
+        '<div class="card" style="margin-bottom:12px;">' +
+          '<div class="card-body" style="padding:16px;">' +
+            '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;">' +
+              '<div>' +
+                '<div style="font-size:12px;opacity:.75;letter-spacing:.04em;">PROFIL PENGGUNA</div>' +
+                '<h2 style="margin:6px 0 4px;">Profil</h2>' +
+                '<div data-profile-head-name style="font-weight:700;">-</div>' +
+                '<div data-profile-head-role style="opacity:.8;">-</div>' +
+              '</div>' +
+              '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
+                '<button type="button" class="btn btn-secondary" data-profile-session-refresh>Muat Ulang Sesi</button>' +
+                '<button type="button" class="btn btn-primary" data-profile-refresh>Segarkan Profil</button>' +
+              '</div>' +
+            '</div>' +
+            '<div data-profile-status class="profile-status profile-status-info" style="margin-top:12px;padding:10px 12px;border-radius:12px;background:rgba(13,110,253,.08);">Menyiapkan profil...</div>' +
+          '</div>' +
+        '</div>' +
 
-        <div class="card" style="margin-bottom:12px;overflow:hidden;">
-          <div class="card-body" style="padding:0;overflow:auto;">
-            <table style="width:100%;border-collapse:collapse;">
-              <tbody data-profile-table-body>
-                <tr><td style="padding:14px;">Memuat data profil...</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
+        '<div class="card" style="margin-bottom:12px;overflow:hidden;">' +
+          '<div class="card-body" style="padding:0;overflow:auto;">' +
+            '<table style="width:100%;border-collapse:collapse;">' +
+              '<tbody data-profile-table-body>' +
+                '<tr><td style="padding:14px;">Memuat data profil...</td></tr>' +
+              '</tbody>' +
+            '</table>' +
+          '</div>' +
+        '</div>' +
 
-        <div class="card" style="margin-bottom:12px;">
-          <div class="card-body" style="padding:16px;">
-            <h3 style="margin:0 0 10px;">Status Ringkas</h3>
-            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;">
-              <div style="padding:12px;border-radius:14px;background:rgba(13,110,253,.06);">
-                <div style="font-size:12px;opacity:.7;">Jaringan</div>
-                <div data-profile-online-state style="font-size:18px;font-weight:700;">${navigator.onLine ? 'Online' : 'Offline'}</div>
-              </div>
-              <div style="padding:12px;border-radius:14px;background:rgba(25,135,84,.08);">
-                <div style="font-size:12px;opacity:.7;">Token Sesi</div>
-                <div style="font-size:18px;font-weight:700;">${getSessionToken() ? 'Tersedia' : 'Tidak ada'}</div>
-              </div>
-              <div style="padding:12px;border-radius:14px;background:rgba(255,193,7,.12);">
-                <div style="font-size:12px;opacity:.7;">Fokus Perbaikan</div>
-                <div style="font-size:16px;font-weight:700;">Wilayah Tugas</div>
-              </div>
-            </div>
-          </div>
-        </div>
+        '<div class="card" style="margin-bottom:12px;">' +
+          '<div class="card-body" style="padding:16px;">' +
+            '<h3 style="margin:0 0 10px;">Status Ringkas</h3>' +
+            '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;">' +
+              '<div style="padding:12px;border-radius:14px;background:rgba(13,110,253,.06);">' +
+                '<div style="font-size:12px;opacity:.7;">Jaringan</div>' +
+                '<div data-profile-online-state style="font-size:18px;font-weight:700;">' + (navigator.onLine ? 'Online' : 'Offline') + '</div>' +
+              '</div>' +
+              '<div style="padding:12px;border-radius:14px;background:rgba(25,135,84,.08);">' +
+                '<div style="font-size:12px;opacity:.7;">Fokus Perbaikan</div>' +
+                '<div style="font-size:16px;font-weight:700;">Wilayah Tugas</div>' +
+              '</div>' +
+              '<div style="padding:12px;border-radius:14px;background:rgba(255,193,7,.12);">' +
+                '<div style="font-size:12px;opacity:.7;">Status Tampilan</div>' +
+                '<div style="font-size:16px;font-weight:700;">Lazy-load aktif</div>' +
+              '</div>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
 
-        <div data-profile-permissions></div>
-      </section>
-    `;
+        '<div data-profile-permissions></div>' +
+      '</section>';
   }
 
-  const View = {
-    id: VIEW_NAME,
-    title: 'Profil',
-    render(root) {
-      const html = template();
-      if (root && typeof root.innerHTML !== 'undefined') {
-        root.innerHTML = html;
-        return root;
-      }
-      return html;
+  var ProfileView = {
+    render: function (root) {
+      var container = getRoot(root);
+      container.innerHTML = template();
+      return container;
     },
+
     async afterRender(root) {
-      bind(root);
-      await hydrate(root, { remote: true });
+      var container = getRoot(root);
+      bind(container);
+      await hydrate(container, { remote: true });
     },
+
     async mount(root) {
-      const el = getRoot(root);
-      this.render(el);
-      await this.afterRender(el);
-      return el;
+      var container = this.render(root);
+      await this.afterRender(container);
+      return container;
+    },
+
+    async init(routeName, root) {
+      return this.mount(root);
+    },
+
+    async show(routeName, root) {
+      return this.mount(root);
+    },
+
+    async refresh(root) {
+      return hydrate(root || getRoot(), { remote: true });
     }
   };
 
-  window.profileView = View;
-  window.ProfileView = View;
-  window.appViews = window.appViews || {};
-  window.appViews[VIEW_NAME] = View;
+  window.ProfileView = ProfileView;
+  window.profileView = ProfileView;
 })(window, document);
