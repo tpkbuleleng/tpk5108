@@ -827,69 +827,6 @@
     showToast('Cache ringan berhasil dibersihkan.', 'success');
   }
 
-  function isDashboardScreenVisible() {
-    var screen = byId('dashboard-screen');
-    return !!(screen && !screen.classList.contains('hidden'));
-  }
-
-  function ensureDashboardReady(callback) {
-    if (isDashboardScreenVisible()) {
-      if (typeof callback === 'function') callback();
-      return;
-    }
-
-    if (window.Router && typeof window.Router.go === 'function') {
-      window.Router.go('dashboard', {
-        onRouteReady: function () {
-          if (typeof callback === 'function') callback();
-        }
-      });
-      return;
-    }
-
-    if (typeof callback === 'function') callback();
-  }
-
-  function bindLegacyQuickButtons() {
-    var dashboard = byId('dashboard-screen');
-    if (!dashboard) return;
-
-    function normalizedText(node) {
-      return String((node && node.textContent) || '').replace(/\s+/g, ' ').trim().toLowerCase();
-    }
-
-    function bindMatch(matchers, handler) {
-      var buttons = dashboard.querySelectorAll('button');
-      Array.prototype.forEach.call(buttons, function (btn) {
-        if (!btn || btn.dataset.bound === '1') return;
-        if (btn.id === 'btn-sync-now-header' || btn.id === 'btn-settings' || btn.id === 'btn-logout') return;
-
-        var text = normalizedText(btn);
-        var isMatch = matchers.some(function (matcher) {
-          return text === matcher;
-        });
-
-        if (!isMatch) return;
-
-        btn.dataset.bound = '1';
-        btn.addEventListener('click', function (event) {
-          event.preventDefault();
-          handler();
-        });
-      });
-    }
-
-    bindMatch(['profil'], openProfile);
-    bindMatch(['sinkronisasi', 'draft & sinkronisasi', 'draft dan sinkronisasi'], openSyncScreen);
-    bindMatch(['sinkronkan'], syncNow);
-    bindMatch(['rekap saya'], openRekapKader);
-    bindMatch(['daftar sasaran'], openSasaranList);
-    bindMatch(['registrasi', 'registrasi sasaran'], openRegistrasi);
-    bindMatch(['pendampingan', 'lapor pendampingan'], openPendampinganEntry);
-    bindMatch(['pengaturan', 'perbarui aplikasi'], openSettings);
-    bindMatch(['keluar', 'logout'], logoutCurrentUser);
-  }
-
   function setVersionText() {
     var version = getConfig().APP_VERSION || getConfig().VERSION || '-';
     setText('settings-app-version', version);
@@ -907,29 +844,23 @@
   }
 
   function openSettings() {
-    ensureDashboardReady(function () {
-      setVersionText();
-      ensureFontSizeControl();
-      applyTheme(getThemeValue());
-      applyFontSize(getFontSizeValue());
-      openModal('settings-modal');
-    });
+    setVersionText();
+    ensureFontSizeControl();
+    applyTheme(getThemeValue());
+    applyFontSize(getFontSizeValue());
+    openModal('settings-modal');
   }
 
   function openProfile() {
-    ensureDashboardReady(function () {
-      var profile = getProfile();
-      applyDashboardProfile(profile);
-      fillProfileForm(profile);
-      exitProfileEditMode();
-      openModal('profile-modal');
-    });
+    var profile = getProfile();
+    applyDashboardProfile(profile);
+    fillProfileForm(profile);
+    exitProfileEditMode();
+    openModal('profile-modal');
   }
 
   function openHelp() {
-    ensureDashboardReady(function () {
-      openModal('help-modal');
-    });
+    openModal('help-modal');
   }
 
   function openRegistrasi() {
@@ -969,13 +900,6 @@
   }
 
   function openSyncScreen() {
-    ['settings-modal', 'profile-modal', 'help-modal'].forEach(function (id) {
-      var modal = byId(id);
-      if (modal && modal.classList.contains('active')) {
-        closeModal(id);
-      }
-    });
-
     go('sync', {
       onRouteReady: function () {
         if (window.SyncView && typeof window.SyncView.refresh === 'function') {
@@ -1250,7 +1174,6 @@
     bindSettingsModal();
     bindProfileModal();
     bindHelpModal();
-    bindLegacyQuickButtons();
     bindNetworkStatus();
     bindEscapeKey();
   }
@@ -1305,3 +1228,4 @@
     }
   });
 })(window, document);
+
