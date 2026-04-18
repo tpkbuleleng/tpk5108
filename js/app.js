@@ -1,120 +1,194 @@
 (function (window, document) {
   'use strict';
 
-  function qs(id) {
+  function byId(id) {
     return document.getElementById(id);
   }
+
+  function safeConsole(method) {
+    return function () {
+      try {
+        if (window.console && typeof window.console[method] === 'function') {
+          window.console[method].apply(window.console, arguments);
+        }
+      } catch (err) {}
+    };
+  }
+
+  var log = safeConsole('log');
+  var warn = safeConsole('warn');
 
   function cleanSensitiveUrl() {
     try {
       var url = new URL(window.location.href);
-      ['username', 'password', 'id_user', 'kata_sandi'].forEach(function (key) {
+      var keys = ['username', 'password', 'id_user', 'kata_sandi'];
+      var changed = false;
+      keys.forEach(function (key) {
         if (url.searchParams.has(key)) {
           url.searchParams.delete(key);
+          changed = true;
         }
       });
-      var cleanUrl = url.pathname + (url.search || '') + (url.hash || '');
-      window.history.replaceState({}, document.title, cleanUrl);
+      if (changed) {
+        var next = url.pathname + (url.search || '') + (url.hash || '');
+        window.history.replaceState({}, document.title, next);
+      }
     } catch (err) {
-      console.warn('[app] cleanSensitiveUrl failed:', err);
+      warn('cleanSensitiveUrl failed:', err && err.message ? err.message : err);
     }
   }
 
-  function bindHeaderButtons() {
-    var btnSyncHeader = qs('btn-sync-header');
-    var btnOpenSync = qs('btn-open-sync');
-    var btnUpdateApp = qs('btn-update-app');
-
-    if (btnSyncHeader && !btnSyncHeader.dataset.bound) {
-      btnSyncHeader.dataset.bound = '1';
-      btnSyncHeader.addEventListener('click', function () {
-        if (window.SyncManager && typeof window.SyncManager.syncNow === 'function') {
-          window.SyncManager.syncNow();
-        } else if (window.Router) {
-          window.Router.go('sync');
-        }
-      });
-    }
-
-    if (btnOpenSync && !btnOpenSync.dataset.bound) {
-      btnOpenSync.dataset.bound = '1';
-      btnOpenSync.addEventListener('click', function () {
-        if (window.Router) window.Router.go('sync');
-      });
-    }
-
-    if (btnUpdateApp && !btnUpdateApp.dataset.bound) {
-      btnUpdateApp.dataset.bound = '1';
-      btnUpdateApp.addEventListener('click', function () {
-        cleanSensitiveUrl();
-
-        try {
-          if (window.registrationWaiting && typeof window.registrationWaiting.postMessage === 'function') {
-            window.registrationWaiting.postMessage({ type: 'SKIP_WAITING' });
-          }
-        } catch (err) {}
-
-        window.location.reload();
-      });
-    }
+  function getSessionToken() {
+    try {
+      if (window.Api && typeof window.Api.getSessionToken === 'function') {
+        return String(window.Api.getSessionToken() || '').trim();
+      }
+    } catch (err) {}
+    return '';
   }
 
-  function bindConnectivityBadge() {
-    var badge = qs('network-status') || qs('network-status-class');
-    if (!badge) return;
-
-    function refreshBadge() {
-      var online = navigator.onLine !== false;
-      badge.textContent = online ? 'Online' : 'Offline';
-      badge.classList.toggle('online', online);
-      badge.classList.toggle('offline', !online);
-    }
-
-    refreshBadge();
-    window.addEventListener('online', refreshBadge);
-    window.addEventListener('offline', refreshBadge);
-  }
-
-  function initSyncLifecycle() {
-    if (window.SyncManager && typeof window.SyncManager.init === 'function') {
-      window.SyncManager.init();
-    }
-
-    window.addEventListener('online', function () {
-      if (window.SyncManager && typeof window.SyncManager.syncNow === 'function') {
-        window.SyncManager.syncNow();
+  function hideSplash() {
+    ['app-splash', 'splash-screen', 'startup-splash', 'boot-splash'].forEach(function (id) {
+      var el = byId(id);
+      if (el) {
+        el.classList.add('hidden');
+        el.style.display = 'none';
+        el.setAttribute('aria-hidden', 'true');
       }
     });
   }
 
-  function initApp() {
+  function showSplash() {
+    ['app-splash', 'splash-screen', 'startup-splash', 'boot-splash'].forEach(function (id) {
+      var el = byId(id);
+      if (el) {
+        el.classList.remove('hidden');
+        el.style.display = '';
+        el.setAttribute('aria-hidden', 'false');
+      }
+    });
+  }
+
+  function showLoginShell() {
+    var ids = ['login-screen', 'screen-login', 'login-root'];
+    ids.forEach(function (id) {
+      var el = byId(id);
+      if (el) {
+        el.classList.remove('hidden');
+        el.classList.add('active');
+        el.style.display = '';
+      }
+    });
+  }
+
+  function openInitialRoute() {
+    try {
+      if (!window.Router || typeof window.Router.go !== 'function') {
+        showLoginShell();
+        return;
+      }
+      if (getSessionToken()) {
+        window.Router.go('dashboard');
+      } else {
+        window.Router.go('login');
+      }
+    } catch (err) {
+      warn('openInitialRoute failed:', err && err.message ? err.message : err);
+      showLoginShell();
+    }
+  }
+
+  function initAuth() {
+    try {
+      if (window.Auth && typeof window.Auth.init === 'function') {
+        window.Auth.init();
+      }
+    } catch (err) {
+      warn('Auth.init failed:', err && err.message ? err.message : err);
+    }
+  }
+
+  function initRouter() {
+    try {
+      if (window.Router && typeof window.Router.init === 'function') {
+        window.Router.init();
+      }
+    } catch (err) {
+      warn('Router.init failed:', err && err.message ? err.message : err);
+    }
+  }
+
+  function initBootstrapSoft() {
+    try {
+      if (window.AppBootstrap && typeof window.AppBootstrap.init === 'function') {
+        var result = window.AppBootstrap.init();
+        if (result && typeof result.then === 'function') {
+          result.catch(function (err) {
+            warn('AppBootstrap.init promise rejected:', err && err.message ? err.message : err);
+          });
+        }
+      }
+    } catch (err) {
+      warn('AppBootstrap.init failed:', err && err.message ? err.message : err);
+    }
+  }
+
+  function registerServiceWorkerSoft() {
+    try {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('./sw.js').catch(function (err) {
+          warn('Service worker register gagal:', err && err.message ? err.message : err);
+        });
+      }
+    } catch (err) {
+      warn('Service worker setup gagal:', err && err.message ? err.message : err);
+    }
+  }
+
+  function wireOnlineOffline() {
+    function notify() {
+      try {
+        var badge = byId('network-status');
+        if (badge) {
+          badge.textContent = navigator.onLine ? 'Online' : 'Offline';
+          badge.className = navigator.onLine ? 'tpk-badge online' : 'tpk-badge offline';
+        }
+      } catch (err) {}
+
+      try {
+        if (window.SyncManager && typeof window.SyncManager.onConnectivityChange === 'function') {
+          window.SyncManager.onConnectivityChange(!!navigator.onLine);
+        }
+      } catch (err2) {}
+    }
+
+    window.addEventListener('online', notify);
+    window.addEventListener('offline', notify);
+    notify();
+  }
+
+  function boot() {
     cleanSensitiveUrl();
+    showSplash();
 
-    if (window.Auth && typeof window.Auth.init === 'function') {
-      window.Auth.init();
-    }
+    initAuth();
+    initRouter();
+    initBootstrapSoft();
+    wireOnlineOffline();
+    registerServiceWorkerSoft();
 
-    if (window.AppBootstrap && typeof window.AppBootstrap.init === 'function') {
-      Promise.resolve(window.AppBootstrap.init()).catch(function (err) {
-        console.warn('[app] AppBootstrap.init failed:', err);
-      });
-    }
+    window.setTimeout(function () {
+      hideSplash();
+      openInitialRoute();
+    }, 250);
 
-    bindHeaderButtons();
-    bindConnectivityBadge();
-    initSyncLifecycle();
+    window.setTimeout(function () {
+      hideSplash();
+      openInitialRoute();
+    }, 1500);
 
-    if (window.Router && typeof window.Router.init === 'function') {
-      window.Router.init();
-    }
+    log('app.js safe boot loaded');
   }
 
-  window.TPKCleanSensitiveUrl = cleanSensitiveUrl;
-  window.App = { init: initApp };
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initApp);
-  } else {
-    initApp();
-  }
+  document.addEventListener('DOMContentLoaded', boot);
 })(window, document);
