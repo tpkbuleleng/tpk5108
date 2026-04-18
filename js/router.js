@@ -15,7 +15,7 @@
 
   var ROUTE_ASSET_MAP = {
     dashboard: [
-      { src: './js/views/dashboardView.js?v=20260418-stage1', globalName: 'DashboardView' }
+      { src: './js/views/dashboardView.js?v=20260418-stage1b', globalName: 'DashboardView' }
     ],
     sasaranList: [
       { src: './js/views/sasaranListView.js?v=20260412-01', globalName: 'SasaranListView' }
@@ -30,7 +30,7 @@
       { src: './js/views/pendampinganView.js?v=20260417-01', globalName: 'PendampinganView' }
     ],
     sync: [
-      { src: './js/views/syncView.js?v=20260418-stage1', globalName: 'SyncView' }
+      { src: './js/views/syncView.js?v=20260418-stage1b', globalName: 'SyncView' }
     ],
     rekapKader: [
       { src: './js/views/rekapKaderView.js?v=20260418-01', globalName: 'RekapKaderView' }
@@ -39,9 +39,33 @@
 
   var scriptPromises = {};
   var isDomBound = false;
+  var bootGuardArmed = false;
 
   function getAppState() {
     return window.AppState || null;
+  }
+
+  function getConfig() {
+    return window.APP_CONFIG || {};
+  }
+
+  function getStorage() {
+    return window.Storage || null;
+  }
+
+  function getSessionToken() {
+    var config = getConfig();
+    var keys = config.STORAGE_KEYS || {};
+    var storage = getStorage();
+
+    try {
+      if (storage && typeof storage.get === 'function' && keys.SESSION_TOKEN) {
+        return String(storage.get(keys.SESSION_TOKEN, '') || '').trim();
+      }
+      return String(localStorage.getItem(keys.SESSION_TOKEN || 'tpk_session_token') || '').trim();
+    } catch (err) {
+      return '';
+    }
   }
 
   function normalizeRouteName(routeName) {
@@ -51,18 +75,16 @@
       splash: 'splash',
       login: 'login',
       dashboard: 'dashboard',
-
-      profile: 'profile',
       profil: 'profile',
+      profile: 'profile',
       settings: 'settings',
       pengaturan: 'settings',
-      help: 'help',
       bantuan: 'help',
+      help: 'help',
 
       'sasaran-list': 'sasaranList',
       sasaranList: 'sasaranList',
       sasaran_list: 'sasaranList',
-      sasaran: 'sasaranList',
 
       'sasaran-detail': 'sasaranDetail',
       sasaranDetail: 'sasaranDetail',
@@ -76,17 +98,15 @@
       pendampingan: 'pendampingan',
 
       sync: 'sync',
+      sinkronisasi: 'sync',
       syncScreen: 'sync',
       'sync-screen': 'sync',
-      sinkronisasi: 'sync',
-      draftSinkronisasi: 'sync',
-      draft_sinkronisasi: 'sync',
 
       rekap: 'rekapKader',
+      'rekap-saya': 'rekapKader',
       rekapKader: 'rekapKader',
       'rekap-kader': 'rekapKader',
-      rekap_kader: 'rekapKader',
-      'rekap-saya': 'rekapKader'
+      rekap_kader: 'rekapKader'
     };
 
     return aliases[raw] || raw;
@@ -101,7 +121,7 @@
     }
 
     var screens = document.querySelectorAll('.screen');
-    Array.prototype.forEach.call(screens, function (screen) {
+    screens.forEach(function (screen) {
       screen.classList.remove('active');
       screen.classList.add('hidden');
     });
@@ -144,7 +164,10 @@
 
   function loadScriptOnce(src, globalName) {
     if (!src) return Promise.resolve();
-    if (isGlobalReady(globalName)) return Promise.resolve();
+
+    if (isGlobalReady(globalName)) {
+      return Promise.resolve();
+    }
 
     if (scriptPromises[src]) {
       return scriptPromises[src];
@@ -183,6 +206,7 @@
   function ensureRouteAssets(routeName) {
     var assets = getRouteAssets(routeName);
     if (!assets.length) return Promise.resolve();
+
     return Promise.all(assets.map(function (asset) {
       return loadScriptOnce(asset.src, asset.globalName);
     }));
@@ -193,6 +217,10 @@
       var target = document.getElementById(screenId);
       if (!target) return;
 
+      if (routeName === 'login' && window.LoginView && typeof window.LoginView.init === 'function') {
+        window.LoginView.init(target, { route: routeName, screenId: screenId });
+        return;
+      }
       if (routeName === 'dashboard' && window.DashboardView && typeof window.DashboardView.init === 'function') {
         window.DashboardView.init(target, { route: routeName, screenId: screenId });
         return;
@@ -264,8 +292,10 @@
       })
       .then(function () {
         if (token !== Router.routeToken) return;
+
         tryInitView(routeName, screenId);
         invokeDefaultRouteReady(routeName);
+
         if (typeof opts.onRouteReady === 'function') {
           opts.onRouteReady({ route: routeName, screenId: screenId });
         }
@@ -275,26 +305,32 @@
       });
   }
 
-  function openDashboardModal(methodName, options) {
+  function openModalIfExists(modalId) {
+    if (window.UI && typeof window.UI.openModal === 'function') {
+      return window.UI.openModal(modalId);
+    }
+
+    var modal = document.getElementById(modalId);
+    if (!modal) return false;
+    modal.classList.remove('hidden');
+    modal.classList.add('active');
+    modal.setAttribute('aria-hidden', 'false');
+    return true;
+  }
+
+  function openDashboardModal(methodName, modalId, options) {
     var opts = options || {};
     var finish = function () {
       if (window.DashboardView && typeof window.DashboardView[methodName] === 'function') {
         window.DashboardView[methodName]();
+        return;
       }
-      if (typeof opts.onRouteReady === 'function') {
-        opts.onRouteReady({ route: 'dashboard', screenId: ROUTE_MAP.dashboard });
-      }
+      openModalIfExists(modalId);
     };
 
-    if (Router.getCurrentRoute() === 'dashboard') {
-      ensureRouteAssets('dashboard')
-        .then(function () {
-          tryInitView('dashboard', ROUTE_MAP.dashboard);
-          finish();
-        })
-        .catch(function (err) {
-          console.error('Gagal membuka modal dashboard:', methodName, err);
-        });
+    var current = normalizeRouteName(Router.currentRoute);
+    if (current === 'dashboard') {
+      finish();
       return true;
     }
 
@@ -302,6 +338,122 @@
       scrollToTop: opts.scrollToTop,
       onRouteReady: function () {
         finish();
+      }
+    });
+  }
+
+  function getHashRoute() {
+    var raw = String(window.location.hash || '').replace(/^#/, '').trim();
+    return normalizeRouteName(raw);
+  }
+
+  function isAnyScreenActive() {
+    return !!document.querySelector('.screen.active:not(.hidden)');
+  }
+
+  function resolveFallbackRoute() {
+    var hashRoute = getHashRoute();
+    if (ROUTE_MAP[hashRoute]) {
+      return hashRoute;
+    }
+    if (hashRoute === 'profile' || hashRoute === 'settings' || hashRoute === 'help') {
+      return hashRoute;
+    }
+    return getSessionToken() ? 'dashboard' : 'login';
+  }
+
+  function applyHashToLocation(routeName) {
+    var normalized = normalizeRouteName(routeName);
+    if (!normalized) return;
+    var targetHash = '#' + normalized;
+    if (window.location.hash !== targetHash) {
+      try {
+        history.replaceState(null, '', targetHash);
+      } catch (err) {
+        window.location.hash = normalized;
+      }
+    }
+  }
+
+  function runBootGuard() {
+    var routeName = resolveFallbackRoute();
+
+    if (routeName === 'profile') {
+      openDashboardModal('openProfile', 'profile-modal', { scrollToTop: false });
+      applyHashToLocation('dashboard');
+      return;
+    }
+    if (routeName === 'settings') {
+      openDashboardModal('openSettings', 'settings-modal', { scrollToTop: false });
+      applyHashToLocation('dashboard');
+      return;
+    }
+    if (routeName === 'help') {
+      openDashboardModal('openHelp', 'help-modal', { scrollToTop: false });
+      applyHashToLocation('dashboard');
+      return;
+    }
+
+    Router.go(routeName, { scrollToTop: false });
+    applyHashToLocation(routeName);
+  }
+
+  function armBootGuard() {
+    if (bootGuardArmed) return;
+    bootGuardArmed = true;
+
+    function ensureVisibleScreen() {
+      if (!isAnyScreenActive()) {
+        runBootGuard();
+        return;
+      }
+
+      var hashRoute = getHashRoute();
+      if (hashRoute && hashRoute !== normalizeRouteName(Router.currentRoute)) {
+        if (hashRoute === 'profile') {
+          openDashboardModal('openProfile', 'profile-modal', { scrollToTop: false });
+          return;
+        }
+        if (hashRoute === 'settings') {
+          openDashboardModal('openSettings', 'settings-modal', { scrollToTop: false });
+          return;
+        }
+        if (hashRoute === 'help') {
+          openDashboardModal('openHelp', 'help-modal', { scrollToTop: false });
+          return;
+        }
+        if (ROUTE_MAP[hashRoute]) {
+          Router.go(hashRoute, { scrollToTop: false });
+        }
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+      window.setTimeout(ensureVisibleScreen, 150);
+    }, { once: true });
+
+    window.addEventListener('load', function () {
+      window.setTimeout(ensureVisibleScreen, 200);
+    }, { once: true });
+
+    window.addEventListener('hashchange', function () {
+      var hashRoute = getHashRoute();
+      if (!hashRoute) return;
+
+      if (hashRoute === 'profile') {
+        openDashboardModal('openProfile', 'profile-modal', { scrollToTop: false });
+        return;
+      }
+      if (hashRoute === 'settings') {
+        openDashboardModal('openSettings', 'settings-modal', { scrollToTop: false });
+        return;
+      }
+      if (hashRoute === 'help') {
+        openDashboardModal('openHelp', 'help-modal', { scrollToTop: false });
+        return;
+      }
+      if (ROUTE_MAP[hashRoute] && hashRoute !== normalizeRouteName(Router.currentRoute)) {
+        Router.go(hashRoute, { scrollToTop: false });
       }
     });
   }
@@ -332,6 +484,7 @@
 
     init: function () {
       bindRouteLinks();
+      armBootGuard();
       return true;
     },
 
@@ -339,9 +492,9 @@
       var normalizedRoute = normalizeRouteName(routeName);
       var opts = options || {};
 
-      if (normalizedRoute === 'profile') return openDashboardModal('openProfile', opts);
-      if (normalizedRoute === 'settings') return openDashboardModal('openSettings', opts);
-      if (normalizedRoute === 'help') return openDashboardModal('openHelp', opts);
+      if (normalizedRoute === 'profile') return openDashboardModal('openProfile', 'profile-modal', opts);
+      if (normalizedRoute === 'settings') return openDashboardModal('openSettings', 'settings-modal', opts);
+      if (normalizedRoute === 'help') return openDashboardModal('openHelp', 'help-modal', opts);
 
       var screenId = ROUTE_MAP[normalizedRoute];
       if (!screenId) {
@@ -357,6 +510,7 @@
 
       var token = updateCurrentRoute(normalizedRoute, screenId);
       finalizeRoute(normalizedRoute, screenId, token, opts);
+      applyHashToLocation(normalizedRoute);
       return true;
     },
 
