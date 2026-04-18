@@ -2,57 +2,19 @@
   'use strict';
 
   var loadedScripts = {};
-  var viewRegistry = {
-    login: {
-      path: './js/views/loginView.js',
-      global: 'LoginView',
-      methods: ['render', 'show', 'init']
-    },
-    dashboard: {
-      path: './js/views/dashboardView.js',
-      global: 'DashboardView',
-      methods: ['render', 'show', 'init', 'refresh']
-    },
-    rekap: {
-      path: './js/views/rekapKaderView.js',
-      global: 'RekapKaderView',
-      methods: ['render', 'show', 'init']
-    },
-    sasaran: {
-      path: './js/views/sasaranListView.js',
-      global: 'SasaranListView',
-      methods: ['render', 'show', 'init']
-    },
-    sasarandetail: {
-      path: './js/views/sasaranDetailView.js',
-      global: 'SasaranDetailView',
-      methods: ['render', 'show', 'init']
-    },
-    registrasi: {
-      path: './js/views/registrasiView.js',
-      global: 'RegistrasiView',
-      methods: ['render', 'show', 'init']
-    },
-    pendampingan: {
-      path: './js/views/pendampinganView.js',
-      global: 'PendampinganView',
-      methods: ['render', 'show', 'init']
-    },
-    sync: {
-      path: './js/views/syncView.js',
-      global: 'SyncView',
-      methods: ['render', 'show', 'init']
-    },
-    profile: {
-      path: null,
-      global: 'ProfileView',
-      methods: ['render', 'show', 'init']
-    }
+  var routeMap = {
+    login: { file: './js/views/loginView.js', globals: ['LoginView'], methods: ['render', 'show', 'init'] },
+    dashboard: { file: './js/views/dashboardView.js', globals: ['DashboardView'], methods: ['render', 'show', 'init', 'refresh'] },
+    rekap: { file: './js/views/rekapKaderView.js', globals: ['RekapKaderView'], methods: ['render', 'show', 'init'] },
+    sasaran: { file: './js/views/sasaranListView.js', globals: ['SasaranListView'], methods: ['render', 'show', 'init'] },
+    sasarandetail: { file: './js/views/sasaranDetailView.js', globals: ['SasaranDetailView'], methods: ['render', 'show', 'init'] },
+    registrasi: { file: './js/views/registrasiView.js', globals: ['RegistrasiView'], methods: ['render', 'show', 'init'] },
+    pendampingan: { file: './js/views/pendampinganView.js', globals: ['PendampinganView'], methods: ['render', 'show', 'init'] },
+    sync: { file: './js/views/syncView.js', globals: ['SyncView'], methods: ['render', 'show', 'init'] },
+    profile: { file: './js/views/profileView.js', globals: ['ProfileView'], methods: ['render', 'show', 'init'] }
   };
 
-  function byId(id) {
-    return document.getElementById(id);
-  }
+  function byId(id) { return document.getElementById(id); }
 
   function getSessionToken() {
     try {
@@ -63,189 +25,173 @@
     return '';
   }
 
-  function getDefaultRoute() {
-    return getSessionToken() ? 'dashboard' : 'login';
-  }
-
-  function normalizeRoute(route) {
-    var text = String(route || '').trim().toLowerCase();
-    if (!text) return '';
-    return text.replace(/^#/, '');
-  }
-
-  function getContainer() {
+  function getRootContainer() {
     return (
       byId('module-root') ||
       byId('content-root') ||
       byId('view-root') ||
       byId('screen-root') ||
-      byId('screen-container') ||
       byId('konten-app') ||
+      byId('screen-container') ||
       byId('app-content') ||
       document.body
     );
   }
 
-  function setContainerHtml(html) {
-    var container = getContainer();
-    if (container) {
-      container.innerHTML = html || '';
-    }
+  function setRootContent(html) {
+    var root = getRootContainer();
+    if (root) root.innerHTML = html || '';
   }
 
-  function escapeHtml(text) {
-    return String(text == null ? '' : text)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
+  function normalizeRoute(route) {
+    var value = String(route || '').trim().toLowerCase();
+    if (!value) return '';
+    return value.replace(/^#/, '');
   }
 
-  function renderError(routeName, error) {
-    var message = error && error.message ? error.message : String(error || 'Unknown error');
-    setContainerHtml(
-      '<div class="tpk-card"><p>Gagal membuka halaman <b>' +
-        escapeHtml(routeName) +
-        '</b>.</p><pre style="white-space:pre-wrap;">' +
-        escapeHtml(message) +
-        '</pre></div>'
-    );
+  function getDefaultRoute() {
+    return getSessionToken() ? 'dashboard' : 'login';
   }
 
-  function renderPlaceholder(routeName) {
-    setContainerHtml(
-      '<div class="tpk-card"><p>Halaman <b>' +
-        escapeHtml(routeName) +
-        '</b> belum tersedia.</p></div>'
-    );
+  function routeExists(name) {
+    return !!routeMap[name];
   }
 
-  function loadScriptOnce(path) {
-    return new Promise(function (resolve, reject) {
-      if (!path) {
+  function loadScript(url) {
+    if (!url) return Promise.resolve();
+    if (loadedScripts[url] === true) return Promise.resolve();
+    if (loadedScripts[url] && typeof loadedScripts[url].then === 'function') return loadedScripts[url];
+
+    loadedScripts[url] = new Promise(function (resolve, reject) {
+      var script = document.createElement('script');
+      script.src = url;
+      script.async = true;
+      script.onload = function () {
+        loadedScripts[url] = true;
         resolve();
-        return;
-      }
-
-      if (loadedScripts[path] === true) {
-        resolve();
-        return;
-      }
-
-      if (loadedScripts[path] && typeof loadedScripts[path].then === 'function') {
-        loadedScripts[path].then(resolve).catch(reject);
-        return;
-      }
-
-      var existing = document.querySelector('script[data-router-src="' + path + '"]');
-      if (existing && existing.dataset.loaded === '1') {
-        loadedScripts[path] = true;
-        resolve();
-        return;
-      }
-
-      var promise = new Promise(function (res, rej) {
-        var script = existing || document.createElement('script');
-        if (!existing) {
-          script.src = path;
-          script.async = true;
-          script.defer = true;
-          script.dataset.routerSrc = path;
-          document.body.appendChild(script);
-        }
-
-        script.onload = function () {
-          script.dataset.loaded = '1';
-          loadedScripts[path] = true;
-          res();
-        };
-        script.onerror = function () {
-          loadedScripts[path] = false;
-          rej(new Error('Gagal memuat script: ' + path));
-        };
-      });
-
-      loadedScripts[path] = promise;
-      promise.then(resolve).catch(reject);
+      };
+      script.onerror = function () {
+        loadedScripts[url] = false;
+        reject(new Error('Gagal memuat script: ' + url));
+      };
+      document.body.appendChild(script);
     });
+
+    return loadedScripts[url];
   }
 
-  function getViewObject(routeName, config) {
-    if (routeName === 'profile' && !window.ProfileView) {
-      return window.DashboardView || null;
+  function getViewObject(config) {
+    var names = (config && config.globals) || [];
+    for (var i = 0; i < names.length; i += 1) {
+      if (window[names[i]]) return window[names[i]];
     }
-    return window[config.global] || null;
+
+    if (config === routeMap.profile) {
+      return window.ProfileView || createProfileFallback();
+    }
+
+    return null;
+  }
+
+  function createProfileFallback() {
+    return {
+      render: function () {
+        var appState = window.AppState;
+        var profile = {};
+        try {
+          if (appState && typeof appState.getProfile === 'function') {
+            profile = appState.getProfile() || {};
+          }
+        } catch (err) {}
+        var rows = [
+          ['Nama', profile.nama_kader || profile.nama_user || profile.nama || '-'],
+          ['ID User', profile.id_user || '-'],
+          ['Unsur TPK', profile.unsur_tpk || profile.unsur || '-'],
+          ['Nomor Tim', profile.nomor_tim || profile.nomor_tim_display || profile.id_tim || '-'],
+          ['Kecamatan', profile.nama_kecamatan || profile.kecamatan || '-'],
+          ['Desa/Kelurahan', profile.desa_kelurahan || profile.nama_desa || '-'],
+          ['Dusun/RW', profile.dusun_rw || profile.nama_dusun || '-']
+        ];
+        setRootContent(
+          '<div class="tpk-card"><h3>Profil Saya</h3><table style="width:100%;border-collapse:collapse;">' +
+          rows.map(function (row) {
+            return '<tr><td style="padding:8px 10px;font-weight:600;width:180px;">' + row[0] + '</td><td style="padding:8px 10px;">' + row[1] + '</td></tr>';
+          }).join('') +
+          '</table></div>'
+        );
+      }
+    };
   }
 
   function callView(viewObj, methods, routeName) {
-    if (!viewObj) return false;
-
     var names = Array.isArray(methods) ? methods : [methods];
+    var root = getRootContainer();
+
     for (var i = 0; i < names.length; i += 1) {
       var method = names[i];
-      if (typeof viewObj[method] === 'function') {
-        return viewObj[method](routeName);
+      if (viewObj && typeof viewObj[method] === 'function') {
+        if (method === 'init') {
+          return viewObj[method](routeName, root);
+        }
+        if (method === 'show') {
+          return viewObj[method](routeName, root);
+        }
+        if (method === 'render') {
+          return viewObj[method](routeName, root);
+        }
+        return viewObj[method](routeName, root);
       }
     }
 
-    return false;
+    return undefined;
   }
 
-  function updateNav(routeName) {
-    try {
-      var links = document.querySelectorAll('[data-route-link]');
-      Array.prototype.forEach.call(links, function (link) {
-        var active = String(link.getAttribute('data-route-link') || '').toLowerCase() === routeName;
-        link.classList.toggle('is-active', active);
-        link.setAttribute('aria-current', active ? 'page' : 'false');
-      });
-    } catch (err) {}
+  function renderPlaceholder(routeName, message) {
+    setRootContent('<div class="tpk-card"><p>' + (message || ('Halaman ' + routeName + ' belum tersedia.')) + '</p></div>');
   }
 
-  function pushHash(routeName) {
+  function updateActiveLinks(routeName) {
+    var links = Array.prototype.slice.call(document.querySelectorAll('[data-route-link]'));
+    links.forEach(function (link) {
+      var name = normalizeRoute(link.getAttribute('data-route-link'));
+      if (name === routeName) link.classList.add('is-active');
+      else link.classList.remove('is-active');
+    });
+  }
+
+  function handleError(routeName, err) {
+    console.error('Router error:', routeName, err);
+    renderPlaceholder(routeName, 'Gagal membuka halaman <b>' + routeName + '</b>.');
+  }
+
+  async function go(route) {
+    var routeName = normalizeRoute(route) || getDefaultRoute();
+    if (!routeExists(routeName)) {
+      renderPlaceholder(routeName);
+      return;
+    }
+
     try {
       if (window.location.hash !== '#' + routeName) {
         window.history.replaceState({}, document.title, '#' + routeName);
       }
     } catch (err) {}
-  }
 
-  function resolveRoute(route) {
-    var name = normalizeRoute(route) || getDefaultRoute();
-    return {
-      name: name,
-      config: viewRegistry[name] || null
-    };
-  }
+    updateActiveLinks(routeName);
 
-  function go(route) {
-    var resolved = resolveRoute(route);
-    var routeName = resolved.name;
-    var config = resolved.config;
-
-    pushHash(routeName);
-    updateNav(routeName);
-
-    if (!config) {
-      renderPlaceholder(routeName);
-      return Promise.resolve(false);
+    var config = routeMap[routeName];
+    try {
+      await loadScript(config.file);
+      var viewObj = getViewObject(config);
+      if (!viewObj) {
+        renderPlaceholder(routeName, 'Halaman ' + routeName + ' belum tersedia.');
+        return;
+      }
+      var result = callView(viewObj, config.methods, routeName);
+      await Promise.resolve(result);
+    } catch (err) {
+      handleError(routeName, err);
     }
-
-    return loadScriptOnce(config.path)
-      .then(function () {
-        var viewObj = getViewObject(routeName, config);
-        if (!viewObj) {
-          renderPlaceholder(routeName);
-          return false;
-        }
-        return Promise.resolve(callView(viewObj, config.methods, routeName));
-      })
-      .catch(function (error) {
-        console.error('Router error:', routeName, error);
-        renderError(routeName, error);
-        return false;
-      });
   }
 
   function current() {
@@ -253,30 +199,13 @@
   }
 
   function init() {
-    return go(current());
-  }
-
-  function bindLinks() {
-    document.addEventListener('click', function (event) {
-      var link = event.target && event.target.closest ? event.target.closest('[data-route-link]') : null;
-      if (!link) return;
-      event.preventDefault();
-      var routeName = String(link.getAttribute('data-route-link') || '').trim();
-      if (routeName) {
-        go(routeName);
-      }
-    });
-
-    window.addEventListener('hashchange', function () {
-      go(current());
-    });
+    go(current());
   }
 
   window.Router = {
     init: init,
     go: go,
     current: current,
-    bindLinks: bindLinks,
-    loadScriptOnce: loadScriptOnce
+    loadScript: loadScript
   };
 })(window, document);
