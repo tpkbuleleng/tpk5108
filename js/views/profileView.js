@@ -1,728 +1,473 @@
 (function (window, document) {
   'use strict';
 
-  window.__PROFILE_VIEW_BUILD = '20260418-01';
-  console.log('ProfileView build aktif:', window.__PROFILE_VIEW_BUILD);
+  const VIEW_NAME = 'profile';
+  const FALLBACK_PROFILE_KEYS = ['USER_PROFILE', 'TPK_PROFILE', 'tpk_profile'];
+  const FALLBACK_SESSION_KEYS = ['SESSION_TOKEN', 'TPK_SESSION_TOKEN', 'tpk_session_token'];
 
-  var PROFILE_REMOTE_CACHE_KEY = 'tpk_profile_remote_cache_v1';
-  var AUTO_CONTAINER_ID = 'profile-auto-container';
-  var isBound = false;
-
-  function byId(id) {
-    return document.getElementById(id);
-  }
-
-  function getUI() {
-    return window.UI || null;
-  }
-
-  function getApi() {
-    return window.Api || null;
-  }
-
-  function getRouter() {
-    return window.Router || null;
-  }
-
-  function getState() {
-    return window.AppState || null;
-  }
-
-  function getStorage() {
-    return window.Storage || null;
-  }
-
-  function getConfig() {
+  function getAppConfig() {
     return window.APP_CONFIG || {};
   }
 
-  function getActions() {
-    return getConfig().API_ACTIONS || {};
+  function getStorageKey(name, fallback) {
+    const cfg = getAppConfig();
+    const keys = cfg.STORAGE_KEYS || {};
+    return keys[name] || fallback;
   }
 
-  function getStorageKeys() {
-    return getConfig().STORAGE_KEYS || {};
-  }
-
-  function firstNonEmpty() {
-    for (var i = 0; i < arguments.length; i += 1) {
-      var value = arguments[i];
-      if (value !== undefined && value !== null && String(value).trim() !== '') {
-        return value;
-      }
-    }
-    return '';
-  }
-
-  function normalizeSpaces(value) {
-    return String(value == null ? '' : value).replace(/\s+/g, ' ').trim();
-  }
-
-  function normalizeUpper(value) {
-    return normalizeSpaces(value).toUpperCase();
-  }
-
-  function safeJsonParse(raw, fallback) {
-    if (!raw) return fallback;
-    if (typeof raw === 'object') return raw;
+  function readLocal(key) {
     try {
-      return JSON.parse(raw);
-    } catch (err) {
-      return fallback;
-    }
-  }
-
-  function escapeHtml(value) {
-    return String(value == null ? '' : value)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
-  }
-
-  function showToast(message, type) {
-    var ui = getUI();
-    if (ui && typeof ui.showToast === 'function') {
-      ui.showToast(message, type || 'info');
-      return;
-    }
-    if (ui && typeof ui.toast === 'function') {
-      ui.toast(message, type || 'info');
-      return;
-    }
-    try {
-      window.alert(message);
-    } catch (err) {}
-  }
-
-  function setText(id, value) {
-    var ui = getUI();
-    if (ui && typeof ui.setText === 'function') {
-      ui.setText(id, value);
-      return;
-    }
-    var el = byId(id);
-    if (el) {
-      el.textContent = (value === undefined || value === null || value === '') ? '-' : String(value);
-    }
-  }
-
-  function setHTML(id, html) {
-    var ui = getUI();
-    if (ui && typeof ui.setHTML === 'function') {
-      ui.setHTML(id, html);
-      return;
-    }
-    var el = byId(id);
-    if (el) {
-      el.innerHTML = html || '';
-    }
-  }
-
-  function setLoading(buttonId, isLoading, loadingText) {
-    var ui = getUI();
-    if (ui && typeof ui.setLoading === 'function') {
-      ui.setLoading(buttonId, isLoading, loadingText || 'Memuat...');
-      return;
-    }
-
-    var btn = byId(buttonId);
-    if (!btn) return;
-
-    if (isLoading) {
-      if (!btn.dataset.originalText) btn.dataset.originalText = btn.textContent || '';
-      btn.disabled = true;
-      btn.textContent = loadingText || 'Memuat...';
-      return;
-    }
-
-    btn.disabled = false;
-    btn.textContent = btn.dataset.originalText || btn.textContent;
-    delete btn.dataset.originalText;
-  }
-
-  function toggleHidden(id, shouldHide) {
-    var ui = getUI();
-    if (ui && typeof ui.toggleHidden === 'function') {
-      ui.toggleHidden(id, shouldHide);
-      return;
-    }
-    var el = byId(id);
-    if (!el) return;
-    el.classList.toggle('hidden', !!shouldHide);
-  }
-
-  function getStateProfile() {
-    var state = getState();
-    if (state && typeof state.getProfile === 'function') {
-      var profile = state.getProfile() || {};
-      if (profile && Object.keys(profile).length) return profile;
-    }
-    return {};
-  }
-
-  function getStorageProfile() {
-    var storage = getStorage();
-    var keys = getStorageKeys();
-
-    if (storage && typeof storage.get === 'function' && keys.PROFILE) {
-      var fromStorage = storage.get(keys.PROFILE, {}) || {};
-      if (fromStorage && Object.keys(fromStorage).length) return fromStorage;
-    }
-
-    return {};
-  }
-
-  function getSessionProfile() {
-    try {
-      if (window.Session && typeof window.Session.getProfile === 'function') {
-        var profile = window.Session.getProfile() || {};
-        if (profile && Object.keys(profile).length) return profile;
-      }
-    } catch (err) {}
-    return {};
-  }
-
-  function getBootstrapProfile() {
-    try {
-      if (window.AppBootstrap && typeof window.AppBootstrap.getCachedProfile === 'function') {
-        var cached = window.AppBootstrap.getCachedProfile() || {};
-        if (cached && Object.keys(cached).length) return cached;
-      }
-    } catch (err) {}
-
-    var lite = safeJsonParse(localStorage.getItem('tpk_bootstrap_lite'), {}) || {};
-    if (lite.profile && typeof lite.profile === 'object' && Object.keys(lite.profile).length) {
-      return lite.profile;
-    }
-
-    var appBootstrap = safeJsonParse(localStorage.getItem('tpk_app_bootstrap'), {}) || {};
-    if (appBootstrap.profile && typeof appBootstrap.profile === 'object' && Object.keys(appBootstrap.profile).length) {
-      return appBootstrap.profile;
-    }
-
-    return {};
-  }
-
-  function getLocalProfile() {
-    try {
-      var local = safeJsonParse(localStorage.getItem('tpk_profile'), {}) || {};
-      if (local && Object.keys(local).length) return local;
-    } catch (err) {}
-    return {};
-  }
-
-  function getCachedRemoteProfile() {
-    try {
-      var cached = safeJsonParse(localStorage.getItem(PROFILE_REMOTE_CACHE_KEY), {}) || {};
-      if (cached && cached.profile && typeof cached.profile === 'object') {
-        return cached.profile;
-      }
-    } catch (err) {}
-    return {};
-  }
-
-  function getProfile() {
-    var sources = [
-      getSessionProfile(),
-      getStateProfile(),
-      getStorageProfile(),
-      getBootstrapProfile(),
-      getLocalProfile(),
-      getCachedRemoteProfile()
-    ];
-
-    for (var i = 0; i < sources.length; i += 1) {
-      if (sources[i] && Object.keys(sources[i]).length) return sources[i];
-    }
-
-    return {};
-  }
-
-  function getQueueCount() {
-    var state = getState();
-    if (state && typeof state.getSyncQueue === 'function') {
-      var queueFromState = state.getSyncQueue();
-      if (Array.isArray(queueFromState)) return queueFromState.length;
-    }
-
-    var storage = getStorage();
-    var keys = getStorageKeys();
-    if (storage && typeof storage.get === 'function' && keys.SYNC_QUEUE) {
-      var queueFromStorage = storage.get(keys.SYNC_QUEUE, []);
-      if (Array.isArray(queueFromStorage)) return queueFromStorage.length;
-    }
-
-    try {
-      var localQueue = safeJsonParse(localStorage.getItem('tpk_sync_queue_v1'), []);
-      return Array.isArray(localQueue) ? localQueue.length : 0;
-    } catch (err) {
-      return 0;
-    }
-  }
-
-  function getLastSyncAt() {
-    var state = getState();
-    if (state && typeof state.getLastSyncAt === 'function') {
-      var fromState = state.getLastSyncAt();
-      if (fromState) return fromState;
-    }
-
-    var storage = getStorage();
-    var keys = getStorageKeys();
-    if (storage && typeof storage.get === 'function' && keys.LAST_SYNC_AT) {
-      return storage.get(keys.LAST_SYNC_AT, '') || '';
-    }
-
-    try {
-      return localStorage.getItem('tpk_last_sync_at') || '';
+      if (!key) return '';
+      return window.localStorage.getItem(key) || '';
     } catch (err) {
       return '';
     }
   }
 
+  function writeLocal(key, value) {
+    try {
+      if (!key) return;
+      window.localStorage.setItem(key, value);
+    } catch (err) {
+      // no-op
+    }
+  }
+
+  function readJsonLocal(candidates) {
+    const keys = Array.isArray(candidates) ? candidates : [candidates];
+    for (const key of keys) {
+      const raw = readLocal(key);
+      if (!raw) continue;
+      try {
+        return JSON.parse(raw);
+      } catch (err) {
+        // ignore malformed cache and continue
+      }
+    }
+    return null;
+  }
+
+  function getCachedProfile() {
+    const cfg = getAppConfig();
+    const profileKey = getStorageKey('tpk_profile', 'tpk_profile');
+
+    if (window.AppState && typeof window.AppState.get === 'function') {
+      const stateProfile = window.AppState.get('profile')
+        || window.AppState.get('userProfile')
+        || window.AppState.get('bootstrap.profile');
+      if (stateProfile && typeof stateProfile === 'object') return stateProfile;
+    }
+
+    if (window.State && typeof window.State.get === 'function') {
+      const stateProfile = window.State.get('profile')
+        || window.State.get('userProfile')
+        || window.State.get('bootstrap.profile');
+      if (stateProfile && typeof stateProfile === 'object') return stateProfile;
+    }
+
+    return readJsonLocal([profileKey].concat(FALLBACK_PROFILE_KEYS));
+  }
+
+  function saveProfileCache(profile) {
+    if (!profile || typeof profile !== 'object') return;
+
+    const cfg = getAppConfig();
+    const profileKey = getStorageKey('tpk_profile', 'tpk_profile');
+    const raw = JSON.stringify(profile);
+
+    writeLocal(profileKey, raw);
+    FALLBACK_PROFILE_KEYS.forEach((key) => writeLocal(key, raw));
+
+    if (window.AppState && typeof window.AppState.set === 'function') {
+      try { window.AppState.set('profile', profile); } catch (err) { /* no-op */ }
+    }
+    if (window.State && typeof window.State.set === 'function') {
+      try { window.State.set('profile', profile); } catch (err) { /* no-op */ }
+    }
+  }
+
+  function getSessionToken() {
+    const sessionKey = getStorageKey('tpk_session_token', 'tpk_session_token');
+    return readLocal(sessionKey) || FALLBACK_SESSION_KEYS.map(readLocal).find(Boolean) || '';
+  }
+
+  async function apiPost(action, payload, meta) {
+    const safePayload = payload || {};
+    const safeMeta = meta || {};
+
+    if (window.Api && typeof window.Api.post === 'function') {
+      return window.Api.post(action, safePayload, safeMeta);
+    }
+    if (typeof window.apiCall === 'function') {
+      return window.apiCall(action, safePayload, safeMeta);
+    }
+
+    throw new Error('Api.post / apiCall belum tersedia di window');
+  }
+
+  function safeText(value, fallback) {
+    if (value === 0) return '0';
+    if (value === false) return 'Tidak';
+    if (value === true) return 'Ya';
+    if (value === null || value === undefined) return fallback || '-';
+    const str = String(value).trim();
+    return str || (fallback || '-');
+  }
+
+  function ucWords(value) {
+    return safeText(value, '-').toLowerCase().replace(/\b\w/g, (m) => m.toUpperCase());
+  }
+
+  function normalizeRole(value) {
+    const raw = safeText(value, '').toUpperCase().replace(/\s+/g, '_');
+    const map = {
+      KADER: 'Kader',
+      KADER_KB: 'Kader KB',
+      PKB: 'PKB',
+      ADMIN_KECAMATAN: 'Admin Kecamatan',
+      ADMIN_KABUPATEN: 'Admin Kabupaten',
+      SUPER_ADMIN: 'Super Admin'
+    };
+    return map[raw] || safeText(value, '-');
+  }
+
+  function getDisplayNomorTim(data) {
+    data = data || {};
+    return safeText(
+      data.nomor_tim
+      || data.nomor_tim_display
+      || data.nomor_tim_lokal
+      || data.nama_tim
+      || data.id_tim,
+      '-'
+    );
+  }
+
+  function pickFirst(obj, keys, fallback) {
+    if (!obj || typeof obj !== 'object') return fallback || '';
+    for (const key of keys) {
+      const value = obj[key];
+      if (value === 0 || value === false || value === true) return value;
+      if (typeof value === 'string' && value.trim()) return value.trim();
+      if (value && typeof value !== 'string') return value;
+    }
+    return fallback || '';
+  }
+
+  function getWilayahDisplay(profile) {
+    const kecamatan = pickFirst(profile, [
+      'nama_kecamatan', 'kecamatan', 'wilayah_kecamatan', 'scope_kecamatan'
+    ], '');
+    const desa = pickFirst(profile, [
+      'desa_kelurahan', 'nama_desa_kelurahan', 'nama_desa', 'desa', 'wilayah_desa_kelurahan', 'scope_desa_kelurahan'
+    ], '');
+    const dusun = pickFirst(profile, [
+      'dusun_rw', 'nama_dusun_rw', 'dusun', 'rw', 'wilayah_dusun_rw', 'scope_dusun_rw', 'wilayah_tugas_dusun_rw'
+    ], '');
+
+    return {
+      kecamatan: safeText(kecamatan, '-'),
+      desa: safeText(desa, '-'),
+      dusun: safeText(dusun, '-')
+    };
+  }
+
   function formatDateTime(value) {
     if (!value) return '-';
-    var d = new Date(value);
-    if (isNaN(d.getTime())) return String(value);
+    const dt = new Date(value);
+    if (Number.isNaN(dt.getTime())) return safeText(value, '-');
+    const yy = dt.getFullYear();
+    const mm = String(dt.getMonth() + 1).padStart(2, '0');
+    const dd = String(dt.getDate()).padStart(2, '0');
+    const hh = String(dt.getHours()).padStart(2, '0');
+    const mi = String(dt.getMinutes()).padStart(2, '0');
+    return `${yy}-${mm}-${dd} ${hh}:${mi}`;
+  }
+
+  function getRoot(root) {
+    if (root && typeof root.querySelector === 'function') return root;
+    return document.getElementById('content-area')
+      || document.getElementById('app-content')
+      || document.querySelector('[data-route-root]')
+      || document.body;
+  }
+
+  function setText(root, selector, value) {
+    const el = root.querySelector(selector);
+    if (el) el.textContent = safeText(value, '-');
+  }
+
+  function setStatus(root, text, type) {
+    const box = root.querySelector('[data-profile-status]');
+    if (!box) return;
+    box.textContent = safeText(text, '');
+    box.className = `profile-status profile-status-${type || 'info'}`;
+  }
+
+  function getProfileRows(profile) {
+    const wilayah = getWilayahDisplay(profile);
+    return [
+      ['Nama Pengguna', safeText(pickFirst(profile, ['nama_pengguna', 'nama_user', 'nama_lengkap', 'nama_kader'], '-'))],
+      ['ID Pengguna', safeText(pickFirst(profile, ['id_user', 'username', 'id_kader'], '-'))],
+      ['Unsur TPK', normalizeRole(pickFirst(profile, ['unsur_tpk', 'role_label', 'role_akses', 'role'], '-'))],
+      ['Nomor Tim', getDisplayNomorTim(profile)],
+      ['Kecamatan', wilayah.kecamatan],
+      ['Desa/Kelurahan', wilayah.desa],
+      ['Dusun/RW', wilayah.dusun],
+      ['Status Online', navigator.onLine ? 'Online' : 'Offline'],
+      ['Versi Aplikasi', safeText(getAppConfig().APP_VERSION || getAppConfig().appVersion, '-')],
+      ['Token Tersedia', getSessionToken() ? 'Ya' : 'Tidak'],
+      ['Cache Profil Diperbarui', formatDateTime(profile.updated_at || profile.cached_at || profile.fetched_at)]
+    ];
+  }
+
+  function renderRows(root, profile) {
+    const tbody = root.querySelector('[data-profile-table-body]');
+    if (!tbody) return;
+
+    const rows = getProfileRows(profile);
+    tbody.innerHTML = rows.map(([label, value]) => {
+      return `<tr>
+        <th style="text-align:left;vertical-align:top;padding:10px 12px;width:38%;">${label}</th>
+        <td style="padding:10px 12px;">${safeText(value, '-')}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  function renderPermissionList(root, permissionData) {
+    const box = root.querySelector('[data-profile-permissions]');
+    if (!box) return;
+
+    const perms = [];
+    if (Array.isArray(permissionData)) perms.push(...permissionData);
+    if (permissionData && Array.isArray(permissionData.permissions)) perms.push(...permissionData.permissions);
+    if (permissionData && Array.isArray(permissionData.data)) perms.push(...permissionData.data);
+
+    if (!perms.length) {
+      box.innerHTML = '<div class="card"><div class="card-body">Belum ada daftar hak akses tambahan.</div></div>';
+      return;
+    }
+
+    box.innerHTML = `<div class="card"><div class="card-body"><ul style="margin:0;padding-left:18px;"></ul></div></div>`;
+    const ul = box.querySelector('ul');
+    perms.forEach((item) => {
+      const li = document.createElement('li');
+      li.textContent = safeText(item.label || item.name || item.code || item, '-');
+      ul.appendChild(li);
+    });
+  }
+
+  async function fetchProfileBundle() {
+    let profileRes = null;
+    let permissionRes = null;
+    let sessionRes = null;
+
     try {
-      return d.toLocaleString('id-ID');
+      profileRes = await apiPost('getMyProfile', {});
     } catch (err) {
-      return String(value);
+      profileRes = { ok: false, message: err && err.message ? err.message : 'Gagal memuat profil' };
     }
-  }
-
-  function buildWilayahParts(profile) {
-    var scope = profile.scope_wilayah || profile.tim_wilayah_scope || profile.wilayah_scope || {};
-
-    var kecamatan = firstNonEmpty(
-      scope.kecamatan,
-      scope.nama_kecamatan,
-      profile.nama_kecamatan,
-      profile.kecamatan
-    );
-
-    var desa = firstNonEmpty(
-      scope.desa_kelurahan,
-      scope.nama_desa,
-      scope.nama_desa_kelurahan,
-      profile.nama_desa,
-      profile.desa_kelurahan,
-      profile.nama_desa_kelurahan
-    );
-
-    var dusun = firstNonEmpty(
-      scope.dusun_rw,
-      scope.nama_dusun,
-      scope.nama_dusun_rw,
-      profile.nama_dusun,
-      profile.dusun_rw,
-      profile.nama_dusun_rw,
-      profile.wilayah_tugas_dusun_rw
-    );
-
-    return {
-      kecamatan: normalizeSpaces(kecamatan),
-      desa: normalizeSpaces(desa),
-      dusun: normalizeSpaces(dusun)
-    };
-  }
-
-  function normalizeBooleanText(value) {
-    if (value === true) return 'YA';
-    if (value === false) return 'TIDAK';
-
-    var raw = normalizeUpper(value);
-    if (!raw) return '-';
-
-    if (['YA', 'Y', 'TRUE', '1', 'SUDAH'].indexOf(raw) >= 0) return 'YA';
-    if (['TIDAK', 'N', 'FALSE', '0', 'BELUM'].indexOf(raw) >= 0) return 'TIDAK';
-
-    return normalizeSpaces(value);
-  }
-
-  function normalizeCurrencyText(value) {
-    if (value === undefined || value === null || value === '') return '-';
-
-    var num = Number(String(value).replace(/[^0-9.-]/g, ''));
-    if (isNaN(num)) return normalizeSpaces(value);
 
     try {
-      return num.toLocaleString('id-ID');
+      permissionRes = await apiPost('getMyPermissions', {});
     } catch (err) {
-      return String(num);
-    }
-  }
-
-  function normalizeProfile(raw) {
-    var profile = raw && typeof raw === 'object' ? raw : {};
-    var wilayah = buildWilayahParts(profile);
-
-    var wilayahTugas = firstNonEmpty(
-      profile.wilayah_tugas_lengkap,
-      profile.wilayah_tugas,
-      profile.nama_wilayah_tugas,
-      [wilayah.dusun, wilayah.desa, wilayah.kecamatan].filter(Boolean).join(' / '),
-      wilayah.kecamatan
-    );
-
-    return {
-      nama_kader: normalizeUpper(firstNonEmpty(profile.nama_kader, profile.nama, profile.full_name, '-')),
-      id_user: normalizeSpaces(firstNonEmpty(profile.id_user, profile.username, profile.id_kader, '-')),
-      unsur_tpk: normalizeUpper(firstNonEmpty(profile.unsur_tpk, profile.role_label, profile.role_akses, profile.role, '-')),
-      nomor_tim: normalizeSpaces(firstNonEmpty(
-        profile.nomor_tim,
-        profile.nomor_tim_display,
-        profile.nomor_tim_lokal,
-        profile.nama_tim,
-        profile.id_tim,
-        '-'
-      )),
-      id_tim: normalizeSpaces(firstNonEmpty(profile.id_tim, '-')),
-      nama_tim: normalizeSpaces(firstNonEmpty(profile.nama_tim, profile.id_tim, '-')),
-      id_wilayah: normalizeSpaces(firstNonEmpty(profile.id_wilayah, profile.id_wilayah_tugas, '-')),
-      wilayah_tugas: normalizeUpper(firstNonEmpty(wilayahTugas, '-')),
-      nama_kecamatan: normalizeUpper(firstNonEmpty(wilayah.kecamatan, '-')),
-      nama_desa: normalizeUpper(firstNonEmpty(wilayah.desa, '-')),
-      nama_dusun: normalizeUpper(firstNonEmpty(wilayah.dusun, '-')),
-      nomor_wa: normalizeSpaces(firstNonEmpty(profile.nomor_wa, profile.no_wa, profile.phone, '-')),
-      status_kader_tpk: normalizeUpper(firstNonEmpty(profile.status_kader_tpk, profile.status_kader, '-')),
-      memiliki_bpjstk: normalizeBooleanText(firstNonEmpty(profile.memiliki_bpjstk, profile.has_bpjstk, '')),
-      status_bpjstk: normalizeUpper(firstNonEmpty(profile.status_bpjstk, '-')),
-      mengantar_mbg_3b: normalizeBooleanText(firstNonEmpty(profile.mengantar_mbg_3b, profile.antar_mbg_3b, '')),
-      status_mbg: normalizeUpper(firstNonEmpty(profile.status_mbg, '-')),
-      mendapat_insentif_mbg_3b: normalizeBooleanText(firstNonEmpty(profile.mendapat_insentif_mbg_3b, profile.mendapat_insentif_mbg, '')),
-      insentif_mbg_3b_per_sasaran: normalizeCurrencyText(firstNonEmpty(profile.insentif_mbg_3b_per_sasaran, '')),
-      insentif_mbg_3b: normalizeCurrencyText(firstNonEmpty(profile.insentif_mbg_3b, '')),
-      insentif_mbg: normalizeCurrencyText(firstNonEmpty(profile.insentif_mbg, '')),
-      updated_at: firstNonEmpty(profile.updated_at, profile.last_seen, profile.last_sync_at, ''),
-      raw: profile
-    };
-  }
-
-  function persistProfile(profile) {
-    var safeProfile = profile && typeof profile === 'object' ? profile : {};
-    var state = getState();
-    var storage = getStorage();
-    var keys = getStorageKeys();
-
-    if (state && typeof state.setProfile === 'function') {
-      state.setProfile(safeProfile);
-    }
-
-    if (storage && typeof storage.set === 'function' && keys.PROFILE) {
-      storage.set(keys.PROFILE, safeProfile);
+      permissionRes = null;
     }
 
     try {
-      localStorage.setItem('tpk_profile', JSON.stringify(safeProfile));
-      localStorage.setItem(PROFILE_REMOTE_CACHE_KEY, JSON.stringify({
-        saved_at: new Date().toISOString(),
-        profile: safeProfile
-      }));
-    } catch (err) {}
-  }
-
-  function extractProfilePayload(result) {
-    if (!result) return {};
-    var data = result.data || {};
-
-    if (data.profile && typeof data.profile === 'object') return data.profile;
-    if (data.user && typeof data.user === 'object') return data.user;
-    if (data.item && typeof data.item === 'object') return data.item;
-    if (typeof data === 'object' && !Array.isArray(data)) return data;
-
-    return {};
-  }
-
-  function getActionName() {
-    var actions = getActions();
-    return actions.GET_MY_PROFILE || actions.GET_PROFILE || 'getMyProfile';
-  }
-
-  function setMeta(text) {
-    setText('profile-screen-meta', text || '');
-  }
-
-  function ensureAutoContainer() {
-    var existing = byId(AUTO_CONTAINER_ID);
-    if (existing) return existing;
-
-    var screen = byId('profile-screen');
-    if (!screen) return null;
-
-    var container = document.createElement('div');
-    container.id = AUTO_CONTAINER_ID;
-    container.style.marginTop = '16px';
-    screen.appendChild(container);
-    return container;
-  }
-
-  function renderAutoLayout(data) {
-    var container = ensureAutoContainer();
-    if (!container) return;
-
-    var html = [
-      '<section class="summary-grid">',
-        '<article class="stat-card">',
-          '<span class="label">Nama Pengguna</span>',
-          '<strong>' + escapeHtml(data.nama_kader) + '</strong>',
-        '</article>',
-        '<article class="stat-card">',
-          '<span class="label">Unsur TPK</span>',
-          '<strong>' + escapeHtml(data.unsur_tpk) + '</strong>',
-        '</article>',
-        '<article class="stat-card">',
-          '<span class="label">ID Pengguna</span>',
-          '<strong>' + escapeHtml(data.id_user) + '</strong>',
-        '</article>',
-        '<article class="stat-card">',
-          '<span class="label">Nomor Tim</span>',
-          '<strong>' + escapeHtml(data.nomor_tim) + '</strong>',
-        '</article>',
-      '</section>',
-      '<section class="activity-item" style="margin-top:12px;">',
-        '<div><span class="label">Wilayah Tugas</span><strong>' + escapeHtml(data.wilayah_tugas) + '</strong></div>',
-        '<div><span class="label">Kecamatan</span><strong>' + escapeHtml(data.nama_kecamatan) + '</strong></div>',
-        '<div><span class="label">Desa/Kelurahan</span><strong>' + escapeHtml(data.nama_desa) + '</strong></div>',
-        '<div><span class="label">Dusun/RW</span><strong>' + escapeHtml(data.nama_dusun) + '</strong></div>',
-        '<div><span class="label">No. WA</span><strong>' + escapeHtml(data.nomor_wa) + '</strong></div>',
-        '<div><span class="label">Status Kader</span><strong>' + escapeHtml(data.status_kader_tpk) + '</strong></div>',
-      '</section>',
-      '<section class="activity-item" style="margin-top:12px;">',
-        '<div><span class="label">BPJSTK</span><strong>' + escapeHtml(data.memiliki_bpjstk) + '</strong></div>',
-        '<div><span class="label">Status BPJSTK</span><strong>' + escapeHtml(data.status_bpjstk) + '</strong></div>',
-        '<div><span class="label">Mengantar MBG 3B</span><strong>' + escapeHtml(data.mengantar_mbg_3b) + '</strong></div>',
-        '<div><span class="label">Status MBG</span><strong>' + escapeHtml(data.status_mbg) + '</strong></div>',
-        '<div><span class="label">Insentif MBG per Sasaran</span><strong>' + escapeHtml(data.insentif_mbg_3b_per_sasaran) + '</strong></div>',
-        '<div><span class="label">Insentif MBG 3B</span><strong>' + escapeHtml(data.insentif_mbg_3b) + '</strong></div>',
-        '<div><span class="label">Insentif MBG</span><strong>' + escapeHtml(data.insentif_mbg) + '</strong></div>',
-        '<div><span class="label">Draft Pending</span><strong>' + escapeHtml(String(getQueueCount())) + '</strong></div>',
-        '<div><span class="label">Sinkronisasi Terakhir</span><strong>' + escapeHtml(formatDateTime(getLastSyncAt())) + '</strong></div>',
-        '<div><span class="label">Status Jaringan</span><strong>' + escapeHtml(window.navigator && window.navigator.onLine ? 'ONLINE' : 'OFFLINE') + '</strong></div>',
-      '</section>'
-    ].join('');
-
-    container.innerHTML = html;
-  }
-
-  function renderToKnownIds(data) {
-    setText('profile-nama-pengguna', data.nama_kader);
-    setText('profile-unsur-tpk', data.unsur_tpk);
-    setText('profile-id-pengguna', data.id_user);
-    setText('profile-nomor-tim', data.nomor_tim);
-    setText('profile-id-tim', data.id_tim);
-    setText('profile-nama-tim', data.nama_tim);
-    setText('profile-id-wilayah', data.id_wilayah);
-    setText('profile-wilayah-tugas', data.wilayah_tugas);
-    setText('profile-kecamatan', data.nama_kecamatan);
-    setText('profile-desa', data.nama_desa);
-    setText('profile-dusun', data.nama_dusun);
-    setText('profile-nomor-wa', data.nomor_wa);
-    setText('profile-status-kader', data.status_kader_tpk);
-    setText('profile-bpjstk', data.memiliki_bpjstk);
-    setText('profile-status-bpjstk', data.status_bpjstk);
-    setText('profile-mbg', data.mengantar_mbg_3b);
-    setText('profile-status-mbg', data.status_mbg);
-    setText('profile-insentif-mbg-per-sasaran', data.insentif_mbg_3b_per_sasaran);
-    setText('profile-insentif-mbg-3b', data.insentif_mbg_3b);
-    setText('profile-insentif-mbg', data.insentif_mbg);
-    setText('profile-last-sync', formatDateTime(getLastSyncAt()));
-    setText('profile-network-status', window.navigator && window.navigator.onLine ? 'ONLINE' : 'OFFLINE');
-
-    setText('profile-stat-draft', String(getQueueCount()));
-    setText('profile-stat-sync', formatDateTime(getLastSyncAt()));
-    setText('profile-stat-network', window.navigator && window.navigator.onLine ? 'ONLINE' : 'OFFLINE');
-  }
-
-  function renderSummaryBlocks(data) {
-    var summaryHtml = [
-      '<div class="activity-item">',
-        '<div><span class="label">Nama Pengguna</span><strong>' + escapeHtml(data.nama_kader) + '</strong></div>',
-        '<div><span class="label">Unsur TPK</span><strong>' + escapeHtml(data.unsur_tpk) + '</strong></div>',
-        '<div><span class="label">ID Pengguna</span><strong>' + escapeHtml(data.id_user) + '</strong></div>',
-        '<div><span class="label">Nomor Tim</span><strong>' + escapeHtml(data.nomor_tim) + '</strong></div>',
-      '</div>'
-    ].join('');
-
-    var detailHtml = [
-      '<div class="activity-item">',
-        '<div><span class="label">Wilayah Tugas</span><strong>' + escapeHtml(data.wilayah_tugas) + '</strong></div>',
-        '<div><span class="label">Kecamatan</span><strong>' + escapeHtml(data.nama_kecamatan) + '</strong></div>',
-        '<div><span class="label">Desa/Kelurahan</span><strong>' + escapeHtml(data.nama_desa) + '</strong></div>',
-        '<div><span class="label">Dusun/RW</span><strong>' + escapeHtml(data.nama_dusun) + '</strong></div>',
-        '<div><span class="label">No. WA</span><strong>' + escapeHtml(data.nomor_wa) + '</strong></div>',
-        '<div><span class="label">Status Kader</span><strong>' + escapeHtml(data.status_kader_tpk) + '</strong></div>',
-      '</div>'
-    ].join('');
-
-    var programHtml = [
-      '<div class="activity-item">',
-        '<div><span class="label">BPJSTK</span><strong>' + escapeHtml(data.memiliki_bpjstk) + '</strong></div>',
-        '<div><span class="label">Status BPJSTK</span><strong>' + escapeHtml(data.status_bpjstk) + '</strong></div>',
-        '<div><span class="label">Mengantar MBG 3B</span><strong>' + escapeHtml(data.mengantar_mbg_3b) + '</strong></div>',
-        '<div><span class="label">Status MBG</span><strong>' + escapeHtml(data.status_mbg) + '</strong></div>',
-        '<div><span class="label">Insentif MBG per Sasaran</span><strong>' + escapeHtml(data.insentif_mbg_3b_per_sasaran) + '</strong></div>',
-        '<div><span class="label">Insentif MBG 3B</span><strong>' + escapeHtml(data.insentif_mbg_3b) + '</strong></div>',
-        '<div><span class="label">Insentif MBG</span><strong>' + escapeHtml(data.insentif_mbg) + '</strong></div>',
-        '<div><span class="label">Draft Pending</span><strong>' + escapeHtml(String(getQueueCount())) + '</strong></div>',
-        '<div><span class="label">Sinkronisasi Terakhir</span><strong>' + escapeHtml(formatDateTime(getLastSyncAt())) + '</strong></div>',
-      '</div>'
-    ].join('');
-
-    setHTML('profile-summary-box', summaryHtml);
-    setHTML('profile-detail-box', detailHtml);
-    setHTML('profile-program-box', programHtml);
-  }
-
-  function render(data) {
-    renderToKnownIds(data);
-    renderSummaryBlocks(data);
-    renderAutoLayout(data);
-    setText('profile-screen-title', 'Profil');
-    setText('profile-screen-subtitle', 'Informasi akun dan wilayah tugas aktif');
-  }
-
-  async function fetchRemoteProfile() {
-    var api = getApi();
-    if (!api || typeof api.post !== 'function') {
-      throw new Error('Api.post belum tersedia.');
+      sessionRes = await apiPost('bootstrapSession', {});
+    } catch (err) {
+      sessionRes = null;
     }
 
-    var action = getActionName();
-    var result = await api.post(action, {}, { includeAuth: true, timeoutMs: 12000 });
-    if (!result || result.ok === false) {
-      throw new Error((result && result.message) || 'Gagal memuat profil.');
-    }
-
-    return extractProfilePayload(result);
+    return { profileRes, permissionRes, sessionRes };
   }
 
-  var ProfileView = {
-    _lastProfile: {},
+  function extractProfile(profileRes, sessionRes) {
+    return (profileRes && (profileRes.data || profileRes.profile))
+      || (sessionRes && sessionRes.data && (sessionRes.data.profile || sessionRes.data.session || sessionRes.data.user))
+      || (sessionRes && (sessionRes.profile || sessionRes.session || sessionRes.user))
+      || null;
+  }
 
-    init: function () {
-      if (isBound) return;
-      isBound = true;
-      this.bindEvents();
-    },
+  async function hydrate(root, options) {
+    const container = getRoot(root);
+    const opts = options || {};
+    const cachedProfile = getCachedProfile();
 
-    bindEvents: function () {
-      var self = this;
+    if (cachedProfile) {
+      renderRows(container, cachedProfile);
+      setText(container, '[data-profile-head-name]', pickFirst(cachedProfile, ['nama_pengguna', 'nama_user', 'nama_lengkap', 'nama_kader'], '-'));
+      setText(container, '[data-profile-head-role]', normalizeRole(pickFirst(cachedProfile, ['unsur_tpk', 'role_label', 'role_akses', 'role'], '-')));
+      setStatus(container, 'Profil cache dimuat.', 'muted');
+    } else {
+      setStatus(container, 'Belum ada cache profil. Menarik data terbaru...', 'info');
+    }
 
-      var backBtn = byId('btn-back-from-profile');
-      if (backBtn && backBtn.dataset.bound !== '1') {
-        backBtn.dataset.bound = '1';
-        backBtn.addEventListener('click', function () {
-          var router = getRouter();
-          if (router && typeof router.go === 'function') {
-            router.go('dashboard');
-          }
-        });
+    if (opts.remote === false) return;
+
+    const refreshBtn = container.querySelector('[data-profile-refresh]');
+    const sessionBtn = container.querySelector('[data-profile-session-refresh]');
+    if (refreshBtn) refreshBtn.disabled = true;
+    if (sessionBtn) sessionBtn.disabled = true;
+
+    const bundle = await fetchProfileBundle();
+    const profile = extractProfile(bundle.profileRes, bundle.sessionRes);
+
+    if (profile) {
+      profile.fetched_at = new Date().toISOString();
+      saveProfileCache(profile);
+      renderRows(container, profile);
+      setText(container, '[data-profile-head-name]', pickFirst(profile, ['nama_pengguna', 'nama_user', 'nama_lengkap', 'nama_kader'], '-'));
+      setText(container, '[data-profile-head-role]', normalizeRole(pickFirst(profile, ['unsur_tpk', 'role_label', 'role_akses', 'role'], '-')));
+      setStatus(container, 'Profil terbaru berhasil dimuat.', 'success');
+    } else {
+      const message = (bundle.profileRes && bundle.profileRes.message)
+        || 'Profil belum bisa dimuat dari backend.';
+      setStatus(container, message, 'warning');
+    }
+
+    renderPermissionList(container, bundle.permissionRes && (bundle.permissionRes.data || bundle.permissionRes));
+
+    if (refreshBtn) refreshBtn.disabled = false;
+    if (sessionBtn) sessionBtn.disabled = false;
+  }
+
+  async function handleSessionRefresh(root) {
+    const container = getRoot(root);
+    const btn = container.querySelector('[data-profile-session-refresh]');
+    if (btn) btn.disabled = true;
+
+    try {
+      const res = await apiPost('bootstrapSession', {});
+      const profile = (res && res.data && (res.data.profile || res.data.session || res.data.user))
+        || res.profile || res.session || res.user || null;
+
+      if (profile) {
+        profile.fetched_at = new Date().toISOString();
+        saveProfileCache(profile);
       }
 
-      ['btn-refresh-profile-screen', 'btn-refresh-profile'].forEach(function (id) {
-        var btn = byId(id);
-        if (!btn || btn.dataset.bound === '1') return;
-        btn.dataset.bound = '1';
-        btn.addEventListener('click', function () {
-          self.load(true);
-        });
+      await hydrate(container, { remote: true });
+      setStatus(container, 'Sesi berhasil dimuat ulang.', 'success');
+    } catch (err) {
+      setStatus(container, err && err.message ? err.message : 'Gagal memuat ulang sesi.', 'error');
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  function bind(root) {
+    const container = getRoot(root);
+
+    const refreshBtn = container.querySelector('[data-profile-refresh]');
+    if (refreshBtn && !refreshBtn.__bound) {
+      refreshBtn.__bound = true;
+      refreshBtn.addEventListener('click', function () {
+        hydrate(container, { remote: true });
       });
+    }
 
-      window.addEventListener('online', function () {
-        setText('profile-network-status', 'ONLINE');
-        setText('profile-stat-network', 'ONLINE');
+    const sessionBtn = container.querySelector('[data-profile-session-refresh]');
+    if (sessionBtn && !sessionBtn.__bound) {
+      sessionBtn.__bound = true;
+      sessionBtn.addEventListener('click', function () {
+        handleSessionRefresh(container);
       });
+    }
 
-      window.addEventListener('offline', function () {
-        setText('profile-network-status', 'OFFLINE');
-        setText('profile-stat-network', 'OFFLINE');
-      });
-    },
+    window.addEventListener('online', function () {
+      const liveRoot = getRoot(container);
+      setText(liveRoot, '[data-profile-online-state]', 'Online');
+    });
 
-    open: function () {
-      this.init();
-      var router = getRouter();
-      if (router && typeof router.go === 'function') {
-        router.go('profile');
+    window.addEventListener('offline', function () {
+      const liveRoot = getRoot(container);
+      setText(liveRoot, '[data-profile-online-state]', 'Offline');
+    });
+  }
+
+  function template() {
+    return `
+      <section class="screen screen-profile" data-screen="profile" style="padding:12px;">
+        <div class="card" style="margin-bottom:12px;">
+          <div class="card-body" style="padding:16px;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;">
+              <div>
+                <div style="font-size:12px;opacity:.75;letter-spacing:.04em;">PROFIL PENGGUNA</div>
+                <h2 style="margin:6px 0 4px;">Profil</h2>
+                <div data-profile-head-name style="font-weight:700;">-</div>
+                <div data-profile-head-role style="opacity:.8;">-</div>
+              </div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button type="button" class="btn btn-secondary" data-profile-session-refresh>Muat Ulang Sesi</button>
+                <button type="button" class="btn btn-primary" data-profile-refresh>Segarkan Profil</button>
+              </div>
+            </div>
+            <div data-profile-status class="profile-status profile-status-info" style="margin-top:12px;padding:10px 12px;border-radius:12px;background:rgba(13,110,253,.08);">Menyiapkan profil...</div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom:12px;overflow:hidden;">
+          <div class="card-body" style="padding:0;overflow:auto;">
+            <table style="width:100%;border-collapse:collapse;">
+              <tbody data-profile-table-body>
+                <tr><td style="padding:14px;">Memuat data profil...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom:12px;">
+          <div class="card-body" style="padding:16px;">
+            <h3 style="margin:0 0 10px;">Status Ringkas</h3>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;">
+              <div style="padding:12px;border-radius:14px;background:rgba(13,110,253,.06);">
+                <div style="font-size:12px;opacity:.7;">Jaringan</div>
+                <div data-profile-online-state style="font-size:18px;font-weight:700;">${navigator.onLine ? 'Online' : 'Offline'}</div>
+              </div>
+              <div style="padding:12px;border-radius:14px;background:rgba(25,135,84,.08);">
+                <div style="font-size:12px;opacity:.7;">Token Sesi</div>
+                <div style="font-size:18px;font-weight:700;">${getSessionToken() ? 'Tersedia' : 'Tidak ada'}</div>
+              </div>
+              <div style="padding:12px;border-radius:14px;background:rgba(255,193,7,.12);">
+                <div style="font-size:12px;opacity:.7;">Fokus Perbaikan</div>
+                <div style="font-size:16px;font-weight:700;">Wilayah Tugas</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div data-profile-permissions></div>
+      </section>
+    `;
+  }
+
+  const View = {
+    id: VIEW_NAME,
+    title: 'Profil',
+    render(root) {
+      const html = template();
+      if (root && typeof root.innerHTML !== 'undefined') {
+        root.innerHTML = html;
+        return root;
       }
-      this.load(false);
+      return html;
     },
-
-    refresh: function () {
-      this.init();
-      this.load(true);
+    async afterRender(root) {
+      bind(root);
+      await hydrate(root, { remote: true });
     },
-
-    load: async function (forceRemote) {
-      this.init();
-
-      var cachedProfile = getProfile();
-      var normalizedCached = normalizeProfile(cachedProfile);
-      var hasCached = normalizedCached.raw && Object.keys(normalizedCached.raw).length;
-
-      setMeta('Sedang memuat profil...');
-      setLoading('btn-refresh-profile-screen', true, 'Memuat...');
-      setLoading('btn-refresh-profile', true, 'Memuat...');
-
-      if (hasCached) {
-        this._lastProfile = normalizedCached;
-        render(normalizedCached);
-      }
-
-      if ((window.navigator && window.navigator.onLine === false) && !forceRemote) {
-        if (hasCached) {
-          setMeta('Profil ditampilkan dari cache lokal karena perangkat sedang offline.');
-        } else {
-          setMeta('Perangkat sedang offline dan cache profil belum tersedia.');
-          render(normalizeProfile({}));
-        }
-
-        setLoading('btn-refresh-profile-screen', false);
-        setLoading('btn-refresh-profile', false);
-        return;
-      }
-
-      try {
-        var remoteProfile = await fetchRemoteProfile();
-        if (remoteProfile && Object.keys(remoteProfile).length) {
-          persistProfile(remoteProfile);
-          this._lastProfile = normalizeProfile(remoteProfile);
-          render(this._lastProfile);
-          setMeta('Profil aktif berhasil dimuat dari server.');
-          return;
-        }
-
-        throw new Error('Data profil dari server kosong.');
-      } catch (err) {
-        if (hasCached) {
-          render(normalizedCached);
-          setMeta('Profil server gagal dimuat. Menampilkan cache terakhir yang tersedia.');
-          showToast((err && err.message) || 'Gagal memuat profil aktif.', 'warning');
-        } else {
-          render(normalizeProfile({}));
-          setMeta((err && err.message) || 'Gagal memuat profil aktif.');
-          showToast((err && err.message) || 'Gagal memuat profil aktif.', 'warning');
-        }
-      } finally {
-        setLoading('btn-refresh-profile-screen', false);
-        setLoading('btn-refresh-profile', false);
-      }
-    },
-
-    getCurrentProfile: function () {
-      return this._lastProfile || normalizeProfile(getProfile());
+    async mount(root) {
+      const el = getRoot(root);
+      this.render(el);
+      await this.afterRender(el);
+      return el;
     }
   };
 
-  window.ProfileView = ProfileView;
-  window.ProfileScreen = ProfileView;
-
-  document.addEventListener('DOMContentLoaded', function () {
-    if (window.ProfileView && typeof window.ProfileView.init === 'function') {
-      window.ProfileView.init();
-    }
-  });
+  window.profileView = View;
+  window.ProfileView = View;
+  window.appViews = window.appViews || {};
+  window.appViews[VIEW_NAME] = View;
 })(window, document);

@@ -1,496 +1,424 @@
 (function (window, document) {
   'use strict';
 
-  var isBound = false;
+  const VIEW_NAME = 'sync';
+  const FALLBACK_QUEUE_KEYS = ['TPK_SYNC_QUEUE', 'SYNC_QUEUE', 'sync_queue'];
+  const FALLBACK_LAST_SYNC_KEYS = ['TPK_LAST_SYNC_AT', 'LAST_SYNC_AT', 'last_sync_at'];
+  const TRACKED_STATUSES = ['PENDING', 'PROCESSING', 'SUCCESS', 'FAILED', 'CONFLICT', 'DUPLICATE'];
 
-  function byId(id) {
-    return document.getElementById(id);
+  function safeText(value, fallback) {
+    if (value === 0) return '0';
+    if (value === false) return 'Tidak';
+    if (value === true) return 'Ya';
+    if (value === null || value === undefined) return fallback || '-';
+    const str = String(value).trim();
+    return str || (fallback || '-');
   }
 
-  function getUI() {
-    return window.UI || null;
+  function formatDateTime(value) {
+    if (!value) return '-';
+    const dt = new Date(value);
+    if (Number.isNaN(dt.getTime())) return safeText(value, '-');
+    const yy = dt.getFullYear();
+    const mm = String(dt.getMonth() + 1).padStart(2, '0');
+    const dd = String(dt.getDate()).padStart(2, '0');
+    const hh = String(dt.getHours()).padStart(2, '0');
+    const mi = String(dt.getMinutes()).padStart(2, '0');
+    return `${yy}-${mm}-${dd} ${hh}:${mi}`;
   }
 
-  function getApi() {
-    return window.Api || null;
+  function getRoot(root) {
+    if (root && typeof root.querySelector === 'function') return root;
+    return document.getElementById('content-area')
+      || document.getElementById('app-content')
+      || document.querySelector('[data-route-root]')
+      || document.body;
   }
 
-  function getState() {
-    return window.AppState || null;
-  }
-
-  function getStorage() {
-    return window.Storage || null;
-  }
-
-  function getConfig() {
-    return window.APP_CONFIG || {};
-  }
-
-  function getStorageKeys() {
-    return getConfig().STORAGE_KEYS || {};
-  }
-
-  function showToast(message, type) {
-    var ui = getUI();
-    if (ui && typeof ui.showToast === 'function') {
-      ui.showToast(message, type || 'info');
-      return;
-    }
-
+  function readLocal(key) {
     try {
-      window.alert(message);
-    } catch (err) {}
-  }
-
-  function setText(id, value) {
-    var ui = getUI();
-    if (ui && typeof ui.setText === 'function') {
-      ui.setText(id, value);
-      return;
-    }
-
-    var el = byId(id);
-    if (el) {
-      el.textContent = (value === undefined || value === null || value === '') ? '-' : String(value);
+      if (!key) return '';
+      return window.localStorage.getItem(key) || '';
+    } catch (err) {
+      return '';
     }
   }
 
-  function setHTML(id, html) {
-    var ui = getUI();
-    if (ui && typeof ui.setHTML === 'function') {
-      ui.setHTML(id, html);
-      return;
-    }
-
-    var el = byId(id);
-    if (el) {
-      el.innerHTML = html || '';
+  function writeLocal(key, value) {
+    try {
+      if (!key) return;
+      window.localStorage.setItem(key, value);
+    } catch (err) {
+      // no-op
     }
   }
 
-  function escapeHtml(value) {
-    return String(value == null ? '' : value)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
-  }
-
-  function getQueue() {
-    var state = getState();
-    if (state && typeof state.getSyncQueue === 'function') {
-      var fromState = state.getSyncQueue();
-      if (Array.isArray(fromState)) return fromState;
+  function readQueueFallback() {
+    for (const key of FALLBACK_QUEUE_KEYS) {
+      const raw = readLocal(key);
+      if (!raw) continue;
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (err) {
+        // ignore malformed cache
+      }
     }
-
-    var storage = getStorage();
-    var keys = getStorageKeys();
-    if (storage && typeof storage.get === 'function' && keys.SYNC_QUEUE) {
-      var fromStorage = storage.get(keys.SYNC_QUEUE, []);
-      return Array.isArray(fromStorage) ? fromStorage : [];
-    }
-
     return [];
   }
 
-  function saveQueue(queue) {
-    var safeQueue = Array.isArray(queue) ? queue : [];
+  function writeQueueFallback(items) {
+    const raw = JSON.stringify(Array.isArray(items) ? items : []);
+    FALLBACK_QUEUE_KEYS.forEach((key) => writeLocal(key, raw));
+  }
 
-    var state = getState();
-    if (state && typeof state.setSyncQueue === 'function') {
-      state.setSyncQueue(safeQueue);
+  function setStatus(root, text, type) {
+    const box = root.querySelector('[data-sync-status]');
+    if (!box) return;
+    box.textContent = safeText(text, '');
+    box.className = `sync-status sync-status-${type || 'info'}`;
+  }
+
+  function setText(root, selector, value) {
+    const el = root.querySelector(selector);
+    if (el) el.textContent = safeText(value, '-');
+  }
+
+  function getQueueRepo() {
+    return window.QueueRepo || window.queueRepo || null;
+  }
+
+  function getSyncManager() {
+    return window.SyncManager || window.syncManager || null;
+  }
+
+  async function readQueueItems() {
+    const repo = getQueueRepo();
+    const methods = ['listAll', 'getAll', 'list', 'all', 'findAll', 'getQueueItems'];
+
+    if (repo) {
+      for (const method of methods) {
+        if (typeof repo[method] !== 'function') continue;
+        const result = await repo[method]();
+        if (Array.isArray(result)) return result;
+        if (result && Array.isArray(result.items)) return result.items;
+        if (result && Array.isArray(result.rows)) return result.rows;
+      }
     }
 
-    var storage = getStorage();
-    var keys = getStorageKeys();
-    if (storage && typeof storage.set === 'function' && keys.SYNC_QUEUE) {
-      storage.set(keys.SYNC_QUEUE, safeQueue);
+    return readQueueFallback();
+  }
+
+  async function clearSuccessItems(currentItems) {
+    const repo = getQueueRepo();
+    const successStatuses = ['SUCCESS', 'DUPLICATE'];
+
+    if (repo && typeof repo.clearByStatus === 'function') {
+      await repo.clearByStatus(successStatuses);
+      return true;
     }
-  }
-
-  function setLastSyncAt(timestamp) {
-    var value = String(timestamp || '');
-
-    var state = getState();
-    if (state && typeof state.setLastSyncAt === 'function') {
-      state.setLastSyncAt(value);
+    if (repo && typeof repo.clearSuccess === 'function') {
+      await repo.clearSuccess();
+      return true;
+    }
+    if (repo && typeof repo.deleteByStatus === 'function') {
+      await repo.deleteByStatus(successStatuses);
+      return true;
     }
 
-    var storage = getStorage();
-    var keys = getStorageKeys();
-    if (storage && typeof storage.set === 'function' && keys.LAST_SYNC_AT) {
-      storage.set(keys.LAST_SYNC_AT, value);
-    }
-  }
-
-  function normalizeStatus(value) {
-    return String(value || 'PENDING').toUpperCase();
-  }
-
-  function normalizeQueueItem(item) {
-    var raw = item || {};
-    return {
-      id: raw.id || raw.client_submit_id || raw.id_local || '',
-      action: raw.action || '',
-      payload: raw.payload && typeof raw.payload === 'object' ? raw.payload : {},
-      sync_status: normalizeStatus(raw.sync_status || raw.status || 'PENDING'),
-      created_at: raw.created_at || raw.saved_at || '',
-      last_error: raw.last_error || raw.error || '',
-      retries: Number(raw.retries || 0)
-    };
-  }
-
-  function getFilters() {
-    return {
-      action: (byId('sync-filter-action') && byId('sync-filter-action').value) || '',
-      status: String((byId('sync-filter-status') && byId('sync-filter-status').value) || '').toUpperCase(),
-      keyword: ((byId('sync-filter-keyword') && byId('sync-filter-keyword').value) || '').trim().toLowerCase()
-    };
-  }
-
-  function getFilteredQueue() {
-    var filters = getFilters();
-    var queue = getQueue().map(normalizeQueueItem);
-
-    return queue.filter(function (item) {
-      var actionMatch = !filters.action || item.action === filters.action;
-      var statusMatch = !filters.status || normalizeStatus(item.sync_status) === filters.status;
-
-      var payload = item.payload || {};
-      var keywordSource = [
-        item.id || '',
-        payload.client_submit_id || '',
-        payload.id_sasaran || '',
-        payload.nama_sasaran || '',
-        payload.nama || '',
-        payload.id_pendampingan || '',
-        item.action || ''
-      ].join(' ').toLowerCase();
-
-      var keywordMatch = !filters.keyword || keywordSource.indexOf(filters.keyword) !== -1;
-
-      return actionMatch && statusMatch && keywordMatch;
+    const filtered = (Array.isArray(currentItems) ? currentItems : []).filter((item) => {
+      const status = String(item.status || '').toUpperCase();
+      return !successStatuses.includes(status);
     });
+    writeQueueFallback(filtered);
+    return true;
   }
 
-  function formatActionLabel(action) {
-    var map = {
-      registerSasaran: 'Registrasi Sasaran',
-      submitPendampingan: 'Pendampingan',
-      editPendampingan: 'Edit Pendampingan',
-      updateSasaran: 'Edit Sasaran'
+  function normalizeItem(item) {
+    const payload = item && typeof item.payload === 'object' ? item.payload : {};
+    return {
+      queue_id: safeText(item.queue_id || item.id || item.local_id || item.client_submit_id, '-'),
+      action: safeText(item.action || item.type || item.entity_type || '-', '-'),
+      entity: safeText(item.entity_type || payload.entity_type || payload.jenis_sasaran || payload.id_sasaran || '-', '-'),
+      status: String(item.status || 'PENDING').toUpperCase(),
+      retry_count: Number(item.retry_count || 0),
+      updated_at: item.updated_at || item.created_at || item.submit_at || '',
+      created_at: item.created_at || item.updated_at || item.submit_at || '',
+      message: safeText(item.last_error || item.message || payload.nama_sasaran || payload.nama || '-', '-'),
+      raw: item
+    };
+  }
+
+  function computeSummary(items) {
+    const summary = {
+      total: 0,
+      lastSyncAt: FALLBACK_LAST_SYNC_KEYS.map(readLocal).find(Boolean) || '-',
+      isSyncing: false
     };
 
-    return map[action] || action || '-';
-  }
-
-  function renderQueueItem(item) {
-    var payload = item.payload || {};
-    var title = payload.nama_sasaran || payload.nama || payload.id_sasaran || payload.id_pendampingan || item.id || '-';
-    var status = normalizeStatus(item.sync_status || 'PENDING');
-    var badgeClass = status === 'FAILED'
-      ? 'badge-danger-soft'
-      : (status === 'SUCCESS' ? 'badge-success-soft' : 'badge-warning');
-
-    return [
-      '<article class="queue-card">',
-        '<div class="queue-card-header">',
-          '<div>',
-            '<h4 class="sasaran-card-title">', escapeHtml(title), '</h4>',
-            '<p class="muted-text">', escapeHtml(formatActionLabel(item.action)), '</p>',
-          '</div>',
-          '<span class="badge ', escapeHtml(badgeClass), '">', escapeHtml(status), '</span>',
-        '</div>',
-
-        '<div class="queue-card-meta">',
-          '<div><span class="label">ID Queue</span><strong>', escapeHtml(item.id || '-'), '</strong></div>',
-          '<div><span class="label">Waktu Simpan</span><strong>', escapeHtml(item.created_at || '-'), '</strong></div>',
-          '<div><span class="label">ID Sasaran</span><strong>', escapeHtml(payload.id_sasaran || '-'), '</strong></div>',
-          '<div><span class="label">Retry</span><strong>', escapeHtml(String(item.retries || 0)), '</strong></div>',
-        '</div>',
-
-        item.last_error
-          ? '<p class="muted-text" style="margin-top:10px;">Error: ' + escapeHtml(item.last_error) + '</p>'
-          : '',
-
-        '<div class="queue-card-actions">',
-          '<button class="btn btn-secondary btn-sm" data-sync-retry-id="', escapeHtml(item.id), '">Kirim Ulang</button>',
-          '<button class="btn btn-danger btn-sm" data-sync-delete-id="', escapeHtml(item.id), '">Hapus</button>',
-        '</div>',
-      '</article>'
-    ].join('');
-  }
-
-  async function postQueueItem(item) {
-    var api = getApi();
-    if (!api || typeof api.post !== 'function') {
-      throw new Error('Api.post belum tersedia.');
-    }
-
-    if (!item || !item.action) {
-      throw new Error('Item antrean tidak valid.');
-    }
-
-    var payload = Object.assign({}, item.payload || {});
-
-    return api.post(item.action, payload, {
-      includeAuth: true,
-      clientSubmitId: payload.client_submit_id || '',
-      syncSource: payload.sync_source || 'OFFLINE'
+    TRACKED_STATUSES.forEach((status) => {
+      summary[status] = 0;
     });
+
+    (Array.isArray(items) ? items : []).forEach((raw) => {
+      const item = normalizeItem(raw);
+      const status = TRACKED_STATUSES.includes(item.status) ? item.status : 'PENDING';
+      summary.total += 1;
+      summary[status] += 1;
+      if (status === 'PROCESSING') summary.isSyncing = true;
+    });
+
+    return summary;
   }
 
-  var SyncView = {
-    init: function () {
-      this.bindEvents();
-      this.render();
-    },
+  function renderSummary(root, summary) {
+    setText(root, '[data-sync-online-state]', navigator.onLine ? 'Online' : 'Offline');
+    setText(root, '[data-sync-total]', summary.total);
+    setText(root, '[data-sync-pending]', summary.PENDING);
+    setText(root, '[data-sync-processing]', summary.PROCESSING);
+    setText(root, '[data-sync-success]', summary.SUCCESS + summary.DUPLICATE);
+    setText(root, '[data-sync-failed]', summary.FAILED);
+    setText(root, '[data-sync-conflict]', summary.CONFLICT);
+    setText(root, '[data-sync-last]', formatDateTime(summary.lastSyncAt));
+  }
 
-    getFilters: getFilters,
+  function renderQueueList(root, items) {
+    const box = root.querySelector('[data-sync-queue-list]');
+    if (!box) return;
 
-    getQueue: function () {
-      return getQueue().map(normalizeQueueItem);
-    },
+    const normalized = (Array.isArray(items) ? items : []).map(normalizeItem)
+      .sort((a, b) => new Date(b.updated_at || b.created_at || 0) - new Date(a.updated_at || a.created_at || 0));
 
-    getFilteredQueue: function () {
-      return getFilteredQueue();
-    },
+    if (!normalized.length) {
+      box.innerHTML = '<div class="card"><div class="card-body">Antrean sinkronisasi masih kosong.</div></div>';
+      return;
+    }
 
-    render: function () {
-      var queue = this.getQueue();
-      var filtered = this.getFilteredQueue();
+    box.innerHTML = normalized.slice(0, 50).map((item) => {
+      const badgeBg = item.status === 'SUCCESS' || item.status === 'DUPLICATE'
+        ? 'rgba(25,135,84,.12)'
+        : item.status === 'FAILED' || item.status === 'CONFLICT'
+          ? 'rgba(220,53,69,.10)'
+          : item.status === 'PROCESSING'
+            ? 'rgba(13,110,253,.10)'
+            : 'rgba(255,193,7,.18)';
 
-      var pendingCount = queue.filter(function (item) {
-        return normalizeStatus(item.sync_status) === 'PENDING';
-      }).length;
+      return `
+        <div class="card" style="margin-bottom:10px;">
+          <div class="card-body" style="padding:14px;">
+            <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:flex-start;">
+              <div>
+                <div style="font-weight:700;">${safeText(item.action, '-')}</div>
+                <div style="font-size:12px;opacity:.7;">ID antrean: ${safeText(item.queue_id, '-')}</div>
+              </div>
+              <div style="padding:5px 10px;border-radius:999px;background:${badgeBg};font-weight:700;font-size:12px;">${item.status}</div>
+            </div>
+            <div style="margin-top:10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;">
+              <div><strong>Entitas:</strong> ${safeText(item.entity, '-')}</div>
+              <div><strong>Retry:</strong> ${safeText(item.retry_count, '0')}</div>
+              <div><strong>Diperbarui:</strong> ${formatDateTime(item.updated_at)}</div>
+            </div>
+            <div style="margin-top:8px;"><strong>Keterangan:</strong> ${safeText(item.message, '-')}</div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
 
-      var failedCount = queue.filter(function (item) {
-        return normalizeStatus(item.sync_status) === 'FAILED';
-      }).length;
+  async function refresh(root, options) {
+    const container = getRoot(root);
+    const opts = options || {};
 
-      setText('sync-total-count', String(queue.length));
-      setText('sync-pending-count', String(pendingCount));
-      setText('sync-failed-count', String(failedCount));
-      setText('stat-draft', String(queue.length));
+    if (!opts.silent) {
+      setStatus(container, 'Membaca status sinkronisasi...', 'info');
+    }
 
-      if (!queue.length) {
-        setText('sync-screen-meta', 'Belum ada data antrean.');
-      } else if (!filtered.length) {
-        setText('sync-screen-meta', 'Total ' + queue.length + ' draft tersimpan lokal, tidak ada yang cocok dengan filter.');
-      } else {
-        setText('sync-screen-meta', filtered.length + ' dari ' + queue.length + ' draft ditampilkan.');
+    const items = await readQueueItems();
+    const summary = computeSummary(items);
+    renderSummary(container, summary);
+    renderQueueList(container, items);
+
+    if (summary.total === 0) {
+      setStatus(container, 'Tidak ada antrean yang menunggu sinkronisasi.', 'muted');
+    } else if (summary.FAILED > 0 || summary.CONFLICT > 0) {
+      setStatus(container, 'Ada item gagal atau konflik. Periksa daftar di bawah.', 'warning');
+    } else if (summary.PENDING > 0 || summary.PROCESSING > 0) {
+      setStatus(container, 'Masih ada data yang menunggu dikirim.', 'info');
+    } else {
+      setStatus(container, 'Antrean lokal bersih.', 'success');
+    }
+
+    const syncBtn = container.querySelector('[data-sync-run]');
+    if (syncBtn) syncBtn.disabled = !navigator.onLine;
+
+    return { items, summary };
+  }
+
+  async function runSync(root) {
+    const container = getRoot(root);
+    const manager = getSyncManager();
+    const btn = container.querySelector('[data-sync-run]');
+    if (btn) btn.disabled = true;
+
+    try {
+      if (!navigator.onLine) {
+        throw new Error('Perangkat sedang offline. Sinkronisasi ditunda.');
       }
 
-      if (!queue.length) {
-        setHTML('sync-list-container', '<p class="muted-text">Belum ada draft offline.</p>');
-        return;
-      }
+      setStatus(container, 'Sinkronisasi sedang berjalan...', 'info');
 
-      if (!filtered.length) {
-        setHTML('sync-list-container', '<p class="muted-text">Tidak ada draft yang sesuai filter.</p>');
-        return;
-      }
+      let result = null;
+      const methods = ['startSync', 'syncNow', 'run', 'flush', 'processQueue'];
 
-      setHTML('sync-list-container', filtered.map(renderQueueItem).join(''));
-    },
-
-    handleDelete: function (itemId) {
-      var queue = this.getQueue().filter(function (item) {
-        return item.id !== itemId;
-      });
-
-      saveQueue(queue);
-      this.render();
-      showToast('Draft dihapus dari antrean.', 'info');
-    },
-
-    handleRetry: async function (itemId) {
-      var queue = this.getQueue();
-      var target = queue.find(function (item) {
-        return item.id === itemId;
-      });
-
-      if (!target) {
-        showToast('Draft tidak ditemukan.', 'warning');
-        return;
-      }
-
-      try {
-        var result = await postQueueItem(target);
-
-        if (!result || result.ok === false) {
-          throw new Error((result && result.message) || 'Draft gagal dikirim ulang.');
-        }
-
-        var nextQueue = queue.filter(function (item) {
-          return item.id !== itemId;
-        });
-
-        saveQueue(nextQueue);
-        setLastSyncAt(new Date().toISOString());
-        this.render();
-        showToast('Draft berhasil disinkronkan.', 'success');
-      } catch (err) {
-        var updatedQueue = queue.map(function (item) {
-          if (item.id !== itemId) return item;
-
-          return Object.assign({}, item, {
-            sync_status: 'FAILED',
-            retries: Number(item.retries || 0) + 1,
-            last_error: err && err.message ? err.message : String(err)
-          });
-        });
-
-        saveQueue(updatedQueue);
-        this.render();
-        showToast((err && err.message) || 'Draft gagal dikirim ulang.', 'warning');
-      }
-    },
-
-    handleSyncAll: async function () {
-      var queue = this.getQueue();
-      if (!queue.length) {
-        showToast('Belum ada antrean untuk disinkronkan.', 'info');
-        return;
-      }
-
-      var remaining = [];
-      var successCount = 0;
-      var failedCount = 0;
-
-      for (var i = 0; i < queue.length; i += 1) {
-        var item = queue[i];
-
-        try {
-          var result = await postQueueItem(item);
-
-          if (!result || result.ok === false) {
-            throw new Error((result && result.message) || 'Sinkronisasi item gagal.');
-          }
-
-          successCount += 1;
-        } catch (err) {
-          failedCount += 1;
-
-          remaining.push(Object.assign({}, item, {
-            sync_status: 'FAILED',
-            retries: Number(item.retries || 0) + 1,
-            last_error: err && err.message ? err.message : String(err)
-          }));
+      if (manager) {
+        for (const method of methods) {
+          if (typeof manager[method] !== 'function') continue;
+          result = await manager[method]();
+          break;
         }
       }
 
-      saveQueue(remaining);
-      setLastSyncAt(new Date().toISOString());
-      this.render();
+      const nowIso = new Date().toISOString();
+      FALLBACK_LAST_SYNC_KEYS.forEach((key) => writeLocal(key, nowIso));
 
-      if (successCount && !failedCount) {
-        showToast('Semua draft berhasil disinkronkan.', 'success');
-        return;
-      }
+      await refresh(container, { silent: true });
+      setStatus(container, result && result.message ? result.message : 'Sinkronisasi selesai.', 'success');
+    } catch (err) {
+      setStatus(container, err && err.message ? err.message : 'Sinkronisasi gagal dijalankan.', 'error');
+    } finally {
+      if (btn) btn.disabled = !navigator.onLine;
+    }
+  }
 
-      if (successCount && failedCount) {
-        showToast(successCount + ' draft berhasil, ' + failedCount + ' draft gagal.', 'warning');
-        return;
-      }
+  async function bind(root) {
+    const container = getRoot(root);
 
-      showToast('Semua draft gagal disinkronkan.', 'warning');
-    },
-
-    bindEvents: function () {
-      var self = this;
-      if (isBound) return;
-      isBound = true;
-
-      ['sync-filter-action', 'sync-filter-status'].forEach(function (id) {
-        var el = byId(id);
-        if (!el) return;
-        el.addEventListener('change', function () {
-          self.render();
-        });
+    const refreshBtn = container.querySelector('[data-sync-refresh]');
+    if (refreshBtn && !refreshBtn.__bound) {
+      refreshBtn.__bound = true;
+      refreshBtn.addEventListener('click', function () {
+        refresh(container);
       });
+    }
 
-      var keywordFilter = byId('sync-filter-keyword');
-      if (keywordFilter) {
-        keywordFilter.addEventListener('input', function () {
-          self.render();
-        });
+    const runBtn = container.querySelector('[data-sync-run]');
+    if (runBtn && !runBtn.__bound) {
+      runBtn.__bound = true;
+      runBtn.addEventListener('click', function () {
+        runSync(container);
+      });
+    }
+
+    const clearBtn = container.querySelector('[data-sync-clear-success]');
+    if (clearBtn && !clearBtn.__bound) {
+      clearBtn.__bound = true;
+      clearBtn.addEventListener('click', async function () {
+        const current = await readQueueItems();
+        await clearSuccessItems(current);
+        await refresh(container, { silent: true });
+        setStatus(container, 'Riwayat sukses lokal dibersihkan.', 'success');
+      });
+    }
+
+    if (!window.__syncViewOnlineBound) {
+      window.__syncViewOnlineBound = true;
+      window.addEventListener('online', function () {
+        const liveRoot = getRoot(container);
+        refresh(liveRoot, { silent: true });
+      });
+      window.addEventListener('offline', function () {
+        const liveRoot = getRoot(container);
+        refresh(liveRoot, { silent: true });
+      });
+    }
+  }
+
+  function template() {
+    return `
+      <section class="screen screen-sync" data-screen="sync" style="padding:12px;">
+        <div class="card" style="margin-bottom:12px;">
+          <div class="card-body" style="padding:16px;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;">
+              <div>
+                <div style="font-size:12px;opacity:.75;letter-spacing:.04em;">SINKRONISASI</div>
+                <h2 style="margin:6px 0 4px;">Sinkronisasi Data</h2>
+                <div style="opacity:.8;">Memantau antrean lokal, status online, dan proses kirim data.</div>
+              </div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button type="button" class="btn btn-secondary" data-sync-refresh>Muat Ulang</button>
+                <button type="button" class="btn btn-secondary" data-sync-clear-success>Bersihkan Riwayat Sukses</button>
+                <button type="button" class="btn btn-primary" data-sync-run>Sinkronkan Sekarang</button>
+              </div>
+            </div>
+            <div data-sync-status class="sync-status sync-status-info" style="margin-top:12px;padding:10px 12px;border-radius:12px;background:rgba(13,110,253,.08);">Menyiapkan status sinkronisasi...</div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom:12px;">
+          <div class="card-body" style="padding:16px;">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;">
+              <div style="padding:12px;border-radius:14px;background:rgba(13,110,253,.06);">
+                <div style="font-size:12px;opacity:.7;">Jaringan</div>
+                <div data-sync-online-state style="font-size:18px;font-weight:700;">${navigator.onLine ? 'Online' : 'Offline'}</div>
+              </div>
+              <div style="padding:12px;border-radius:14px;background:rgba(255,193,7,.16);">
+                <div style="font-size:12px;opacity:.7;">Pending</div>
+                <div data-sync-pending style="font-size:18px;font-weight:700;">0</div>
+              </div>
+              <div style="padding:12px;border-radius:14px;background:rgba(13,110,253,.10);">
+                <div style="font-size:12px;opacity:.7;">Processing</div>
+                <div data-sync-processing style="font-size:18px;font-weight:700;">0</div>
+              </div>
+              <div style="padding:12px;border-radius:14px;background:rgba(25,135,84,.12);">
+                <div style="font-size:12px;opacity:.7;">Sukses</div>
+                <div data-sync-success style="font-size:18px;font-weight:700;">0</div>
+              </div>
+              <div style="padding:12px;border-radius:14px;background:rgba(220,53,69,.10);">
+                <div style="font-size:12px;opacity:.7;">Gagal</div>
+                <div data-sync-failed style="font-size:18px;font-weight:700;">0</div>
+              </div>
+              <div style="padding:12px;border-radius:14px;background:rgba(111,66,193,.10);">
+                <div style="font-size:12px;opacity:.7;">Konflik</div>
+                <div data-sync-conflict style="font-size:18px;font-weight:700;">0</div>
+              </div>
+            </div>
+            <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:12px;opacity:.82;">
+              <div>Total antrean: <strong data-sync-total>0</strong></div>
+              <div>Sinkron terakhir: <strong data-sync-last>-</strong></div>
+            </div>
+          </div>
+        </div>
+
+        <div data-sync-queue-list></div>
+      </section>
+    `;
+  }
+
+  const View = {
+    id: VIEW_NAME,
+    title: 'Sinkronisasi',
+    render(root) {
+      const html = template();
+      if (root && typeof root.innerHTML !== 'undefined') {
+        root.innerHTML = html;
+        return root;
       }
-
-      var btnSyncAll = byId('btn-sync-all-screen');
-      if (btnSyncAll) {
-        btnSyncAll.addEventListener('click', async function () {
-          await self.handleSyncAll();
-        });
-      }
-
-      var btnRefresh = byId('btn-refresh-sync-screen');
-      if (btnRefresh) {
-        btnRefresh.addEventListener('click', function () {
-          self.render();
-          showToast('Daftar draft diperbarui.', 'info');
-        });
-      }
-
-      var listContainer = byId('sync-list-container');
-      if (listContainer) {
-        listContainer.addEventListener('click', async function (event) {
-          var retryBtn = event.target.closest('[data-sync-retry-id]');
-          if (retryBtn) {
-            var retryId = retryBtn.getAttribute('data-sync-retry-id');
-            if (retryId) {
-              await self.handleRetry(retryId);
-            }
-            return;
-          }
-
-          var deleteBtn = event.target.closest('[data-sync-delete-id]');
-          if (deleteBtn) {
-            var deleteId = deleteBtn.getAttribute('data-sync-delete-id');
-            if (deleteId) {
-              self.handleDelete(deleteId);
-            }
-          }
-        });
-      }
-
-      var btnBack = byId('btn-back-from-sync');
-      if (btnBack) {
-        btnBack.addEventListener('click', function () {
-          if (window.Router && typeof window.Router.go === 'function') {
-            window.Router.go('dashboard');
-          }
-        });
-      }
+      return html;
     },
-
-    refresh: function () {
-      this.bindEvents();
-      this.render();
+    async afterRender(root) {
+      await bind(root);
+      await refresh(root, { silent: false });
     },
-
-    open: function () {
-      if (window.Router && typeof window.Router.go === 'function') {
-        window.Router.go('sync');
-      }
-      this.refresh();
-    },
-
-    syncAll: async function () {
-      await this.handleSyncAll();
+    async mount(root) {
+      const el = getRoot(root);
+      this.render(el);
+      await this.afterRender(el);
+      return el;
     }
   };
 
-  window.SyncView = SyncView;
-
-  // Alias sementara agar referensi lama tidak langsung patah
-  window.SyncScreen = SyncView;
-
-  document.addEventListener('DOMContentLoaded', function () {
-    if (window.SyncView && typeof window.SyncView.init === 'function') {
-      window.SyncView.init();
-    }
-  });
+  window.syncView = View;
+  window.SyncView = View;
+  window.appViews = window.appViews || {};
+  window.appViews[VIEW_NAME] = View;
 })(window, document);
