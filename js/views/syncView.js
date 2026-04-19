@@ -11,16 +11,20 @@
     return window.UI || null;
   }
 
-  function getApi() {
-    return window.Api || null;
-  }
-
   function getState() {
     return window.AppState || null;
   }
 
   function getStorage() {
     return window.Storage || null;
+  }
+
+  function getQueueRepo() {
+    return window.QueueRepo || null;
+  }
+
+  function getSyncManager() {
+    return window.SyncManager || null;
   }
 
   function getConfig() {
@@ -37,10 +41,7 @@
       ui.showToast(message, type || 'info');
       return;
     }
-
-    try {
-      window.alert(message);
-    } catch (err) {}
+    try { window.alert(message); } catch (err) {}
   }
 
   function setText(id, value) {
@@ -49,7 +50,6 @@
       ui.setText(id, value);
       return;
     }
-
     var el = byId(id);
     if (el) {
       el.textContent = (value === undefined || value === null || value === '') ? '-' : String(value);
@@ -62,11 +62,8 @@
       ui.setHTML(id, html);
       return;
     }
-
     var el = byId(id);
-    if (el) {
-      el.innerHTML = html || '';
-    }
+    if (el) el.innerHTML = html || '';
   }
 
   function escapeHtml(value) {
@@ -78,53 +75,6 @@
       .replace(/'/g, '&#39;');
   }
 
-  function getQueue() {
-    var state = getState();
-    if (state && typeof state.getSyncQueue === 'function') {
-      var fromState = state.getSyncQueue();
-      if (Array.isArray(fromState)) return fromState;
-    }
-
-    var storage = getStorage();
-    var keys = getStorageKeys();
-    if (storage && typeof storage.get === 'function' && keys.SYNC_QUEUE) {
-      var fromStorage = storage.get(keys.SYNC_QUEUE, []);
-      return Array.isArray(fromStorage) ? fromStorage : [];
-    }
-
-    return [];
-  }
-
-  function saveQueue(queue) {
-    var safeQueue = Array.isArray(queue) ? queue : [];
-
-    var state = getState();
-    if (state && typeof state.setSyncQueue === 'function') {
-      state.setSyncQueue(safeQueue);
-    }
-
-    var storage = getStorage();
-    var keys = getStorageKeys();
-    if (storage && typeof storage.set === 'function' && keys.SYNC_QUEUE) {
-      storage.set(keys.SYNC_QUEUE, safeQueue);
-    }
-  }
-
-  function setLastSyncAt(timestamp) {
-    var value = String(timestamp || '');
-
-    var state = getState();
-    if (state && typeof state.setLastSyncAt === 'function') {
-      state.setLastSyncAt(value);
-    }
-
-    var storage = getStorage();
-    var keys = getStorageKeys();
-    if (storage && typeof storage.set === 'function' && keys.LAST_SYNC_AT) {
-      storage.set(keys.LAST_SYNC_AT, value);
-    }
-  }
-
   function normalizeStatus(value) {
     return String(value || 'PENDING').toUpperCase();
   }
@@ -132,13 +82,15 @@
   function normalizeQueueItem(item) {
     var raw = item || {};
     return {
-      id: raw.id || raw.client_submit_id || raw.id_local || '',
-      action: raw.action || '',
+      id: String(raw.queue_id || raw.id || raw.client_submit_id || raw.id_local || ''),
+      action: String(raw.action || ''),
       payload: raw.payload && typeof raw.payload === 'object' ? raw.payload : {},
       sync_status: normalizeStatus(raw.sync_status || raw.status || 'PENDING'),
       created_at: raw.created_at || raw.saved_at || '',
       last_error: raw.last_error || raw.error || '',
-      retries: Number(raw.retries || 0)
+      retries: Number(raw.retry_count || raw.retries || 0),
+      queue_id: String(raw.queue_id || raw.id || ''),
+      is_archived: !!raw.is_archived
     };
   }
 
@@ -150,31 +102,6 @@
     };
   }
 
-  function getFilteredQueue() {
-    var filters = getFilters();
-    var queue = getQueue().map(normalizeQueueItem);
-
-    return queue.filter(function (item) {
-      var actionMatch = !filters.action || item.action === filters.action;
-      var statusMatch = !filters.status || normalizeStatus(item.sync_status) === filters.status;
-
-      var payload = item.payload || {};
-      var keywordSource = [
-        item.id || '',
-        payload.client_submit_id || '',
-        payload.id_sasaran || '',
-        payload.nama_sasaran || '',
-        payload.nama || '',
-        payload.id_pendampingan || '',
-        item.action || ''
-      ].join(' ').toLowerCase();
-
-      var keywordMatch = !filters.keyword || keywordSource.indexOf(filters.keyword) !== -1;
-
-      return actionMatch && statusMatch && keywordMatch;
-    });
-  }
-
   function formatActionLabel(action) {
     var map = {
       registerSasaran: 'Registrasi Sasaran',
@@ -182,7 +109,6 @@
       editPendampingan: 'Edit Pendampingan',
       updateSasaran: 'Edit Sasaran'
     };
-
     return map[action] || action || '-';
   }
 
@@ -192,7 +118,7 @@
     var status = normalizeStatus(item.sync_status || 'PENDING');
     var badgeClass = status === 'FAILED'
       ? 'badge-danger-soft'
-      : (status === 'SUCCESS' ? 'badge-success-soft' : 'badge-warning');
+      : (status === 'SUCCESS' ? 'badge-success-soft' : (status === 'CONFLICT' ? 'badge-warning' : 'badge-warning'));
 
     return [
       '<article class="queue-card">',
@@ -203,18 +129,13 @@
           '</div>',
           '<span class="badge ', escapeHtml(badgeClass), '">', escapeHtml(status), '</span>',
         '</div>',
-
         '<div class="queue-card-meta">',
           '<div><span class="label">ID Queue</span><strong>', escapeHtml(item.id || '-'), '</strong></div>',
           '<div><span class="label">Waktu Simpan</span><strong>', escapeHtml(item.created_at || '-'), '</strong></div>',
           '<div><span class="label">ID Sasaran</span><strong>', escapeHtml(payload.id_sasaran || '-'), '</strong></div>',
           '<div><span class="label">Retry</span><strong>', escapeHtml(String(item.retries || 0)), '</strong></div>',
         '</div>',
-
-        item.last_error
-          ? '<p class="muted-text" style="margin-top:10px;">Error: ' + escapeHtml(item.last_error) + '</p>'
-          : '',
-
+        item.last_error ? '<p class="muted-text" style="margin-top:10px;">Error: ' + escapeHtml(item.last_error) + '</p>' : '',
         '<div class="queue-card-actions">',
           '<button class="btn btn-secondary btn-sm" data-sync-retry-id="', escapeHtml(item.id), '">Kirim Ulang</button>',
           '<button class="btn btn-danger btn-sm" data-sync-delete-id="', escapeHtml(item.id), '">Hapus</button>',
@@ -223,23 +144,80 @@
     ].join('');
   }
 
-  async function postQueueItem(item) {
-    var api = getApi();
-    if (!api || typeof api.post !== 'function') {
-      throw new Error('Api.post belum tersedia.');
+  async function getLegacyQueue() {
+    var state = getState();
+    if (state && typeof state.getSyncQueue === 'function') {
+      var fromState = state.getSyncQueue();
+      if (Array.isArray(fromState)) return fromState;
     }
-
-    if (!item || !item.action) {
-      throw new Error('Item antrean tidak valid.');
+    var storage = getStorage();
+    var keys = getStorageKeys();
+    if (storage && typeof storage.get === 'function' && keys.SYNC_QUEUE) {
+      var fromStorage = storage.get(keys.SYNC_QUEUE, []);
+      return Array.isArray(fromStorage) ? fromStorage : [];
     }
+    return [];
+  }
 
-    var payload = Object.assign({}, item.payload || {});
+  async function getQueue() {
+    var repo = getQueueRepo();
+    if (repo && typeof repo.getAll === 'function') {
+      var items = await repo.getAll({ includeArchived: false });
+      return (items || [])
+        .map(normalizeQueueItem)
+        .filter(function (item) {
+          return item.sync_status !== 'SUCCESS' && item.sync_status !== 'DUPLICATE' && !item.is_archived;
+        });
+    }
+    var legacy = await getLegacyQueue();
+    return legacy.map(normalizeQueueItem);
+  }
 
-    return api.post(item.action, payload, {
-      includeAuth: true,
-      clientSubmitId: payload.client_submit_id || '',
-      syncSource: payload.sync_source || 'OFFLINE'
+  async function getFilteredQueue() {
+    var filters = getFilters();
+    var queue = await getQueue();
+    return queue.filter(function (item) {
+      var actionMatch = !filters.action || item.action === filters.action;
+      var statusMatch = !filters.status || normalizeStatus(item.sync_status) === filters.status;
+      var payload = item.payload || {};
+      var keywordSource = [
+        item.id || '',
+        payload.client_submit_id || '',
+        payload.id_sasaran || '',
+        payload.nama_sasaran || '',
+        payload.nama || '',
+        payload.id_pendampingan || '',
+        item.action || ''
+      ].join(' ').toLowerCase();
+      var keywordMatch = !filters.keyword || keywordSource.indexOf(filters.keyword) !== -1;
+      return actionMatch && statusMatch && keywordMatch;
     });
+  }
+
+  async function removeItem(itemId) {
+    var repo = getQueueRepo();
+    if (repo && typeof repo.remove === 'function') {
+      await repo.remove(itemId);
+      if (typeof repo.syncLegacyMirror === 'function') {
+        await repo.syncLegacyMirror();
+      }
+      return true;
+    }
+
+    var queue = (await getLegacyQueue()).map(normalizeQueueItem).filter(function (item) {
+      return item.id !== itemId;
+    });
+
+    var state = getState();
+    if (state && typeof state.setSyncQueue === 'function') {
+      state.setSyncQueue(queue);
+    }
+    var storage = getStorage();
+    var keys = getStorageKeys();
+    if (storage && typeof storage.set === 'function' && keys.SYNC_QUEUE) {
+      storage.set(keys.SYNC_QUEUE, queue);
+    }
+    return true;
   }
 
   var SyncView = {
@@ -248,26 +226,16 @@
       this.render();
     },
 
-    getFilters: getFilters,
-
-    getQueue: function () {
-      return getQueue().map(normalizeQueueItem);
-    },
-
-    getFilteredQueue: function () {
-      return getFilteredQueue();
-    },
-
-    render: function () {
-      var queue = this.getQueue();
-      var filtered = this.getFilteredQueue();
+    render: async function () {
+      var queue = await getQueue();
+      var filtered = await getFilteredQueue();
 
       var pendingCount = queue.filter(function (item) {
-        return normalizeStatus(item.sync_status) === 'PENDING';
+        return item.sync_status === 'PENDING' || item.sync_status === 'PROCESSING';
       }).length;
 
       var failedCount = queue.filter(function (item) {
-        return normalizeStatus(item.sync_status) === 'FAILED';
+        return item.sync_status === 'FAILED' || item.sync_status === 'CONFLICT';
       }).length;
 
       setText('sync-total-count', String(queue.length));
@@ -296,107 +264,50 @@
       setHTML('sync-list-container', filtered.map(renderQueueItem).join(''));
     },
 
-    handleDelete: function (itemId) {
-      var queue = this.getQueue().filter(function (item) {
-        return item.id !== itemId;
-      });
-
-      saveQueue(queue);
-      this.render();
+    handleDelete: async function (itemId) {
+      await removeItem(itemId);
+      await this.render();
       showToast('Draft dihapus dari antrean.', 'info');
     },
 
     handleRetry: async function (itemId) {
-      var queue = this.getQueue();
-      var target = queue.find(function (item) {
-        return item.id === itemId;
-      });
+      var repo = getQueueRepo();
+      var manager = getSyncManager();
 
-      if (!target) {
+      if (!repo || typeof repo.getById !== 'function') {
+        showToast('Queue formal belum tersedia.', 'warning');
+        return;
+      }
+
+      var item = await repo.getById(itemId);
+      if (!item) {
         showToast('Draft tidak ditemukan.', 'warning');
         return;
       }
 
-      try {
-        var result = await postQueueItem(target);
+      await repo.updateStatus(itemId, 'PENDING', { last_error: '' });
 
-        if (!result || result.ok === false) {
-          throw new Error((result && result.message) || 'Draft gagal dikirim ulang.');
-        }
-
-        var nextQueue = queue.filter(function (item) {
-          return item.id !== itemId;
-        });
-
-        saveQueue(nextQueue);
-        setLastSyncAt(new Date().toISOString());
-        this.render();
-        showToast('Draft berhasil disinkronkan.', 'success');
-      } catch (err) {
-        var updatedQueue = queue.map(function (item) {
-          if (item.id !== itemId) return item;
-
-          return Object.assign({}, item, {
-            sync_status: 'FAILED',
-            retries: Number(item.retries || 0) + 1,
-            last_error: err && err.message ? err.message : String(err)
-          });
-        });
-
-        saveQueue(updatedQueue);
-        this.render();
-        showToast((err && err.message) || 'Draft gagal dikirim ulang.', 'warning');
+      if (manager && typeof manager.syncOne === 'function' && navigator.onLine !== false) {
+        await manager.syncOne(item);
       }
+
+      if (typeof repo.syncLegacyMirror === 'function') {
+        await repo.syncLegacyMirror();
+      }
+      await this.render();
+      showToast('Proses kirim ulang selesai.', 'info');
     },
 
     handleSyncAll: async function () {
-      var queue = this.getQueue();
-      if (!queue.length) {
-        showToast('Belum ada antrean untuk disinkronkan.', 'info');
+      var manager = getSyncManager();
+      if (!manager || typeof manager.syncAll !== 'function') {
+        showToast('SyncManager belum tersedia.', 'warning');
         return;
       }
 
-      var remaining = [];
-      var successCount = 0;
-      var failedCount = 0;
-
-      for (var i = 0; i < queue.length; i += 1) {
-        var item = queue[i];
-
-        try {
-          var result = await postQueueItem(item);
-
-          if (!result || result.ok === false) {
-            throw new Error((result && result.message) || 'Sinkronisasi item gagal.');
-          }
-
-          successCount += 1;
-        } catch (err) {
-          failedCount += 1;
-
-          remaining.push(Object.assign({}, item, {
-            sync_status: 'FAILED',
-            retries: Number(item.retries || 0) + 1,
-            last_error: err && err.message ? err.message : String(err)
-          }));
-        }
-      }
-
-      saveQueue(remaining);
-      setLastSyncAt(new Date().toISOString());
-      this.render();
-
-      if (successCount && !failedCount) {
-        showToast('Semua draft berhasil disinkronkan.', 'success');
-        return;
-      }
-
-      if (successCount && failedCount) {
-        showToast(successCount + ' draft berhasil, ' + failedCount + ' draft gagal.', 'warning');
-        return;
-      }
-
-      showToast('Semua draft gagal disinkronkan.', 'warning');
+      var summary = await manager.syncAll();
+      await this.render();
+      showToast((summary && summary.message) || 'Sinkronisasi selesai.', (summary && summary.failed > 0) || (summary && summary.conflict > 0) ? 'warning' : 'success');
     },
 
     bindEvents: function () {
@@ -440,18 +351,14 @@
           var retryBtn = event.target.closest('[data-sync-retry-id]');
           if (retryBtn) {
             var retryId = retryBtn.getAttribute('data-sync-retry-id');
-            if (retryId) {
-              await self.handleRetry(retryId);
-            }
+            if (retryId) await self.handleRetry(retryId);
             return;
           }
 
           var deleteBtn = event.target.closest('[data-sync-delete-id]');
           if (deleteBtn) {
             var deleteId = deleteBtn.getAttribute('data-sync-delete-id');
-            if (deleteId) {
-              self.handleDelete(deleteId);
-            }
+            if (deleteId) await self.handleDelete(deleteId);
           }
         });
       }
@@ -484,13 +391,5 @@
   };
 
   window.SyncView = SyncView;
-
-  // Alias sementara agar referensi lama tidak langsung patah
   window.SyncScreen = SyncView;
-
-  document.addEventListener('DOMContentLoaded', function () {
-    if (window.SyncView && typeof window.SyncView.init === 'function') {
-      window.SyncView.init();
-    }
-  });
 })(window, document);
