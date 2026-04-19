@@ -1,296 +1,347 @@
+
 (function (window) {
   'use strict';
 
-  var STATUS = {
+  var STATUS = Object.freeze({
     PENDING: 'PENDING',
     PROCESSING: 'PROCESSING',
     SUCCESS: 'SUCCESS',
     FAILED: 'FAILED',
     CONFLICT: 'CONFLICT',
     DUPLICATE: 'DUPLICATE'
-  };
+  });
 
   function nowIso() {
-    return window.TpkDb.nowIso();
+    return new Date().toISOString();
   }
 
-  function toArray(value) {
-    return Array.isArray(value) ? value : [];
-  }
-
-  function getProfile() {
-    return (window.StorageHelper && window.StorageHelper.getProfile()) || {};
-  }
-
-  function getLegacyQueue() {
-    return window.StorageHelper ? window.StorageHelper.getLegacySyncQueue() : [];
-  }
-
-  function removeLegacyQueue() {
-    if (window.StorageHelper) {
-      window.StorageHelper.setLegacySyncQueue([]);
+  function clone(value) {
+    try {
+      return JSON.parse(JSON.stringify(value));
+    } catch (err) {
+      return value;
     }
   }
 
-  function normalizeQueueItem(item) {
+  function getConfig() {
+    return window.APP_CONFIG || {};
+  }
+
+  function getStorageKeys() {
+    return getConfig().STORAGE_KEYS || {};
+  }
+
+  function getStorage() {
+    return window.Storage || null;
+  }
+
+  function getState() {
+    return window.AppState || null;
+  }
+
+  function getApi() {
+    return window.Api || null;
+  }
+
+  function getSessionToken() {
+    if (window.Api && typeof window.Api.getSessionToken === 'function') {
+      return String(window.Api.getSessionToken() || '');
+    }
+    var storage = getStorage();
+    var keys = getStorageKeys();
+    if (storage && typeof storage.get === 'function') {
+      return String(storage.get(keys.SESSION_TOKEN, '') || '');
+    }
+    return '';
+  }
+
+  function getDeviceId() {
+    if (window.Api && typeof window.Api.getOrCreateDeviceId === 'function') {
+      return String(window.Api.getOrCreateDeviceId() || '');
+    }
+    var storage = getStorage();
+    var keys = getStorageKeys();
+    if (storage && typeof storage.get === 'function') {
+      return String(storage.get(keys.DEVICE_ID, '') || '');
+    }
+    return '';
+  }
+
+  function getProfile() {
+    var state = getState();
+    if (state && typeof state.getProfile === 'function') {
+      return state.getProfile() || {};
+    }
+    var storage = getStorage();
+    var keys = getStorageKeys();
+    if (storage && typeof storage.get === 'function') {
+      return storage.get(keys.PROFILE, {}) || {};
+    }
+    return {};
+  }
+
+  function ensureQueueId(existing) {
+    if (existing) return String(existing);
+    return 'QUE-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8).toUpperCase();
+  }
+
+  function ensureClientSubmitId(payload, queueId) {
+    if (payload && payload.client_submit_id) return String(payload.client_submit_id);
+    if (window.ClientId && typeof window.ClientId.ensure === 'function') {
+      return window.ClientId.ensure('', 'SUB');
+    }
+    return 'SUB-' + (queueId || ensureQueueId(''));
+  }
+
+  function normalizeStatus(value) {
+    var raw = String(value || STATUS.PENDING).trim().toUpperCase();
+    return STATUS[raw] || raw || STATUS.PENDING;
+  }
+
+  function normalizeItem(item) {
     var profile = getProfile();
-    var payload = item && item.payload ? item.payload : {};
-    var queueId = item.queue_id || item.id || (window.ClientId && typeof window.ClientId.queueId === 'function' ? window.ClientId.queueId() : window.TpkDb.randomId('Q'));
-    var syncStatus = item.status || item.sync_status || STATUS.PENDING;
+    var payload = item && typeof item.payload === 'object' ? clone(item.payload) : {};
+    var queueId = ensureQueueId(item && (item.queue_id || item.id));
 
     return {
       queue_id: queueId,
-      action: String(item.action || '').trim(),
-      entity_type: String(item.entity_type || inferEntityType(item.action, payload)).trim(),
-      entity_id_local: String(item.entity_id_local || item.local_id || payload.draft_id || payload.id_draft || '').trim(),
-      client_submit_id: String(item.client_submit_id || payload.client_submit_id || '').trim(),
+      id: queueId,
+      action: String(item && item.action || payload.action || '').trim(),
+      entity_type: String(item && item.entity_type || '').trim(),
+      entity_id_local: String(item && item.entity_id_local || '').trim(),
+      client_submit_id: ensureClientSubmitId(payload, queueId),
       payload: payload,
-      status: syncStatus,
-      retry_count: Number(item.retry_count || 0),
-      last_error: String(item.last_error || '').trim(),
-      created_at: item.created_at || nowIso(),
-      updated_at: item.updated_at || nowIso(),
-      id_user: String(item.id_user || profile.id_user || profile.username || '').trim(),
-      id_tim: String(item.id_tim || profile.id_tim || '').trim(),
-      device_id: String(item.device_id || (window.StorageHelper && window.StorageHelper.getDeviceId()) || '').trim(),
-      app_version: String(item.app_version || (window.APP_CONFIG && window.APP_CONFIG.APP_VERSION) || '').trim(),
-      last_synced_at: item.last_synced_at || '',
-      last_result_code: Number(item.last_result_code || 0)
+      status: normalizeStatus(item && (item.status || item.sync_status)),
+      retry_count: Number(item && (item.retry_count || item.retries) || 0),
+      last_error: String(item && item.last_error || ''),
+      last_response_code: Number(item && item.last_response_code || 0),
+      created_at: String(item && item.created_at || nowIso()),
+      updated_at: String(item && item.updated_at || nowIso()),
+      id_user: String(item && item.id_user || profile.id_user || ''),
+      id_tim: String(item && item.id_tim || profile.id_tim || ''),
+      device_id: String(item && item.device_id || getDeviceId() || ''),
+      app_version: String(item && item.app_version || (getConfig().APP_VERSION || '')),
+      sync_source: String(item && item.sync_source || payload.sync_source || 'OFFLINE_QUEUE'),
+      is_archived: !!(item && item.is_archived)
     };
   }
 
-  function inferEntityType(action, payload) {
-    var act = String(action || '').toLowerCase();
-    var jenis = String((payload && payload.jenis_sasaran) || '').toLowerCase();
-    if (act.indexOf('pendampingan') >= 0) return 'PENDAMPINGAN';
-    if (act.indexOf('registrasi') >= 0 || act.indexOf('sasaran') >= 0 || jenis) return 'REGISTRASI';
-    return 'GENERAL';
+  async function ensureDb() {
+    if (!window.AppDB || typeof window.AppDB.getAll !== 'function') {
+      throw new Error('AppDB belum tersedia.');
+    }
+    return window.AppDB;
   }
 
-  async function recordResult(queueId, status, code, message) {
-    await window.TpkDb.put(window.TpkDb.STORES.SYNC_RESULT_LOG, {
-      result_id: window.TpkDb.randomId('RES'),
-      queue_id: queueId,
-      status: status,
-      response_code: Number(code || 0),
-      message: String(message || ''),
-      created_at: nowIso()
+  function toLegacyMirror(items) {
+    return (items || []).filter(function (item) {
+      return !item.is_archived && item.status !== STATUS.SUCCESS && item.status !== STATUS.DUPLICATE;
+    }).map(function (item) {
+      return {
+        id: item.queue_id,
+        action: item.action,
+        payload: clone(item.payload || {}),
+        sync_status: item.status,
+        status: item.status,
+        created_at: item.created_at,
+        last_error: item.last_error || '',
+        retries: Number(item.retry_count || 0)
+      };
     });
   }
 
-  async function updateSummaryState() {
-    if (!window.AppState) return;
-    var summary = await QueueRepo.getSummary();
-    window.AppState.setSync({
-      pending_count: summary.pending,
-      processing_count: summary.processing,
-      failed_count: summary.failed,
-      conflict_count: summary.conflict,
-      duplicate_count: summary.duplicate,
-      success_count: summary.success,
-      last_sync_at: (window.StorageHelper && window.StorageHelper.getLastSyncAt()) || ''
+  async function syncLegacyMirror() {
+    var db = await ensureDb();
+    var all = await db.getAll(db.STORES.SYNC_QUEUE);
+    var mirrored = toLegacyMirror(all);
+
+    var storage = getStorage();
+    var keys = getStorageKeys();
+    if (storage && typeof storage.set === 'function' && keys.SYNC_QUEUE) {
+      storage.set(keys.SYNC_QUEUE, mirrored);
+    }
+
+    var state = getState();
+    if (state && typeof state.setSyncQueue === 'function') {
+      state.setSyncQueue(mirrored);
+    }
+
+    return mirrored;
+  }
+
+  async function save(item) {
+    var db = await ensureDb();
+    var normalized = normalizeItem(item);
+    normalized.updated_at = nowIso();
+    await db.put(db.STORES.SYNC_QUEUE, normalized);
+    await syncLegacyMirror();
+    return normalized;
+  }
+
+  async function getAll(options) {
+    var db = await ensureDb();
+    var items = await db.getAll(db.STORES.SYNC_QUEUE);
+    var opts = options || {};
+    var out = (items || []).map(normalizeItem).filter(function (item) {
+      if (opts.includeArchived === true) return true;
+      return !item.is_archived;
     });
+
+    out.sort(function (a, b) {
+      return String(a.created_at || '').localeCompare(String(b.created_at || ''));
+    });
+
+    return out;
+  }
+
+  async function getById(queueId) {
+    var db = await ensureDb();
+    var item = await db.get(db.STORES.SYNC_QUEUE, queueId);
+    return item ? normalizeItem(item) : null;
+  }
+
+  async function enqueue(action, payload, meta) {
+    var next = normalizeItem(Object.assign({}, meta || {}, {
+      action: action,
+      payload: clone(payload || {}),
+      status: STATUS.PENDING,
+      created_at: nowIso(),
+      updated_at: nowIso()
+    }));
+
+    await save(next);
+    try {
+      await window.AppDB.logAudit('QUEUE_ENQUEUE', {
+        queue_id: next.queue_id,
+        action: next.action,
+        client_submit_id: next.client_submit_id
+      });
+    } catch (err) {}
+    return next;
+  }
+
+  async function getByStatuses(statusList) {
+    var targets = (statusList || []).map(normalizeStatus);
+    var items = await getAll();
+    return items.filter(function (item) {
+      return targets.indexOf(item.status) >= 0;
+    });
+  }
+
+  async function getPending(limit) {
+    var items = await getByStatuses([STATUS.PENDING, STATUS.FAILED]);
+    if (limit && limit > 0) return items.slice(0, limit);
+    return items;
+  }
+
+  async function updateStatus(queueId, status, patch) {
+    var item = await getById(queueId);
+    if (!item) return null;
+
+    var next = Object.assign({}, item, clone(patch || {}), {
+      status: normalizeStatus(status),
+      updated_at: nowIso()
+    });
+
+    await save(next);
+    return next;
+  }
+
+  async function markProcessing(queueId) {
+    return updateStatus(queueId, STATUS.PROCESSING);
+  }
+
+  async function markSuccess(queueId, patch) {
+    return updateStatus(queueId, STATUS.SUCCESS, patch || {});
+  }
+
+  async function markDuplicate(queueId, patch) {
+    return updateStatus(queueId, STATUS.DUPLICATE, patch || {});
+  }
+
+  async function markConflict(queueId, patch) {
+    return updateStatus(queueId, STATUS.CONFLICT, patch || {});
+  }
+
+  async function markFailed(queueId, errorMessage, patch) {
+    var current = await getById(queueId);
+    var nextRetry = Number((current && current.retry_count) || 0) + 1;
+    return updateStatus(queueId, STATUS.FAILED, Object.assign({}, patch || {}, {
+      retry_count: nextRetry,
+      last_error: String(errorMessage || '')
+    }));
+  }
+
+  async function remove(queueId) {
+    var db = await ensureDb();
+    await db.remove(db.STORES.SYNC_QUEUE, queueId);
+    await syncLegacyMirror();
+    return true;
+  }
+
+  async function archive(queueId) {
+    var item = await getById(queueId);
+    if (!item) return false;
+    item.is_archived = true;
+    item.updated_at = nowIso();
+    await save(item);
+    return true;
+  }
+
+  async function clearCompleted() {
+    var items = await getByStatuses([STATUS.SUCCESS, STATUS.DUPLICATE]);
+    for (var i = 0; i < items.length; i += 1) {
+      await archive(items[i].queue_id);
+    }
+    await syncLegacyMirror();
+    return true;
+  }
+
+  async function stats() {
+    var items = await getAll();
+    var out = {
+      total: items.length,
+      pending: 0,
+      processing: 0,
+      success: 0,
+      failed: 0,
+      conflict: 0,
+      duplicate: 0
+    };
+
+    items.forEach(function (item) {
+      var status = normalizeStatus(item.status);
+      if (status === STATUS.PENDING) out.pending += 1;
+      else if (status === STATUS.PROCESSING) out.processing += 1;
+      else if (status === STATUS.SUCCESS) out.success += 1;
+      else if (status === STATUS.FAILED) out.failed += 1;
+      else if (status === STATUS.CONFLICT) out.conflict += 1;
+      else if (status === STATUS.DUPLICATE) out.duplicate += 1;
+    });
+
+    return out;
   }
 
   var QueueRepo = {
     STATUS: STATUS,
-
-    init: async function () {
-      var migrated = await this.migrateLegacyQueue();
-      await updateSummaryState();
-      return { ok: true, migrated: migrated };
-    },
-
-    migrateLegacyQueue: async function () {
-      var already = await window.TpkDb.getMeta('legacy_sync_queue_migrated', false);
-      if (already) return 0;
-
-      var legacyItems = toArray(getLegacyQueue());
-      if (!legacyItems.length) {
-        await window.TpkDb.setMeta('legacy_sync_queue_migrated', true);
-        return 0;
-      }
-
-      var migrated = 0;
-      for (var i = 0; i < legacyItems.length; i += 1) {
-        var row = normalizeQueueItem(legacyItems[i]);
-        if (!row.action) continue;
-        await window.TpkDb.put(window.TpkDb.STORES.SYNC_QUEUE, row);
-        migrated += 1;
-      }
-
-      removeLegacyQueue();
-      await window.TpkDb.setMeta('legacy_sync_queue_migrated', true);
-      await window.TpkDb.putAudit('LEGACY_QUEUE_MIGRATED', 'Migrated items: ' + migrated);
-      return migrated;
-    },
-
-    add: async function (item) {
-      var row = normalizeQueueItem(item || {});
-      if (!row.action) throw new Error('Action antrean kosong.');
-      await window.TpkDb.put(window.TpkDb.STORES.SYNC_QUEUE, row);
-      await window.TpkDb.putAudit('QUEUE_ADD', JSON.stringify({ queue_id: row.queue_id, action: row.action }));
-      await updateSummaryState();
-      return row;
-    },
-
-    getById: function (queueId) {
-      return window.TpkDb.get(window.TpkDb.STORES.SYNC_QUEUE, queueId);
-    },
-
-    getAll: async function () {
-      var rows = await window.TpkDb.getAll(window.TpkDb.STORES.SYNC_QUEUE);
-      return rows.sort(function (a, b) {
-        return String(a.created_at || '').localeCompare(String(b.created_at || ''));
-      });
-    },
-
-    getPending: async function (limit) {
-      var rows = await window.TpkDb.listQueueByStatus(STATUS.PENDING);
-      if (!limit || limit < 1) return rows;
-      return rows.slice(0, limit);
-    },
-
-    update: async function (queueId, patch) {
-      var current = await this.getById(queueId);
-      if (!current) return null;
-      var next = Object.assign({}, current, patch || {}, { updated_at: nowIso() });
-      await window.TpkDb.put(window.TpkDb.STORES.SYNC_QUEUE, next);
-      await updateSummaryState();
-      return next;
-    },
-
-    remove: async function (queueId) {
-      await window.TpkDb.delete(window.TpkDb.STORES.SYNC_QUEUE, queueId);
-      await updateSummaryState();
-      return true;
-    },
-
-    clearAll: async function () {
-      await window.TpkDb.clear(window.TpkDb.STORES.SYNC_QUEUE);
-      await updateSummaryState();
-      return true;
-    },
-
-    markProcessing: function (queueId) {
-      return this.update(queueId, { status: STATUS.PROCESSING, last_error: '' });
-    },
-
-    markSuccess: async function (queueId, info) {
-      var updated = await this.update(queueId, {
-        status: STATUS.SUCCESS,
-        last_error: '',
-        last_result_code: Number(info && info.code || 200),
-        last_synced_at: nowIso()
-      });
-      await recordResult(queueId, STATUS.SUCCESS, info && info.code, info && info.message);
-      window.StorageHelper && window.StorageHelper.touchLastSyncAt(updated && updated.last_synced_at);
-      return updated;
-    },
-
-    markDuplicate: async function (queueId, message) {
-      var updated = await this.update(queueId, {
-        status: STATUS.DUPLICATE,
-        last_error: String(message || ''),
-        last_synced_at: nowIso(),
-        last_result_code: 200
-      });
-      await recordResult(queueId, STATUS.DUPLICATE, 200, message);
-      window.StorageHelper && window.StorageHelper.touchLastSyncAt(updated && updated.last_synced_at);
-      return updated;
-    },
-
-    markConflict: async function (queueId, message, code) {
-      var updated = await this.update(queueId, {
-        status: STATUS.CONFLICT,
-        last_error: String(message || 'Conflict'),
-        last_synced_at: nowIso(),
-        last_result_code: Number(code || 409)
-      });
-      await recordResult(queueId, STATUS.CONFLICT, code || 409, message);
-      return updated;
-    },
-
-    markFailed: async function (queueId, message, code) {
-      var current = await this.getById(queueId);
-      var retryCount = Number(current && current.retry_count || 0) + 1;
-      var updated = await this.update(queueId, {
-        status: STATUS.FAILED,
-        last_error: String(message || 'Sinkronisasi gagal'),
-        retry_count: retryCount,
-        last_synced_at: nowIso(),
-        last_result_code: Number(code || 0)
-      });
-      await recordResult(queueId, STATUS.FAILED, code || 0, message);
-      return updated;
-    },
-
-    requeue: async function (queueId, message) {
-      var current = await this.getById(queueId);
-      var retryCount = Number(current && current.retry_count || 0) + 1;
-      return this.update(queueId, {
-        status: STATUS.PENDING,
-        last_error: String(message || ''),
-        retry_count: retryCount,
-        last_synced_at: nowIso()
-      });
-    },
-
-    pruneCompleted: async function (olderThanDays) {
-      var days = Number(olderThanDays || 7);
-      var rows = await this.getAll();
-      var now = Date.now();
-      var removed = 0;
-      for (var i = 0; i < rows.length; i += 1) {
-        var row = rows[i];
-        if ([STATUS.SUCCESS, STATUS.DUPLICATE].indexOf(row.status) === -1) continue;
-        var ts = row.last_synced_at ? new Date(row.last_synced_at).getTime() : 0;
-        if (!ts || (now - ts) < days * 86400000) continue;
-        await this.remove(row.queue_id);
-        removed += 1;
-      }
-      return removed;
-    },
-
-    getSummary: async function () {
-      var rows = await this.getAll();
-      return rows.reduce(function (acc, row) {
-        acc.total += 1;
-        var status = row.status || STATUS.PENDING;
-        if (status === STATUS.PENDING) acc.pending += 1;
-        if (status === STATUS.PROCESSING) acc.processing += 1;
-        if (status === STATUS.SUCCESS) acc.success += 1;
-        if (status === STATUS.FAILED) acc.failed += 1;
-        if (status === STATUS.CONFLICT) acc.conflict += 1;
-        if (status === STATUS.DUPLICATE) acc.duplicate += 1;
-        return acc;
-      }, {
-        total: 0,
-        pending: 0,
-        processing: 0,
-        success: 0,
-        failed: 0,
-        conflict: 0,
-        duplicate: 0
-      });
-    },
-
-    toLegacyItems: async function () {
-      var rows = await this.getAll();
-      return rows.map(function (item) {
-        return {
-          id: item.queue_id,
-          action: item.action,
-          payload: item.payload || {},
-          client_submit_id: item.client_submit_id || '',
-          created_at: item.created_at || '',
-          retry_count: Number(item.retry_count || 0),
-          sync_status: item.status || STATUS.PENDING,
-          last_error: item.last_error || '',
-          last_synced_at: item.last_synced_at || ''
-        };
-      });
-    }
+    normalizeItem: normalizeItem,
+    enqueue: enqueue,
+    save: save,
+    getAll: getAll,
+    getById: getById,
+    getPending: getPending,
+    getByStatuses: getByStatuses,
+    updateStatus: updateStatus,
+    markProcessing: markProcessing,
+    markSuccess: markSuccess,
+    markDuplicate: markDuplicate,
+    markConflict: markConflict,
+    markFailed: markFailed,
+    remove: remove,
+    archive: archive,
+    clearCompleted: clearCompleted,
+    stats: stats,
+    syncLegacyMirror: syncLegacyMirror
   };
 
   window.QueueRepo = QueueRepo;
