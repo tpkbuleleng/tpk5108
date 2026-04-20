@@ -273,7 +273,36 @@
     return out;
   }
 
+  function isSafeReadFallbackAllowed() {
+    try {
+      var apiUrl = new URL(getApiBaseUrl(), window.location.href);
+      var currentUrl = new URL(window.location.href);
+      var isSameOrigin = apiUrl.origin === currentUrl.origin;
+      var host = String(apiUrl.hostname || '').toLowerCase();
+
+      if (isSameOrigin) return true;
+
+      if (
+        host.indexOf('script.google.com') >= 0 ||
+        host.indexOf('script.googleusercontent.com') >= 0
+      ) {
+        return false;
+      }
+
+      return false;
+    } catch (err) {
+      return false;
+    }
+  }
+
   async function tryReadOnlyGetFallback(action, payload, options) {
+    if (!isSafeReadFallbackAllowed()) {
+      return createNetworkError('Fallback GET dinonaktifkan untuk endpoint API ini.', {
+        transport_fallback_skipped: true,
+        reason: 'unsafe_cross_origin_get'
+      });
+    }
+
     var opts = options || {};
     var params = Object.assign({}, buildReadableQueryPayload(payload || {}), opts.fallbackGetParams || {});
 
