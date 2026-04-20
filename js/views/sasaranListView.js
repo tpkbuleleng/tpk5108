@@ -1,7 +1,7 @@
 (function (window, document) {
   'use strict';
 
-  window.__SASARAN_LIST_VIEW_BUILD = '20260412-01';
+  window.__SASARAN_LIST_VIEW_BUILD = '20260420-01';
   console.log('SasaranListView build aktif:', window.__SASARAN_LIST_VIEW_BUILD);
 
   var SCREEN_ID = 'sasaran-list-screen';
@@ -16,6 +16,7 @@
 
   var LOCAL_SELECTED_KEY = 'tpk_selected_sasaran';
   var LOCAL_CACHE_KEY = 'tpk_sasaran_cache_v1';
+  var LIST_CACHE_TTL_MS = 10 * 60 * 1000;
 
   function byId(id) {
     return document.getElementById(id);
@@ -73,8 +74,61 @@
       .replace(/'/g, '&#39;');
   }
 
+  function isPlainObject(value) {
+    return !!value && Object.prototype.toString.call(value) === '[object Object]';
+  }
+
+  function collectDisplayParts(value, parts, seen, depth) {
+    if (depth > 4 || value === undefined || value === null) return;
+
+    if (Array.isArray(value)) {
+      value.forEach(function (item) {
+        collectDisplayParts(item, parts, seen, depth + 1);
+      });
+      return;
+    }
+
+    if (isPlainObject(value)) {
+      var preferred = [
+        'nama_wilayah_lengkap', 'nama_wilayah_sasaran', 'nama_wilayah', 'wilayah_sasaran', 'wilayah', 'label', 'text', 'display',
+        'dusun_rw', 'nama_dusun', 'dusun', 'desa_kelurahan', 'nama_desa', 'desa', 'kecamatan', 'nama_kecamatan'
+      ];
+
+      preferred.forEach(function (key) {
+        if (value[key] !== undefined && value[key] !== null) {
+          collectDisplayParts(value[key], parts, seen, depth + 1);
+        }
+      });
+
+      Object.keys(value).forEach(function (key) {
+        if (preferred.indexOf(key) >= 0) return;
+        collectDisplayParts(value[key], parts, seen, depth + 1);
+      });
+      return;
+    }
+
+    var text = String(value == null ? '' : value).replace(/\s+/g, ' ').trim();
+    if (!text) return;
+
+    var upper = text.toUpperCase();
+    if (upper === '-' || upper === 'NULL' || upper === 'UNDEFINED' || upper === 'N/A' || upper === 'NA' || upper === '[OBJECT OBJECT]') {
+      return;
+    }
+
+    if (!seen[upper]) {
+      seen[upper] = true;
+      parts.push(text);
+    }
+  }
+
+  function toDisplayText(value) {
+    var parts = [];
+    collectDisplayParts(value, parts, {}, 0);
+    return parts.join(' • ');
+  }
+
   function normalizeSpaces(value) {
-    return String(value == null ? '' : value).replace(/\s+/g, ' ').trim();
+    return String(toDisplayText(value) || '').replace(/\s+/g, ' ').trim();
   }
 
   function normalizeUpper(value) {
@@ -184,23 +238,40 @@
       item.nama_dusun || item.dusun_rw || item.dusun || '',
       item.nama_desa || item.desa_kelurahan || item.desa || '',
       item.nama_kecamatan || item.kecamatan || ''
-    ].filter(Boolean);
+    ].map(normalizeSpaces).filter(Boolean);
 
     if (wilayahAsalEksplisit.length) {
       return wilayahAsalEksplisit.join(' • ');
     }
 
-    return String(
+    return normalizeSpaces(
       item.nama_wilayah_sasaran ||
       item.wilayah_sasaran ||
       item.nama_wilayah ||
       item.wilayah ||
       '-'
-    ).trim() || '-';
+    ) || '-';
   }
 
   function getItemId(item) {
     return String(item && (item.id_sasaran || item.id || '')).trim();
+  }
+
+  function normalizeItem(item) {
+    var safe = item && typeof item === 'object' ? Object.assign({}, item) : {};
+    var itemId = getItemId(safe);
+    var wilayah = getWilayahLabel(safe);
+
+    safe.id_sasaran = itemId || String(safe.id_sasaran || safe.id || '').trim();
+    safe.id = String(safe.id || safe.id_sasaran || '').trim();
+    safe.nama_sasaran = normalizeSpaces(safe.nama_sasaran || safe.nama || '');
+    safe.jenis_sasaran = normalizeSpaces(safe.jenis_sasaran || '');
+    safe.status_sasaran = normalizeSpaces(safe.status_sasaran || safe.status || '');
+    safe.nik_sasaran = normalizeSpaces(safe.nik_sasaran || safe.nik || '');
+    safe.nomor_kk = normalizeSpaces(safe.nomor_kk || '');
+    safe.nama_wilayah_sasaran = wilayah;
+    safe.wilayah_sasaran = wilayah;
+    return safe;
   }
 
   function setSelectedSasaran(item) {
@@ -226,7 +297,7 @@
     try {
       localStorage.setItem(LOCAL_CACHE_KEY, JSON.stringify({
         saved_at: new Date().toISOString(),
-        items: Array.isArray(items) ? items : []
+        items: Array.isArray(items) ? items.map(normalizeItem) : []
       }));
     } catch (err) {}
   }
@@ -234,9 +305,15 @@
   function readLocalCache() {
     try {
       var raw = JSON.parse(localStorage.getItem(LOCAL_CACHE_KEY) || '{}');
-      return Array.isArray(raw.items) ? raw.items : [];
+      var items = Array.isArray(raw.items) ? raw.items.map(normalizeItem) : [];
+      var savedAt = raw.saved_at ? new Date(raw.saved_at).getTime() : 0;
+      return {
+        items: items,
+        saved_at: raw.saved_at || '',
+        is_fresh: savedAt > 0 && (Date.now() - savedAt) <= LIST_CACHE_TTL_MS
+      };
     } catch (err) {
-      return [];
+      return { items: [], saved_at: '', is_fresh: false };
     }
   }
 
@@ -435,8 +512,8 @@
       }
 
       var cached = readLocalCache();
-      if (cached.length) {
-        this._lastItems = cached.slice();
+      if (cached.items.length) {
+        this._lastItems = cached.items.slice();
         this.rebuildItemMap();
         this.renderLocal();
 
@@ -452,8 +529,9 @@
     rebuildItemMap: function () {
       var map = {};
       this._lastItems.forEach(function (item) {
-        var id = getItemId(item);
-        if (id) map[id] = item;
+        var safeItem = normalizeItem(item);
+        var id = getItemId(safeItem);
+        if (id) map[id] = safeItem;
       });
       this._itemMap = map;
     },
@@ -472,7 +550,11 @@
       var api = getApi();
       if (!api || typeof api.post !== 'function') {
         setMeta('Gagal memuat data sasaran.');
-        setEmpty('API belum tersedia.');
+        if (this._lastItems.length) {
+          this.renderLocal();
+        } else {
+          setEmpty('API belum tersedia.');
+        }
         return;
       }
 
@@ -480,7 +562,11 @@
 
       if (!payload.id_tim) {
         setMeta('Gagal memuat data sasaran.');
-        setEmpty('id_tim tidak ditemukan pada profil/session.');
+        if (this._lastItems.length) {
+          this.renderLocal();
+        } else {
+          setEmpty('id_tim tidak ditemukan pada profil/session.');
+        }
         return;
       }
 
@@ -492,24 +578,44 @@
       setLoading();
 
       try {
-        var result = await api.post('getSasaranByTim', payload);
+        var action = api.getActionName ? api.getActionName('GET_SASARAN_BY_TIM', 'getSasaranByTim') : 'getSasaranByTim';
+        var result = await api.post(action, payload, {
+          includeAuth: true,
+          timeoutMs: 12000,
+          retryCount: 1,
+          retryDelayMs: 900,
+          readOnlyFallbackGet: true
+        });
 
         if (!result || result.ok === false) {
-          setMeta('Gagal memuat data sasaran.');
-          setEmpty((result && result.message) || 'Gagal memuat data sasaran.');
+          setMeta('Menampilkan cache lokal sasaran.');
+          if (this._lastItems.length) {
+            this.renderLocal();
+            toast((result && result.message) || 'Daftar sasaran sedang memakai cache lokal.', 'warning');
+          } else {
+            setEmpty((result && result.message) || 'Gagal memuat data sasaran.');
+          }
           return;
         }
 
         var data = result.data || {};
-        var items = Array.isArray(data.items) ? data.items : (Array.isArray(data) ? data : []);
+        var items = Array.isArray(data.items) ? data.items
+          : (Array.isArray(data.list) ? data.list
+          : (Array.isArray(data.records) ? data.records
+          : (Array.isArray(data) ? data : [])));
 
-        this._lastItems = items.slice();
+        this._lastItems = items.map(normalizeItem);
         saveLocalCache(this._lastItems);
         this.rebuildItemMap();
         this.renderLocal();
       } catch (err) {
-        setMeta('Gagal memuat data sasaran.');
-        setEmpty(err && err.message ? err.message : 'Gagal terhubung ke server.');
+        setMeta('Menampilkan cache lokal sasaran.');
+        if (this._lastItems.length) {
+          this.renderLocal();
+          toast(err && err.message ? err.message : 'Daftar sasaran sedang memakai cache lokal.', 'warning');
+        } else {
+          setEmpty(err && err.message ? err.message : 'Gagal terhubung ke server.');
+        }
       }
     },
 
@@ -533,8 +639,8 @@
     },
 
     openDetail: function (idSasaran) {
-      var item = this.findItemById(idSasaran);
-      if (!item) return;
+      var item = this.findItemById(idSasaran) || normalizeItem({ id_sasaran: idSasaran, id: idSasaran });
+      if (!getItemId(item)) return;
 
       setSelectedSasaran(item);
 
@@ -550,8 +656,8 @@
     },
 
     openPendampingan: function (idSasaran) {
-      var item = this.findItemById(idSasaran);
-      if (!item) {
+      var item = this.findItemById(idSasaran) || normalizeItem({ id_sasaran: idSasaran, id: idSasaran });
+      if (!getItemId(item)) {
         toast('Data sasaran tidak ditemukan.', 'warning');
         return;
       }

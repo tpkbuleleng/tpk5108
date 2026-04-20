@@ -131,8 +131,61 @@
     }
   }
 
+  function isPlainObject(value) {
+    return !!value && Object.prototype.toString.call(value) === '[object Object]';
+  }
+
+  function collectDisplayParts(value, parts, seen, depth) {
+    if (depth > 4 || value === undefined || value === null) return;
+
+    if (Array.isArray(value)) {
+      value.forEach(function (item) {
+        collectDisplayParts(item, parts, seen, depth + 1);
+      });
+      return;
+    }
+
+    if (isPlainObject(value)) {
+      var preferredKeys = [
+        'nama_wilayah_lengkap', 'nama_wilayah', 'wilayah', 'label', 'text', 'display', 'title', 'name', 'nama', 'value',
+        'dusun_rw', 'nama_dusun', 'dusun', 'desa_kelurahan', 'nama_desa', 'desa', 'kecamatan', 'nama_kecamatan', 'alamat'
+      ];
+
+      preferredKeys.forEach(function (key) {
+        if (value[key] !== undefined && value[key] !== null) {
+          collectDisplayParts(value[key], parts, seen, depth + 1);
+        }
+      });
+
+      Object.keys(value).forEach(function (key) {
+        if (preferredKeys.indexOf(key) >= 0) return;
+        collectDisplayParts(value[key], parts, seen, depth + 1);
+      });
+      return;
+    }
+
+    var text = String(value == null ? '' : value).replace(/\s+/g, ' ').trim();
+    if (!text) return;
+
+    var upper = text.toUpperCase();
+    if (upper === '-' || upper === 'NULL' || upper === 'UNDEFINED' || upper === 'N/A' || upper === 'NA' || upper === '[OBJECT OBJECT]') {
+      return;
+    }
+
+    if (!seen[upper]) {
+      seen[upper] = true;
+      parts.push(text);
+    }
+  }
+
+  function toDisplayText(value) {
+    var parts = [];
+    collectDisplayParts(value, parts, {}, 0);
+    return parts.join(' • ');
+  }
+
   function normalizeText(value) {
-    return String(value == null ? '' : value).replace(/\s+/g, ' ').trim();
+    return String(toDisplayText(value) || '').replace(/\s+/g, ' ').trim();
   }
 
   function normalizeUpperDisplay(value) {
@@ -156,7 +209,8 @@
     var list = Array.isArray(values) ? values : [values];
 
     for (var i = 0; i < list.length; i += 1) {
-      if (isMeaningful(list[i])) return String(list[i]);
+      var normalized = normalizeText(list[i]);
+      if (isMeaningful(normalized)) return normalized;
     }
 
     return fallback || '';
@@ -213,15 +267,14 @@
       if (!value.length) return '-';
       return value.map(function (item) {
         return formatValue(item);
-      }).join(', ');
+      }).filter(function (item) {
+        return item && item !== '-';
+      }).join(', ') || '-';
     }
 
     if (typeof value === 'object') {
-      try {
-        return JSON.stringify(value);
-      } catch (err) {
-        return '[object]';
-      }
+      value = toDisplayText(value);
+      if (!value) return '-';
     }
 
     var text = normalizeText(value);
@@ -407,39 +460,52 @@
     var kecamatan = pickFirstMeaningful([
       raw.nama_kecamatan,
       raw.kecamatan,
+      raw.wilayah_kecamatan,
       extra.nama_kecamatan,
-      extra.kecamatan
+      extra.kecamatan,
+      extra.wilayah_kecamatan,
+      raw.wilayah
     ], '');
 
     var desa = pickFirstMeaningful([
       raw.desa_kelurahan,
       raw.nama_desa,
       raw.desa,
+      raw.wilayah_desa,
       extra.desa_kelurahan,
       extra.nama_desa,
-      extra.desa
+      extra.desa,
+      extra.wilayah_desa,
+      raw.wilayah
     ], '');
 
     var dusun = pickFirstMeaningful([
       raw.dusun_rw,
       raw.nama_dusun,
       raw.dusun,
+      raw.wilayah_dusun,
       extra.dusun_rw,
       extra.nama_dusun,
-      extra.dusun
+      extra.dusun,
+      extra.wilayah_dusun,
+      raw.wilayah
     ], '');
 
     var wilayah = pickFirstMeaningful([
       raw.nama_wilayah,
       raw.wilayah,
+      raw.wilayah_sasaran,
+      raw.nama_wilayah_sasaran,
       extra.nama_wilayah,
       extra.wilayah,
+      extra.wilayah_sasaran,
+      extra.nama_wilayah_sasaran,
       [dusun, desa, kecamatan].filter(Boolean).join(' • ')
     ], '-');
 
     return {
       id_sasaran: pickFirstMeaningful([raw.id_sasaran, raw.id, extra.id_sasaran], ''),
-      nama_sasaran: pickFirstMeaningful([raw.nama_sasaran, extra.nama_sasaran], ''),
+      nama_sasaran: pickFirstMeaningful([raw.nama_sasaran, raw.nama, extra.nama_sasaran], ''),
       status_sasaran: pickFirstMeaningful([raw.status_sasaran, raw.status, extra.status_sasaran], 'AKTIF'),
       jenis_sasaran: pickFirstMeaningful([raw.jenis_sasaran, extra.jenis_sasaran], ''),
       nik_sasaran: pickFirstMeaningful([raw.nik_sasaran, raw.nik, extra.nik_sasaran, extra.nik], ''),
@@ -484,10 +550,10 @@
     raw = raw || {};
 
     return {
-      id_pendampingan: raw.id_pendampingan || raw.id || '',
-      tanggal_pendampingan: raw.tanggal_pendampingan || raw.submit_at || raw.created_at || '',
-      status_kunjungan: raw.status_kunjungan || raw.status || '',
-      catatan_umum: raw.catatan_umum || raw.ringkasan || raw.catatan || '',
+      id_pendampingan: pickFirstMeaningful([raw.id_pendampingan, raw.id], ''),
+      tanggal_pendampingan: pickFirstMeaningful([raw.tanggal_pendampingan, raw.submit_at, raw.created_at], ''),
+      status_kunjungan: pickFirstMeaningful([raw.status_kunjungan, raw.status], ''),
+      catatan_umum: pickFirstMeaningful([raw.catatan_umum, raw.ringkasan, raw.catatan], ''),
       raw: raw
     };
   }
@@ -767,6 +833,19 @@
     }
   }
 
+  function unwrapDetailPayload(data) {
+    var source = data || {};
+
+    if (source && typeof source === 'object') {
+      if (source.item && typeof source.item === 'object') return source.item;
+      if (source.detail && typeof source.detail === 'object') return source.detail;
+      if (source.sasaran && typeof source.sasaran === 'object') return source.sasaran;
+      if (source.record && typeof source.record === 'object') return source.record;
+    }
+
+    return source;
+  }
+
   async function fetchDetail(idSasaran) {
     var api = getApi();
     if (!api || typeof api.post !== 'function') {
@@ -778,14 +857,17 @@
       id_sasaran: idSasaran
     }, {
       includeAuth: true,
-      timeoutMs: 8000
+      timeoutMs: 12000,
+      retryCount: 1,
+      retryDelayMs: 900,
+      readOnlyFallbackGet: true
     });
 
     if (!result || result.ok === false) {
       throw new Error((result && result.message) || 'Gagal memuat detail sasaran.');
     }
 
-    return normalizeDetail(result.data || {});
+    return normalizeDetail(unwrapDetailPayload(result.data || {}));
   }
 
   async function fetchRiwayat(idSasaran) {
@@ -800,7 +882,10 @@
       limit: 5
     }, {
       includeAuth: true,
-      timeoutMs: 6000
+      timeoutMs: 10000,
+      retryCount: 1,
+      retryDelayMs: 900,
+      readOnlyFallbackGet: true
     });
 
     if (!result || result.ok === false) {
@@ -951,13 +1036,18 @@
       currentDetail = normalizeDetail(previewSelected);
 
       var cached = getCachedEntry(resolvedId);
-      if (cached && cached.detail) {
-        currentDetail = normalizeDetail(cached.detail);
-        renderHeader(currentDetail);
-        renderExtraFields(currentDetail);
+      var detail = currentDetail;
+      var riwayat = [];
 
-        if (cached.riwayat && cached.riwayat.length) {
-          renderRiwayat(cached.riwayat);
+      if (cached && cached.detail) {
+        detail = normalizeDetail(cached.detail);
+        currentDetail = detail;
+        renderHeader(detail);
+        renderExtraFields(detail);
+
+        riwayat = Array.isArray(cached.riwayat) ? cached.riwayat.slice() : [];
+        if (riwayat.length) {
+          renderRiwayat(riwayat);
         } else {
           setHTML('detail-riwayat-ringkas', '<p class="muted-text">Riwayat pendampingan sedang dimuat...</p>');
         }
@@ -970,45 +1060,87 @@
       }
 
       var requestToken = ++currentRequestToken;
+      var shouldFetchDetail = options.forceRefresh || !(cached && cached.detailFresh && cached.detail);
+      var shouldFetchRiwayat = options.forceRefresh || !(cached && cached.riwayatFresh && cached.riwayat && cached.riwayat.length);
+      var jobs = [];
 
-      var detail = currentDetail;
-      var riwayat = cached && Array.isArray(cached.riwayat) ? cached.riwayat : [];
+      if (shouldFetchDetail) {
+        jobs.push(fetchDetail(resolvedId).then(function (value) {
+          return { type: 'detail', value: value };
+        }));
+      }
 
-      try {
-        detail = await fetchDetail(resolvedId);
-        if (requestToken !== currentRequestToken) return;
+      if (shouldFetchRiwayat) {
+        jobs.push(fetchRiwayat(resolvedId).then(function (value) {
+          return { type: 'riwayat', value: value };
+        }));
+      }
 
+      if (!jobs.length) {
+        return;
+      }
+
+      var settled = await Promise.allSettled(jobs);
+      if (requestToken !== currentRequestToken) return;
+
+      var detailError = null;
+      var riwayatError = null;
+      var detailLoaded = false;
+      var riwayatLoaded = false;
+
+      settled.forEach(function (entry) {
+        if (entry.status === 'fulfilled' && entry.value) {
+          if (entry.value.type === 'detail') {
+            detailLoaded = true;
+            detail = normalizeDetail(entry.value.value || {});
+          }
+          if (entry.value.type === 'riwayat') {
+            riwayatLoaded = true;
+            riwayat = Array.isArray(entry.value.value) ? entry.value.value.slice() : [];
+          }
+          return;
+        }
+
+        var reason = entry && entry.reason ? entry.reason : null;
+        var message = reason && reason.message ? reason.message : 'Request gagal.';
+        if (!detailLoaded && detailError === null && shouldFetchDetail) {
+          detailError = message;
+          shouldFetchDetail = false;
+          return;
+        }
+        if (!riwayatLoaded && riwayatError === null && shouldFetchRiwayat) {
+          riwayatError = message;
+          shouldFetchRiwayat = false;
+        }
+      });
+
+      if (detailLoaded) {
         currentDetail = detail;
         setSelectedSasaran(detail);
         renderHeader(detail);
         renderExtraFields(detail);
-      } catch (err) {
-        if (requestToken !== currentRequestToken) return;
-
-        if (!(cached && cached.detail)) {
-          setHTML(
-            'detail-extra-fields',
-            '<div><span class="label">Gagal memuat</span><strong>' + escapeHtml((err && err.message) || 'Detail sasaran belum dapat dimuat.') + '</strong></div>'
-          );
-        }
+      } else if (!(cached && cached.detail)) {
+        renderHeader(currentDetail || previewSelected);
+        setHTML(
+          'detail-extra-fields',
+          '<div><span class="label">Keterangan</span><strong>' + escapeHtml(detailError || 'Detail sasaran belum dapat dimuat.') + '</strong></div>'
+        );
       }
 
-      try {
-        riwayat = await fetchRiwayat(resolvedId);
-        if (requestToken !== currentRequestToken) return;
+      if (riwayatLoaded) {
         renderRiwayat(riwayat);
-      } catch (err2) {
-        if (requestToken !== currentRequestToken) return;
-
-        if (!riwayat.length) {
-          setHTML(
-            'detail-riwayat-ringkas',
-            '<p class="muted-text">Riwayat pendampingan belum dapat dimuat.</p>'
-          );
-        }
+      } else if (!(cached && cached.riwayat && cached.riwayat.length)) {
+        setHTML(
+          'detail-riwayat-ringkas',
+          '<p class="muted-text">' + escapeHtml(riwayatError || 'Riwayat pendampingan belum dapat dimuat.') + '</p>'
+        );
       }
 
-      setCachedEntry(resolvedId, detail, riwayat);
+      setCachedEntry(
+        resolvedId,
+        detailLoaded ? detail : ((cached && cached.detail) ? cached.detail : currentDetail),
+        riwayatLoaded ? riwayat : ((cached && cached.riwayat) || riwayat)
+      );
     },
 
     openById: function (idSasaran, options) {
