@@ -415,6 +415,165 @@
     );
   }
 
+  function isLogClientErrorAction(action) {
+    var normalized = String(action || '').trim();
+    return normalized === 'logClientError' || normalized === getActionName('LOG_CLIENT_ERROR', 'logClientError');
+  }
+
+  function shouldMaskKey(key) {
+    var text = String(key || '').toLowerCase();
+    return text === 'password' ||
+      text === 'pin' ||
+      text === 'passcode' ||
+      text === 'password_hash' ||
+      text === 'token' ||
+      text === 'session_token' ||
+      text === 'signature' ||
+      text === 'authorization';
+  }
+
+  function sanitizeForLog(value, depth) {
+    depth = typeof depth === 'number' ? depth : 0;
+
+    if (value === null || value === undefined) return value;
+    if (depth > 3) return '[MAX_DEPTH]';
+
+    if (typeof value === 'string') {
+      return value.length > 500 ? value.slice(0, 500) : value;
+    }
+
+    if (typeof value === 'number' || typeof value === 'boolean') {
+      return value;
+    }
+
+    if (Array.isArray(value)) {
+      return value.slice(0, 20).map(function (item) {
+        return sanitizeForLog(item, depth + 1);
+      });
+    }
+
+    if (isPlainObject(value)) {
+      var out = {};
+      Object.keys(value).slice(0, 30).forEach(function (key) {
+        if (shouldMaskKey(key)) {
+          out[key] = '[MASKED]';
+          return;
+        }
+        out[key] = sanitizeForLog(value[key], depth + 1);
+      });
+      return out;
+    }
+
+    try {
+      return String(value);
+    } catch (err) {
+      return '[UNSERIALIZABLE]';
+    }
+  }
+
+  async function safeReportClientError(payload, options) {
+    var opts = options || {};
+
+    if (window.__TPK_REPORTING_CLIENT_ERROR__ === true) {
+      return createNetworkError('Pelaporan error sedang berjalan.', {
+        skipped: true,
+        reason: 'report_in_progress'
+      });
+    }
+
+    var action = getActionName('LOG_CLIENT_ERROR', 'logClientError');
+    var metaOptions = {
+      includeAuth: opts.includeAuth !== false,
+      sessionToken: opts.sessionToken || (opts.includeAuth === false ? '' : getSessionToken()),
+      requestId: opts.requestId || buildRequestId('ERR'),
+      deviceId: opts.deviceId || getOrCreateDeviceId(),
+      meta: {
+        report_source: opts.reportSource || 'client_auto'
+      }
+    };
+
+    var body = buildBody(action, sanitizeForLog(payload || {}, 0), metaOptions);
+    var abortState = createAbortController(typeof opts.timeoutMs === 'number' ? opts.timeoutMs : 8000);
+
+    window.__TPK_REPORTING_CLIENT_ERROR__ = true;
+
+    try {
+      var response = await fetch(getApiBaseUrl(), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'text/plain;charset=utf-8',
+          'Accept': 'application/json, text/plain, */*'
+        },
+        body: JSON.stringify(body),
+        credentials: 'omit',
+        cache: 'no-store',
+        referrerPolicy: 'no-referrer',
+        signal: abortState.controller ? abortState.controller.signal : undefined
+      });
+
+      var parsed = await parseResponse(response);
+      return normalizeResponse(parsed, response);
+    } catch (err) {
+      return normalizeFetchError(err);
+    } finally {
+      if (abortState.timer) {
+        clearTimeout(abortState.timer);
+      }
+      window.__TPK_REPORTING_CLIENT_ERROR__ = false;
+    }
+  }
+
+  function shouldReportApiFailure(action, result, options) {
+    var opts = options || {};
+    if (opts.skipErrorReport === true) return false;
+    if (isLogClientErrorAction(action)) return false;
+    if (!result || result.ok === true) return false;
+    if (opts.forceReportError === true) return true;
+    if (result.code === 0 || result.is_timeout === true) return true;
+    if (typeof result.raw_text === 'string' && result.raw_text) return true;
+    if (typeof result.code === 'number' && result.code >= 500) return true;
+    return false;
+  }
+
+  function reportApiFailureAsync(transport, action, payload, result, options) {
+    if (!shouldReportApiFailure(action, result, options)) {
+      return;
+    }
+
+    var opts = options || {};
+    var requestMeta = buildMeta(opts);
+    var errorPayload = {
+      modul: 'api.js',
+      aksi: transport + ':' + String(action || ''),
+      message: result && result.message ? result.message : 'API request gagal',
+      stack: result && result.error ? String(result.error) : '',
+      code: result && result.code ? result.code : 0,
+      occurred_at: nowIso(),
+      device_id: requestMeta.device_id,
+      app_version: requestMeta.app_version,
+      request_id: requestMeta.request_id,
+      payload_ringkas: {
+        action: action,
+        transport: transport,
+        payload: sanitizeForLog(payload || {}, 0),
+        result: sanitizeForLog({
+          code: result && result.code ? result.code : 0,
+          message: result && result.message ? result.message : '',
+          is_timeout: !!(result && result.is_timeout),
+          raw_text: result && result.raw_text ? result.raw_text : ''
+        }, 0)
+      }
+    };
+
+    safeReportClientError(errorPayload, {
+      includeAuth: opts.includeAuth !== false && !!getSessionToken(),
+      sessionToken: opts.includeAuth === false ? '' : getSessionToken(),
+      requestId: requestMeta.request_id,
+      deviceId: requestMeta.device_id,
+      reportSource: 'api_auto'
+    }).catch(function () {});
+  }
+
   function isRetriableFailure(result) {
     if (!result) return true;
     if (result.ok === true) return false;
@@ -607,6 +766,7 @@
       setSessionToken(result.data.session_token);
     }
 
+    reportApiFailureAsync('POST', action, payload || {}, result, opts);
     return handleAuthFailureCleanup(result);
   }
 
@@ -638,6 +798,7 @@
       retryDelayMs: typeof opts.retryDelayMs === 'number' ? opts.retryDelayMs : DEFAULT_RETRY_DELAY_MS
     });
 
+    reportApiFailureAsync('GET', action, params || {}, result, opts);
     return handleAuthFailureCleanup(result);
   }
 
@@ -750,13 +911,15 @@
       message: message || 'Unknown client error',
       device_id: getOrCreateDeviceId(),
       app_version: config.APP_VERSION || '',
-      occurred_at: nowIso()
+      occurred_at: nowIso(),
+      modul: 'client',
+      aksi: 'reportClientError'
     }, extraPayload || {});
 
-    return post(getActionName('LOG_CLIENT_ERROR', 'logClientError'), payload, {
-      includeAuth: true,
-      timeoutMs: 8000,
-      retryCount: 0
+    return safeReportClientError(payload, {
+      includeAuth: !!getSessionToken(),
+      sessionToken: getSessionToken(),
+      reportSource: 'manual_client_report'
     });
   }
 
