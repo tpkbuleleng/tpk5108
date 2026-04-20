@@ -4,6 +4,7 @@
 
   var DEFAULT_TIMEOUT_MS = 45000;
   var DEFAULT_RETRY_COUNT = 0;
+  var DEFAULT_READ_FALLBACK_TIMEOUT_MS = 15000;
   var DEFAULT_RETRY_DELAY_MS = 1200;
 
   function nowIso() {
@@ -226,6 +227,64 @@
     });
 
     return search.toString();
+  }
+
+  function isPlainObject(value) {
+    return !!value && Object.prototype.toString.call(value) === '[object Object]';
+  }
+
+  function canUseQueryValue(value) {
+    return value !== undefined && value !== null && (
+      typeof value === 'string' ||
+      typeof value === 'number' ||
+      typeof value === 'boolean'
+    );
+  }
+
+  function buildReadableQueryPayload(payload) {
+    var source = payload && typeof payload === 'object' ? payload : {};
+    var out = {};
+
+    Object.keys(source).forEach(function (key) {
+      var value = source[key];
+
+      if (canUseQueryValue(value)) {
+        out[key] = value;
+        return;
+      }
+
+      if (Array.isArray(value)) {
+        var arr = value.filter(function (item) {
+          return canUseQueryValue(item);
+        });
+        if (arr.length) {
+          out[key] = arr.join(',');
+        }
+        return;
+      }
+
+      if (isPlainObject(value)) {
+        try {
+          out[key] = JSON.stringify(value);
+        } catch (err) {}
+      }
+    });
+
+    return out;
+  }
+
+  async function tryReadOnlyGetFallback(action, payload, options) {
+    var opts = options || {};
+    var params = Object.assign({}, buildReadableQueryPayload(payload || {}), opts.fallbackGetParams || {});
+
+    return get(action, params, {
+      includeAuth: opts.includeAuth !== false,
+      sessionToken: opts.sessionToken,
+      timeoutMs: typeof opts.fallbackTimeoutMs === 'number'
+        ? opts.fallbackTimeoutMs
+        : DEFAULT_READ_FALLBACK_TIMEOUT_MS,
+      retryCount: 0
+    });
   }
 
   function createAbortController(timeoutMs) {
@@ -492,7 +551,8 @@
     var result = await executeWithRetry(function () {
       return doFetchJson('POST', getApiBaseUrl(), {
         headers: {
-          'Content-Type': 'text/plain;charset=utf-8'
+          'Content-Type': 'text/plain;charset=utf-8',
+          'Accept': 'application/json, text/plain, */*'
         },
         body: JSON.stringify(body)
       }, timeoutMs);
@@ -500,6 +560,19 @@
       retryCount: typeof opts.retryCount === 'number' ? opts.retryCount : DEFAULT_RETRY_COUNT,
       retryDelayMs: typeof opts.retryDelayMs === 'number' ? opts.retryDelayMs : DEFAULT_RETRY_DELAY_MS
     });
+
+    if ((!result || result.ok === false) && opts.readOnlyFallbackGet === true && isRetriableFailure(result)) {
+      var fallbackResult = await tryReadOnlyGetFallback(action, payload || {}, Object.assign({}, opts, {
+        sessionToken: body && body.meta ? body.meta.session_token : ''
+      }));
+
+      if (fallbackResult && fallbackResult.ok) {
+        fallbackResult.meta = Object.assign({}, fallbackResult.meta || {}, {
+          transport_fallback: 'GET_AFTER_POST_FAIL'
+        });
+        result = fallbackResult;
+      }
+    }
 
     if (result.ok && result.data && result.data.session_token) {
       setSessionToken(result.data.session_token);
