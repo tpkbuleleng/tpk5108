@@ -6,6 +6,9 @@
   var DETAIL_CACHE_TTL_MS = 10 * 60 * 1000;
   var RIWAYAT_CACHE_TTL_MS = 5 * 60 * 1000;
 
+  window.__SASARAN_DETAIL_VIEW_BUILD = '20260421-02';
+  console.log('SasaranDetailView build aktif:', window.__SASARAN_DETAIL_VIEW_BUILD);
+
   var isInitialized = false;
   var currentRequestToken = 0;
   var currentDetail = null;
@@ -616,6 +619,25 @@
     writeStorage(DETAIL_CACHE_KEY, map.data);
   }
 
+
+  function cacheDetailOnly(idSasaran, detail) {
+    var cached = getCachedEntry(idSasaran);
+    setCachedEntry(
+      idSasaran,
+      detail || (cached && cached.detail) || null,
+      (cached && cached.riwayat) || []
+    );
+  }
+
+  function cacheRiwayatOnly(idSasaran, riwayat) {
+    var cached = getCachedEntry(idSasaran);
+    setCachedEntry(
+      idSasaran,
+      (cached && cached.detail) || currentDetail || null,
+      Array.isArray(riwayat) ? riwayat : ((cached && cached.riwayat) || [])
+    );
+  }
+
   function renderHeader(detail) {
     var safe = detail || {};
     var status = safe.status_sasaran || 'AKTIF';
@@ -802,12 +824,12 @@
 
     setHTML(
       'detail-extra-fields',
-      '<div><span class="label">Memuat</span><strong>Data tambahan sedang dimuat...</strong></div>'
+      '<div><span class="label">Memuat</span><strong>Data tambahan sedang dimuat. Bagian lain tetap bisa dipakai...</strong></div>'
     );
 
     setHTML(
       'detail-riwayat-ringkas',
-      '<p class="muted-text">Riwayat pendampingan sedang dimuat...</p>'
+      '<p class="muted-text">Riwayat pendampingan sedang dimuat terpisah...</p>'
     );
   }
 
@@ -857,10 +879,10 @@
       id_sasaran: idSasaran
     }, {
       includeAuth: true,
-      timeoutMs: 12000,
-      retryCount: 1,
-      retryDelayMs: 900,
-      readOnlyFallbackGet: true
+      timeoutMs: 8000,
+      retryCount: 0,
+      retryDelayMs: 0,
+      readOnlyFallbackGet: false
     });
 
     if (!result || result.ok === false) {
@@ -882,10 +904,10 @@
       limit: 5
     }, {
       includeAuth: true,
-      timeoutMs: 10000,
-      retryCount: 1,
-      retryDelayMs: 900,
-      readOnlyFallbackGet: true
+      timeoutMs: 7000,
+      retryCount: 0,
+      retryDelayMs: 0,
+      readOnlyFallbackGet: false
     });
 
     if (!result || result.ok === false) {
@@ -1062,85 +1084,61 @@
       var requestToken = ++currentRequestToken;
       var shouldFetchDetail = options.forceRefresh || !(cached && cached.detailFresh && cached.detail);
       var shouldFetchRiwayat = options.forceRefresh || !(cached && cached.riwayatFresh && cached.riwayat && cached.riwayat.length);
-      var jobs = [];
+      var tasks = [];
 
       if (shouldFetchDetail) {
-        jobs.push(fetchDetail(resolvedId).then(function (value) {
-          return { type: 'detail', value: value };
-        }));
+        tasks.push(
+          fetchDetail(resolvedId)
+            .then(function (value) {
+              if (requestToken !== currentRequestToken) return;
+              detail = normalizeDetail(value || {});
+              currentDetail = detail;
+              setSelectedSasaran(detail);
+              renderHeader(detail);
+              renderExtraFields(detail);
+              cacheDetailOnly(resolvedId, detail);
+            })
+            .catch(function (err) {
+              if (requestToken !== currentRequestToken) return;
+              var message = err && err.message ? err.message : 'Detail sasaran belum dapat dimuat.';
+              if (!(cached && cached.detail)) {
+                renderHeader(currentDetail || previewSelected);
+                setHTML(
+                  'detail-extra-fields',
+                  '<div><span class="label">Keterangan</span><strong>' + escapeHtml(message) + '</strong></div>'
+                );
+              }
+            })
+        );
       }
 
       if (shouldFetchRiwayat) {
-        jobs.push(fetchRiwayat(resolvedId).then(function (value) {
-          return { type: 'riwayat', value: value };
-        }));
+        tasks.push(
+          fetchRiwayat(resolvedId)
+            .then(function (value) {
+              if (requestToken !== currentRequestToken) return;
+              riwayat = Array.isArray(value) ? value.slice() : [];
+              renderRiwayat(riwayat);
+              cacheRiwayatOnly(resolvedId, riwayat);
+            })
+            .catch(function (err) {
+              if (requestToken !== currentRequestToken) return;
+              var message = err && err.message ? err.message : 'Riwayat pendampingan belum dapat dimuat.';
+              if (!(cached && cached.riwayat && cached.riwayat.length)) {
+                setHTML(
+                  'detail-riwayat-ringkas',
+                  '<p class="muted-text">' + escapeHtml(message) + '</p>'
+                );
+              }
+            })
+        );
       }
 
-      if (!jobs.length) {
+      if (!tasks.length) {
         return;
       }
 
-      var settled = await Promise.allSettled(jobs);
-      if (requestToken !== currentRequestToken) return;
-
-      var detailError = null;
-      var riwayatError = null;
-      var detailLoaded = false;
-      var riwayatLoaded = false;
-
-      settled.forEach(function (entry) {
-        if (entry.status === 'fulfilled' && entry.value) {
-          if (entry.value.type === 'detail') {
-            detailLoaded = true;
-            detail = normalizeDetail(entry.value.value || {});
-          }
-          if (entry.value.type === 'riwayat') {
-            riwayatLoaded = true;
-            riwayat = Array.isArray(entry.value.value) ? entry.value.value.slice() : [];
-          }
-          return;
-        }
-
-        var reason = entry && entry.reason ? entry.reason : null;
-        var message = reason && reason.message ? reason.message : 'Request gagal.';
-        if (!detailLoaded && detailError === null && shouldFetchDetail) {
-          detailError = message;
-          shouldFetchDetail = false;
-          return;
-        }
-        if (!riwayatLoaded && riwayatError === null && shouldFetchRiwayat) {
-          riwayatError = message;
-          shouldFetchRiwayat = false;
-        }
-      });
-
-      if (detailLoaded) {
-        currentDetail = detail;
-        setSelectedSasaran(detail);
-        renderHeader(detail);
-        renderExtraFields(detail);
-      } else if (!(cached && cached.detail)) {
-        renderHeader(currentDetail || previewSelected);
-        setHTML(
-          'detail-extra-fields',
-          '<div><span class="label">Keterangan</span><strong>' + escapeHtml(detailError || 'Detail sasaran belum dapat dimuat.') + '</strong></div>'
-        );
-      }
-
-      if (riwayatLoaded) {
-        renderRiwayat(riwayat);
-      } else if (!(cached && cached.riwayat && cached.riwayat.length)) {
-        setHTML(
-          'detail-riwayat-ringkas',
-          '<p class="muted-text">' + escapeHtml(riwayatError || 'Riwayat pendampingan belum dapat dimuat.') + '</p>'
-        );
-      }
-
-      setCachedEntry(
-        resolvedId,
-        detailLoaded ? detail : ((cached && cached.detail) ? cached.detail : currentDetail),
-        riwayatLoaded ? riwayat : ((cached && cached.riwayat) || riwayat)
-      );
+      await Promise.allSettled(tasks);
     },
 
     openById: function (idSasaran, options) {

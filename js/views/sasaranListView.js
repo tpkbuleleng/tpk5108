@@ -1,7 +1,7 @@
 (function (window, document) {
   'use strict';
 
-  window.__SASARAN_LIST_VIEW_BUILD = '20260420-01';
+  window.__SASARAN_LIST_VIEW_BUILD = '20260421-01';
   console.log('SasaranListView build aktif:', window.__SASARAN_LIST_VIEW_BUILD);
 
   var SCREEN_ID = 'sasaran-list-screen';
