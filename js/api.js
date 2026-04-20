@@ -1,3 +1,4 @@
+
 (function (window) {
   'use strict';
 
@@ -95,7 +96,6 @@
         return window.crypto.randomUUID();
       }
     } catch (err) {}
-
     return 'id-' + Date.now() + '-' + Math.random().toString(36).slice(2, 12);
   }
 
@@ -288,7 +288,6 @@
     }
 
     var derivedOk = false;
-
     if (res.status === 'success') derivedOk = true;
     if (res.success === true) derivedOk = true;
     if (typeof res.code === 'number' && res.code >= 200 && res.code < 300) derivedOk = true;
@@ -306,15 +305,12 @@
   }
 
   function createNetworkError(message, extra) {
-    return Object.assign(
-      {
-        ok: false,
-        code: 0,
-        message: message || 'Koneksi ke backend gagal.',
-        data: null
-      },
-      extra || {}
-    );
+    return Object.assign({
+      ok: false,
+      code: 0,
+      message: message || 'Koneksi ke backend gagal.',
+      data: null
+    }, extra || {});
   }
 
   function normalizeFetchError(err) {
@@ -341,6 +337,7 @@
     if (message.indexOf('koneksi') >= 0) return true;
     if (message.indexOf('network') >= 0) return true;
     if (message.indexOf('failed to fetch') >= 0) return true;
+    if (message.indexOf('cors') >= 0) return true;
     return false;
   }
 
@@ -426,11 +423,9 @@
 
   function handleAuthFailureCleanup(normalized) {
     if (!normalized) return normalized;
-
     if (normalized.code === 401 || normalized.code === 403) {
       clearSessionToken();
     }
-
     return normalized;
   }
 
@@ -438,14 +433,15 @@
     var abortState = createAbortController(timeoutMs);
 
     try {
-      var response = await fetch(url, Object.assign({}, fetchOptions, {
+      var options = Object.assign({}, fetchOptions, {
         method: method,
         signal: abortState.controller ? abortState.controller.signal : undefined,
         credentials: 'omit',
-        redirect: 'follow',
-        mode: 'cors'
-      }));
+        cache: 'no-store',
+        referrerPolicy: 'no-referrer'
+      });
 
+      var response = await fetch(url, options);
       var parsed = await parseResponse(response);
       return normalizeResponse(parsed, response);
     } catch (err) {
@@ -527,9 +523,7 @@
 
     if (opts.includeAuth !== false) {
       var token = opts.sessionToken || getSessionToken();
-      if (token) {
-        queryParams.token = token;
-      }
+      if (token) queryParams.token = token;
     }
 
     var queryString = buildQueryString(queryParams);
@@ -650,7 +644,6 @@
 
   async function reportClientError(message, extraPayload) {
     var config = getConfig();
-
     var payload = Object.assign({
       message: message || 'Unknown client error',
       device_id: getOrCreateDeviceId(),
@@ -690,6 +683,5 @@
   };
 
   window.Api = Api;
-
   log('api.js loaded');
 })(window);
