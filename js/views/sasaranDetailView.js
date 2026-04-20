@@ -6,12 +6,16 @@
   var DETAIL_CACHE_TTL_MS = 10 * 60 * 1000;
   var RIWAYAT_CACHE_TTL_MS = 5 * 60 * 1000;
 
-  window.__SASARAN_DETAIL_VIEW_BUILD = '20260421-02';
+  window.__SASARAN_DETAIL_VIEW_BUILD = '20260421-03';
   console.log('SasaranDetailView build aktif:', window.__SASARAN_DETAIL_VIEW_BUILD);
 
   var isInitialized = false;
   var currentRequestToken = 0;
   var currentDetail = null;
+  var isAutoOpening = false;
+  var isOpeningDetail = false;
+  var openingDetailId = '';
+  var currentOpenPromise = null;
 
   function byId(id) {
     return document.getElementById(id);
@@ -840,17 +844,27 @@
 
   function autoOpenSelectedIfNeeded() {
     if (!isDetailScreenActive()) return;
-    if (currentDetail && getItemId(currentDetail)) return;
 
     var selected = getSelectedSasaran() || {};
     var id = getItemId(selected);
     if (!id) return;
 
+    if (currentDetail && getItemId(currentDetail) === id) return;
+    if (isAutoOpening) return;
+    if (isOpeningDetail && openingDetailId === id) return;
+
     if (window.SasaranDetailView && typeof window.SasaranDetailView.open === 'function') {
-      window.SasaranDetailView.open(id, {
+      isAutoOpening = true;
+      Promise.resolve(window.SasaranDetailView.open(id, {
         skipRoute: true,
         selected: selected,
-        silent: true
+        silent: true,
+        skipInitAutoOpen: true,
+        triggeredByAutoOpen: true
+      })).catch(function () {
+        return null;
+      }).finally(function () {
+        isAutoOpening = false;
       });
     }
   }
@@ -879,7 +893,7 @@
       id_sasaran: idSasaran
     }, {
       includeAuth: true,
-      timeoutMs: 8000,
+      timeoutMs: 12000,
       retryCount: 0,
       retryDelayMs: 0,
       readOnlyFallbackGet: false
@@ -904,7 +918,7 @@
       limit: 5
     }, {
       includeAuth: true,
-      timeoutMs: 7000,
+      timeoutMs: 9000,
       retryCount: 0,
       retryDelayMs: 0,
       readOnlyFallbackGet: false
@@ -973,9 +987,13 @@
   }
 
   var SasaranDetailView = {
-    init: function () {
+    init: function (options) {
+      options = options || {};
+
       if (isInitialized) {
-        autoOpenSelectedIfNeeded();
+        if (!options.skipAutoOpen) {
+          autoOpenSelectedIfNeeded();
+        }
         return;
       }
 
@@ -1012,13 +1030,15 @@
         });
       }
 
-      autoOpenSelectedIfNeeded();
+      if (!options.skipAutoOpen) {
+        autoOpenSelectedIfNeeded();
+      }
     },
 
     open: async function (idSasaran, options) {
-      this.init();
-
       options = options || {};
+      this.init({ skipAutoOpen: options.skipInitAutoOpen === true });
+
       var selected = options.selected || getSelectedSasaran() || {};
       var resolvedId = String(idSasaran || selected.id_sasaran || selected.id || '').trim();
 
@@ -1040,7 +1060,8 @@
                 window.SasaranDetailView.open(resolvedId, {
                   skipRoute: true,
                   selected: selected,
-                  silent: true
+                  silent: true,
+                  skipInitAutoOpen: true
                 });
               }
             }
@@ -1049,96 +1070,115 @@
         }
       }
 
-      var previewSelected = Object.assign({}, selected, {
-        id_sasaran: selected.id_sasaran || selected.id || resolvedId,
-        id: selected.id || selected.id_sasaran || resolvedId
-      });
+      if (isOpeningDetail && openingDetailId === resolvedId && !options.forceRefresh) {
+        return currentOpenPromise || Promise.resolve();
+      }
 
-      setSelectedSasaran(previewSelected);
-      currentDetail = normalizeDetail(previewSelected);
+      openingDetailId = resolvedId;
+      isOpeningDetail = true;
 
-      var cached = getCachedEntry(resolvedId);
-      var detail = currentDetail;
-      var riwayat = [];
+      currentOpenPromise = (async function () {
+        var previewSelected = Object.assign({}, selected, {
+          id_sasaran: selected.id_sasaran || selected.id || resolvedId,
+          id: selected.id || selected.id_sasaran || resolvedId
+        });
 
-      if (cached && cached.detail) {
-        detail = normalizeDetail(cached.detail);
-        currentDetail = detail;
-        renderHeader(detail);
-        renderExtraFields(detail);
+        setSelectedSasaran(previewSelected);
+        currentDetail = normalizeDetail(previewSelected);
 
-        riwayat = Array.isArray(cached.riwayat) ? cached.riwayat.slice() : [];
-        if (riwayat.length) {
-          renderRiwayat(riwayat);
+        var cached = getCachedEntry(resolvedId);
+        var detail = currentDetail;
+        var riwayat = [];
+
+        if (cached && cached.detail) {
+          detail = normalizeDetail(cached.detail);
+          currentDetail = detail;
+          renderHeader(detail);
+          renderExtraFields(detail);
+
+          riwayat = Array.isArray(cached.riwayat) ? cached.riwayat.slice() : [];
+          if (riwayat.length) {
+            renderRiwayat(riwayat);
+          } else {
+            setHTML('detail-riwayat-ringkas', '<p class="muted-text">Riwayat pendampingan sedang dimuat...</p>');
+          }
+
+          if (cached.detailFresh && cached.riwayatFresh && !options.forceRefresh) {
+            return;
+          }
         } else {
-          setHTML('detail-riwayat-ringkas', '<p class="muted-text">Riwayat pendampingan sedang dimuat...</p>');
+          renderLoadingPreview(previewSelected);
         }
 
-        if (cached.detailFresh && cached.riwayatFresh && !options.forceRefresh) {
+        var requestToken = ++currentRequestToken;
+        var shouldFetchDetail = options.forceRefresh || !(cached && cached.detailFresh && cached.detail);
+        var shouldFetchRiwayat = options.forceRefresh || !(cached && cached.riwayatFresh && cached.riwayat && cached.riwayat.length);
+        var tasks = [];
+
+        if (shouldFetchDetail) {
+          tasks.push(
+            fetchDetail(resolvedId)
+              .then(function (value) {
+                if (requestToken !== currentRequestToken) return;
+                detail = normalizeDetail(value || {});
+                currentDetail = detail;
+                setSelectedSasaran(detail);
+                renderHeader(detail);
+                renderExtraFields(detail);
+                cacheDetailOnly(resolvedId, detail);
+              })
+              .catch(function (err) {
+                if (requestToken !== currentRequestToken) return;
+                var message = err && err.message ? err.message : 'Detail sasaran belum dapat dimuat.';
+                if (!(cached && cached.detail)) {
+                  renderHeader(currentDetail || previewSelected);
+                  setHTML(
+                    'detail-extra-fields',
+                    '<div><span class="label">Keterangan</span><strong>' + escapeHtml(message) + '</strong></div>'
+                  );
+                }
+              })
+          );
+        }
+
+        if (shouldFetchRiwayat) {
+          tasks.push(
+            fetchRiwayat(resolvedId)
+              .then(function (value) {
+                if (requestToken !== currentRequestToken) return;
+                riwayat = Array.isArray(value) ? value.slice() : [];
+                renderRiwayat(riwayat);
+                cacheRiwayatOnly(resolvedId, riwayat);
+              })
+              .catch(function (err) {
+                if (requestToken !== currentRequestToken) return;
+                var message = err && err.message ? err.message : 'Riwayat pendampingan belum dapat dimuat.';
+                if (!(cached && cached.riwayat && cached.riwayat.length)) {
+                  setHTML(
+                    'detail-riwayat-ringkas',
+                    '<p class="muted-text">' + escapeHtml(message) + '</p>'
+                  );
+                }
+              })
+          );
+        }
+
+        if (!tasks.length) {
           return;
         }
-      } else {
-        renderLoadingPreview(previewSelected);
+
+        await Promise.allSettled(tasks);
+      })();
+
+      try {
+        return await currentOpenPromise;
+      } finally {
+        if (openingDetailId === resolvedId) {
+          isOpeningDetail = false;
+          openingDetailId = '';
+          currentOpenPromise = null;
+        }
       }
-
-      var requestToken = ++currentRequestToken;
-      var shouldFetchDetail = options.forceRefresh || !(cached && cached.detailFresh && cached.detail);
-      var shouldFetchRiwayat = options.forceRefresh || !(cached && cached.riwayatFresh && cached.riwayat && cached.riwayat.length);
-      var tasks = [];
-
-      if (shouldFetchDetail) {
-        tasks.push(
-          fetchDetail(resolvedId)
-            .then(function (value) {
-              if (requestToken !== currentRequestToken) return;
-              detail = normalizeDetail(value || {});
-              currentDetail = detail;
-              setSelectedSasaran(detail);
-              renderHeader(detail);
-              renderExtraFields(detail);
-              cacheDetailOnly(resolvedId, detail);
-            })
-            .catch(function (err) {
-              if (requestToken !== currentRequestToken) return;
-              var message = err && err.message ? err.message : 'Detail sasaran belum dapat dimuat.';
-              if (!(cached && cached.detail)) {
-                renderHeader(currentDetail || previewSelected);
-                setHTML(
-                  'detail-extra-fields',
-                  '<div><span class="label">Keterangan</span><strong>' + escapeHtml(message) + '</strong></div>'
-                );
-              }
-            })
-        );
-      }
-
-      if (shouldFetchRiwayat) {
-        tasks.push(
-          fetchRiwayat(resolvedId)
-            .then(function (value) {
-              if (requestToken !== currentRequestToken) return;
-              riwayat = Array.isArray(value) ? value.slice() : [];
-              renderRiwayat(riwayat);
-              cacheRiwayatOnly(resolvedId, riwayat);
-            })
-            .catch(function (err) {
-              if (requestToken !== currentRequestToken) return;
-              var message = err && err.message ? err.message : 'Riwayat pendampingan belum dapat dimuat.';
-              if (!(cached && cached.riwayat && cached.riwayat.length)) {
-                setHTML(
-                  'detail-riwayat-ringkas',
-                  '<p class="muted-text">' + escapeHtml(message) + '</p>'
-                );
-              }
-            })
-        );
-      }
-
-      if (!tasks.length) {
-        return;
-      }
-
-      await Promise.allSettled(tasks);
     },
 
     openById: function (idSasaran, options) {
@@ -1157,7 +1197,8 @@
       return this.open(idSasaran, {
         skipRoute: true,
         selected: selected,
-        forceRefresh: true
+        forceRefresh: true,
+        skipInitAutoOpen: true
       });
     },
 
