@@ -5,8 +5,9 @@
   var DETAIL_CACHE_KEY = 'tpk_sasaran_detail_cache_v1';
   var DETAIL_CACHE_TTL_MS = 10 * 60 * 1000;
   var RIWAYAT_CACHE_TTL_MS = 5 * 60 * 1000;
+  var EDIT_HANDOFF_KEY = 'tpk_registrasi_edit_handoff_v1';
 
-  window.__SASARAN_DETAIL_VIEW_BUILD = '20260421-03';
+  window.__SASARAN_DETAIL_VIEW_BUILD = '20260421-04';
   console.log('SasaranDetailView build aktif:', window.__SASARAN_DETAIL_VIEW_BUILD);
 
   var isInitialized = false;
@@ -418,6 +419,37 @@
     } catch (err) {}
   }
 
+  function setEditHandoff(item) {
+    var safeItem = item && typeof item === 'object' ? item : {};
+    writeStorage(EDIT_HANDOFF_KEY, {
+      mode: 'edit',
+      source: 'sasaranDetailView',
+      created_at: new Date().toISOString(),
+      item: safeItem
+    });
+  }
+
+  function clearEditHandoff() {
+    var storage = getStorage();
+    if (storage && typeof storage.remove === 'function') {
+      storage.remove(EDIT_HANDOFF_KEY);
+    }
+    try {
+      localStorage.removeItem(EDIT_HANDOFF_KEY);
+    } catch (err) {}
+  }
+
+  function getEditHandoff() {
+    return readStorage(EDIT_HANDOFF_KEY, {}) || {};
+  }
+
+  function consumeEditHandoff() {
+    var value = getEditHandoff();
+    clearEditHandoff();
+    return value;
+  }
+
+
   function getItemId(item) {
     return normalizeText((item && (item.id_sasaran || item.id)) || '');
   }
@@ -553,14 +585,125 @@
     };
   }
 
+
+  function getBoolLabel(value) {
+    if (value === true) return 'YA';
+    if (value === false) return 'TIDAK';
+
+    var text = normalizeUpperDisplay(value);
+    if (!text) return '';
+    if (text === 'YA' || text === 'Y' || text === 'TRUE') return 'YA';
+    if (text === 'TIDAK' || text === 'T' || text === 'FALSE') return 'TIDAK';
+    return normalizeText(value);
+  }
+
+  function getRingkasRiwayatTokens(raw, payload) {
+    raw = raw || {};
+    payload = payload || {};
+
+    var tokens = [];
+    var seen = {};
+
+    function push(label, value) {
+      var clean = normalizeText(value);
+      if (!clean) return;
+
+      var token = label ? (label + ': ' + clean) : clean;
+      var key = token.toUpperCase();
+      if (seen[key]) return;
+      seen[key] = true;
+      tokens.push(token);
+    }
+
+    push('JKN', pickFirstMeaningful([
+      raw.kepesertaan_jkn,
+      payload.kepesertaan_jkn,
+      payload.jkn
+    ], ''));
+
+    push('KIE', getBoolLabel(pickFirstMeaningful([
+      raw.kie,
+      payload.kie,
+      payload.memberikan_kie,
+      payload.memberikan_penyuluhan
+    ], '')));
+
+    push('Rujukan', pickFirstMeaningful([
+      raw.pelayanan_rujukan,
+      raw.rujukan,
+      payload.pelayanan_rujukan,
+      payload.rujukan
+    ], ''));
+
+    push('Bansos', pickFirstMeaningful([
+      raw.bansos_status,
+      raw.bansos,
+      payload.bansos_status,
+      payload.bansos
+    ], ''));
+
+    push('MBG', getBoolLabel(pickFirstMeaningful([
+      raw.mbg_terima,
+      payload.mbg_terima
+    ], '')));
+
+    push('TTD', getBoolLabel(pickFirstMeaningful([
+      raw.dapat_ttd,
+      payload.dapat_ttd
+    ], '')));
+
+    push('HB', pickFirstMeaningful([
+      raw.kadar_hb,
+      payload.kadar_hb
+    ], ''));
+
+    push('LILA', pickFirstMeaningful([
+      raw.lila,
+      payload.lila
+    ], ''));
+
+    return tokens;
+  }
+
+  function buildRiwayatRingkasText(raw, payload) {
+    var text = pickFirstMeaningful([
+      raw.catatan_umum,
+      raw.ringkasan,
+      raw.catatan,
+      payload.catatan_umum,
+      payload.ringkasan,
+      payload.catatan
+    ], '');
+
+    if (text) return text;
+
+    var tokens = getRingkasRiwayatTokens(raw, payload);
+    if (tokens.length) {
+      return tokens.slice(0, 4).join(' • ');
+    }
+
+    return '';
+  }
+
   function normalizeRiwayatItem(raw) {
     raw = raw || {};
+    var payload = extractPayloadMap(raw);
 
     return {
       id_pendampingan: pickFirstMeaningful([raw.id_pendampingan, raw.id], ''),
       tanggal_pendampingan: pickFirstMeaningful([raw.tanggal_pendampingan, raw.submit_at, raw.created_at], ''),
-      status_kunjungan: pickFirstMeaningful([raw.status_kunjungan, raw.status], ''),
-      catatan_umum: pickFirstMeaningful([raw.catatan_umum, raw.ringkasan, raw.catatan], ''),
+      status_kunjungan: pickFirstMeaningful([
+        raw.status_kunjungan,
+        raw.status,
+        payload.status_kunjungan,
+        payload.status
+      ], ''),
+      periode_bulan: pickFirstMeaningful([raw.periode_bulan, payload.periode_bulan], ''),
+      periode_tahun: pickFirstMeaningful([raw.periode_tahun, payload.periode_tahun], ''),
+      form_id: pickFirstMeaningful([raw.form_id, payload.form_id], ''),
+      sync_source: pickFirstMeaningful([raw.sync_source, payload.sync_source], ''),
+      catatan_umum: buildRiwayatRingkasText(raw, payload),
+      ringkas_tokens: getRingkasRiwayatTokens(raw, payload),
       raw: raw
     };
   }
@@ -786,13 +929,29 @@
     setHTML('detail-extra-fields', html);
   }
 
+
+  function formatPeriodeLabel(item) {
+    item = item || {};
+    var bulan = normalizeText(item.periode_bulan);
+    var tahun = normalizeText(item.periode_tahun);
+
+    if (bulan && tahun) return bulan + '/' + tahun;
+    if (tahun) return tahun;
+    return '';
+  }
+
   function renderRiwayat(items) {
     var safeItems = Array.isArray(items) ? items : [];
 
     if (!safeItems.length) {
       setHTML(
         'detail-riwayat-ringkas',
-        '<p class="muted-text">Belum ada riwayat pendampingan untuk sasaran ini.</p>'
+        [
+          '<div class="detail-empty-state">',
+            '<p class="muted-text" style="margin:0 0 10px;">Belum ada riwayat pendampingan untuk sasaran ini.</p>',
+            '<button type="button" class="btn btn-secondary" data-action="refresh-riwayat">Muat Ulang Riwayat</button>',
+          '</div>'
+        ].join('')
       );
       return;
     }
@@ -801,6 +960,13 @@
       var tanggal = formatValue(item.tanggal_pendampingan, 'tanggal_pendampingan');
       var status = formatValue(item.status_kunjungan || '-', 'status_kunjungan');
       var catatan = formatValue(item.catatan_umum || '-', 'catatan_umum');
+      var periode = formatPeriodeLabel(item);
+      var tokens = Array.isArray(item.ringkas_tokens) ? item.ringkas_tokens.slice(0, 3) : [];
+      var metaBits = [];
+
+      if (periode) metaBits.push('Periode ' + periode);
+      if (item.form_id) metaBits.push('Form ' + item.form_id);
+      if (item.sync_source) metaBits.push(String(item.sync_source).toUpperCase());
 
       return [
         '<article class="list-card">',
@@ -811,15 +977,41 @@
             '</div>',
             '<span class="badge badge-neutral">', escapeHtml(status), '</span>',
           '</div>',
+          metaBits.length ? '<p class="muted-text" style="margin:10px 0 0;">' + escapeHtml(metaBits.join(' • ')) + '</p>' : '',
           '<div style="margin-top:10px;">',
-            '<span class="label">Catatan Umum</span>',
+            '<span class="label">Ringkasan</span>',
             '<strong>', escapeHtml(catatan), '</strong>',
           '</div>',
+          tokens.length ? [
+            '<div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;">',
+            tokens.map(function (token) {
+              return '<span class="badge badge-neutral">' + escapeHtml(token) + '</span>';
+            }).join(''),
+            '</div>'
+          ].join('') : '',
         '</article>'
       ].join('');
     }).join('');
 
+    html += [
+      '<div style="margin-top:10px;display:flex;justify-content:flex-end;">',
+        '<button type="button" class="btn btn-secondary" data-action="refresh-riwayat">Muat Ulang Riwayat</button>',
+      '</div>'
+    ].join('');
+
     setHTML('detail-riwayat-ringkas', html);
+  }
+
+  function renderRiwayatError(message) {
+    setHTML(
+      'detail-riwayat-ringkas',
+      [
+        '<div class="detail-empty-state">',
+          '<p class="muted-text" style="margin:0 0 10px;">', escapeHtml(message || 'Riwayat pendampingan belum dapat dimuat.'), '</p>',
+          '<button type="button" class="btn btn-secondary" data-action="refresh-riwayat">Coba Lagi</button>',
+        '</div>'
+      ].join('')
+    );
   }
 
   function renderLoadingPreview(selected) {
@@ -918,7 +1110,7 @@
       limit: 5
     }, {
       includeAuth: true,
-      timeoutMs: 9000,
+      timeoutMs: 12000,
       retryCount: 0,
       retryDelayMs: 0,
       readOnlyFallbackGet: false
@@ -959,6 +1151,42 @@
     }
   }
 
+
+  function invokeRegistrasiEditBridge(item) {
+    var safeItem = item && typeof item === 'object' ? item : {};
+    var bridges = [
+      window.RegistrasiView && window.RegistrasiView.openEdit,
+      window.RegistrasiForm && window.RegistrasiForm.openEdit,
+      window.RegistrasiView && window.RegistrasiView.openByMode,
+      window.RegistrasiForm && window.RegistrasiForm.openByMode
+    ].filter(function (fn) {
+      return typeof fn === 'function';
+    });
+
+    if (!bridges.length) return false;
+
+    for (var i = 0; i < bridges.length; i += 1) {
+      try {
+        if (bridges[i] === (window.RegistrasiView && window.RegistrasiView.openByMode) ||
+            bridges[i] === (window.RegistrasiForm && window.RegistrasiForm.openByMode)) {
+          bridges[i].call(
+            bridges[i] === (window.RegistrasiView && window.RegistrasiView.openByMode) ? window.RegistrasiView : window.RegistrasiForm,
+            'edit',
+            safeItem
+          );
+        } else {
+          bridges[i].call(
+            bridges[i] === (window.RegistrasiView && window.RegistrasiView.openEdit) ? window.RegistrasiView : window.RegistrasiForm,
+            safeItem
+          );
+        }
+        return true;
+      } catch (err) {}
+    }
+
+    return false;
+  }
+
   function openEditSasaranFromDetail() {
     var selected = currentDetail || getSelectedSasaran() || {};
     var idSasaran = getItemId(selected);
@@ -969,21 +1197,42 @@
     }
 
     setSelectedSasaran(selected);
+    setEditHandoff(selected);
 
-    if (window.RegistrasiView && typeof window.RegistrasiView.openEdit === 'function') {
-      window.RegistrasiView.openEdit(selected);
-      return;
-    }
-
-    if (window.RegistrasiForm && typeof window.RegistrasiForm.openEdit === 'function') {
-      window.RegistrasiForm.openEdit(selected);
+    if (invokeRegistrasiEditBridge(selected)) {
+      clearEditHandoff();
       return;
     }
 
     var router = getRouter();
     if (router && typeof router.go === 'function') {
-      router.go('registrasi');
+      router.go('registrasi', {
+        onRouteReady: function () {
+          var attempts = 0;
+          var maxAttempts = 20;
+
+          function tryOpen() {
+            attempts += 1;
+            if (invokeRegistrasiEditBridge(selected)) {
+              clearEditHandoff();
+              return;
+            }
+
+            if (attempts < maxAttempts) {
+              window.setTimeout(tryOpen, 150);
+              return;
+            }
+
+            showToast('Mode edit dibuka ke menu Registrasi. Jika form edit belum otomatis tampil, pilih edit dari data sasaran terpilih.', 'info');
+          }
+
+          tryOpen();
+        }
+      });
+      return;
     }
+
+    showToast('Menu Registrasi belum dapat dibuka.', 'warning');
   }
 
   var SasaranDetailView = {
@@ -1002,6 +1251,7 @@
       var btnBack = byId('btn-back-list-from-detail');
       var btnPendampingan = byId('btn-go-to-pendampingan');
       var btnEdit = byId('btn-go-to-edit-sasaran');
+      var riwayatContainer = byId('detail-riwayat-ringkas');
 
       if (btnBack && btnBack.dataset.bound !== '1') {
         btnBack.dataset.bound = '1';
@@ -1027,6 +1277,18 @@
         btnEdit.addEventListener('click', function (event) {
           event.preventDefault();
           openEditSasaranFromDetail();
+        });
+      }
+
+      if (riwayatContainer && riwayatContainer.dataset.bound !== '1') {
+        riwayatContainer.dataset.bound = '1';
+        riwayatContainer.addEventListener('click', function (event) {
+          var target = event.target && event.target.closest ? event.target.closest('[data-action="refresh-riwayat"]') : null;
+          if (!target) return;
+          event.preventDefault();
+          if (window.SasaranDetailView && typeof window.SasaranDetailView.refreshRiwayat === 'function') {
+            window.SasaranDetailView.refreshRiwayat();
+          }
         });
       }
 
@@ -1154,10 +1416,7 @@
                 if (requestToken !== currentRequestToken) return;
                 var message = err && err.message ? err.message : 'Riwayat pendampingan belum dapat dimuat.';
                 if (!(cached && cached.riwayat && cached.riwayat.length)) {
-                  setHTML(
-                    'detail-riwayat-ringkas',
-                    '<p class="muted-text">' + escapeHtml(message) + '</p>'
-                  );
+                  renderRiwayatError(message);
                 }
               })
           );
@@ -1200,6 +1459,34 @@
         forceRefresh: true,
         skipInitAutoOpen: true
       });
+    },
+
+    refreshRiwayat: async function () {
+      var selected = currentDetail || getSelectedSasaran() || {};
+      var idSasaran = getItemId(selected);
+
+      if (!idSasaran) {
+        showToast('Tidak ada sasaran yang dipilih.', 'warning');
+        return;
+      }
+
+      setHTML('detail-riwayat-ringkas', '<p class="muted-text">Riwayat pendampingan sedang dimuat...</p>');
+
+      try {
+        var riwayat = await fetchRiwayat(idSasaran);
+        renderRiwayat(riwayat);
+        cacheRiwayatOnly(idSasaran, riwayat);
+      } catch (err) {
+        renderRiwayatError(err && err.message ? err.message : 'Riwayat pendampingan belum dapat dimuat.');
+      }
+    },
+
+    getPendingEditHandoff: function () {
+      return getEditHandoff();
+    },
+
+    consumePendingEditHandoff: function () {
+      return consumeEditHandoff();
     },
 
     getCurrentDetail: function () {
