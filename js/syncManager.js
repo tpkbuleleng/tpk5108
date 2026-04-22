@@ -5,6 +5,32 @@
   var isInitialized = false;
   var isRunning = false;
 
+  function getObsGroup(name, fallbackMap) {
+    var cfg = getConfig();
+    var src = cfg && cfg.OBSERVABILITY && cfg.OBSERVABILITY[name] ? cfg.OBSERVABILITY[name] : null;
+    return src || fallbackMap || {};
+  }
+
+  var SYNC_OBS = {
+    BUSINESS_STATUS: getObsGroup('BUSINESS_STATUS', {
+      SUCCESS: 'SUCCESS',
+      DUPLICATE: 'DUPLICATE',
+      CONFLICT: 'CONFLICT',
+      VALIDATION_ERROR: 'VALIDATION_ERROR',
+      UNAUTHORIZED: 'UNAUTHORIZED',
+      FORBIDDEN: 'FORBIDDEN',
+      NOT_FOUND: 'NOT_FOUND',
+      SERVER_ERROR: 'SERVER_ERROR',
+      REJECTED: 'REJECTED'
+    }),
+    STATUS_SYNC: getObsGroup('STATUS_SYNC', {
+      PENDING: 'PENDING',
+      PROCESSING: 'PROCESSING',
+      SUCCESS: 'SUCCESS',
+      FAILED: 'FAILED'
+    })
+  };
+
   function nowIso() {
     return new Date().toISOString();
   }
@@ -55,14 +81,15 @@
     return message.indexOf('duplicate') >= 0 || message.indexOf('sudah pernah') >= 0 || message.indexOf('duplikat') >= 0 || code === 208;
   }
 
-  async function logResult(queueId, status, responseCode, message, raw) {
+  async function logResult(queueId, statusSync, businessStatus, responseCode, message, raw) {
     var db = getDb();
     if (!db || typeof db.put !== 'function') return;
 
     await db.put(db.STORES.SYNC_RESULT_LOG, {
       result_id: 'RES-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8).toUpperCase(),
       queue_id: String(queueId || ''),
-      status: String(status || ''),
+      status: String(statusSync || ''),
+      business_status: String(businessStatus || ''),
       response_code: Number(responseCode || 0),
       message: String(message || ''),
       raw: raw || null,
@@ -122,8 +149,8 @@
           last_error: '',
           last_response_code: Number(result.code || 200)
         });
-        await logResult(item.queue_id, 'SUCCESS', result.code || 200, result.message || 'OK', result);
-        return { status: 'SUCCESS', result: result };
+        await logResult(item.queue_id, SYNC_OBS.STATUS_SYNC.SUCCESS, SYNC_OBS.BUSINESS_STATUS.SUCCESS, result.code || 200, result.message || 'OK', result);
+        return { status_sync: SYNC_OBS.STATUS_SYNC.SUCCESS, business_status: SYNC_OBS.BUSINESS_STATUS.SUCCESS, result: result };
       }
 
       if (detectDuplicate(result)) {
@@ -131,8 +158,8 @@
           last_error: '',
           last_response_code: Number(result && result.code || 208)
         });
-        await logResult(item.queue_id, 'DUPLICATE', result && result.code || 208, result && result.message || 'Duplicate aman', result);
-        return { status: 'DUPLICATE', result: result };
+        await logResult(item.queue_id, SYNC_OBS.STATUS_SYNC.SUCCESS, SYNC_OBS.BUSINESS_STATUS.DUPLICATE, result && result.code || 208, result && result.message || 'Duplicate aman', result);
+        return { status_sync: SYNC_OBS.STATUS_SYNC.SUCCESS, business_status: SYNC_OBS.BUSINESS_STATUS.DUPLICATE, result: result };
       }
 
       if (detectConflict(result)) {
@@ -140,15 +167,15 @@
           last_response_code: Number(result && result.code || 409),
           last_error: String(result && result.message || 'Conflict')
         });
-        await logResult(item.queue_id, 'CONFLICT', result && result.code || 409, result && result.message || 'Conflict', result);
-        return { status: 'CONFLICT', result: result };
+        await logResult(item.queue_id, SYNC_OBS.STATUS_SYNC.FAILED, SYNC_OBS.BUSINESS_STATUS.CONFLICT, result && result.code || 409, result && result.message || 'Conflict', result);
+        return { status_sync: SYNC_OBS.STATUS_SYNC.FAILED, business_status: SYNC_OBS.BUSINESS_STATUS.CONFLICT, result: result };
       }
 
       throw new Error((result && result.message) || 'Sinkronisasi item gagal.');
     } catch (err) {
       await repo.markFailed(item.queue_id, err && err.message ? err.message : String(err));
-      await logResult(item.queue_id, 'FAILED', 0, err && err.message ? err.message : String(err), null);
-      return { status: 'FAILED', error: err };
+      await logResult(item.queue_id, SYNC_OBS.STATUS_SYNC.FAILED, SYNC_OBS.BUSINESS_STATUS.SERVER_ERROR, 0, err && err.message ? err.message : String(err), null);
+      return { status_sync: SYNC_OBS.STATUS_SYNC.FAILED, business_status: SYNC_OBS.BUSINESS_STATUS.SERVER_ERROR, error: err };
     }
   }
 
@@ -191,10 +218,10 @@
 
       for (var i = 0; i < queue.length; i += 1) {
         var outcome = await syncOne(queue[i]);
-        if (outcome.status === 'SUCCESS') summary.success += 1;
-        else if (outcome.status === 'FAILED') summary.failed += 1;
-        else if (outcome.status === 'CONFLICT') summary.conflict += 1;
-        else if (outcome.status === 'DUPLICATE') summary.duplicate += 1;
+        if (outcome.business_status === SYNC_OBS.BUSINESS_STATUS.SUCCESS) summary.success += 1;
+        else if (outcome.business_status === SYNC_OBS.BUSINESS_STATUS.SERVER_ERROR || outcome.business_status === SYNC_OBS.BUSINESS_STATUS.VALIDATION_ERROR || outcome.business_status === SYNC_OBS.BUSINESS_STATUS.UNAUTHORIZED || outcome.business_status === SYNC_OBS.BUSINESS_STATUS.FORBIDDEN || outcome.business_status === SYNC_OBS.BUSINESS_STATUS.NOT_FOUND || outcome.business_status === SYNC_OBS.BUSINESS_STATUS.REJECTED) summary.failed += 1;
+        else if (outcome.business_status === SYNC_OBS.BUSINESS_STATUS.CONFLICT) summary.conflict += 1;
+        else if (outcome.business_status === SYNC_OBS.BUSINESS_STATUS.DUPLICATE) summary.duplicate += 1;
       }
 
       if (state && typeof state.setLastSyncAt === 'function') {
