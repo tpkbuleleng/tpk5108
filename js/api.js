@@ -1,4 +1,3 @@
-
 (function (window) {
   'use strict';
 
@@ -6,6 +5,8 @@
   var DEFAULT_RETRY_COUNT = 0;
   var DEFAULT_READ_FALLBACK_TIMEOUT_MS = 15000;
   var DEFAULT_RETRY_DELAY_MS = 1200;
+  var isReportingClientError = false;
+  var recentReportMap = Object.create(null);
 
   function nowIso() {
     return new Date().toISOString();
@@ -641,6 +642,34 @@
     return handleAuthFailureCleanup(result);
   }
 
+  function shouldSkipClientErrorReport(extraPayload) {
+    if (!extraPayload || typeof extraPayload !== 'object') return false;
+    if (extraPayload.__fromClientErrorReporter === true) return true;
+    if (String(extraPayload.action || '').trim() === 'logClientError') return true;
+    return false;
+  }
+
+  function buildErrorFingerprint(message, extraPayload) {
+    return [
+      String(message || '').trim(),
+      String(extraPayload && extraPayload.modul || ''),
+      String(extraPayload && extraPayload.action || '')
+    ].join('::').slice(0, 500);
+  }
+
+  function wasRecentlyReported(message, extraPayload) {
+    var fp = buildErrorFingerprint(message, extraPayload);
+    var now = Date.now();
+    var prev = recentReportMap[fp] || 0;
+
+    if (now - prev < 3000) {
+      return true;
+    }
+
+    recentReportMap[fp] = now;
+    return false;
+  }
+
   async function healthCheck() {
     return get(getActionName('HEALTH_CHECK', 'healthCheck'), {}, {
       includeAuth: false,
@@ -745,19 +774,56 @@
   }
 
   async function reportClientError(message, extraPayload) {
-    var config = getConfig();
+    if (isReportingClientError) {
+      return { ok: false, skipped: true, message: 'Client error reporter sedang aktif.' };
+    }
+
+    if (shouldSkipClientErrorReport(extraPayload)) {
+      return { ok: false, skipped: true, message: 'Client error report dilewati.' };
+    }
+
+    if (wasRecentlyReported(message, extraPayload)) {
+      return { ok: false, skipped: true, message: 'Client error report duplikat dilewati.' };
+    }
+
+    var config = null;
+    try {
+      config = getConfig();
+    } catch (err) {
+      return { ok: false, skipped: true, message: 'APP_CONFIG belum siap untuk report error.' };
+    }
+
+    var sessionToken = '';
+    try {
+      sessionToken = getSessionToken();
+    } catch (err2) {
+      sessionToken = '';
+    }
+
     var payload = Object.assign({
       message: message || 'Unknown client error',
       device_id: getOrCreateDeviceId(),
       app_version: config.APP_VERSION || '',
-      occurred_at: nowIso()
+      occurred_at: nowIso(),
+      __fromClientErrorReporter: true
     }, extraPayload || {});
 
-    return post(getActionName('LOG_CLIENT_ERROR', 'logClientError'), payload, {
-      includeAuth: true,
-      timeoutMs: 8000,
-      retryCount: 0
-    });
+    isReportingClientError = true;
+    try {
+      return await post(getActionName('LOG_CLIENT_ERROR', 'logClientError'), payload, {
+        includeAuth: !!sessionToken,
+        sessionToken: sessionToken || '',
+        timeoutMs: 8000,
+        retryCount: 0,
+        meta: {
+          reporter_guard: 'CLIENT_ERROR_V1'
+        }
+      });
+    } catch (err3) {
+      return createNetworkError(err3 && err3.message ? err3.message : 'Gagal mengirim client error report.');
+    } finally {
+      isReportingClientError = false;
+    }
   }
 
   var Api = {
