@@ -90,11 +90,21 @@
     if (!payload.sync_source) {
       payload.sync_source = 'OFFLINE_QUEUE';
     }
+    if (!payload.queue_id && item.queue_id) {
+      payload.queue_id = item.queue_id;
+    }
+    if (payload.retry_count === undefined || payload.retry_count === null || payload.retry_count === '') {
+      payload.retry_count = Number(item.retry_count || 0);
+    }
 
     return api.post(item.action, payload, {
       includeAuth: true,
       clientSubmitId: payload.client_submit_id || '',
-      syncSource: payload.sync_source || 'OFFLINE_QUEUE'
+      syncSource: payload.sync_source || 'OFFLINE_QUEUE',
+      meta: {
+        queue_id: item.queue_id || '',
+        retry_count: Number(item.retry_count || 0)
+      }
     });
   }
 
