@@ -1,9 +1,12 @@
-
 (function (window) {
   'use strict';
 
   var isInitialized = false;
   var isRunning = false;
+
+  function getConfig() {
+    return window.APP_CONFIG || {};
+  }
 
   function getObsGroup(name, fallbackMap) {
     var cfg = getConfig();
@@ -20,6 +23,7 @@
       UNAUTHORIZED: 'UNAUTHORIZED',
       FORBIDDEN: 'FORBIDDEN',
       NOT_FOUND: 'NOT_FOUND',
+      RATE_LIMITED: 'RATE_LIMITED',
       SERVER_ERROR: 'SERVER_ERROR',
       REJECTED: 'REJECTED'
     }),
@@ -33,10 +37,6 @@
 
   function nowIso() {
     return new Date().toISOString();
-  }
-
-  function getConfig() {
-    return window.APP_CONFIG || {};
   }
 
   function getState() {
@@ -79,6 +79,58 @@
     var code = Number(result && result.code || 0);
     var message = lower(result && result.message);
     return message.indexOf('duplicate') >= 0 || message.indexOf('sudah pernah') >= 0 || message.indexOf('duplikat') >= 0 || code === 208;
+  }
+
+  function getBusinessStatusFromResult(result) {
+    var rawCandidates = [
+      result && result.business_status,
+      result && result.businessStatus,
+      result && result.status_business,
+      result && result.data && result.data.business_status,
+      result && result.data && result.data.businessStatus,
+      result && result.raw && result.raw.business_status,
+      result && result.raw && result.raw.businessStatus,
+      result && result.raw && result.raw.data && result.raw.data.business_status,
+      result && result.raw && result.raw.data && result.raw.data.businessStatus
+    ];
+
+    for (var i = 0; i < rawCandidates.length; i += 1) {
+      var value = String(rawCandidates[i] || '').trim().toUpperCase();
+      if (value && SYNC_OBS.BUSINESS_STATUS[value]) {
+        return SYNC_OBS.BUSINESS_STATUS[value];
+      }
+      if (value === 'DUPLICATE_BLOCKED') {
+        return SYNC_OBS.BUSINESS_STATUS.DUPLICATE;
+      }
+      if (value === 'ERROR') {
+        return SYNC_OBS.BUSINESS_STATUS.SERVER_ERROR;
+      }
+      if (value === 'FAILED') {
+        return SYNC_OBS.BUSINESS_STATUS.REJECTED;
+      }
+    }
+
+    if (detectDuplicate(result)) return SYNC_OBS.BUSINESS_STATUS.DUPLICATE;
+    if (detectConflict(result)) return SYNC_OBS.BUSINESS_STATUS.CONFLICT;
+
+    var code = Number(result && result.code || 0);
+    if (code === 401) return SYNC_OBS.BUSINESS_STATUS.UNAUTHORIZED;
+    if (code === 403) return SYNC_OBS.BUSINESS_STATUS.FORBIDDEN;
+    if (code === 404) return SYNC_OBS.BUSINESS_STATUS.NOT_FOUND;
+    if (code === 409) return SYNC_OBS.BUSINESS_STATUS.CONFLICT;
+    if (code === 422) return SYNC_OBS.BUSINESS_STATUS.VALIDATION_ERROR;
+    if (code === 429) return SYNC_OBS.BUSINESS_STATUS.RATE_LIMITED;
+    if (code >= 500) return SYNC_OBS.BUSINESS_STATUS.SERVER_ERROR;
+    if (result && result.ok === true) return SYNC_OBS.BUSINESS_STATUS.SUCCESS;
+
+    var message = lower(result && result.message);
+    if (message.indexOf('validasi') >= 0) return SYNC_OBS.BUSINESS_STATUS.VALIDATION_ERROR;
+    if (message.indexOf('unauthorized') >= 0 || message.indexOf('session') >= 0 || message.indexOf('token') >= 0) return SYNC_OBS.BUSINESS_STATUS.UNAUTHORIZED;
+    if (message.indexOf('forbidden') >= 0 || message.indexOf('tidak berhak') >= 0 || message.indexOf('scope') >= 0) return SYNC_OBS.BUSINESS_STATUS.FORBIDDEN;
+    if (message.indexOf('tidak ditemukan') >= 0 || message.indexOf('not found') >= 0) return SYNC_OBS.BUSINESS_STATUS.NOT_FOUND;
+    if (message.indexOf('rate') >= 0 && message.indexOf('limit') >= 0) return SYNC_OBS.BUSINESS_STATUS.RATE_LIMITED;
+
+    return SYNC_OBS.BUSINESS_STATUS.REJECTED;
   }
 
   async function logResult(queueId, statusSync, businessStatus, responseCode, message, raw) {
@@ -143,35 +195,40 @@
 
     try {
       var result = await postQueueItem(item);
+      var businessStatus = getBusinessStatusFromResult(result);
+      var responseCode = Number(result && result.code || 0);
+      var responseMessage = result && result.message ? result.message : 'Sinkronisasi item selesai.';
 
-      if (result && result.ok === true) {
-        await repo.markSuccess(item.queue_id, {
-          last_error: '',
-          last_response_code: Number(result.code || 200)
-        });
-        await logResult(item.queue_id, SYNC_OBS.STATUS_SYNC.SUCCESS, SYNC_OBS.BUSINESS_STATUS.SUCCESS, result.code || 200, result.message || 'OK', result);
-        return { status_sync: SYNC_OBS.STATUS_SYNC.SUCCESS, business_status: SYNC_OBS.BUSINESS_STATUS.SUCCESS, result: result };
-      }
-
-      if (detectDuplicate(result)) {
+      if (businessStatus === SYNC_OBS.BUSINESS_STATUS.DUPLICATE) {
         await repo.markDuplicate(item.queue_id, {
           last_error: '',
-          last_response_code: Number(result && result.code || 208)
+          last_response_code: responseCode || 208
         });
-        await logResult(item.queue_id, SYNC_OBS.STATUS_SYNC.SUCCESS, SYNC_OBS.BUSINESS_STATUS.DUPLICATE, result && result.code || 208, result && result.message || 'Duplicate aman', result);
+        await logResult(item.queue_id, SYNC_OBS.STATUS_SYNC.SUCCESS, SYNC_OBS.BUSINESS_STATUS.DUPLICATE, responseCode || 208, responseMessage || 'Duplicate aman', result);
         return { status_sync: SYNC_OBS.STATUS_SYNC.SUCCESS, business_status: SYNC_OBS.BUSINESS_STATUS.DUPLICATE, result: result };
       }
 
-      if (detectConflict(result)) {
+      if (businessStatus === SYNC_OBS.BUSINESS_STATUS.CONFLICT) {
         await repo.markConflict(item.queue_id, {
-          last_response_code: Number(result && result.code || 409),
-          last_error: String(result && result.message || 'Conflict')
+          last_response_code: responseCode || 409,
+          last_error: String(responseMessage || 'Conflict')
         });
-        await logResult(item.queue_id, SYNC_OBS.STATUS_SYNC.FAILED, SYNC_OBS.BUSINESS_STATUS.CONFLICT, result && result.code || 409, result && result.message || 'Conflict', result);
+        await logResult(item.queue_id, SYNC_OBS.STATUS_SYNC.FAILED, SYNC_OBS.BUSINESS_STATUS.CONFLICT, responseCode || 409, responseMessage || 'Conflict', result);
         return { status_sync: SYNC_OBS.STATUS_SYNC.FAILED, business_status: SYNC_OBS.BUSINESS_STATUS.CONFLICT, result: result };
       }
 
-      throw new Error((result && result.message) || 'Sinkronisasi item gagal.');
+      if (result && result.ok === true || businessStatus === SYNC_OBS.BUSINESS_STATUS.SUCCESS) {
+        await repo.markSuccess(item.queue_id, {
+          last_error: '',
+          last_response_code: responseCode || 200
+        });
+        await logResult(item.queue_id, SYNC_OBS.STATUS_SYNC.SUCCESS, SYNC_OBS.BUSINESS_STATUS.SUCCESS, responseCode || 200, responseMessage || 'OK', result);
+        return { status_sync: SYNC_OBS.STATUS_SYNC.SUCCESS, business_status: SYNC_OBS.BUSINESS_STATUS.SUCCESS, result: result };
+      }
+
+      await repo.markFailed(item.queue_id, responseMessage || 'Sinkronisasi item gagal.');
+      await logResult(item.queue_id, SYNC_OBS.STATUS_SYNC.FAILED, businessStatus, responseCode, responseMessage, result);
+      return { status_sync: SYNC_OBS.STATUS_SYNC.FAILED, business_status: businessStatus, result: result };
     } catch (err) {
       await repo.markFailed(item.queue_id, err && err.message ? err.message : String(err));
       await logResult(item.queue_id, SYNC_OBS.STATUS_SYNC.FAILED, SYNC_OBS.BUSINESS_STATUS.SERVER_ERROR, 0, err && err.message ? err.message : String(err), null);
@@ -219,9 +276,9 @@
       for (var i = 0; i < queue.length; i += 1) {
         var outcome = await syncOne(queue[i]);
         if (outcome.business_status === SYNC_OBS.BUSINESS_STATUS.SUCCESS) summary.success += 1;
-        else if (outcome.business_status === SYNC_OBS.BUSINESS_STATUS.SERVER_ERROR || outcome.business_status === SYNC_OBS.BUSINESS_STATUS.VALIDATION_ERROR || outcome.business_status === SYNC_OBS.BUSINESS_STATUS.UNAUTHORIZED || outcome.business_status === SYNC_OBS.BUSINESS_STATUS.FORBIDDEN || outcome.business_status === SYNC_OBS.BUSINESS_STATUS.NOT_FOUND || outcome.business_status === SYNC_OBS.BUSINESS_STATUS.REJECTED) summary.failed += 1;
         else if (outcome.business_status === SYNC_OBS.BUSINESS_STATUS.CONFLICT) summary.conflict += 1;
         else if (outcome.business_status === SYNC_OBS.BUSINESS_STATUS.DUPLICATE) summary.duplicate += 1;
+        else summary.failed += 1;
       }
 
       if (state && typeof state.setLastSyncAt === 'function') {
