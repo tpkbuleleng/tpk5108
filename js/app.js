@@ -2,7 +2,8 @@
   'use strict';
 
   var hasInitialized = false;
-  var hasInstalledGlobalErrorHandlers = false;
+  var isReportingError = false;
+  var recentErrorMap = Object.create(null);
 
   function log() {
     try {
@@ -16,77 +17,110 @@
     } catch (err) {}
   }
 
-  function safeSerialize(value) {
-    if (value === null || value === undefined) return '';
+  function nowTs() {
+    return Date.now();
+  }
+
+  function getMessage(errorLike) {
+    if (!errorLike) return '';
+    if (typeof errorLike === 'string') return errorLike;
+    if (errorLike && errorLike.message) return String(errorLike.message);
     try {
-      if (typeof value === 'string') return value;
-      return JSON.stringify(value);
+      return String(errorLike);
     } catch (err) {
+      return 'Unknown error';
+    }
+  }
+
+  function buildFingerprint(source, action, errorLike) {
+    return [source || '', action || '', getMessage(errorLike)].join('::').slice(0, 400);
+  }
+
+  function shouldSkipRecent(source, action, errorLike) {
+    var fp = buildFingerprint(source, action, errorLike);
+    var ts = recentErrorMap[fp] || 0;
+    var now = nowTs();
+
+    if (now - ts < 3000) {
+      return true;
+    }
+
+    recentErrorMap[fp] = now;
+    return false;
+  }
+
+  function setSplashMessage(message) {
+    var text = String(message || '').trim();
+    if (!text) return;
+
+    var selectors = [
+      '#splash-status',
+      '#splash-message',
+      '#loading-message',
+      '#splash-text',
+      '[data-splash-message]'
+    ];
+
+    for (var i = 0; i < selectors.length; i += 1) {
       try {
-        return String(value);
-      } catch (stringErr) {
-        return '[UNSERIALIZABLE]';
-      }
+        var el = document.querySelector(selectors[i]);
+        if (el) {
+          el.textContent = text;
+          return;
+        }
+      } catch (err) {}
     }
   }
 
-  function describeError(err) {
-    if (!err) {
-      return {
-        message: 'Unknown error',
-        stack: ''
-      };
+  function notifyUser(message) {
+    if (window.Notifier && typeof window.Notifier.show === 'function') {
+      window.Notifier.show(message, 'error');
+      return;
     }
-
-    if (typeof err === 'string') {
-      return {
-        message: err,
-        stack: ''
-      };
-    }
-
-    return {
-      message: err.message || safeSerialize(err),
-      stack: err.stack || ''
-    };
+    setSplashMessage(message);
   }
 
-  function reportClientError(action, err, extra) {
+  async function reportClientError(source, action, errorLike, extra) {
+    if (isReportingError) return false;
+    if (shouldSkipRecent(source, action, errorLike)) return false;
+    if (!window.APP_CONFIG || !window.Api || typeof window.Api.reportClientError !== 'function') {
+      return false;
+    }
+
+    var message = getMessage(errorLike) || 'Unknown client error';
+
+    isReportingError = true;
     try {
-      if (!window.Api || typeof window.Api.reportClientError !== 'function') {
-        return;
-      }
-
-      var details = describeError(err);
-      var payload = Object.assign({
-        modul: 'app.js',
-        aksi: action || 'app_error',
-        message: details.message,
-        stack: details.stack,
-        href: window.location && window.location.href ? window.location.href : '',
-        user_agent: navigator && navigator.userAgent ? navigator.userAgent : ''
-      }, extra || {});
-
-      Promise.resolve(window.Api.reportClientError(details.message, payload)).catch(function () {});
-    } catch (reportErr) {}
+      await window.Api.reportClientError(message, Object.assign({
+        modul: source || 'app.js',
+        action: action || 'runtime',
+        stack_trace: errorLike && errorLike.stack ? String(errorLike.stack) : '',
+        __fromClientErrorReporter: true
+      }, extra || {}));
+      return true;
+    } catch (err) {
+      return false;
+    } finally {
+      isReportingError = false;
+    }
   }
 
   function installGlobalErrorHandlers() {
-    if (hasInstalledGlobalErrorHandlers) return;
-    hasInstalledGlobalErrorHandlers = true;
+    if (window.__tpkGlobalErrorHandlersInstalled === true) return;
+    window.__tpkGlobalErrorHandlersInstalled = true;
 
     window.addEventListener('error', function (event) {
-      reportClientError('window.error', event && event.error ? event.error : (event && event.message ? event.message : 'Window error'), {
-        filename: event && event.filename ? event.filename : '',
-        lineno: event && event.lineno ? event.lineno : 0,
-        colno: event && event.colno ? event.colno : 0
-      });
+      var err = event && (event.error || event.message || 'window.error');
+      reportClientError('app.js', 'window.error', err, {
+        filename: event && event.filename ? String(event.filename) : '',
+        lineno: event && event.lineno ? Number(event.lineno) : 0,
+        colno: event && event.colno ? Number(event.colno) : 0
+      }).catch(function () {});
     });
 
     window.addEventListener('unhandledrejection', function (event) {
-      reportClientError('window.unhandledrejection', event && event.reason ? event.reason : 'Unhandled promise rejection', {
-        reason_type: event && event.reason ? Object.prototype.toString.call(event.reason) : ''
-      });
+      var reason = event && event.reason ? event.reason : 'Promise rejected';
+      reportClientError('app.js', 'window.unhandledrejection', reason, {}).catch(function () {});
     });
   }
 
@@ -102,9 +136,7 @@
       return registration;
     } catch (err) {
       warn('Service worker gagal didaftarkan:', err);
-      reportClientError('serviceWorker.register', err, {
-        scope: './sw.js'
-      });
+      reportClientError('app.js', 'serviceWorker.register', err, {}).catch(function () {});
       return null;
     }
   }
@@ -112,6 +144,10 @@
   async function startApplication() {
     try {
       log('TPK app starting...');
+
+      if (!window.APP_CONFIG) {
+        throw new Error('APP_CONFIG belum tersedia.');
+      }
 
       if (window.AppBootstrap && typeof window.AppBootstrap.init === 'function') {
         await window.AppBootstrap.init();
@@ -124,20 +160,17 @@
       }
 
       warn('Bootstrap aplikasi belum tersedia.');
-      reportClientError('startApplication.bootstrap_missing', 'Bootstrap aplikasi belum tersedia.');
+      notifyUser('Bootstrap aplikasi belum tersedia.');
     } catch (err) {
       warn('Gagal menjalankan aplikasi:', err);
-      reportClientError('startApplication', err);
-
-      if (window.Notifier && typeof window.Notifier.show === 'function') {
-        window.Notifier.show('Aplikasi gagal dimulai.', 'error');
-      }
+      notifyUser('Aplikasi gagal dimulai.');
+      reportClientError('app.js', 'startApplication', err, {}).catch(function () {});
     }
   }
 
   function scheduleBackgroundTasks() {
     function run() {
-      registerServiceWorker();
+      registerServiceWorker().catch(function () {});
     }
 
     if (typeof window.requestIdleCallback === 'function') {
