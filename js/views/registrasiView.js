@@ -56,6 +56,51 @@
       .toLowerCase();
   }
 
+  function buildCatinDataPasanganCompat(answers) {
+    const src = answers || {};
+    const manual = safeTrim(firstNonEmpty(src.data_pasangan));
+    if (manual) return manual;
+
+    const nama = safeTrim(src.nama_pasangan);
+    const nik = safeTrim(src.nik_pasangan).replace(/\D+/g, '').slice(0, 16);
+    const parts = [];
+
+    if (nama) parts.push(`Nama: ${nama}`);
+    if (nik) parts.push(`NIK: ${nik}`);
+
+    return parts.join(' | ');
+  }
+
+  function buildCatinDomisiliCompat(answers) {
+    const src = answers || {};
+    const manual = safeTrim(firstNonEmpty(src.domisili_setelah_menikah));
+    if (manual) return manual;
+
+    return [
+      src.kabupaten_asal_pasangan,
+      src.kecamatan_asal_pasangan,
+      src.desa_asal_pasangan,
+      src.dusun_asal_pasangan
+    ].map(safeTrim).filter(Boolean).join(' / ');
+  }
+
+  function normalizeKehamilanDiinginkanCompat(value) {
+    const raw = safeTrim(value);
+    if (!raw) return '';
+
+    const key = toLowerSnake(raw);
+    const map = {
+      ya_ingin_hamil_segera: 'Ya, ingin hamil segera',
+      tidak_ingin_hamil_nanti: 'Tidak, ingin hamil nanti',
+      tidak_ingin_hamil_lagi: 'Tidak, ingin hamil lagi',
+      ya_ingin_hamil_segera_: 'Ya, ingin hamil segera',
+      tidak__ingin_hamil_nanti: 'Tidak, ingin hamil nanti',
+      tidak__ingin_hamil_lagi: 'Tidak, ingin hamil lagi'
+    };
+
+    return map[key] || raw;
+  }
+
   function safeJsonParse(value, fallback) {
     if (!value) return fallback;
     if (typeof value === 'object') return value;
@@ -1473,12 +1518,33 @@
         ? firstNonEmpty(getEditItem().jenis_sasaran, data.answers.jenis_sasaran)
         : data.answers.jenis_sasaran;
 
+      const normalizedAnswers = Object.assign({}, data.answers, {
+        jenis_sasaran: lockedJenis
+      });
+
+      if (safeTrim(normalizedAnswers.berat_badan_sebelum_hamil) && !safeTrim(normalizedAnswers.bb_sebelum_hamil)) {
+        normalizedAnswers.bb_sebelum_hamil = safeTrim(normalizedAnswers.berat_badan_sebelum_hamil);
+      }
+
+      if (toUpper(lockedJenis) === 'CATIN') {
+        if (!safeTrim(normalizedAnswers.data_pasangan)) {
+          normalizedAnswers.data_pasangan = buildCatinDataPasanganCompat(normalizedAnswers);
+        }
+        if (!safeTrim(normalizedAnswers.domisili_setelah_menikah)) {
+          normalizedAnswers.domisili_setelah_menikah = buildCatinDomisiliCompat(normalizedAnswers);
+        }
+      }
+
+      if (toUpper(lockedJenis) === 'BUMIL') {
+        normalizedAnswers.kehamilan_diinginkan = normalizeKehamilanDiinginkanCompat(
+          normalizedAnswers.kehamilan_diinginkan
+        );
+      }
+
       const payload = {
         form_id: data.form_id || mapJenisToFormId(lockedJenis),
         jenis_sasaran: lockedJenis,
-        answers: Object.assign({}, data.answers, {
-          jenis_sasaran: lockedJenis
-        }),
+        answers: normalizedAnswers,
         sync_source: 'ONLINE'
       };
 
