@@ -2732,3 +2732,318 @@ body.app-theme-dark .label {
     font-size: 20px;
   }
 }
+
+
+/* =========================================================
+   TPK COMPACT FINAL 20260425
+   Fokus: ruang layar lebih hemat, tetap nyaman di HP/tablet/PC.
+   ========================================================= */
+:root {
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius: 14px;
+  --radius-lg: 16px;
+  --radius-xl: 18px;
+  --btn-height: 40px;
+  --btn-height-sm: 34px;
+  --input-height: 40px;
+  --dashboard-offset-desktop: 120px;
+  --dashboard-offset-tablet: 118px;
+  --dashboard-offset-mobile: 126px;
+  --dashboard-offset-small: 132px;
+  --menu-offset-desktop: 98px;
+  --menu-offset-tablet: 96px;
+  --menu-offset-mobile: 102px;
+}
+body { line-height: 1.42; }
+.page-content { width: min(100%, 1120px); padding: 14px 14px 28px; }
+.card,
+#dashboard-screen .card,
+#sasaran-list-screen .card,
+#sasaran-detail-screen .card,
+#registrasi-screen .card,
+#pendampingan-screen .card,
+#sync-screen .card,
+#rekap-kader-screen .card {
+  border-radius: 16px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
+}
+.card-compact,
+.compact-card,
+.pendampingan-section-card,
+.dynamic-section,
+.list-card,
+.sasaran-item,
+.riwayat-item,
+.sasaran-card,
+.queue-card,
+.dynamic-field-card,
+.validation-box {
+  border-radius: 14px !important;
+  padding: 10px 12px !important;
+  margin-bottom: 10px !important;
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.045) !important;
+}
+.form-group { margin-bottom: 10px; }
+.form-group label { margin-bottom: 5px; font-size: 12.5px; line-height: 1.25; }
+.form-group input,
+.form-group select,
+.form-group textarea,
+input,
+select,
+textarea {
+  min-height: var(--input-height);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 14px;
+}
+.form-group input, input { padding: 0 10px; }
+textarea, .form-group textarea { min-height: 82px; }
+.input-hint,
+.field-hint,
+.form-help-text,
+.muted-text { margin-top: 4px; font-size: 11.5px; line-height: 1.32; }
+.btn { min-height: var(--btn-height); border-radius: 11px; padding: 8px 11px; font-size: 14px; }
+.btn-sm { min-height: var(--btn-height-sm); padding: 6px 10px; font-size: 12.5px; }
+.badge { min-height: 26px; padding: 4px 10px; font-size: 11.5px; }
+.section-actions,
+.setting-actions,
+.modal-actions,
+.sasaran-card-actions,
+.queue-card-actions,
+.compact-actions,
+.sasaran-card-actions-compact,
+.riwayat-actions-compact { gap: 8px !important; margin-top: 10px !important; }
+.action-grid-2 { gap: 8px; }
+.top-space { margin-top: 12px; }
+.label { margin-bottom: 3px; font-size: 11.5px; line-height: 1.25; }
+.profile-grid,
+.stats-grid,
+.filters-grid,
+.menu-grid,
+.queue-card-meta,
+.sasaran-card-meta,
+.wilayah-grid,
+.profile-mini-grid,
+.profile-edit-grid { gap: 8px; }
+.profile-grid strong,
+.wilayah-grid strong,
+.profile-mini-grid strong { font-size: 13.5px; line-height: 1.32; }
+.filters-grid { grid-template-columns: repeat(auto-fit, minmax(178px, 1fr)); }
+#dashboard-screen .topbar.topbar-dashboard {
+  top: 6px !important;
+  left: 10px !important;
+  right: 10px !important;
+  border-radius: 18px !important;
+  padding: calc(env(safe-area-inset-top, 0px) + 6px) 10px 8px !important;
+  gap: 6px !important;
+}
+#dashboard-screen .topbar.topbar-dashboard .topbar-logo { width: 28px; height: 28px; }
+#dashboard-screen .topbar.topbar-dashboard .topbar-title { font-size: 15.5px !important; line-height: 1.08 !important; }
+#dashboard-screen .topbar.topbar-dashboard .topbar-subtitle { margin-top: 1px !important; font-size: 10.5px !important; }
+#dashboard-screen .topbar-dashboard__actions { gap: 7px !important; grid-template-columns: repeat(4, minmax(76px, 1fr)) !important; }
+#dashboard-screen .topbar-dashboard__actions > * { max-width: 96px !important; }
+#dashboard-screen .topbar-dashboard__status-badge,
+#dashboard-screen .topbar-dashboard__btn {
+  height: 31px !important;
+  padding: 0 8px !important;
+  border-radius: 9px !important;
+  font-size: 10.5px !important;
+}
+#dashboard-screen > .page-content { padding-top: var(--dashboard-offset-desktop) !important; }
+:is(#sasaran-list-screen,#sasaran-detail-screen,#registrasi-screen,#pendampingan-screen,#sync-screen,#rekap-kader-screen) {
+  --menu-logo-size: clamp(34px, 2.4vw, 44px);
+  --menu-logo-left: 12px;
+  --menu-actions-width: 88px;
+  --menu-left-space: calc(var(--menu-logo-size) + 18px);
+}
+:is(#sasaran-list-screen,#sasaran-detail-screen,#registrasi-screen,#pendampingan-screen,#sync-screen,#rekap-kader-screen) > .topbar {
+  top: 6px !important;
+  left: 10px !important;
+  right: 10px !important;
+  min-height: 76px !important;
+  border-radius: 18px !important;
+  padding: calc(env(safe-area-inset-top, 0px) + 8px) 12px 10px 12px !important;
+}
+:is(#sasaran-list-screen,#sasaran-detail-screen,#registrasi-screen,#pendampingan-screen,#sync-screen,#rekap-kader-screen) .topbar-title { font-size: 15.5px !important; line-height: 1.12 !important; }
+:is(#sasaran-list-screen,#sasaran-detail-screen,#registrasi-screen,#pendampingan-screen,#sync-screen,#rekap-kader-screen) .topbar-subtitle { margin-top: 2px !important; font-size: 10.5px !important; line-height: 1.22 !important; }
+:is(#sasaran-list-screen,#sasaran-detail-screen,#registrasi-screen,#pendampingan-screen,#sync-screen,#rekap-kader-screen) .topbar-actions { right: 12px !important; gap: 7px !important; }
+:is(#sasaran-list-screen,#sasaran-detail-screen,#registrasi-screen,#pendampingan-screen,#sync-screen,#rekap-kader-screen) .topbar-actions .btn {
+  min-width: 72px !important;
+  min-height: 32px !important;
+  padding: 6px 10px !important;
+  border-radius: 10px !important;
+  font-size: 12px !important;
+}
+:is(#sasaran-list-screen,#sasaran-detail-screen,#registrasi-screen,#pendampingan-screen,#sync-screen,#rekap-kader-screen) > .page-content { padding-top: var(--menu-offset-desktop) !important; }
+#dashboard-screen .section-header,
+#sasaran-list-screen .section-header,
+#sasaran-detail-screen .section-header,
+#registrasi-screen .section-header,
+#pendampingan-screen .section-header,
+#sync-screen .section-header,
+#rekap-kader-screen .section-header,
+.dynamic-section-header {
+  padding: 10px 12px !important;
+  margin: 0 0 9px !important;
+  border-radius: 14px !important;
+  gap: 8px !important;
+}
+#dashboard-screen .section-header h3,
+#sasaran-list-screen .section-header h3,
+#sasaran-detail-screen .section-header h3,
+#registrasi-screen .section-header h3,
+#pendampingan-screen .section-header h3,
+#sync-screen .section-header h3,
+#rekap-kader-screen .section-header h3,
+.dynamic-section-header { font-size: 15px !important; line-height: 1.22 !important; }
+#dashboard-screen .section-header p,
+#sasaran-list-screen .section-header p,
+#sasaran-detail-screen .section-header p,
+#registrasi-screen .section-header p,
+#pendampingan-screen .section-header p,
+#sync-screen .section-header p,
+#rekap-kader-screen .section-header p { margin-top: 3px !important; font-size: 11.5px !important; line-height: 1.28 !important; }
+.stats-grid { gap: 8px; margin-bottom: 10px; }
+.stat-card { min-height: 68px; border-radius: 15px; padding: 10px 12px; }
+.stat-card .label { font-size: 11.5px; }
+.stat-card strong { font-size: 21px; }
+.menu-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.menu-card,
+.menu-card.menu-card--compact { border-radius: 15px; padding: 10px 11px; min-height: 104px; }
+.menu-card__head { gap: 8px; margin-bottom: 7px; }
+.menu-card__icon,
+.menu-card-icon { width: 34px; height: 34px; border-radius: 11px; font-size: 16px; }
+.menu-card__meta { min-height: 22px; padding: 4px 8px; font-size: 9.5px; }
+.menu-card h4 { margin-bottom: 4px; font-size: 13.5px; line-height: 1.18; }
+.menu-card p { font-size: 11px; line-height: 1.28; }
+.list-stack,
+#sasaran-list-container,
+#riwayat-pendampingan-container { display: grid; gap: 8px; }
+.list-card-header,
+.sasaran-card-header,
+.queue-card-header,
+.riwayat-card-header { gap: 8px !important; margin-bottom: 7px !important; }
+.sasaran-card-title,
+.list-card h4,
+.riwayat-item h4 { font-size: 15px !important; line-height: 1.2 !important; }
+.sasaran-card-meta,
+.queue-card-meta { gap: 7px; }
+.dynamic-form-container,
+.dynamic-section-body,
+#registrasi-dynamic-fields,
+#pendampingan-dynamic-fields { display: grid; gap: 8px; }
+.dynamic-field-card .form-group,
+.dynamic-section .form-group,
+.pendampingan-section-card .form-group { margin-bottom: 8px; }
+.validation-box { padding: 9px 11px !important; }
+.validation-list { padding-left: 16px; font-size: 12.5px; line-height: 1.32; }
+.sticky-submit-bar { gap: 8px; padding: 8px 0 0; margin-top: 10px; }
+.modal-panel { border-radius: 16px; padding: 14px; }
+.modal-header { margin-bottom: 10px; }
+.setting-group,
+.help-group,
+.profile-group { border-radius: 14px; padding: 10px 12px; }
+.compact-checkbox-row { display: flex; align-items: center; gap: 8px; min-height: 36px; }
+.compact-list-card { cursor: pointer; }
+.compact-card-title { margin: 0 0 3px !important; font-size: 15px; line-height: 1.2; }
+.compact-card-subtitle { margin: 0 !important; }
+.compact-meta-grid { margin-top: 8px !important; }
+.compact-span-all { grid-column: 1 / -1; }
+.sasaran-card-actions-compact,
+.riwayat-actions-compact { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 9px; }
+.riwayat-actions-end-compact { display: flex; justify-content: flex-end; margin-top: 8px; }
+.compact-empty-text { margin: 0 0 8px !important; }
+.compact-riwayat-meta,
+.compact-token-wrap { margin-top: 7px !important; }
+.dynamic-section-compact .dynamic-section-body { gap: 7px; }
+.dynamic-field-card-compact { padding: 9px 10px !important; }
+@media (max-width: 980px) {
+  .page-content { padding-left: 12px; padding-right: 12px; }
+  .profile-grid,
+  .profile-grid-4,
+  .wilayah-grid,
+  .wilayah-grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .menu-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  #dashboard-screen > .page-content { padding-top: var(--dashboard-offset-tablet) !important; }
+  :is(#sasaran-list-screen,#sasaran-detail-screen,#registrasi-screen,#pendampingan-screen,#sync-screen,#rekap-kader-screen) > .page-content { padding-top: var(--menu-offset-tablet) !important; }
+}
+@media (max-width: 640px) {
+  .page-content { padding: 10px 10px 24px; }
+  .card,
+  #dashboard-screen .card,
+  #sasaran-list-screen .card,
+  #sasaran-detail-screen .card,
+  #registrasi-screen .card,
+  #pendampingan-screen .card,
+  #sync-screen .card,
+  #rekap-kader-screen .card { padding: 10px 11px; border-radius: 14px; }
+  .filters-grid,
+  .profile-grid,
+  .profile-grid-4,
+  .wilayah-grid,
+  .wilayah-grid-2,
+  .profile-mini-grid,
+  .profile-edit-grid,
+  .queue-card-meta,
+  .sasaran-card-meta { grid-template-columns: 1fr; }
+  .form-group-span-2,
+  .wilayah-grid-span,
+  .profile-edit-grid .span-2 { grid-column: auto; }
+  #dashboard-screen .topbar-dashboard__actions { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; gap: 5px !important; }
+  #dashboard-screen .topbar-dashboard__actions > * { max-width: none !important; }
+  #dashboard-screen .topbar-dashboard__status-badge,
+  #dashboard-screen .topbar-dashboard__btn { height: 29px !important; padding: 0 4px !important; font-size: 9.5px !important; }
+  #dashboard-screen > .page-content { padding-top: var(--dashboard-offset-mobile) !important; }
+  :is(#sasaran-list-screen,#sasaran-detail-screen,#registrasi-screen,#pendampingan-screen,#sync-screen,#rekap-kader-screen) {
+    --menu-logo-size: 32px;
+    --menu-logo-left: 10px;
+    --menu-actions-width: 70px;
+    --menu-left-space: 46px;
+  }
+  :is(#sasaran-list-screen,#sasaran-detail-screen,#registrasi-screen,#pendampingan-screen,#sync-screen,#rekap-kader-screen) > .topbar {
+    min-height: 78px !important;
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+  }
+  :is(#sasaran-list-screen,#sasaran-detail-screen,#registrasi-screen,#pendampingan-screen,#sync-screen,#rekap-kader-screen) > .topbar > div:first-child {
+    padding-left: var(--menu-left-space);
+    padding-right: var(--menu-actions-width);
+  }
+  :is(#sasaran-list-screen,#sasaran-detail-screen,#registrasi-screen,#pendampingan-screen,#sync-screen,#rekap-kader-screen) .topbar-title { font-size: 14.5px !important; }
+  :is(#sasaran-list-screen,#sasaran-detail-screen,#registrasi-screen,#pendampingan-screen,#sync-screen,#rekap-kader-screen) .topbar-subtitle { font-size: 10px !important; }
+  :is(#sasaran-list-screen,#sasaran-detail-screen,#registrasi-screen,#pendampingan-screen,#sync-screen,#rekap-kader-screen) .topbar-actions .btn {
+    min-width: 58px !important;
+    min-height: 30px !important;
+    padding: 5px 7px !important;
+    font-size: 11px !important;
+  }
+  :is(#sasaran-list-screen,#sasaran-detail-screen,#registrasi-screen,#pendampingan-screen,#sync-screen,#rekap-kader-screen) > .page-content { padding-top: var(--menu-offset-mobile) !important; }
+  .stats-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .stat-card { min-height: 62px; padding: 8px 9px; }
+  .stat-card .label { font-size: 10px; }
+  .stat-card strong { font-size: 18px; }
+  .menu-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+  .menu-card,
+  .menu-card.menu-card--compact { min-height: 96px; padding: 9px; }
+  .menu-card__icon,
+  .menu-card-icon { width: 30px; height: 30px; font-size: 14px; }
+  .menu-card__meta { display: none; }
+  .menu-card h4 { font-size: 12.5px; }
+  .menu-card p { font-size: 10.5px; }
+  .section-actions .btn,
+  .sasaran-card-actions .btn,
+  .queue-card-actions .btn,
+  .compact-actions .btn,
+  .sasaran-card-actions-compact .btn,
+  .riwayat-actions-compact .btn,
+  .sticky-submit-bar .btn { min-height: 36px; font-size: 12.5px; padding: 7px 9px; }
+}
+@media (max-width: 390px) {
+  :root { --dashboard-offset-mobile: 132px; --menu-offset-mobile: 106px; }
+  .stats-grid { grid-template-columns: 1fr; }
+  .menu-card,
+  .menu-card.menu-card--compact { min-height: 88px; }
+}
