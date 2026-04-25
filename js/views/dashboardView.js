@@ -347,7 +347,7 @@
     return [
       '<button',
       ' type="button"',
-      ' class="menu-card ', accentClass, '"',
+      ' class="menu-card menu-card--compact ', accentClass, '"',
       ' data-menu-key="', escapeHtml(item.key), '"',
       ' data-menu-action="', escapeHtml(item.action || ''), '"',
       ' data-menu-route="', escapeHtml(item.route || ''), '"',
