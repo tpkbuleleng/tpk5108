@@ -1,5 +1,4 @@
-
-const SW_VERSION = 'tpk-sw-stage1-v1';
+const SW_VERSION = 'tpk-sw-final-20260425-01';
 const SHELL_CACHE = 'tpk-shell-' + SW_VERSION;
 const ASSET_CACHE = 'tpk-assets-' + SW_VERSION;
 const APP_SHELL = [
@@ -10,12 +9,19 @@ const APP_SHELL = [
   './assets/img/logo.png',
   './assets/img/logo-192.png',
   './js/config.js',
+  './js/utils.js',
   './js/storage.js',
   './js/state.js',
+  './js/db.js',
+  './js/queueRepo.js',
+  './js/validators.js',
+  './js/cachePolicy.js',
   './js/api.js',
   './js/auth.js',
+  './js/router.js',
   './js/bootstrap.js',
   './js/ui.js',
+  './js/syncManager.js',
   './js/app.js'
 ];
 
@@ -27,6 +33,7 @@ function isPrivateRequest(requestUrl, method) {
   if (/script\.google\.com/i.test(href)) return true;
   if (/script\.googleusercontent\.com/i.test(href)) return true;
   if (/\/exec(\?|$)/i.test(href)) return true;
+  if (/\/api\//i.test(href)) return true;
 
   return false;
 }
@@ -36,10 +43,21 @@ function isSameOriginAsset(url) {
     /\.(?:css|js|png|jpg|jpeg|svg|webp|gif|ico|woff2?|ttf|eot|json|webmanifest)$/i.test(url.pathname);
 }
 
+async function notifyClients(message) {
+  const clients = await self.clients.matchAll({ includeUncontrolled: true, type: 'window' });
+  clients.forEach((client) => {
+    try {
+      client.postMessage(message);
+    } catch (err) {}
+  });
+}
+
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(SHELL_CACHE).then((cache) => cache.addAll(APP_SHELL)).then(() => self.skipWaiting())
-  );
+  event.waitUntil((async () => {
+    const cache = await caches.open(SHELL_CACHE);
+    await cache.addAll(APP_SHELL);
+    await self.skipWaiting();
+  })());
 });
 
 self.addEventListener('activate', (event) => {
@@ -59,7 +77,16 @@ self.addEventListener('activate', (event) => {
     }
 
     await self.clients.claim();
+    await notifyClients({ type: 'TPK_SW_ACTIVATED', version: SW_VERSION });
   })());
+});
+
+self.addEventListener('message', (event) => {
+  const data = event && event.data ? event.data : {};
+
+  if (data && data.type === 'TPK_SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 self.addEventListener('fetch', (event) => {
@@ -78,11 +105,11 @@ self.addEventListener('fetch', (event) => {
 
         const network = await fetch(request);
         const cache = await caches.open(SHELL_CACHE);
-        cache.put(request, network.clone());
+        cache.put('./index.html', network.clone());
         return network;
       } catch (err) {
-        const cached = await caches.match(request);
-        if (cached) return cached;
+        const cachedRequest = await caches.match(request);
+        if (cachedRequest) return cachedRequest;
         return caches.match('./index.html');
       }
     })());
@@ -101,7 +128,14 @@ self.addEventListener('fetch', (event) => {
         return response;
       }).catch(() => null);
 
-      return cached || networkPromise || fetch(request);
+      if (cached) {
+        return cached;
+      }
+
+      const network = await networkPromise;
+      if (network) return network;
+
+      return fetch(request);
     })());
   }
 });
