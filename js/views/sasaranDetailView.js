@@ -948,7 +948,7 @@
         'detail-riwayat-ringkas',
         [
           '<div class="detail-empty-state">',
-            '<p class="muted-text" style="margin:0 0 10px;">Belum ada riwayat pendampingan untuk sasaran ini.</p>',
+            '<p class="muted-text compact-empty-text">Belum ada riwayat pendampingan untuk sasaran ini.</p>',
             '<button type="button" class="btn btn-secondary" data-action="refresh-riwayat">Muat Ulang Riwayat</button>',
           '</div>'
         ].join('')
@@ -972,18 +972,18 @@
         '<article class="list-card">',
           '<div class="list-card-header row-between">',
             '<div>',
-              '<h4 style="margin:0 0 4px;">', escapeHtml(tanggal), '</h4>',
-              '<p class="muted-text" style="margin:0;">ID Pendampingan: ', escapeHtml(item.id_pendampingan || '-'), '</p>',
+              '<h4 class="compact-card-title">', escapeHtml(tanggal), '</h4>',
+              '<p class="muted-text compact-card-subtitle">ID Pendampingan: ', escapeHtml(item.id_pendampingan || '-'), '</p>',
             '</div>',
             '<span class="badge badge-neutral">', escapeHtml(status), '</span>',
           '</div>',
-          metaBits.length ? '<p class="muted-text" style="margin:10px 0 0;">' + escapeHtml(metaBits.join(' • ')) + '</p>' : '',
-          '<div style="margin-top:10px;">',
+          metaBits.length ? '<p class="muted-text compact-riwayat-meta">' + escapeHtml(metaBits.join(' • ')) + '</p>' : '',
+          '<div class="compact-token-wrap">',
             '<span class="label">Ringkasan</span>',
             '<strong>', escapeHtml(catatan), '</strong>',
           '</div>',
           tokens.length ? [
-            '<div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;">',
+            '<div class="riwayat-actions-compact">',
             tokens.map(function (token) {
               return '<span class="badge badge-neutral">' + escapeHtml(token) + '</span>';
             }).join(''),
@@ -994,7 +994,7 @@
     }).join('');
 
     html += [
-      '<div style="margin-top:10px;display:flex;justify-content:flex-end;">',
+      '<div class="riwayat-actions-end-compact">',
         '<button type="button" class="btn btn-secondary" data-action="refresh-riwayat">Muat Ulang Riwayat</button>',
       '</div>'
     ].join('');
@@ -1007,7 +1007,7 @@
       'detail-riwayat-ringkas',
       [
         '<div class="detail-empty-state">',
-          '<p class="muted-text" style="margin:0 0 10px;">', escapeHtml(message || 'Riwayat pendampingan belum dapat dimuat.'), '</p>',
+          '<p class="muted-text compact-empty-text">', escapeHtml(message || 'Riwayat pendampingan belum dapat dimuat.'), '</p>',
           '<button type="button" class="btn btn-secondary" data-action="refresh-riwayat">Coba Lagi</button>',
         '</div>'
       ].join('')
