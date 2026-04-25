@@ -30,6 +30,10 @@
     return window.Storage || null;
   }
 
+  function isMirrorGuardActive() {
+    return window.__tpkStage1bSyncMirrorGuard === true;
+  }
+
   function safeGetFromStorage(key, fallbackValue) {
     var storage = getStorage();
     if (!storage || typeof storage.get !== 'function' || !key) {
@@ -48,6 +52,46 @@
     var storage = getStorage();
     if (!storage || typeof storage.remove !== 'function' || !key) return;
     storage.remove(key);
+  }
+
+  function mirrorQueueToRepo(queue) {
+    var storage = getStorage();
+    if (isMirrorGuardActive()) return;
+    if (!storage || typeof storage.importLegacySyncQueue !== 'function') return;
+
+    window.setTimeout(function () {
+      storage.importLegacySyncQueue(Array.isArray(queue) ? queue : []).catch(function () {});
+    }, 0);
+  }
+
+  function normalizeSyncStatus(item) {
+    var raw = item && typeof item === 'object' ? (item.status || item.sync_status) : '';
+    return String(raw || 'PENDING').trim().toUpperCase();
+  }
+
+  function countLocalQueue(queue) {
+    var safeQueue = Array.isArray(queue) ? queue : [];
+    var summary = {
+      total: safeQueue.length,
+      pending: 0,
+      processing: 0,
+      success: 0,
+      failed: 0,
+      conflict: 0,
+      duplicate: 0
+    };
+
+    safeQueue.forEach(function (item) {
+      var status = normalizeSyncStatus(item);
+      if (status === 'PROCESSING') summary.processing += 1;
+      else if (status === 'SUCCESS') summary.success += 1;
+      else if (status === 'FAILED') summary.failed += 1;
+      else if (status === 'CONFLICT') summary.conflict += 1;
+      else if (status === 'DUPLICATE') summary.duplicate += 1;
+      else summary.pending += 1;
+    });
+
+    return summary;
   }
 
   function createInitialState() {
@@ -278,11 +322,26 @@
       var value = Array.isArray(queue) ? queue : [];
       mergeObject('sync', { queue: value }, { persist: true });
       safeSetToStorage(keys.SYNC_QUEUE, value);
+      mirrorQueueToRepo(value);
       return clone(value);
     },
 
     getSyncQueue: function () {
       return clone((state.sync && state.sync.queue) || []);
+    },
+
+    refreshSyncFromQueueRepo: async function () {
+      if (!window.QueueRepo || typeof window.QueueRepo.syncLegacyMirror !== 'function') {
+        return this.getSyncQueue();
+      }
+      return window.QueueRepo.syncLegacyMirror();
+    },
+
+    getSyncSummary: async function () {
+      if (!window.QueueRepo || typeof window.QueueRepo.stats !== 'function') {
+        return countLocalQueue(this.getSyncQueue());
+      }
+      return window.QueueRepo.stats();
     },
 
     setLastSyncAt: function (timestamp) {
