@@ -692,8 +692,8 @@
 
     var result = await post(getActionName('LOGIN', 'login'), data, {
       includeAuth: false,
-      timeoutMs: 30000,
-      retryCount: 0,
+      timeoutMs: 60000,
+      retryCount: 1,
       retryDelayMs: 1500
     });
 
@@ -740,8 +740,8 @@
   async function refreshBootstrapLite(payload) {
     return post(getActionName('REFRESH_BOOTSTRAP_LITE', 'refreshBootstrapLite'), payload || {}, {
       includeAuth: true,
-      timeoutMs: 9000,
-      retryCount: 0,
+      timeoutMs: 30000,
+      retryCount: 1,
       retryDelayMs: 1200
     });
   }
@@ -758,17 +758,8 @@
   async function getDashboardSummaryLite(payload) {
     return post(getActionName('GET_DASHBOARD_SUMMARY_LITE', 'getDashboardSummaryLite'), payload || {}, {
       includeAuth: true,
-      timeoutMs: 9000,
-      retryCount: 0,
-      retryDelayMs: 1200
-    });
-  }
-
-  async function getDashboardLite(payload) {
-    return post(getActionName('GET_DASHBOARD_LITE', 'getDashboardLite'), payload || {}, {
-      includeAuth: true,
-      timeoutMs: 9000,
-      retryCount: 0,
+      timeoutMs: 30000,
+      retryCount: 1,
       retryDelayMs: 1200
     });
   }
@@ -780,6 +771,52 @@
       retryCount: 1,
       retryDelayMs: 1000
     });
+  }
+
+  async function reportClientPerformance(eventName, data) {
+    var config = null;
+    try {
+      config = getConfig();
+    } catch (err) {
+      return { ok: false, skipped: true, message: 'APP_CONFIG belum siap untuk report performance.' };
+    }
+
+    var perfCfg = config.PERFORMANCE || {};
+    if (perfCfg.ENABLE_CLIENT_PERFORMANCE_LOG === false) {
+      return { ok: false, skipped: true, message: 'Client performance log dinonaktifkan.' };
+    }
+
+    var sessionToken = '';
+    try {
+      sessionToken = getSessionToken();
+    } catch (err2) {
+      sessionToken = '';
+    }
+
+    var payload = Object.assign({
+      message: 'CLIENT_PERFORMANCE',
+      modul: 'registrasiView.js',
+      action: eventName || 'client_performance',
+      event_type: 'PERFORMANCE',
+      device_id: getOrCreateDeviceId(),
+      app_version: config.APP_VERSION || '',
+      occurred_at: nowIso(),
+      __fromClientPerformanceReporter: true
+    }, data || {});
+
+    try {
+      return await post(getActionName('LOG_CLIENT_ERROR', 'logClientError'), payload, {
+        includeAuth: !!sessionToken,
+        sessionToken: sessionToken || '',
+        timeoutMs: 6000,
+        retryCount: 0,
+        meta: {
+          reporter_guard: 'CLIENT_PERF_V1'
+        }
+      });
+    } catch (err3) {
+      return createNetworkError(err3 && err3.message ? err3.message : 'Gagal mengirim client performance report.');
+    }
   }
 
   async function reportClientError(message, extraPayload) {
@@ -855,9 +892,9 @@
     refreshBootstrapLite: refreshBootstrapLite,
     getMyProfileLite: getMyProfileLite,
     getDashboardSummaryLite: getDashboardSummaryLite,
-    getDashboardLite: getDashboardLite,
     getAppBootstrapRef: getAppBootstrapRef,
-    reportClientError: reportClientError
+    reportClientError: reportClientError,
+    reportClientPerformance: reportClientPerformance
   };
 
   window.Api = Api;
