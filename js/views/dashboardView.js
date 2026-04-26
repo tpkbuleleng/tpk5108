@@ -13,6 +13,10 @@
     'tpk_last_filter_rekap'
   ];
 
+  var dashboardLiteTimer = null;
+  var dashboardLiteInFlight = false;
+  var dashboardLiteLastRun = 0;
+
   var BASE_MENU = {
     daftar_sasaran: {
       key: 'daftar_sasaran',
@@ -1160,6 +1164,88 @@
     });
   }
 
+  function extractDashboardSummary(responseData) {
+    var data = responseData || {};
+    if (data.summary && typeof data.summary === 'object') return data.summary;
+    if (data.dashboard && typeof data.dashboard === 'object') return data.dashboard;
+    return data;
+  }
+
+  function applyDashboardSummary(summary) {
+    var data = summary && typeof summary === 'object' ? summary : {};
+
+    setText('stat-sasaran', data.total_sasaran || data.total_sasaran_aktif || data.sasaran_aktif || 0);
+    setText('stat-pendampingan', data.total_pendampingan_bulan_ini || data.total_pendampingan || data.pendampingan_bulan_ini || 0);
+
+    if (data.total_draft_pending !== undefined || data.draft_pending !== undefined) {
+      setText('stat-draft', data.total_draft_pending || data.draft_pending || 0);
+    }
+
+    var state = getState();
+    if (state && typeof state.setDashboardSummary === 'function') {
+      state.setDashboardSummary(data);
+    }
+  }
+
+  function applyCachedDashboardSummary() {
+    var state = getState();
+    if (!state || typeof state.getDashboardSummary !== 'function') return;
+
+    var cached = state.getDashboardSummary() || {};
+    if (cached && Object.keys(cached).length) {
+      applyDashboardSummary(cached);
+    }
+  }
+
+  function scheduleDashboardLiteRefresh(options) {
+    var opts = options || {};
+    var delay = typeof opts.delayMs === 'number' ? opts.delayMs : 1100;
+    var now = Date.now();
+
+    if (dashboardLiteInFlight) return;
+    if (!opts.force && dashboardLiteLastRun && (now - dashboardLiteLastRun < 30000)) return;
+
+    if (dashboardLiteTimer) {
+      window.clearTimeout(dashboardLiteTimer);
+    }
+
+    dashboardLiteTimer = window.setTimeout(function () {
+      dashboardLiteTimer = null;
+      refreshDashboardLite({ background: true }).catch(function (err) {
+        try {
+          console.warn('Dashboard lite gagal dimuat:', err && err.message ? err.message : err);
+        } catch (e) {}
+      });
+    }, delay);
+  }
+
+  async function refreshDashboardLite(options) {
+    var api = getApi();
+    if (!api) return null;
+    if (dashboardLiteInFlight) return null;
+
+    dashboardLiteInFlight = true;
+    dashboardLiteLastRun = Date.now();
+
+    try {
+      var result = null;
+
+      if (typeof api.getDashboardLite === 'function') {
+        result = await api.getDashboardLite({});
+      } else if (typeof api.getDashboardSummaryLite === 'function') {
+        result = await api.getDashboardSummaryLite({});
+      }
+
+      if (result && result.ok) {
+        applyDashboardSummary(extractDashboardSummary(result.data || {}));
+      }
+
+      return result;
+    } finally {
+      dashboardLiteInFlight = false;
+    }
+  }
+
   function init() {
     var profile = getProfile();
     var role = profile.role_akses || profile.role || 'KADER';
@@ -1167,6 +1253,7 @@
     applyTheme(getThemeValue());
     cleanupDashboardText();
     applyDashboardProfile(profile);
+    applyCachedDashboardSummary();
     renderMenu(role);
     setVersionText();
     applyFontSize(getFontSizeValue());
@@ -1176,6 +1263,7 @@
     bindHelpModal();
     bindNetworkStatus();
     bindEscapeKey();
+    scheduleDashboardLiteRefresh({ delayMs: 1200 });
   }
 
   function refresh() {
@@ -1197,6 +1285,9 @@
   var DashboardView = {
     init: init,
     refresh: refresh,
+    refreshDashboardLite: refreshDashboardLite,
+    scheduleDashboardLiteRefresh: scheduleDashboardLiteRefresh,
+    applyDashboardSummary: applyDashboardSummary,
     setRole: setRole,
     renderMenu: renderMenu,
     getDefinitions: getDefinitions,
