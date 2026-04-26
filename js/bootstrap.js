@@ -152,11 +152,16 @@
       }
 
       if (token) {
-        this.showSplashStatus('Memeriksa sesi pengguna...');
-        var sessionOk = await this.restoreSessionAndRoute({ preferCachedUi: true, initRunId: initRunId });
-        if (!sessionOk && this._initRunId === initRunId) {
-          this.openScreen('login-screen');
+        this.showSplashStatus('Memulihkan sesi di latar belakang...');
+
+        if (isSafeToForceDashboard(currentRoute)) {
+          this.openScreen('dashboard-screen');
+          if (window.Router && typeof window.Router.go === 'function') {
+            window.Router.go('dashboard', { skipHeavyRefresh: true });
+          }
         }
+
+        this.restoreSessionAndRouteBackground_({ preferCachedUi: true, initRunId: initRunId });
       }
     },
 
@@ -385,11 +390,39 @@
 
       if (window.DashboardView && typeof window.DashboardView.applyBootstrapLite === 'function') {
         window.DashboardView.applyBootstrapLite(payload);
-      } else if (window.DashboardView && typeof window.DashboardView.refresh === 'function') {
-        window.DashboardView.refresh();
+      } else if (window.DashboardView && typeof window.DashboardView.applyDashboardProfile === 'function' && profile && Object.keys(profile).length) {
+        window.DashboardView.applyDashboardProfile(profile);
       }
 
       return payload;
+    },
+
+    restoreSessionAndRouteBackground_(options) {
+      var self = this;
+      var opts = options || {};
+
+      function run() {
+        self.restoreSessionAndRoute(Object.assign({}, opts, {
+          background: true,
+          allowHeavyFallback: false,
+          keepUiOnFailure: true
+        })).then(function (ok) {
+          if (!ok && opts.initRunId && self._initRunId === opts.initRunId) {
+            self.openScreen('login-screen');
+            if (window.Router && typeof window.Router.go === 'function') {
+              window.Router.go('login');
+            }
+          }
+        }).catch(function (err) {
+          console.warn('Restore session background gagal:', err && err.message ? err.message : err);
+        });
+      }
+
+      if (typeof window.requestIdleCallback === 'function') {
+        window.requestIdleCallback(run, { timeout: 700 });
+      } else {
+        window.setTimeout(run, 120);
+      }
     },
 
     async restoreSessionAndRoute(options) {
@@ -412,12 +445,14 @@
           result = await window.Api.refreshBootstrapLite({});
         }
 
-        if ((!result || !result.ok) && typeof window.Api.bootstrapSession === 'function') {
+        if ((!result || !result.ok) && options.allowHeavyFallback === true && typeof window.Api.bootstrapSession === 'function') {
           result = await window.Api.bootstrapSession({});
         }
 
         if (!result || !result.ok) {
-          this.clearSession();
+          if (options.keepUiOnFailure !== true) {
+            this.clearSession();
+          }
           return false;
         }
 
