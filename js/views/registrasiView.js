@@ -794,10 +794,18 @@
       const cacheKey = `${formId}:${jenis}`;
 
       if (DEFINITION_CACHE[cacheKey]) {
+        try {
+          Object.defineProperty(DEFINITION_CACHE[cacheKey], '__frontend_cache_hit', {
+            value: true,
+            configurable: true,
+            enumerable: false
+          });
+        } catch (_) {}
         return DEFINITION_CACHE[cacheKey];
       }
 
       let result = null;
+      const apiStart = (window.performance && performance.now) ? performance.now() : Date.now();
 
       try {
         if (window.RegistrasiService && isFunction(window.RegistrasiService.getRegistrasiFormDefinition)) {
@@ -817,7 +825,37 @@
         });
       }
 
+      const apiEnd = (window.performance && performance.now) ? performance.now() : Date.now();
       const data = result && result.data ? result.data : result;
+      const meta = result && result.meta ? result.meta : (data && data.meta ? data.meta : {});
+
+      if (data && typeof data === 'object') {
+        try {
+          Object.defineProperty(data, '__meta', {
+            value: meta || {},
+            configurable: true,
+            enumerable: false
+          });
+          Object.defineProperty(data, '__frontend_api_perf', {
+            value: {
+              api_ms: Math.round(apiEnd - apiStart),
+              local_cache_hit: false,
+              backend_cached: !!(meta && meta.cached),
+              cache_put_ok: meta && Object.prototype.hasOwnProperty.call(meta, 'cache_put_ok') ? !!meta.cache_put_ok : undefined
+            },
+            configurable: true,
+            enumerable: false
+          });
+        } catch (_) {
+          data.__meta = meta || {};
+          data.__frontend_api_perf = {
+            api_ms: Math.round(apiEnd - apiStart),
+            local_cache_hit: false,
+            backend_cached: !!(meta && meta.cached)
+          };
+        }
+      }
+
       DEFINITION_CACHE[cacheKey] = data || {};
       return DEFINITION_CACHE[cacheKey];
     },
@@ -985,7 +1023,7 @@
       const html = sections.map((section) => {
         const items = (section.questions || []).map((question) => this.renderDynamicQuestion(question)).join('');
         return `
-          <section class="dynamic-section dynamic-section-compact" data-section-id="${escapeHtml(section.section_id)}">
+          <section class="dynamic-section" data-section-id="${escapeHtml(section.section_id)}">
             <div class="dynamic-section-header">${escapeHtml(section.section_label || 'Data Khusus')}</div>
             <div class="dynamic-section-body">
               ${items}
@@ -1076,7 +1114,7 @@
       }
 
       return `
-        <div class="dynamic-field-card dynamic-field-card-compact" data-question-code="${escapeHtml(code)}">
+        <div class="dynamic-field-card" data-question-code="${escapeHtml(code)}">
           <div class="form-group">
             <label for="dyn-${escapeHtml(code)}">${label}${requiredMark}</label>
             ${inputHtml}
@@ -3135,3 +3173,202 @@
   };
 })(window, document);
 /* ===== HOTFIX V9 end ===== */
+
+
+/* ===== REGISTRASI PERFORMANCE INSTRUMENTATION FINAL 20260426 start ===== */
+(function (window, document) {
+  'use strict';
+
+  var RF = window.RegistrasiForm;
+  if (!RF || RF.__regPerfInstrumentation20260426 === true) return;
+  RF.__regPerfInstrumentation20260426 = true;
+
+  function nowMs() {
+    try {
+      if (window.performance && typeof window.performance.now === 'function') {
+        return window.performance.now();
+      }
+    } catch (_) {}
+    return Date.now();
+  }
+
+  function s(value) {
+    return String(value == null ? '' : value).trim();
+  }
+
+  function upper(value) {
+    return s(value).toUpperCase();
+  }
+
+  function getFormId(jenis) {
+    var map = { CATIN: 'FRM1002', BUMIL: 'FRM1003', BUFAS: 'FRM1004', BADUTA: 'FRM1005' };
+    return map[upper(jenis)] || 'FRM1001';
+  }
+
+  function countQuestionsFromSections(sections) {
+    var total = 0;
+    (Array.isArray(sections) ? sections : []).forEach(function (section) {
+      total += Array.isArray(section && section.questions) ? section.questions.length : 0;
+    });
+    return total;
+  }
+
+  function countOptions(questions) {
+    var total = 0;
+    (Array.isArray(questions) ? questions : []).forEach(function (q) {
+      total += Array.isArray(q && q.options) ? q.options.length : 0;
+    });
+    return total;
+  }
+
+  function countRules(questions) {
+    var total = 0;
+    (Array.isArray(questions) ? questions : []).forEach(function (q) {
+      total += Array.isArray(q && q.rules) ? q.rules.length : 0;
+    });
+    return total;
+  }
+
+  function getPerfStore() {
+    if (!window.__TPK_REGISTRASI_PERF__) {
+      window.__TPK_REGISTRASI_PERF__ = [];
+    }
+    return window.__TPK_REGISTRASI_PERF__;
+  }
+
+  function pushPerfRecord(record) {
+    var store = getPerfStore();
+    store.push(record);
+    while (store.length > 50) store.shift();
+
+    try {
+      console.info('[TPK_REGISTRASI_PERF]', record);
+    } catch (_) {}
+
+    if (window.Api && typeof window.Api.reportClientPerformance === 'function') {
+      window.Api.reportClientPerformance('registrasi_dynamic_form_ready', record).catch(function () {});
+    }
+  }
+
+  function createCtx(jenis) {
+    return {
+      request_id: 'REGFORM-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
+      jenis_sasaran: upper(jenis),
+      form_id: getFormId(jenis),
+      start_ms: nowMs(),
+      api_ms: 0,
+      render_dynamic_fields_ms: 0,
+      rules_apply_ms: 0,
+      normalize_prepare_other_ms: 0,
+      backend_cached: null,
+      local_cache_hit: null,
+      cache_put_ok: null,
+      backend_form_perf: null,
+      section_count: 0,
+      question_count: 0,
+      field_count: 0,
+      option_count: 0,
+      rule_count: 0,
+      status: 'STARTED'
+    };
+  }
+
+  var activeCtx = null;
+
+  var originalGetDefinition = RF.getRegistrasiFormDefinition;
+  if (typeof originalGetDefinition === 'function') {
+    RF.getRegistrasiFormDefinition = async function (jenisSasaran) {
+      var ctx = activeCtx;
+      var t0 = nowMs();
+      var result = await originalGetDefinition.apply(this, arguments);
+      var elapsed = Math.round(nowMs() - t0);
+
+      if (ctx) {
+        ctx.api_ms += elapsed;
+        if (result && result.__frontend_api_perf) {
+          ctx.api_ms = Number(result.__frontend_api_perf.api_ms || ctx.api_ms || elapsed);
+          ctx.local_cache_hit = !!result.__frontend_api_perf.local_cache_hit;
+          ctx.backend_cached = !!result.__frontend_api_perf.backend_cached;
+          if (result.__frontend_api_perf.cache_put_ok !== undefined) {
+            ctx.cache_put_ok = !!result.__frontend_api_perf.cache_put_ok;
+          }
+        } else if (result && result.__frontend_cache_hit === true) {
+          ctx.local_cache_hit = true;
+        }
+
+        if (result && result.__meta) {
+          ctx.backend_cached = result.__meta.cached === true;
+          if (result.__meta.cache_put_ok !== undefined) ctx.cache_put_ok = !!result.__meta.cache_put_ok;
+          if (result.__meta.form_perf) ctx.backend_form_perf = result.__meta.form_perf;
+        }
+      }
+
+      return result;
+    };
+  }
+
+  var originalRenderDynamicFields = RF.renderDynamicFields;
+  if (typeof originalRenderDynamicFields === 'function') {
+    RF.renderDynamicFields = function (sections) {
+      var t0 = nowMs();
+      var out = originalRenderDynamicFields.apply(this, arguments);
+      if (activeCtx) {
+        activeCtx.render_dynamic_fields_ms += Math.round(nowMs() - t0);
+        activeCtx.section_count = Array.isArray(sections) ? sections.length : 0;
+        activeCtx.question_count = Array.isArray(this._dynamicQuestions) ? this._dynamicQuestions.length : countQuestionsFromSections(sections);
+        activeCtx.field_count = activeCtx.question_count;
+        activeCtx.option_count = countOptions(this._dynamicQuestions || []);
+        activeCtx.rule_count = countRules(this._dynamicQuestions || []);
+      }
+      return out;
+    };
+  }
+
+  var originalUpdateConditional = RF.updateConditionalDynamicFields;
+  if (typeof originalUpdateConditional === 'function') {
+    RF.updateConditionalDynamicFields = function () {
+      var t0 = nowMs();
+      var out = originalUpdateConditional.apply(this, arguments);
+      if (activeCtx) {
+        activeCtx.rules_apply_ms += Math.round(nowMs() - t0);
+      }
+      return out;
+    };
+  }
+
+  var originalLoadDynamicFields = RF.loadDynamicFields;
+  if (typeof originalLoadDynamicFields === 'function') {
+    RF.loadDynamicFields = async function (jenisSasaran) {
+      var jenis = upper(jenisSasaran);
+      if (!jenis) {
+        return originalLoadDynamicFields.apply(this, arguments);
+      }
+
+      var previousCtx = activeCtx;
+      var ctx = createCtx(jenis);
+      activeCtx = ctx;
+
+      try {
+        var out = await originalLoadDynamicFields.apply(this, arguments);
+        ctx.status = 'SUCCESS';
+        return out;
+      } catch (err) {
+        ctx.status = 'ERROR';
+        ctx.error_message = err && err.message ? err.message : String(err);
+        throw err;
+      } finally {
+        var total = Math.round(nowMs() - ctx.start_ms);
+        ctx.total_dynamic_form_ready_ms = total;
+        ctx.normalize_prepare_other_ms = Math.max(
+          total - Number(ctx.api_ms || 0) - Number(ctx.render_dynamic_fields_ms || 0) - Number(ctx.rules_apply_ms || 0),
+          0
+        );
+        ctx.form_id = this._currentFormId || ctx.form_id;
+        ctx.finished_at = new Date().toISOString();
+        pushPerfRecord(ctx);
+        activeCtx = previousCtx;
+      }
+    };
+  }
+})(window, document);
+/* ===== REGISTRASI PERFORMANCE INSTRUMENTATION FINAL 20260426 end ===== */
