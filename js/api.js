@@ -692,8 +692,8 @@
 
     var result = await post(getActionName('LOGIN', 'login'), data, {
       includeAuth: false,
-      timeoutMs: 60000,
-      retryCount: 1,
+      timeoutMs: 30000,
+      retryCount: 0,
       retryDelayMs: 1500
     });
 
@@ -740,8 +740,8 @@
   async function refreshBootstrapLite(payload) {
     return post(getActionName('REFRESH_BOOTSTRAP_LITE', 'refreshBootstrapLite'), payload || {}, {
       includeAuth: true,
-      timeoutMs: 30000,
-      retryCount: 1,
+      timeoutMs: 9000,
+      retryCount: 0,
       retryDelayMs: 1200
     });
   }
@@ -758,8 +758,17 @@
   async function getDashboardSummaryLite(payload) {
     return post(getActionName('GET_DASHBOARD_SUMMARY_LITE', 'getDashboardSummaryLite'), payload || {}, {
       includeAuth: true,
-      timeoutMs: 30000,
-      retryCount: 1,
+      timeoutMs: 9000,
+      retryCount: 0,
+      retryDelayMs: 1200
+    });
+  }
+
+  async function getDashboardLite(payload) {
+    return post(getActionName('GET_DASHBOARD_LITE', 'getDashboardLite'), payload || {}, {
+      includeAuth: true,
+      timeoutMs: 9000,
+      retryCount: 0,
       retryDelayMs: 1200
     });
   }
@@ -846,6 +855,7 @@
     refreshBootstrapLite: refreshBootstrapLite,
     getMyProfileLite: getMyProfileLite,
     getDashboardSummaryLite: getDashboardSummaryLite,
+    getDashboardLite: getDashboardLite,
     getAppBootstrapRef: getAppBootstrapRef,
     reportClientError: reportClientError
   };
