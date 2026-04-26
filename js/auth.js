@@ -445,23 +445,36 @@
   }
 
   function hydrateDashboardAfterLogin(loginResult) {
-    Promise.resolve().then(async function () {
-      try {
-        var resolvedProfile = await resolveProfileAfterLogin(loginResult);
+    var startedAt = Date.now();
 
-        if (resolvedProfile && Object.keys(resolvedProfile).length) {
-          var mergedProfile = mergeProfileData(getStoredProfile(), resolvedProfile);
-          saveProfile(mergedProfile);
-          applyProfileToUi(mergedProfile);
-        }
+    function run() {
+      Promise.resolve().then(async function () {
+        try {
+          var resolvedProfile = await resolveProfileAfterLogin(loginResult);
 
-        if (window.DashboardView && typeof window.DashboardView.refresh === 'function') {
-          window.DashboardView.refresh();
+          if (resolvedProfile && Object.keys(resolvedProfile).length) {
+            var mergedProfile = mergeProfileData(getStoredProfile(), resolvedProfile);
+            saveProfile(mergedProfile);
+            applyProfileToUi(mergedProfile);
+          }
+
+          if (window.DashboardView && typeof window.DashboardView.applyDashboardProfile === 'function') {
+            window.DashboardView.applyDashboardProfile(getStoredProfile());
+          } else if (window.DashboardView && typeof window.DashboardView.refresh === 'function') {
+            window.DashboardView.refresh();
+          }
+        } catch (err) {
+          console.warn('Gagal memuat profil lanjutan setelah login:', err && err.message ? err.message : err);
         }
-      } catch (err) {
-        console.warn('Gagal memuat profil lanjutan setelah login:', err && err.message ? err.message : err);
-      }
-    });
+      });
+    }
+
+    if (typeof window.requestIdleCallback === 'function') {
+      window.requestIdleCallback(run, { timeout: 1500 });
+      return;
+    }
+
+    window.setTimeout(run, Math.max(300, 1200 - (Date.now() - startedAt)));
   }
 
   async function handleLoginSubmit(event) {
@@ -518,13 +531,11 @@
 
       openDashboard();
 
-      if (window.DashboardView && typeof window.DashboardView.refresh === 'function') {
-        window.DashboardView.refresh();
+      if (window.DashboardView && typeof window.DashboardView.applyDashboardProfile === 'function') {
+        window.DashboardView.applyDashboardProfile(mergedImmediateProfile || {});
       }
 
-      setTimeout(function () {
-        hydrateDashboardAfterLogin(result);
-      }, 0);
+      hydrateDashboardAfterLogin(result);
 
       if (wajibGantiPassword) {
         showToast('Login berhasil. Akun ini masih perlu ganti password.', 'warning');
