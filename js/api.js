@@ -646,6 +646,7 @@
     if (!extraPayload || typeof extraPayload !== 'object') return false;
     if (extraPayload.__fromClientErrorReporter === true) return true;
     if (String(extraPayload.action || '').trim() === 'logClientError') return true;
+    if (String(extraPayload.action || '').trim() === 'logClientPerformance') return true;
     return false;
   }
 
@@ -797,7 +798,9 @@
       message: 'CLIENT_PERFORMANCE',
       modul: 'registrasiView.js',
       action: eventName || 'client_performance',
-      event_type: 'PERFORMANCE',
+      event_type: 'CLIENT_PERFORMANCE',
+      type: 'CLIENT_PERFORMANCE',
+      category: 'performance',
       device_id: getOrCreateDeviceId(),
       app_version: config.APP_VERSION || '',
       occurred_at: nowIso(),
@@ -805,13 +808,13 @@
     }, data || {});
 
     try {
-      return await post(getActionName('LOG_CLIENT_ERROR', 'logClientError'), payload, {
+      return await post(getActionName('LOG_CLIENT_PERFORMANCE', 'logClientPerformance'), payload, {
         includeAuth: !!sessionToken,
         sessionToken: sessionToken || '',
         timeoutMs: 6000,
         retryCount: 0,
         meta: {
-          reporter_guard: 'CLIENT_PERF_V1'
+          reporter_guard: 'CLIENT_PERF_V2'
         }
       });
     } catch (err3) {
