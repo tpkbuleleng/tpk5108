@@ -538,6 +538,7 @@
         if (d && dusunValues.indexOf(d) < 0) dusunValues.push(d);
       });
       var dusun = dusunValues.join(' / ') || normalizeDisplayText(base.dusun_rw || base.nama_dusun || base.dusun || '');
+      var unsur = normalizeDisplayText(base.unsur_tpk || base.unsur || first.unsur_tpk || first.unsur || '');
       var wilayah = normalizeDisplayText(first.wilayah_tugas || base.wilayah_tugas || base.wilayah || '');
       if (!wilayah) {
         var parts = [];
@@ -547,6 +548,8 @@
         wilayah = parts.join(', ');
       }
 
+      base.unsur_tpk = normalizeDisplayText(base.unsur_tpk || unsur || '');
+      base.unsur = normalizeDisplayText(base.unsur || base.unsur_tpk || unsur || '');
       base.id_tim = normalizeDisplayText(base.id_tim || first.id_tim || '');
       base.id_wilayah = normalizeDisplayText(base.id_wilayah || first.id_wilayah || '');
       base.nama_kecamatan = kec;
