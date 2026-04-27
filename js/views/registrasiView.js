@@ -3257,8 +3257,12 @@
       form_id: getFormId(jenis),
       start_ms: nowMs(),
       api_ms: 0,
+      api_time_ms: 0,
       render_dynamic_fields_ms: 0,
+      render_time_ms: 0,
       rules_apply_ms: 0,
+      apply_rules_time_ms: 0,
+      bind_events_time_ms: 0,
       normalize_prepare_other_ms: 0,
       backend_cached: null,
       local_cache_hit: null,
@@ -3285,8 +3289,10 @@
 
       if (ctx) {
         ctx.api_ms += elapsed;
+        ctx.api_time_ms = ctx.api_ms;
         if (result && result.__frontend_api_perf) {
           ctx.api_ms = Number(result.__frontend_api_perf.api_ms || ctx.api_ms || elapsed);
+          ctx.api_time_ms = ctx.api_ms;
           ctx.local_cache_hit = !!result.__frontend_api_perf.local_cache_hit;
           ctx.backend_cached = !!result.__frontend_api_perf.backend_cached;
           if (result.__frontend_api_perf.cache_put_ok !== undefined) {
@@ -3314,6 +3320,7 @@
       var out = originalRenderDynamicFields.apply(this, arguments);
       if (activeCtx) {
         activeCtx.render_dynamic_fields_ms += Math.round(nowMs() - t0);
+        activeCtx.render_time_ms = activeCtx.render_dynamic_fields_ms;
         activeCtx.section_count = Array.isArray(sections) ? sections.length : 0;
         activeCtx.question_count = Array.isArray(this._dynamicQuestions) ? this._dynamicQuestions.length : countQuestionsFromSections(sections);
         activeCtx.field_count = activeCtx.question_count;
@@ -3331,6 +3338,7 @@
       var out = originalUpdateConditional.apply(this, arguments);
       if (activeCtx) {
         activeCtx.rules_apply_ms += Math.round(nowMs() - t0);
+        activeCtx.apply_rules_time_ms = activeCtx.rules_apply_ms;
       }
       return out;
     };
@@ -3359,8 +3367,9 @@
       } finally {
         var total = Math.round(nowMs() - ctx.start_ms);
         ctx.total_dynamic_form_ready_ms = total;
+        ctx.total_until_visible_ms = total;
         ctx.normalize_prepare_other_ms = Math.max(
-          total - Number(ctx.api_ms || 0) - Number(ctx.render_dynamic_fields_ms || 0) - Number(ctx.rules_apply_ms || 0),
+          total - Number(ctx.api_ms || 0) - Number(ctx.render_dynamic_fields_ms || 0) - Number(ctx.rules_apply_ms || 0) - Number(ctx.bind_events_time_ms || 0),
           0
         );
         ctx.form_id = this._currentFormId || ctx.form_id;
