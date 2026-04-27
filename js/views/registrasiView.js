@@ -56,6 +56,41 @@
       .toLowerCase();
   }
 
+  function humanizeOptionLabel(value) {
+    const raw = safeTrim(value);
+    if (!raw) return '';
+
+    return raw
+      .replace(/[_\-]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function getOptionDisplayLabel(option) {
+    const opt = option || {};
+    const explicit = safeTrim(firstNonEmpty(opt.label, opt.option_label, opt.text, opt.display));
+    const value = safeTrim(firstNonEmpty(opt.value, opt.option_value));
+    const chosen = explicit || value;
+    return humanizeOptionLabel(chosen || value);
+  }
+
+  function lockJenisSasaranForEdit() {
+    const jenisEl = byId('reg-jenis-sasaran');
+    if (!jenisEl) return;
+
+    const isEdit = getMode() === 'edit';
+    setReadonly(jenisEl, isEdit);
+    jenisEl.classList.toggle('is-locked', isEdit);
+    jenisEl.setAttribute('aria-readonly', isEdit ? 'true' : 'false');
+    jenisEl.setAttribute('data-locked-edit', isEdit ? '1' : '0');
+
+    if (isEdit) {
+      const editItem = getEditItem() || {};
+      const existingJenis = firstNonEmpty(editItem.jenis_sasaran, jenisEl.value);
+      if (existingJenis) jenisEl.value = existingJenis;
+    }
+  }
+
   function buildCatinDataPasanganCompat(answers) {
     const src = answers || {};
     const manual = safeTrim(firstNonEmpty(src.data_pasangan));
@@ -670,8 +705,7 @@
         idLabel.value = isEdit ? firstNonEmpty(editItem.id_sasaran, editItem.id) : '';
       }
 
-      const jenisEl = byId('reg-jenis-sasaran');
-      setReadonly(jenisEl, isEdit);
+      lockJenisSasaranForEdit();
     },
 
     resetForm() {
@@ -772,10 +806,12 @@
       Object.keys(map).forEach((id) => {
         uiSetValue(id, map[id]);
       });
+      lockJenisSasaranForEdit();
     },
 
     async handleJenisChange() {
       if (getMode() === 'edit') {
+        lockJenisSasaranForEdit();
         this.applyGenderLockByJenis();
         this.applyJenisSpecificStaticFields();
         this.renderValidation();
@@ -999,11 +1035,14 @@
         question_order: Number(firstNonEmpty(question.question_order, qIndex + 1)),
         min_value: firstNonEmpty(question.min_value, ''),
         max_value: firstNonEmpty(question.max_value, ''),
-        options: Array.isArray(question.options) ? question.options.map((opt, idx) => ({
-          value: safeTrim(firstNonEmpty(opt.value, opt.option_value)),
-          label: safeTrim(firstNonEmpty(opt.label, opt.option_label, opt.value, opt.option_value)),
-          order: Number(firstNonEmpty(opt.order, opt.option_order, idx + 1))
-        })) : [],
+        options: Array.isArray(question.options) ? question.options.map((opt, idx) => {
+          const value = safeTrim(firstNonEmpty(opt.value, opt.option_value));
+          return {
+            value: value,
+            label: getOptionDisplayLabel(opt) || humanizeOptionLabel(value),
+            order: Number(firstNonEmpty(opt.order, opt.option_order, idx + 1))
+          };
+        }) : [],
         rules: Array.isArray(question.rules) ? question.rules : []
       };
     },
@@ -1080,9 +1119,13 @@
       } else if (question.field_type === 'select') {
         const options = (question.options || [])
           .sort((a, b) => Number(a.order || 0) - Number(b.order || 0))
-          .map((opt) => `
-            <option value="${escapeHtml(opt.value)}">${escapeHtml(opt.label)}</option>
-          `).join('');
+          .map((opt) => {
+            const valueRaw = firstNonEmpty(opt.value, opt.option_value);
+            const labelRaw = getOptionDisplayLabel(opt) || humanizeOptionLabel(valueRaw);
+            return `
+            <option value="${escapeHtml(valueRaw)}">${escapeHtml(labelRaw)}</option>
+          `;
+          }).join('');
 
         inputHtml = `
           <select
@@ -1744,8 +1787,9 @@
     }
 
     function toOptionHtmlV4(value) {
-      const safe = escapeHtml(value);
-      return '<option value="' + safe + '">' + safe + '</option>';
+      const safeValue = escapeHtml(value);
+      const safeLabel = escapeHtml(humanizeOptionLabel(value));
+      return '<option value="' + safeValue + '">' + safeLabel + '</option>';
     }
 
     function fillSelectOptionsV4(selectEl, values, selectedValue) {
@@ -2059,6 +2103,7 @@
         desa: map['reg-desa'],
         dusun: map['reg-dusun']
       }).catch(function () {});
+      lockJenisSasaranForEdit();
       this.applyJenisSpecificStaticFields();
     };
 
@@ -2074,6 +2119,7 @@
     RegistrasiForm.openEdit = async function (item) {
       captureReturnRouteV4();
       const out = await _origOpenEditV4.call(this, item);
+      lockJenisSasaranForEdit();
       this.applyJenisSpecificStaticFields();
       return out;
     };
@@ -2709,6 +2755,33 @@
       questions: flatQuestions
     });
   };
+
+
+  /* ===== PATCH 2D: UI label opsi dan lock jenis sasaran edit ===== */
+  (function applyRegistrasi2DMinorFix() {
+    if (RegistrasiForm.__PATCH_2D_UI_MINOR_FIX === true) return;
+    RegistrasiForm.__PATCH_2D_UI_MINOR_FIX = true;
+
+    const _origApplyModeUI2D = RegistrasiForm.applyModeUI;
+    RegistrasiForm.applyModeUI = function () {
+      const out = _origApplyModeUI2D.apply(this, arguments);
+      lockJenisSasaranForEdit();
+      return out;
+    };
+
+    const _origCollectFormData2D = RegistrasiForm.collectFormData;
+    RegistrasiForm.collectFormData = function () {
+      const data = _origCollectFormData2D.apply(this, arguments) || {};
+      if (getMode() === 'edit') {
+        const editItem = getEditItem() || {};
+        const lockedJenis = firstNonEmpty(editItem.jenis_sasaran, data.answers && data.answers.jenis_sasaran);
+        data.answers = Object.assign({}, data.answers || {}, { jenis_sasaran: lockedJenis });
+        data.form_id = this._currentFormId || mapJenisToFormId(lockedJenis);
+        lockJenisSasaranForEdit();
+      }
+      return data;
+    };
+  })();
 
   window.RegistrasiForm = RegistrasiForm;
 
