@@ -394,6 +394,10 @@
         window.DashboardView.applyDashboardProfile(profile);
       }
 
+      if (opts.refreshProfileRefs !== false && profile && Object.keys(profile).length) {
+        this.refreshProfileFromBackendRefs_(profile).catch(function () {});
+      }
+
       return payload;
     },
 
@@ -508,6 +512,96 @@
       setTextAliases(['profile-desa', 'wilayah-desa', 'profile-desa-value'], wilayah.desa);
       setTextAliases(['profile-dusun', 'wilayah-dusun', 'profile-dusun-value'], wilayah.dusun);
       setTextAliases(['header-kecamatan', 'profile-kecamatan', 'wilayah-kecamatan'], wilayah.kecamatan);
+    },
+
+
+
+    needsProfileRecovery(profile) {
+      var data = profile || {};
+      return !(normalizeDisplayText(data.unsur_tpk || data.unsur) &&
+        normalizeDisplayText(data.desa_kelurahan || data.nama_desa || data.desa) &&
+        normalizeDisplayText(data.dusun_rw || data.nama_dusun || data.dusun) &&
+        normalizeDisplayText(data.wilayah_tugas || data.wilayah));
+    },
+
+    mergeTimRefIntoProfile(profile, rows) {
+      var base = profile && typeof profile === 'object' ? Object.assign({}, profile) : {};
+      var list = Array.isArray(rows) ? rows : [];
+      if (!list.length) return base;
+
+      var first = list[0] || {};
+      var kec = normalizeDisplayText(first.nama_kecamatan || first.kecamatan || base.nama_kecamatan || base.kecamatan || '');
+      var desa = normalizeDisplayText(first.desa_kelurahan || first.nama_desa || first.desa || base.desa_kelurahan || base.nama_desa || base.desa || '');
+      var dusunValues = [];
+      list.forEach(function (row) {
+        var d = normalizeDisplayText(row.dusun_rw || row.nama_dusun || row.dusun || '');
+        if (d && dusunValues.indexOf(d) < 0) dusunValues.push(d);
+      });
+      var dusun = dusunValues.join(' / ') || normalizeDisplayText(base.dusun_rw || base.nama_dusun || base.dusun || '');
+      var wilayah = normalizeDisplayText(first.wilayah_tugas || base.wilayah_tugas || base.wilayah || '');
+      if (!wilayah) {
+        var parts = [];
+        if (kec) parts.push(kec);
+        if (desa) parts.push(desa);
+        if (dusun) parts.push(dusun);
+        wilayah = parts.join(', ');
+      }
+
+      base.id_tim = normalizeDisplayText(base.id_tim || first.id_tim || '');
+      base.id_wilayah = normalizeDisplayText(base.id_wilayah || first.id_wilayah || '');
+      base.nama_kecamatan = kec;
+      base.kecamatan = kec;
+      base.desa_kelurahan = desa;
+      base.nama_desa = desa;
+      base.desa = desa;
+      base.dusun_rw = dusun;
+      base.nama_dusun = dusun;
+      base.dusun = dusun;
+      base.wilayah_tugas = wilayah;
+      base.wilayah = wilayah;
+      base.scope_wilayah = base.scope_wilayah || {
+        id_wilayah: base.id_wilayah || '',
+        kecamatan: kec,
+        desa_kelurahan: desa,
+        dusun_rw: dusun
+      };
+      base.wilayah_tugas_ringkas = base.wilayah_tugas_ringkas || list;
+      return base;
+    },
+
+    async refreshProfileFromBackendRefs_(profile) {
+      var base = profile && typeof profile === 'object' ? Object.assign({}, profile) : this.getCachedProfile();
+      if (!this.needsProfileRecovery(base)) return base;
+      if (!window.Api) return base;
+
+      var updated = base;
+      try {
+        if (typeof window.Api.getMyProfileLite === 'function') {
+          var pResult = await window.Api.getMyProfileLite({});
+          if (pResult && pResult.ok && pResult.data) {
+            updated = mergeProfileData(updated, pResult.data || {});
+          }
+        }
+      } catch (ignoreProfile) {}
+
+      try {
+        if (typeof window.Api.getTimRef === 'function') {
+          var tResult = await window.Api.getTimRef({ id_tim: updated.id_tim || base.id_tim || '' });
+          if (tResult && tResult.ok) {
+            var rows = Array.isArray(tResult.data) ? tResult.data : (tResult.data && Array.isArray(tResult.data.items) ? tResult.data.items : []);
+            updated = this.mergeTimRefIntoProfile(updated, rows);
+          }
+        }
+      } catch (ignoreTim) {}
+
+      if (updated && Object.keys(updated).length) {
+        this.persistProfile(updated);
+        this.applyProfileToUi(updated);
+        if (window.DashboardView && typeof window.DashboardView.applyDashboardProfile === 'function') {
+          window.DashboardView.applyDashboardProfile(updated);
+        }
+      }
+      return updated;
     },
 
     clearSession() {

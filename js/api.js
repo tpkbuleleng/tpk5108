@@ -774,6 +774,34 @@
     });
   }
 
+  async function getTimRef(payload) {
+    return post(getActionName('GET_TIM_REF', 'getTimRef'), payload || {}, {
+      includeAuth: true,
+      timeoutMs: 15000,
+      retryCount: 1,
+      retryDelayMs: 800
+    });
+  }
+
+  async function getDashboardLite(payload) {
+    return post(getActionName('GET_DASHBOARD_LITE', 'getDashboardLite'), payload || {}, {
+      includeAuth: true,
+      timeoutMs: 20000,
+      retryCount: 1,
+      retryDelayMs: 800
+    });
+  }
+
+  async function getSasaranListLite(payload) {
+    return post(getActionName('GET_SASARAN_LIST_LITE', 'getSasaranListLite'), payload || {}, {
+      includeAuth: true,
+      timeoutMs: 15000,
+      retryCount: 1,
+      retryDelayMs: 900,
+      readOnlyFallbackGet: true
+    });
+  }
+
   async function reportClientPerformance(eventName, data) {
     var config = null;
     try {
@@ -895,7 +923,10 @@
     refreshBootstrapLite: refreshBootstrapLite,
     getMyProfileLite: getMyProfileLite,
     getDashboardSummaryLite: getDashboardSummaryLite,
+    getDashboardLite: getDashboardLite,
     getAppBootstrapRef: getAppBootstrapRef,
+    getTimRef: getTimRef,
+    getSasaranListLite: getSasaranListLite,
     reportClientError: reportClientError,
     reportClientPerformance: reportClientPerformance
   };

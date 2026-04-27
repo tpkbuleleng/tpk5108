@@ -192,6 +192,19 @@
       };
     },
 
+    mergeProfile: function (patch) {
+      var current = state.profile && typeof state.profile === 'object' ? state.profile : {};
+      var incoming = patch && typeof patch === 'object' ? patch : {};
+      var merged = Object.assign({}, current);
+      Object.keys(incoming).forEach(function (key) {
+        var value = incoming[key];
+        if (value === undefined || value === null) return;
+        if (typeof value === 'string' && !value.trim()) return;
+        merged[key] = value;
+      });
+      return this.setProfile(merged);
+    },
+
     setProfile: function (profile) {
       var keys = getStorageKeys();
       var value = profile && typeof profile === 'object' ? profile : {};
