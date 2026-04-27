@@ -200,6 +200,25 @@
     return normalizeText(value).toUpperCase();
   }
 
+  function humanizeOptionLikeValue(value, keyHint) {
+    var text = normalizeText(value);
+    if (!text) return '';
+
+    var key = String(keyHint || '').toLowerCase();
+    if (key === 'id_sasaran' || key === 'id_tim' || key === 'id_wilayah' ||
+        key.indexOf('nik') >= 0 || key.indexOf('kk') >= 0 ||
+        key.indexOf('form_id') >= 0 || key.indexOf('client_submit_id') >= 0 ||
+        key.indexOf('sync_source') >= 0 || key.indexOf('request_id') >= 0) {
+      return text;
+    }
+
+    if (/^[A-Z0-9]+(?:_[A-Z0-9]+)+$/.test(text)) {
+      return text.replace(/_+/g, ' ');
+    }
+
+    return text;
+  }
+
   function isMeaningful(value) {
     if (value === undefined || value === null) return false;
     var text = normalizeText(value);
@@ -310,7 +329,7 @@
       return normalizeUpperDisplay(text);
     }
 
-    return text;
+    return humanizeOptionLikeValue(text, key);
   }
 
   function humanizeKey(key) {
