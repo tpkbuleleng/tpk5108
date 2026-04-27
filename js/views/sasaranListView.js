@@ -1,7 +1,7 @@
 (function (window, document) {
   'use strict';
 
-  window.__SASARAN_LIST_VIEW_BUILD = '20260421-01';
+  window.__SASARAN_LIST_VIEW_BUILD = '20260427-2C';
   console.log('SasaranListView build aktif:', window.__SASARAN_LIST_VIEW_BUILD);
 
   var SCREEN_ID = 'sasaran-list-screen';
@@ -268,7 +268,14 @@
     safe.jenis_sasaran = normalizeSpaces(safe.jenis_sasaran || '');
     safe.status_sasaran = normalizeSpaces(safe.status_sasaran || safe.status || '');
     safe.nik_sasaran = normalizeSpaces(safe.nik_sasaran || safe.nik || '');
-    safe.nomor_kk = normalizeSpaces(safe.nomor_kk || '');
+    safe.nomor_kk = normalizeSpaces(safe.nomor_kk || safe.no_kk || '');
+    safe.tanggal_lahir = normalizeSpaces(safe.tanggal_lahir || safe.tgl_lahir || '');
+    safe.nama_kecamatan = normalizeSpaces(safe.nama_kecamatan || safe.kecamatan || '');
+    safe.kecamatan = safe.nama_kecamatan || normalizeSpaces(safe.kecamatan || '');
+    safe.nama_desa = normalizeSpaces(safe.nama_desa || safe.desa_kelurahan || safe.desa || '');
+    safe.desa_kelurahan = safe.nama_desa || normalizeSpaces(safe.desa_kelurahan || '');
+    safe.nama_dusun = normalizeSpaces(safe.nama_dusun || safe.dusun_rw || safe.dusun || '');
+    safe.dusun_rw = safe.nama_dusun || normalizeSpaces(safe.dusun_rw || '');
     safe.nama_wilayah_sasaran = wilayah;
     safe.wilayah_sasaran = wilayah;
     return safe;
@@ -578,14 +585,19 @@
       setLoading();
 
       try {
-        var action = api.getActionName ? api.getActionName('GET_SASARAN_BY_TIM', 'getSasaranByTim') : 'getSasaranByTim';
-        var result = await api.post(action, payload, {
-          includeAuth: true,
-          timeoutMs: 12000,
-          retryCount: 1,
-          retryDelayMs: 900,
-          readOnlyFallbackGet: true
-        });
+        var result = null;
+        if (typeof api.getSasaranListLite === 'function') {
+          result = await api.getSasaranListLite(payload);
+        } else {
+          var action = api.getActionName ? api.getActionName('GET_SASARAN_LIST_LITE', 'getSasaranListLite') : 'getSasaranListLite';
+          result = await api.post(action, payload, {
+            includeAuth: true,
+            timeoutMs: 12000,
+            retryCount: 1,
+            retryDelayMs: 900,
+            readOnlyFallbackGet: true
+          });
+        }
 
         if (!result || result.ok === false) {
           setMeta('Menampilkan cache lokal sasaran.');

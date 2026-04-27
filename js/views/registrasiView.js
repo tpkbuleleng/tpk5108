@@ -3258,11 +3258,15 @@
       start_ms: nowMs(),
       api_ms: 0,
       api_time_ms: 0,
+      REG_FORM_API_MS: 0,
       render_dynamic_fields_ms: 0,
       render_time_ms: 0,
+      REG_FORM_RENDER_MS: 0,
       rules_apply_ms: 0,
       apply_rules_time_ms: 0,
+      REG_FORM_RULES_MS: 0,
       bind_events_time_ms: 0,
+      REG_FORM_BIND_MS: 0,
       normalize_prepare_other_ms: 0,
       backend_cached: null,
       local_cache_hit: null,
@@ -3374,6 +3378,12 @@
         );
         ctx.form_id = this._currentFormId || ctx.form_id;
         ctx.finished_at = new Date().toISOString();
+        ctx.REG_FORM_API_MS = Number(ctx.api_time_ms || ctx.api_ms || 0);
+        ctx.REG_FORM_RENDER_MS = Number(ctx.render_time_ms || ctx.render_dynamic_fields_ms || 0);
+        ctx.REG_FORM_RULES_MS = Number(ctx.apply_rules_time_ms || ctx.rules_apply_ms || 0);
+        ctx.REG_FORM_BIND_MS = Number(ctx.bind_events_time_ms || 0);
+        ctx.REG_FORM_TOTAL_MS = Number(ctx.total_until_visible_ms || total || 0);
+        ctx.event_name = 'registrasi_dynamic_form_ready';
         pushPerfRecord(ctx);
         activeCtx = previousCtx;
       }

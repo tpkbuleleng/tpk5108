@@ -447,24 +447,58 @@
     });
   }
 
+  function getMeaningful(value) {
+    var text = String(value == null ? '' : value).replace(/\s+/g, ' ').trim();
+    var upper = text.toUpperCase();
+    if (!text || upper === '-' || upper === 'NULL' || upper === 'UNDEFINED' || upper === 'N/A' || upper === 'NA') return '';
+    return text;
+  }
+
+  function buildWilayahFromProfile(profile) {
+    var data = profile || {};
+    var kec = getMeaningful(data.nama_kecamatan || data.kecamatan || data.id_kecamatan || '');
+    var desa = getMeaningful(data.desa_kelurahan || data.nama_desa || data.desa || '');
+    var dusun = getMeaningful(data.dusun_rw || data.nama_dusun || data.dusun || '');
+    var wilayah = getMeaningful(data.wilayah_tugas || data.wilayah || '');
+
+    if (wilayah) {
+      var parts = wilayah.split(/\s*,\s*/).map(function(part) { return getMeaningful(part); }).filter(Boolean);
+      if (!kec && parts[0]) kec = parts[0];
+      if (!desa && parts[1]) desa = parts[1];
+      if (!dusun && parts.length > 2) dusun = parts.slice(2).join(', ');
+    }
+
+    return {
+      kecamatan: kec || '-',
+      desa: desa || '-',
+      dusun: dusun || '-',
+      wilayah: wilayah || [kec, desa, dusun].filter(Boolean).join(', ') || '-'
+    };
+  }
+
   function applyDashboardProfile(profile) {
     var data = profile || {};
+    var wilayah = buildWilayahFromProfile(data);
+    var unsur = getMeaningful(data.unsur_tpk || data.unsur || '');
 
     setText('profile-nama', data.nama_kader || data.nama_user || data.nama || '-');
-    setText('profile-unsur', data.unsur_tpk || data.unsur || '-');
+    setText('profile-unsur', unsur || '-');
     setText('profile-id', data.id_user || '-');
     setText('profile-tim', getDisplayNomorTim(data));
-    setText('profile-desa', data.desa_kelurahan || data.nama_desa || '-');
-    setText('profile-dusun', data.dusun_rw || data.nama_dusun || '-');
-    setText('header-kecamatan', data.nama_kecamatan || data.kecamatan || '-');
+    setText('profile-desa', wilayah.desa);
+    setText('profile-dusun', wilayah.dusun);
+    setText('profile-wilayah', wilayah.wilayah);
+    setText('wilayah-tugas', wilayah.wilayah);
+    setText('header-kecamatan', wilayah.kecamatan);
 
     setText('modal-profile-nama', data.nama_kader || data.nama_user || data.nama || '-');
     setText('modal-profile-id', data.id_user || '-');
-    setText('modal-profile-unsur', data.unsur_tpk || data.unsur || '-');
+    setText('modal-profile-unsur', unsur || '-');
     setText('modal-profile-tim', getDisplayNomorTim(data));
-    setText('modal-profile-kecamatan', data.nama_kecamatan || data.kecamatan || '-');
-    setText('modal-profile-desa', data.desa_kelurahan || data.nama_desa || '-');
-    setText('modal-profile-dusun', data.dusun_rw || data.nama_dusun || '-');
+    setText('modal-profile-kecamatan', wilayah.kecamatan);
+    setText('modal-profile-desa', wilayah.desa);
+    setText('modal-profile-dusun', wilayah.dusun);
+    setText('modal-profile-wilayah', wilayah.wilayah);
     setText('modal-profile-status-kader', data.status_kader_tpk || '-');
     setText('modal-profile-nomor-wa', formatPhone(data.nomor_wa));
     setText('modal-profile-bpjstk', formatFlag(data.memiliki_bpjstk || data.status_bpjstk));
@@ -1282,6 +1316,22 @@
     };
   }
 
+
+  function applyBootstrapLite(payload) {
+    payload = payload || {};
+    var profile = payload.profile || (payload.bootstrap_lite && payload.bootstrap_lite.profile) || {};
+    if (profile && Object.keys(profile).length) {
+      persistProfile(profile);
+      applyDashboardProfile(profile);
+      renderMenu(profile.role_akses || profile.role || 'KADER');
+    }
+
+    var dashboard = payload.dashboard || payload.summary || (payload.bootstrap_lite && payload.bootstrap_lite.dashboard) || {};
+    if (dashboard && Object.keys(dashboard).length) {
+      applyDashboardSummary(extractDashboardSummary(dashboard));
+    }
+  }
+
   var DashboardView = {
     init: init,
     refresh: refresh,
@@ -1293,6 +1343,7 @@
     getDefinitions: getDefinitions,
     normalizeRole: normalizeRole,
     applyDashboardProfile: applyDashboardProfile,
+    applyBootstrapLite: applyBootstrapLite,
     openRegistrasi: openRegistrasi,
     openSasaranList: openSasaranList,
     openPendampinganEntry: openPendampinganEntry,
