@@ -407,23 +407,52 @@
     } catch (_) {}
   }
 
-  function enqueueOfflineRegistrasi(payload) {
+  function isNetworkLikeError(err) {
+    const msg = String((err && err.message) || err || '').toLowerCase();
+    return !navigator.onLine ||
+      msg.indexOf('koneksi') >= 0 ||
+      msg.indexOf('network') >= 0 ||
+      msg.indexOf('fetch') >= 0 ||
+      msg.indexOf('batas waktu') >= 0 ||
+      msg.indexOf('timeout') >= 0 ||
+      msg.indexOf('cors') >= 0 ||
+      msg.indexOf('failed') >= 0;
+  }
+
+  async function enqueueOfflineRegistrasi(payload) {
+    const safePayload = Object.assign({}, payload || {}, { sync_source: 'OFFLINE_QUEUE' });
+
     const manager = getDraftManager();
     if (manager && isFunction(manager.enqueueOfflineRegistrasi)) {
-      manager.enqueueOfflineRegistrasi(payload);
+      await manager.enqueueOfflineRegistrasi(safePayload);
       return true;
     }
+
+    if (window.QueueRepo && isFunction(window.QueueRepo.enqueue)) {
+      await window.QueueRepo.enqueue('registerSasaran', safePayload, {
+        entity_type: 'SASARAN',
+        client_submit_id: safePayload.client_submit_id || '',
+        sync_source: 'OFFLINE_QUEUE'
+      });
+      return true;
+    }
+
     try {
       const key = 'tpk_sync_queue_v1';
       const raw = safeJsonParse(localStorage.getItem(key), []);
       const queue = Array.isArray(raw) ? raw : [];
       queue.push({
+        id: safePayload.client_submit_id || ensureClientSubmitId(''),
         action: 'registerSasaran',
         created_at: new Date().toISOString(),
         sync_status: 'PENDING',
-        payload: payload || {}
+        status: 'PENDING',
+        payload: safePayload
       });
       localStorage.setItem(key, JSON.stringify(queue));
+      if (window.AppState && isFunction(window.AppState.setSyncQueue)) {
+        window.AppState.setSyncQueue(queue);
+      }
       return true;
     } catch (_) {
       return false;
@@ -1662,10 +1691,13 @@
         }
 
         if (!navigator.onLine && mode === 'create') {
-          const queued = enqueueOfflineRegistrasi(payload);
+          const queued = await enqueueOfflineRegistrasi(payload);
           if (queued) {
             saveDraftLocal(payload);
             notify('Sedang offline. Registrasi disimpan ke draft sinkronisasi.');
+            if (window.Router && isFunction(window.Router.go)) {
+              window.Router.go('sync');
+            }
           } else {
             notify('Gagal menyimpan draft registrasi offline.');
           }
@@ -1727,6 +1759,18 @@
       } catch (err) {
         if (mode === 'create') {
           saveDraftLocal(payload);
+          if (isNetworkLikeError(err)) {
+            try {
+              const queuedAfterFailure = await enqueueOfflineRegistrasi(payload);
+              if (queuedAfterFailure) {
+                notify('Koneksi tidak stabil. Registrasi disimpan ke antrean sinkronisasi.', 'warning');
+                if (window.Router && isFunction(window.Router.go)) {
+                  window.Router.go('sync');
+                }
+                return;
+              }
+            } catch (_) {}
+          }
         }
         notify(err && err.message ? err.message : 'Terjadi kesalahan saat menyimpan data.');
       } finally {
