@@ -2,6 +2,9 @@
   'use strict';
 
   var BOOTSTRAP_LITE_KEY = 'tpk_bootstrap_lite';
+  var LAST_GOOD_PROFILE_KEY = 'tpk_last_good_profile';
+  var SESSION_STATUS_KEY = 'tpk_session_status';
+  var LAST_ROUTE_KEY = 'tpk_last_route';
   var SCHEMA_KEY = 'tpk_local_schema_version';
   var DEFAULT_SCHEMA_VERSION = 1;
   var SYNC_MIRROR_GUARD_KEY = '__tpkStage1bSyncMirrorGuard';
@@ -280,6 +283,36 @@
       }
     },
 
+    getLastGoodProfile: function (fallback) {
+      return this.get(LAST_GOOD_PROFILE_KEY, fallback || {});
+    },
+
+    setLastGoodProfile: function (value) {
+      var data = value && typeof value === 'object' ? value : {};
+      if (!Object.keys(data).length) return data;
+      return this.set(LAST_GOOD_PROFILE_KEY, data);
+    },
+
+    getSessionStatus: function (fallback) {
+      return this.get(SESSION_STATUS_KEY, fallback || {});
+    },
+
+    setSessionStatus: function (value) {
+      return this.set(SESSION_STATUS_KEY, value || {});
+    },
+
+    clearSessionStatus: function () {
+      this.remove(SESSION_STATUS_KEY);
+    },
+
+    setLastRoute: function (routeName) {
+      return this.set(LAST_ROUTE_KEY, String(routeName || ''));
+    },
+
+    getLastRoute: function (fallback) {
+      return this.get(LAST_ROUTE_KEY, fallback || '');
+    },
+
     getProfile: function (fallback) {
       var keys = getStorageKeys();
       return this.get(keys.PROFILE || 'tpk_profile', fallback || {});
@@ -287,7 +320,12 @@
 
     setProfile: function (value) {
       var keys = getStorageKeys();
-      return this.set(keys.PROFILE || 'tpk_profile', value || {});
+      var data = value && typeof value === 'object' ? value : {};
+      var saved = this.set(keys.PROFILE || 'tpk_profile', data);
+      if (Object.keys(data).length) {
+        this.setLastGoodProfile(data);
+      }
+      return saved;
     },
 
     getBootstrapLite: function (fallback) {
@@ -308,7 +346,9 @@
       [
         keys.SESSION_TOKEN,
         keys.PROFILE,
-        getBootstrapLiteKey()
+        getBootstrapLiteKey(),
+        LAST_GOOD_PROFILE_KEY,
+        SESSION_STATUS_KEY
       ].filter(Boolean).forEach(function (key) {
         Storage.remove(key);
       });
