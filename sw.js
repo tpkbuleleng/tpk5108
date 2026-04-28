@@ -1,6 +1,10 @@
-const SW_VERSION = 'tpk-sw-final-20260425-01';
+const SW_VERSION = 'tpk-sw-3a-offline-recovery-20260428-01';
 const SHELL_CACHE = 'tpk-shell-' + SW_VERSION;
 const ASSET_CACHE = 'tpk-assets-' + SW_VERSION;
+
+// Core shell: cukup untuk membuka aplikasi, memulihkan sesi lokal,
+// menyimpan draft offline, dan menjalankan queue sync.
+// View tetap runtime-cache saat pernah dibuka.
 const APP_SHELL = [
   './',
   './index.html',
@@ -14,8 +18,6 @@ const APP_SHELL = [
   './js/state.js',
   './js/db.js',
   './js/queueRepo.js',
-  './js/validators.js',
-  './js/cachePolicy.js',
   './js/api.js',
   './js/auth.js',
   './js/router.js',
@@ -43,19 +45,28 @@ function isSameOriginAsset(url) {
     /\.(?:css|js|png|jpg|jpeg|svg|webp|gif|ico|woff2?|ttf|eot|json|webmanifest)$/i.test(url.pathname);
 }
 
+async function safeCacheShell() {
+  const cache = await caches.open(SHELL_CACHE);
+  await Promise.all(APP_SHELL.map(async (asset) => {
+    try {
+      await cache.add(asset);
+    } catch (err) {
+      // Asset opsional tidak boleh membuat SW gagal install.
+      // Jika asset pernah dimuat sebelumnya, runtime cache tetap bisa dipakai.
+    }
+  }));
+}
+
 async function notifyClients(message) {
   const clients = await self.clients.matchAll({ includeUncontrolled: true, type: 'window' });
   clients.forEach((client) => {
-    try {
-      client.postMessage(message);
-    } catch (err) {}
+    try { client.postMessage(message); } catch (err) {}
   });
 }
 
 self.addEventListener('install', (event) => {
   event.waitUntil((async () => {
-    const cache = await caches.open(SHELL_CACHE);
-    await cache.addAll(APP_SHELL);
+    await safeCacheShell();
     await self.skipWaiting();
   })());
 });
@@ -71,9 +82,7 @@ self.addEventListener('activate', (event) => {
     }));
 
     if ('navigationPreload' in self.registration) {
-      try {
-        await self.registration.navigationPreload.enable();
-      } catch (err) {}
+      try { await self.registration.navigationPreload.enable(); } catch (err) {}
     }
 
     await self.clients.claim();
@@ -83,7 +92,6 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('message', (event) => {
   const data = event && event.data ? event.data : {};
-
   if (data && data.type === 'TPK_SKIP_WAITING') {
     self.skipWaiting();
   }
@@ -93,6 +101,7 @@ self.addEventListener('fetch', (event) => {
   const request = event.request;
   const url = new URL(request.url);
 
+  // API privat dan request POST tidak pernah dicache service worker.
   if (isPrivateRequest(url.href, request.method)) {
     return;
   }
@@ -128,13 +137,9 @@ self.addEventListener('fetch', (event) => {
         return response;
       }).catch(() => null);
 
-      if (cached) {
-        return cached;
-      }
-
+      if (cached) return cached;
       const network = await networkPromise;
       if (network) return network;
-
       return fetch(request);
     })());
   }
