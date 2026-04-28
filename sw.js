@@ -1,4 +1,4 @@
-const SW_VERSION = 'tpk-sw-3a-offline-recovery-20260428-01';
+const SW_VERSION = 'tpk-sw-3a-session-offline-recovery-20260428-02';
 const SHELL_CACHE = 'tpk-shell-' + SW_VERSION;
 const ASSET_CACHE = 'tpk-assets-' + SW_VERSION;
 
