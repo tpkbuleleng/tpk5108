@@ -115,6 +115,27 @@
     return route === 'splash' || route === 'login' || route === 'dashboard';
   }
 
+  function isAuthFailureResult(result) {
+    if (!result) return false;
+    var code = Number(result.code || 0);
+    if (code === 401 || code === 403 || result.session_invalid === true) return true;
+    var msg = String(result.message || '').toLowerCase();
+    return msg.indexOf('session token') >= 0 || msg.indexOf('token tidak') >= 0 || msg.indexOf('token expired') >= 0;
+  }
+
+  function isTokenInactiveResult(result) {
+    var msg = String(result && result.message || '').toLowerCase();
+    return result && result.token_inactive === true || msg.indexOf('tidak aktif') >= 0 || msg.indexOf('dicabut') >= 0 || msg.indexOf('inactive') >= 0 || msg.indexOf('revoked') >= 0;
+  }
+
+  function safeToast(message, type) {
+    if (window.UI && typeof window.UI.showToast === 'function') {
+      window.UI.showToast(message, type || 'info');
+      return;
+    }
+    try { console.log('[SESSION]', type || 'info', message); } catch (err) {}
+  }
+
   const AppBootstrap = {
     _initRunId: 0,
 
@@ -230,13 +251,23 @@
       if (!window.Storage || typeof window.Storage.get !== 'function') {
         return {};
       }
-      return window.Storage.get(window.APP_CONFIG.STORAGE_KEYS.PROFILE, {});
+      var profile = window.Storage.get(window.APP_CONFIG.STORAGE_KEYS.PROFILE, {});
+      if (profile && Object.keys(profile).length) return profile;
+      if (typeof window.Storage.getLastGoodProfile === 'function') {
+        return window.Storage.getLastGoodProfile({}) || {};
+      }
+      return {};
     },
 
     persistProfile(profile) {
-      var data = profile || {};
-      if (window.Storage && typeof window.Storage.set === 'function') {
+      var incoming = profile && typeof profile === 'object' ? profile : {};
+      if (!Object.keys(incoming).length) return;
+      var data = mergeProfileData(this.getCachedProfile(), incoming);
+      if (window.Storage && typeof window.Storage.setProfile === 'function') {
+        window.Storage.setProfile(data);
+      } else if (window.Storage && typeof window.Storage.set === 'function') {
         window.Storage.set(window.APP_CONFIG.STORAGE_KEYS.PROFILE, data);
+        if (typeof window.Storage.setLastGoodProfile === 'function') window.Storage.setLastGoodProfile(data);
       }
       if (window.AppState && typeof window.AppState.setProfile === 'function') {
         window.AppState.setProfile(data);
@@ -412,6 +443,12 @@
           keepUiOnFailure: true
         })).then(function (ok) {
           if (!ok && opts.initRunId && self._initRunId === opts.initRunId) {
+            if (window.__TPK_APP_UPDATE_IN_PROGRESS === true) return;
+            var cachedLite = self.getCachedBootstrapLite ? self.getCachedBootstrapLite() : {};
+            var cachedProfile = self.getCachedProfile ? self.getCachedProfile() : {};
+            if ((cachedLite && Object.keys(cachedLite).length) || (cachedProfile && Object.keys(cachedProfile).length)) {
+              return;
+            }
             self.openScreen('login-screen');
             if (window.Router && typeof window.Router.go === 'function') {
               window.Router.go('login');
@@ -454,7 +491,19 @@
         }
 
         if (!result || !result.ok) {
-          if (options.keepUiOnFailure === true || options.preferCachedUi === true) {
+          var authFailure = isAuthFailureResult(result);
+          if (authFailure) {
+            if (window.Storage && typeof window.Storage.setSessionStatus === 'function') {
+              window.Storage.setSessionStatus({
+                status: isTokenInactiveResult(result) ? 'TOKEN_INACTIVE' : 'TOKEN_INVALID',
+                message: result && result.message ? result.message : 'Session tidak valid',
+                updated_at: new Date().toISOString(),
+                source: 'bootstrap.js'
+              });
+            }
+            safeToast(isTokenInactiveResult(result) ? 'Session tidak aktif. Silakan login ulang saat jaringan tersedia.' : 'Session perlu login ulang.', 'warning');
+          }
+          if (options.keepUiOnFailure === true || options.preferCachedUi === true || authFailure) {
             var cachedLiteOnFailure = this.getCachedBootstrapLite ? this.getCachedBootstrapLite() : {};
             var cachedProfileOnFailure = this.getCachedProfile ? this.getCachedProfile() : {};
             if ((cachedLiteOnFailure && Object.keys(cachedLiteOnFailure).length) ||
@@ -468,10 +517,8 @@
             }
           }
 
-          if (options.keepUiOnFailure !== true) {
-            this.clearSession();
-          }
-          return false;
+          // Jangan kosongkan profil/cache/draft otomatis. Token sudah dibersihkan oleh api.js jika memang invalid.
+          return authFailure ? true : false;
         }
 
         var responseData = result.data || {};
@@ -524,7 +571,6 @@
             return true;
           }
         }
-        this.clearSession();
         return false;
       }
     },
@@ -632,6 +678,29 @@
         }
       }
       return updated;
+    },
+
+    safeUpdateApplication() {
+      window.__TPK_APP_UPDATE_IN_PROGRESS = true;
+      try {
+        if (window.Storage && typeof window.Storage.setLastRoute === 'function' && window.Router && typeof window.Router.getCurrentRoute === 'function') {
+          window.Storage.setLastRoute(window.Router.getCurrentRoute() || 'dashboard');
+        }
+      } catch (err) {}
+
+      var finishReload = function () {
+        window.setTimeout(function () {
+          try { window.location.reload(); } catch (e) { location.reload(); }
+        }, 160);
+      };
+
+      try {
+        if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+          navigator.serviceWorker.controller.postMessage({ type: 'TPK_SKIP_WAITING' });
+        }
+      } catch (err2) {}
+
+      finishReload();
     },
 
     clearSession() {
