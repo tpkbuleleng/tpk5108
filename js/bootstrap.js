@@ -454,6 +454,20 @@
         }
 
         if (!result || !result.ok) {
+          if (options.keepUiOnFailure === true || options.preferCachedUi === true) {
+            var cachedLiteOnFailure = this.getCachedBootstrapLite ? this.getCachedBootstrapLite() : {};
+            var cachedProfileOnFailure = this.getCachedProfile ? this.getCachedProfile() : {};
+            if ((cachedLiteOnFailure && Object.keys(cachedLiteOnFailure).length) ||
+                (cachedProfileOnFailure && Object.keys(cachedProfileOnFailure).length)) {
+              if (cachedLiteOnFailure && Object.keys(cachedLiteOnFailure).length) {
+                this.applyBootstrapLite(cachedLiteOnFailure, { persist: false, refreshProfileRefs: false });
+              } else if (cachedProfileOnFailure && Object.keys(cachedProfileOnFailure).length) {
+                this.applyProfileToUi(cachedProfileOnFailure);
+              }
+              return true;
+            }
+          }
+
           if (options.keepUiOnFailure !== true) {
             this.clearSession();
           }
@@ -497,6 +511,19 @@
         return true;
       } catch (err) {
         console.warn('Gagal memulihkan sesi:', err && err.message ? err.message : err);
+        if (options.keepUiOnFailure === true || options.preferCachedUi === true) {
+          var cachedLiteOnCatch = this.getCachedBootstrapLite ? this.getCachedBootstrapLite() : {};
+          var cachedProfileOnCatch = this.getCachedProfile ? this.getCachedProfile() : {};
+          if ((cachedLiteOnCatch && Object.keys(cachedLiteOnCatch).length) ||
+              (cachedProfileOnCatch && Object.keys(cachedProfileOnCatch).length)) {
+            if (cachedLiteOnCatch && Object.keys(cachedLiteOnCatch).length) {
+              this.applyBootstrapLite(cachedLiteOnCatch, { persist: false, refreshProfileRefs: false });
+            } else if (cachedProfileOnCatch && Object.keys(cachedProfileOnCatch).length) {
+              this.applyProfileToUi(cachedProfileOnCatch);
+            }
+            return true;
+          }
+        }
         this.clearSession();
         return false;
       }
