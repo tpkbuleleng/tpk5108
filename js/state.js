@@ -98,7 +98,8 @@
     var keys = getStorageKeys();
 
     return {
-      profile: safeGetFromStorage(keys.PROFILE, {}),
+      profile: safeGetFromStorage(keys.PROFILE, safeGetFromStorage('tpk_last_good_profile', {})),
+      sessionStatus: safeGetFromStorage('tpk_session_status', {}),
       currentRoute: '',
       currentScreenId: '',
       bootstrap: safeGetFromStorage(keys.APP_BOOTSTRAP, {}),
@@ -207,9 +208,12 @@
 
     setProfile: function (profile) {
       var keys = getStorageKeys();
-      var value = profile && typeof profile === 'object' ? profile : {};
+      var incoming = profile && typeof profile === 'object' ? profile : {};
+      var current = state.profile && typeof state.profile === 'object' ? state.profile : {};
+      var value = Object.keys(incoming).length ? incoming : current;
       update('profile', value, { persist: true });
       safeSetToStorage(keys.PROFILE, value);
+      if (Object.keys(value).length) safeSetToStorage('tpk_last_good_profile', value);
       return clone(value);
     },
 
@@ -221,6 +225,24 @@
       var keys = getStorageKeys();
       update('profile', {}, { persist: true, cleared: true });
       safeRemoveFromStorage(keys.PROFILE);
+      safeRemoveFromStorage('tpk_last_good_profile');
+      return {};
+    },
+
+    setSessionStatus: function (status) {
+      var value = status && typeof status === 'object' ? status : {};
+      update('sessionStatus', value, { persist: true });
+      safeSetToStorage('tpk_session_status', value);
+      return clone(value);
+    },
+
+    getSessionStatus: function () {
+      return clone(state.sessionStatus || {});
+    },
+
+    clearSessionStatus: function () {
+      update('sessionStatus', {}, { persist: true, cleared: true });
+      safeRemoveFromStorage('tpk_session_status');
       return {};
     },
 
@@ -233,7 +255,9 @@
     },
 
     setCurrentRoute: function (routeName) {
-      return update('currentRoute', String(routeName || ''));
+      var route = String(routeName || '');
+      safeSetToStorage('tpk_last_route', route);
+      return update('currentRoute', route);
     },
 
     getCurrentRoute: function () {
