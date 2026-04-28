@@ -124,6 +124,18 @@
     });
   }
 
+  function installServiceWorkerMessageHandlers() {
+    if (!('serviceWorker' in navigator) || window.__TPK_SW_MESSAGE_HANDLER_INSTALLED === true) return;
+    window.__TPK_SW_MESSAGE_HANDLER_INSTALLED = true;
+    navigator.serviceWorker.addEventListener('message', function (event) {
+      var data = event && event.data ? event.data : {};
+      if (!data || !data.type) return;
+      if (data.type === 'TPK_SW_ACTIVATED') {
+        try { console.log('Service worker aktif:', data.version || ''); } catch (err) {}
+      }
+    });
+  }
+
   async function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) {
       log('Service worker tidak didukung browser ini.');
@@ -186,6 +198,7 @@
     hasInitialized = true;
 
     installGlobalErrorHandlers();
+    installServiceWorkerMessageHandlers();
     log('app.js loaded');
 
     Promise.resolve().then(function () {
