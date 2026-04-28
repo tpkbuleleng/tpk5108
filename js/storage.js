@@ -317,8 +317,9 @@
     clearDrafts: function () {
       var keys = getStorageKeys();
 
+      // Draft dan antrean sync tidak boleh hilang karena refresh/update aplikasi.
+      // clearDrafts hanya menghapus draft aktif, bukan sync queue formal.
       [
-        keys.SYNC_QUEUE,
         keys.REGISTRASI_DRAFT,
         keys.PENDAMPINGAN_DRAFT,
         'tpk_registrasi_draft',
@@ -331,14 +332,11 @@
     clearRuntimeCache: function () {
       var keys = getStorageKeys();
 
+      // Cache runtime ringan tidak boleh menghapus session, profil terakhir,
+      // bootstrap_lite, daftar sasaran terakhir, form cache, draft, atau queue.
       [
-        keys.APP_BOOTSTRAP,
-        keys.SELECTED_SASARAN,
-        keys.SASARAN_CACHE,
-        keys.BOOTSTRAP,
         keys.DASHBOARD_CACHE,
         keys.EDIT_PENDAMPINGAN,
-        getBootstrapLiteKey(),
         'tpk_dashboard_cache',
         'tpk_edit_pendampingan'
       ].filter(Boolean).forEach(function (key) {
@@ -368,6 +366,62 @@
       this.clearDrafts();
       this.clearRuntimeCache();
       this.clearSyncData();
+    },
+
+    getSasaranListCache: function (fallback) {
+      return this.get('tpk_sasaran_cache_v1', fallback || { saved_at: '', items: [] });
+    },
+
+    setSasaranListCache: function (items, meta) {
+      return this.set('tpk_sasaran_cache_v1', {
+        saved_at: new Date().toISOString(),
+        items: Array.isArray(items) ? items : [],
+        meta: meta || {}
+      });
+    },
+
+    getFormDefinitionCacheKey: function (formId, jenisSasaran) {
+      return 'tpk_form_definition_cache::REGISTRASI::' +
+        String(formId || '').trim().toUpperCase() + '::' +
+        String(jenisSasaran || '').trim().toUpperCase();
+    },
+
+    getFormDefinitionCache: function (formId, jenisSasaran, fallback) {
+      return this.get(this.getFormDefinitionCacheKey(formId, jenisSasaran), fallback || null);
+    },
+
+    setFormDefinitionCache: function (formId, jenisSasaran, definition, meta) {
+      return this.set(this.getFormDefinitionCacheKey(formId, jenisSasaran), {
+        saved_at: new Date().toISOString(),
+        form_id: String(formId || '').trim().toUpperCase(),
+        jenis_sasaran: String(jenisSasaran || '').trim().toUpperCase(),
+        definition: definition || {},
+        meta: meta || {}
+      });
+    },
+
+    getRegistrasiDraft: function (fallback) {
+      return this.get('tpk_registrasi_draft_v_final', fallback || null);
+    },
+
+    setRegistrasiDraft: function (value) {
+      return this.set('tpk_registrasi_draft_v_final', value || null);
+    },
+
+    clearRegistrasiDraft: function () {
+      this.remove('tpk_registrasi_draft_v_final');
+    },
+
+    getPendampinganDraft: function (fallback) {
+      return this.get('tpk_pendampingan_draft', fallback || null);
+    },
+
+    setPendampinganDraft: function (value) {
+      return this.set('tpk_pendampingan_draft', value || null);
+    },
+
+    clearPendampinganDraft: function () {
+      this.remove('tpk_pendampingan_draft');
     },
 
     getBootstrapLiteKey: function () {
