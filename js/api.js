@@ -565,6 +565,154 @@
     return result;
   }
 
+  function normalizeActionName(value) {
+    return String(value || '').trim();
+  }
+
+  function isSasaranListAction(action) {
+    var name = normalizeActionName(action);
+    return name === getActionName('GET_SASARAN_BY_TIM', 'getSasaranByTim') ||
+      name === getActionName('GET_SASARAN_LIST_LITE', 'getSasaranListLite') ||
+      name === 'getSasaranByTim' ||
+      name === 'getSasaranListLite';
+  }
+
+  function isRegistrasiFormDefinitionAction(action) {
+    var name = normalizeActionName(action);
+    return name === getActionName('GET_REGISTRASI_FORM_DEFINITION', 'getRegistrasiFormDefinition') ||
+      name === 'getRegistrasiFormDefinition';
+  }
+
+  function getFormIdFromPayload(payload) {
+    var src = payload || {};
+    var jenis = String(src.jenis_sasaran || src.jenis || '').trim().toUpperCase();
+    var formId = String(src.form_id || '').trim().toUpperCase();
+    if (formId) return formId;
+    var map = {
+      CATIN: 'FRM1002',
+      BUMIL: 'FRM1003',
+      BUFAS: 'FRM1004',
+      BADUTA: 'FRM1005'
+    };
+    return map[jenis] || 'FRM1001';
+  }
+
+  function getJenisFromPayload(payload) {
+    return String((payload && (payload.jenis_sasaran || payload.jenis)) || '').trim().toUpperCase();
+  }
+
+  function getStorageApi() {
+    try { return getStorage(); } catch (err) { return null; }
+  }
+
+  function setOfflineCache(action, payload, result) {
+    if (!result || result.ok !== true) return;
+    var storage = getStorageApi();
+    var data = result.data !== undefined ? result.data : null;
+
+    try {
+      if (isSasaranListAction(action)) {
+        var items = [];
+        if (data && Array.isArray(data.items)) items = data.items;
+        else if (data && Array.isArray(data.list)) items = data.list;
+        else if (Array.isArray(data)) items = data;
+
+        if (storage && typeof storage.setSasaranListCache === 'function') {
+          storage.setSasaranListCache(items, {
+            action: normalizeActionName(action),
+            payload: payload || {},
+            source: 'api_success'
+          });
+        } else {
+          setStorageValue('tpk_sasaran_cache_v1', {
+            saved_at: nowIso(),
+            items: items,
+            meta: { action: normalizeActionName(action), source: 'api_success' }
+          });
+        }
+        return;
+      }
+
+      if (isRegistrasiFormDefinitionAction(action)) {
+        var formId = getFormIdFromPayload(payload);
+        var jenis = getJenisFromPayload(payload);
+        if (storage && typeof storage.setFormDefinitionCache === 'function') {
+          storage.setFormDefinitionCache(formId, jenis, data || {}, {
+            action: normalizeActionName(action),
+            source: 'api_success'
+          });
+        } else {
+          setStorageValue('tpk_form_definition_cache::REGISTRASI::' + formId + '::' + jenis, {
+            saved_at: nowIso(),
+            form_id: formId,
+            jenis_sasaran: jenis,
+            definition: data || {},
+            meta: { action: normalizeActionName(action), source: 'api_success' }
+          });
+        }
+      }
+    } catch (err) {}
+  }
+
+  function getOfflineCacheResult(action, payload, failedResult) {
+    var storage = getStorageApi();
+
+    try {
+      if (isSasaranListAction(action)) {
+        var cache = storage && typeof storage.getSasaranListCache === 'function'
+          ? storage.getSasaranListCache(null)
+          : getStorageValue('tpk_sasaran_cache_v1', null);
+        if (cache && Array.isArray(cache.items) && cache.items.length) {
+          return {
+            ok: true,
+            code: 200,
+            message: 'Menampilkan cache lokal daftar sasaran.',
+            data: {
+              items: cache.items,
+              total: cache.items.length,
+              offline_cache: true,
+              saved_at: cache.saved_at || ''
+            },
+            meta: Object.assign({}, cache.meta || {}, {
+              offline_cache: true,
+              original_error: failedResult && failedResult.message ? failedResult.message : ''
+            })
+          };
+        }
+      }
+
+      if (isRegistrasiFormDefinitionAction(action)) {
+        var formId = getFormIdFromPayload(payload);
+        var jenis = getJenisFromPayload(payload);
+        var formCache = storage && typeof storage.getFormDefinitionCache === 'function'
+          ? storage.getFormDefinitionCache(formId, jenis, null)
+          : getStorageValue('tpk_form_definition_cache::REGISTRASI::' + formId + '::' + jenis, null);
+        if (formCache && formCache.definition && typeof formCache.definition === 'object') {
+          return {
+            ok: true,
+            code: 200,
+            message: 'Menampilkan cache lokal form registrasi.',
+            data: formCache.definition,
+            meta: Object.assign({}, formCache.meta || {}, {
+              offline_cache: true,
+              form_id: formId,
+              jenis_sasaran: jenis,
+              original_error: failedResult && failedResult.message ? failedResult.message : ''
+            })
+          };
+        }
+      }
+    } catch (err) {}
+
+    return null;
+  }
+
+  function shouldUseOfflineCache(result) {
+    if (!result || result.ok === false) return true;
+    if (result.code === 0) return true;
+    return false;
+  }
+
   async function post(action, payload, options) {
     var config = getConfig();
     var opts = options || {};
@@ -601,6 +749,15 @@
           transport_fallback: 'GET_AFTER_POST_FAIL'
         });
         result = fallbackResult;
+      }
+    }
+
+    if (result && result.ok === true) {
+      setOfflineCache(action, payload || {}, result);
+    } else if (shouldUseOfflineCache(result)) {
+      var offlineCacheResult = getOfflineCacheResult(action, payload || {}, result);
+      if (offlineCacheResult) {
+        result = offlineCacheResult;
       }
     }
 
