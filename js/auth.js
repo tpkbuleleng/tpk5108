@@ -564,13 +564,14 @@
     if (isLogoutInProgress) return;
 
     isLogoutInProgress = true;
+    window.__TPK_LOGOUT_IN_PROGRESS = true;
     setLogoutLoading(true);
 
     var logoutPromise = Promise.resolve();
 
     try {
       if (window.Api && typeof window.Api.logout === 'function') {
-        logoutPromise = window.Api.logout({});
+        logoutPromise = window.Api.logout({}, { keepDeviceId: true });
       }
     } catch (err) {
       console.warn('Logout backend gagal dipicu:', err && err.message ? err.message : err);
@@ -593,6 +594,7 @@
         .finally(function () {
           setLogoutLoading(false);
           isLogoutInProgress = false;
+          window.__TPK_LOGOUT_IN_PROGRESS = false;
         });
     }
   }
@@ -626,7 +628,8 @@
     init: initLoginPage,
     login: submitLogin,
     logout: logout,
-    clearLocalSession: clearLocalSession
+    clearLocalSession: clearLocalSession,
+    isLogoutInProgress: function () { return isLogoutInProgress || window.__TPK_LOGOUT_IN_PROGRESS === true; }
   };
 
   window.Auth = Auth;
