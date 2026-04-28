@@ -8,6 +8,50 @@
   var isReportingClientError = false;
   var recentReportMap = Object.create(null);
 
+  function isLogoutInProgress() {
+    return window.__TPK_LOGOUT_IN_PROGRESS === true;
+  }
+
+  function isAppUpdateInProgress() {
+    return window.__TPK_APP_UPDATE_IN_PROGRESS === true;
+  }
+
+  function getSessionStatusKey() {
+    return 'tpk_session_status';
+  }
+
+  function setSessionStatus(status, detail) {
+    try {
+      var storage = getStorage();
+      var payload = Object.assign({
+        status: String(status || ''),
+        updated_at: nowIso()
+      }, detail || {});
+      if (storage && typeof storage.setSessionStatus === 'function') {
+        storage.setSessionStatus(payload);
+      } else {
+        setStorageValue(getSessionStatusKey(), payload);
+      }
+      if (window.AppState && typeof window.AppState.setSessionStatus === 'function') {
+        window.AppState.setSessionStatus(payload);
+      }
+    } catch (err) {}
+  }
+
+  function clearSessionStatus() {
+    try {
+      var storage = getStorage();
+      if (storage && typeof storage.clearSessionStatus === 'function') {
+        storage.clearSessionStatus();
+      } else {
+        removeStorageValue(getSessionStatusKey());
+      }
+      if (window.AppState && typeof window.AppState.clearSessionStatus === 'function') {
+        window.AppState.clearSessionStatus();
+      }
+    } catch (err) {}
+  }
+
   function nowIso() {
     return new Date().toISOString();
   }
@@ -510,12 +554,52 @@
     clearSessionToken();
   }
 
+  function isAuthFailureResult(normalized) {
+    if (!normalized) return false;
+    var code = Number(normalized.code || 0);
+    if (code === 401 || code === 403) return true;
+    var msg = String(normalized.message || '').toLowerCase();
+    return msg.indexOf('session token') >= 0 ||
+      msg.indexOf('token tidak') >= 0 ||
+      msg.indexOf('token expired') >= 0 ||
+      msg.indexOf('unauthorized') >= 0 ||
+      msg.indexOf('forbidden') >= 0;
+  }
+
+  function isTokenInactiveMessage(normalized) {
+    var msg = String(normalized && normalized.message || '').toLowerCase();
+    return msg.indexOf('tidak aktif') >= 0 || msg.indexOf('dicabut') >= 0 || msg.indexOf('inactive') >= 0 || msg.indexOf('revoked') >= 0;
+  }
+
   function handleAuthFailureCleanup(normalized) {
     if (!normalized) return normalized;
-    if (normalized.code === 401 || normalized.code === 403) {
-      clearSessionToken();
-    }
-    return normalized;
+    if (!isAuthFailureResult(normalized)) return normalized;
+
+    // Jangan kosongkan profil/cache/draft secara diam-diam. Hanya token yang invalid dibersihkan
+    // agar request privat berikutnya tidak terus menghantam backend.
+    clearSessionToken();
+    setSessionStatus(isTokenInactiveMessage(normalized) ? 'TOKEN_INACTIVE' : 'TOKEN_INVALID', {
+      code: normalized.code || 0,
+      message: normalized.message || 'Session tidak valid',
+      source: 'api.js'
+    });
+
+    return Object.assign({}, normalized, {
+      session_invalid: true,
+      token_inactive: isTokenInactiveMessage(normalized),
+      keep_cached_profile: true
+    });
+  }
+
+  function createLocalAuthRequiredResult(action) {
+    return handleAuthFailureCleanup({
+      ok: false,
+      code: 401,
+      message: 'Session token tidak ditemukan di perangkat. Silakan login ulang saat jaringan tersedia.',
+      data: null,
+      action: action || '',
+      local_guard: true
+    });
   }
 
   async function doFetchJson(method, url, fetchOptions, timeoutMs) {
@@ -724,6 +808,16 @@
       return createNetworkError('Action API wajib diisi.');
     }
 
+    if (isLogoutInProgress() && opts.allowDuringLogout !== true) {
+      return createNetworkError('Request dibatalkan karena logout sedang berlangsung.', { cancelled: true, reason: 'logout_in_progress' });
+    }
+
+    var requiresAuth = opts.includeAuth !== false;
+    var effectiveToken = opts.sessionToken === undefined ? getSessionToken() : opts.sessionToken;
+    if (requiresAuth && !effectiveToken) {
+      return createLocalAuthRequiredResult(action);
+    }
+
     var body = buildBody(action, payload || {}, opts);
 
     var result = await executeWithRetry(function () {
@@ -779,11 +873,16 @@
       return createNetworkError('Action API wajib diisi.');
     }
 
+    if (isLogoutInProgress() && opts.allowDuringLogout !== true) {
+      return createNetworkError('Request dibatalkan karena logout sedang berlangsung.', { cancelled: true, reason: 'logout_in_progress' });
+    }
+
     var queryParams = Object.assign({}, params || {}, { action: action });
 
     if (opts.includeAuth !== false) {
       var token = opts.sessionToken || getSessionToken();
-      if (token) queryParams.token = token;
+      if (!token) return createLocalAuthRequiredResult(action);
+      queryParams.token = token;
     }
 
     var queryString = buildQueryString(queryParams);
@@ -857,6 +956,7 @@
 
     if (result.ok && result.data && result.data.session_token) {
       setSessionToken(result.data.session_token);
+      clearSessionStatus();
     }
 
     return result;
@@ -867,7 +967,8 @@
     var result = await post(getActionName('LOGOUT', 'logout'), payload || {}, {
       includeAuth: true,
       timeoutMs: 10000,
-      retryCount: 0
+      retryCount: 0,
+      allowDuringLogout: true
     });
 
     clearSensitiveClientState({
@@ -993,7 +1094,7 @@
     }, data || {});
 
     try {
-      return await post(getActionName('LOG_CLIENT_PERFORMANCE', 'logClientPerformance'), payload, {
+      return await post(getActionName('LOG_CLIENT_ERROR', 'logClientError'), payload, {
         includeAuth: !!sessionToken,
         sessionToken: sessionToken || '',
         timeoutMs: 6000,
@@ -1068,6 +1169,8 @@
     setSessionToken: setSessionToken,
     clearSessionToken: clearSessionToken,
     clearSensitiveClientState: clearSensitiveClientState,
+    setSessionStatus: setSessionStatus,
+    clearSessionStatus: clearSessionStatus,
     buildMeta: buildMeta,
     buildBody: buildBody,
     get: get,
