@@ -1,58 +1,18 @@
-(function (window) {
+(function (window, document) {
   'use strict';
 
-  var isInitialized = false;
-  var isRunning = false;
+  var isSyncing = false;
+  var lastSyncAt = '';
+  var lastSummary = { total: 0, pending: 0, failed: 0, processing: 0, conflict: 0, success: 0 };
 
-  function getConfig() {
-    return window.APP_CONFIG || {};
-  }
+  function nowIso() { return new Date().toISOString(); }
 
-  function getObsGroup(name, fallbackMap) {
-    var cfg = getConfig();
-    var src = cfg && cfg.OBSERVABILITY && cfg.OBSERVABILITY[name] ? cfg.OBSERVABILITY[name] : null;
-    return src || fallbackMap || {};
-  }
+  function getRepo() { return window.QueueRepo || null; }
+  function getApi() { return window.Api || null; }
 
-  var SYNC_OBS = {
-    BUSINESS_STATUS: getObsGroup('BUSINESS_STATUS', {
-      SUCCESS: 'SUCCESS',
-      DUPLICATE: 'DUPLICATE',
-      CONFLICT: 'CONFLICT',
-      VALIDATION_ERROR: 'VALIDATION_ERROR',
-      UNAUTHORIZED: 'UNAUTHORIZED',
-      FORBIDDEN: 'FORBIDDEN',
-      NOT_FOUND: 'NOT_FOUND',
-      RATE_LIMITED: 'RATE_LIMITED',
-      SERVER_ERROR: 'SERVER_ERROR',
-      REJECTED: 'REJECTED'
-    }),
-    STATUS_SYNC: getObsGroup('STATUS_SYNC', {
-      PENDING: 'PENDING',
-      PROCESSING: 'PROCESSING',
-      SUCCESS: 'SUCCESS',
-      FAILED: 'FAILED'
-    })
-  };
-
-  function nowIso() {
-    return new Date().toISOString();
-  }
-
-  function getState() {
-    return window.AppState || null;
-  }
-
-  function getQueueRepo() {
-    return window.QueueRepo || null;
-  }
-
-  function getApi() {
-    return window.Api || null;
-  }
-
-  function getDb() {
-    return window.AppDB || null;
+  function setText(id, value) {
+    var el = document.getElementById(id);
+    if (el) el.textContent = value == null || value === '' ? '0' : String(value);
   }
 
   function showToast(message, type) {
@@ -60,282 +20,216 @@
       window.UI.showToast(message, type || 'info');
       return;
     }
-    try {
-      console.log('[SYNC]', type || 'info', message);
-    } catch (err) {}
+    if (window.Notifier && typeof window.Notifier.show === 'function') {
+      window.Notifier.show(message, type || 'info');
+      return;
+    }
+    try { console.log('[TPK Sync]', message); } catch (err) {}
   }
 
-  function lower(text) {
-    return String(text || '').toLowerCase();
+  function normalizeStatus(value) {
+    return String(value || 'PENDING').trim().toUpperCase() || 'PENDING';
   }
 
-  function detectConflict(result) {
-    var code = Number(result && result.code || 0);
-    var message = lower(result && result.message);
-    return code === 409 || message.indexOf('conflict') >= 0 || message.indexOf('versi') >= 0 || message.indexOf('bentrok') >= 0;
+  async function getSummary() {
+    var repo = getRepo();
+    if (!repo || typeof repo.getSummary !== 'function') return lastSummary;
+    lastSummary = await repo.getSummary();
+    return lastSummary;
   }
 
-  function detectDuplicate(result) {
-    var code = Number(result && result.code || 0);
-    var message = lower(result && result.message);
-    return message.indexOf('duplicate') >= 0 || message.indexOf('sudah pernah') >= 0 || message.indexOf('duplikat') >= 0 || code === 208;
-  }
+  async function updateBadge() {
+    var summary = await getSummary();
+    var pendingTotal = Number(summary.pending || 0) + Number(summary.failed || 0) + Number(summary.conflict || 0);
 
-  function getBusinessStatusFromResult(result) {
-    var rawCandidates = [
-      result && result.business_status,
-      result && result.businessStatus,
-      result && result.status_business,
-      result && result.data && result.data.business_status,
-      result && result.data && result.data.businessStatus,
-      result && result.raw && result.raw.business_status,
-      result && result.raw && result.raw.businessStatus,
-      result && result.raw && result.raw.data && result.raw.data.business_status,
-      result && result.raw && result.raw.data && result.raw.data.businessStatus
-    ];
+    setText('stat-draft', pendingTotal);
+    setText('sync-total-count', summary.total || 0);
+    setText('sync-pending-count', summary.pending || 0);
+    setText('sync-failed-count', summary.failed || 0);
 
-    for (var i = 0; i < rawCandidates.length; i += 1) {
-      var value = String(rawCandidates[i] || '').trim().toUpperCase();
-      if (value && SYNC_OBS.BUSINESS_STATUS[value]) {
-        return SYNC_OBS.BUSINESS_STATUS[value];
-      }
-      if (value === 'DUPLICATE_BLOCKED') {
-        return SYNC_OBS.BUSINESS_STATUS.DUPLICATE;
-      }
-      if (value === 'ERROR') {
-        return SYNC_OBS.BUSINESS_STATUS.SERVER_ERROR;
-      }
-      if (value === 'FAILED') {
-        return SYNC_OBS.BUSINESS_STATUS.REJECTED;
+    var meta = document.getElementById('sync-screen-meta');
+    if (meta) {
+      if (!summary.total) {
+        meta.textContent = 'Tidak ada draft offline.';
+      } else {
+        meta.textContent = 'Total: ' + summary.total + ' | Pending: ' + summary.pending + ' | Gagal: ' + summary.failed + (lastSyncAt ? ' | Sync terakhir: ' + lastSyncAt : '');
       }
     }
 
-    if (detectDuplicate(result)) return SYNC_OBS.BUSINESS_STATUS.DUPLICATE;
-    if (detectConflict(result)) return SYNC_OBS.BUSINESS_STATUS.CONFLICT;
-
-    var code = Number(result && result.code || 0);
-    if (code === 401) return SYNC_OBS.BUSINESS_STATUS.UNAUTHORIZED;
-    if (code === 403) return SYNC_OBS.BUSINESS_STATUS.FORBIDDEN;
-    if (code === 404) return SYNC_OBS.BUSINESS_STATUS.NOT_FOUND;
-    if (code === 409) return SYNC_OBS.BUSINESS_STATUS.CONFLICT;
-    if (code === 422) return SYNC_OBS.BUSINESS_STATUS.VALIDATION_ERROR;
-    if (code === 429) return SYNC_OBS.BUSINESS_STATUS.RATE_LIMITED;
-    if (code >= 500) return SYNC_OBS.BUSINESS_STATUS.SERVER_ERROR;
-    if (result && result.ok === true) return SYNC_OBS.BUSINESS_STATUS.SUCCESS;
-
-    var message = lower(result && result.message);
-    if (message.indexOf('validasi') >= 0) return SYNC_OBS.BUSINESS_STATUS.VALIDATION_ERROR;
-    if (message.indexOf('unauthorized') >= 0 || message.indexOf('session') >= 0 || message.indexOf('token') >= 0) return SYNC_OBS.BUSINESS_STATUS.UNAUTHORIZED;
-    if (message.indexOf('forbidden') >= 0 || message.indexOf('tidak berhak') >= 0 || message.indexOf('scope') >= 0) return SYNC_OBS.BUSINESS_STATUS.FORBIDDEN;
-    if (message.indexOf('tidak ditemukan') >= 0 || message.indexOf('not found') >= 0) return SYNC_OBS.BUSINESS_STATUS.NOT_FOUND;
-    if (message.indexOf('rate') >= 0 && message.indexOf('limit') >= 0) return SYNC_OBS.BUSINESS_STATUS.RATE_LIMITED;
-
-    return SYNC_OBS.BUSINESS_STATUS.REJECTED;
-  }
-
-  async function logResult(queueId, statusSync, businessStatus, responseCode, message, raw) {
-    var db = getDb();
-    if (!db || typeof db.put !== 'function') return;
-
-    await db.put(db.STORES.SYNC_RESULT_LOG, {
-      result_id: 'RES-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8).toUpperCase(),
-      queue_id: String(queueId || ''),
-      status: String(statusSync || ''),
-      business_status: String(businessStatus || ''),
-      response_code: Number(responseCode || 0),
-      message: String(message || ''),
-      raw: raw || null,
-      created_at: nowIso()
-    });
-  }
-
-  function setSyncState(isSyncing) {
-    var state = getState();
-    if (state && typeof state.setSyncing === 'function') {
-      state.setSyncing(!!isSyncing);
+    if (window.AppState && typeof window.AppState.setSyncSummary === 'function') {
+      window.AppState.setSyncSummary(summary);
     }
+
+    return summary;
   }
 
-  async function postQueueItem(item) {
+  function extractErrorMessage(result, fallback) {
+    if (!result) return fallback || 'Sinkronisasi gagal.';
+    return result.message || (result.error && result.error.message) || fallback || 'Sinkronisasi gagal.';
+  }
+
+  function isConflictResult(result) {
+    var code = Number(result && result.code || 0);
+    var status = String(result && (result.status || result.business_status || '') || '').toUpperCase();
+    var msg = String(result && result.message || '').toLowerCase();
+    return code === 409 || status === 'CONFLICT' || msg.indexOf('conflict') >= 0 || msg.indexOf('bentrok') >= 0;
+  }
+
+  function isDuplicateSafeResult(result) {
+    var data = result && result.data || {};
+    var msg = String(result && result.message || '').toLowerCase();
+    return data.duplicate === true || data.is_duplicate === true || msg.indexOf('duplicate') >= 0 || msg.indexOf('sudah pernah') >= 0;
+  }
+
+  async function syncItem(item) {
+    var repo = getRepo();
     var api = getApi();
-    if (!api || typeof api.post !== 'function') {
-      throw new Error('Api.post belum tersedia.');
+    if (!repo || !api || typeof api.post !== 'function') {
+      return { ok: false, message: 'QueueRepo/API belum siap.' };
     }
 
-    var payload = Object.assign({}, item.payload || {});
-    if (!payload.client_submit_id && item.client_submit_id) {
-      payload.client_submit_id = item.client_submit_id;
-    }
-    if (!payload.sync_source) {
-      payload.sync_source = 'OFFLINE_QUEUE';
-    }
-    if (!payload.queue_id && item.queue_id) {
-      payload.queue_id = item.queue_id;
-    }
-    if (payload.retry_count === undefined || payload.retry_count === null || payload.retry_count === '') {
-      payload.retry_count = Number(item.retry_count || 0);
+    if (!item || !item.action) {
+      return { ok: false, message: 'Item antrean tidak valid.' };
     }
 
-    return api.post(item.action, payload, {
-      includeAuth: true,
-      clientSubmitId: payload.client_submit_id || '',
-      syncSource: payload.sync_source || 'OFFLINE_QUEUE',
-      meta: {
-        queue_id: item.queue_id || '',
-        retry_count: Number(item.retry_count || 0)
-      }
-    });
-  }
-
-  async function syncOne(item) {
-    var repo = getQueueRepo();
-    if (!repo) throw new Error('QueueRepo belum tersedia.');
-
-    await repo.markProcessing(item.queue_id);
+    var id = item.id || item.client_submit_id;
+    await repo.update(id, { sync_status: 'PROCESSING', status: 'PROCESSING', last_error: '', last_synced_at: nowIso() });
 
     try {
-      var result = await postQueueItem(item);
-      var businessStatus = getBusinessStatusFromResult(result);
-      var responseCode = Number(result && result.code || 0);
-      var responseMessage = result && result.message ? result.message : 'Sinkronisasi item selesai.';
+      var payload = Object.assign({}, item.payload || {}, {
+        sync_source: (item.payload && item.payload.sync_source) || item.sync_source || 'OFFLINE_QUEUE'
+      });
 
-      if (businessStatus === SYNC_OBS.BUSINESS_STATUS.DUPLICATE) {
-        await repo.markDuplicate(item.queue_id, {
-          last_error: '',
-          last_response_code: responseCode || 208
-        });
-        await logResult(item.queue_id, SYNC_OBS.STATUS_SYNC.SUCCESS, SYNC_OBS.BUSINESS_STATUS.DUPLICATE, responseCode || 208, responseMessage || 'Duplicate aman', result);
-        return { status_sync: SYNC_OBS.STATUS_SYNC.SUCCESS, business_status: SYNC_OBS.BUSINESS_STATUS.DUPLICATE, result: result };
+      var result = await api.post(item.action, payload, {
+        clientSubmitId: item.client_submit_id || payload.client_submit_id || '',
+        syncSource: payload.sync_source || 'OFFLINE_QUEUE',
+        timeoutMs: 45000,
+        retryCount: 0,
+        meta: {
+          queue_id: id,
+          sync_source: payload.sync_source || 'OFFLINE_QUEUE'
+        }
+      });
+
+      if (result && result.ok) {
+        await repo.removeById(id);
+        await updateBadge();
+        return { ok: true, data: result.data || {}, duplicate_safe: isDuplicateSafeResult(result) };
       }
 
-      if (businessStatus === SYNC_OBS.BUSINESS_STATUS.CONFLICT) {
-        await repo.markConflict(item.queue_id, {
-          last_response_code: responseCode || 409,
-          last_error: String(responseMessage || 'Conflict')
-        });
-        await logResult(item.queue_id, SYNC_OBS.STATUS_SYNC.FAILED, SYNC_OBS.BUSINESS_STATUS.CONFLICT, responseCode || 409, responseMessage || 'Conflict', result);
-        return { status_sync: SYNC_OBS.STATUS_SYNC.FAILED, business_status: SYNC_OBS.BUSINESS_STATUS.CONFLICT, result: result };
-      }
-
-      if (result && result.ok === true || businessStatus === SYNC_OBS.BUSINESS_STATUS.SUCCESS) {
-        await repo.markSuccess(item.queue_id, {
-          last_error: '',
-          last_response_code: responseCode || 200
-        });
-        await logResult(item.queue_id, SYNC_OBS.STATUS_SYNC.SUCCESS, SYNC_OBS.BUSINESS_STATUS.SUCCESS, responseCode || 200, responseMessage || 'OK', result);
-        return { status_sync: SYNC_OBS.STATUS_SYNC.SUCCESS, business_status: SYNC_OBS.BUSINESS_STATUS.SUCCESS, result: result };
-      }
-
-      await repo.markFailed(item.queue_id, responseMessage || 'Sinkronisasi item gagal.');
-      await logResult(item.queue_id, SYNC_OBS.STATUS_SYNC.FAILED, businessStatus, responseCode, responseMessage, result);
-      return { status_sync: SYNC_OBS.STATUS_SYNC.FAILED, business_status: businessStatus, result: result };
+      var message = extractErrorMessage(result, 'Sinkronisasi gagal.');
+      var status = isConflictResult(result) ? 'CONFLICT' : 'FAILED';
+      await repo.update(id, {
+        sync_status: status,
+        status: status,
+        retry_count: Number(item.retry_count || 0) + 1,
+        last_error: message,
+        last_synced_at: nowIso()
+      });
+      await updateBadge();
+      return { ok: false, status: status, message: message };
     } catch (err) {
-      await repo.markFailed(item.queue_id, err && err.message ? err.message : String(err));
-      await logResult(item.queue_id, SYNC_OBS.STATUS_SYNC.FAILED, SYNC_OBS.BUSINESS_STATUS.SERVER_ERROR, 0, err && err.message ? err.message : String(err), null);
-      return { status_sync: SYNC_OBS.STATUS_SYNC.FAILED, business_status: SYNC_OBS.BUSINESS_STATUS.SERVER_ERROR, error: err };
+      var errMsg = err && err.message ? err.message : 'Sinkronisasi gagal karena koneksi.';
+      await repo.update(id, {
+        sync_status: 'FAILED',
+        status: 'FAILED',
+        retry_count: Number(item.retry_count || 0) + 1,
+        last_error: errMsg,
+        last_synced_at: nowIso()
+      });
+      await updateBadge();
+      return { ok: false, status: 'FAILED', message: errMsg };
     }
   }
 
   async function syncAll(options) {
-    var repo = getQueueRepo();
-    var state = getState();
-    if (!repo) throw new Error('QueueRepo belum tersedia.');
-    if (isRunning) {
-      return {
-        ok: false,
-        message: 'Sinkronisasi sedang berjalan.'
-      };
+    var opts = options || {};
+    if (isSyncing && opts.force !== true) {
+      return { ok: false, message: 'Sinkronisasi sedang berjalan.', synced: 0, failed: 0 };
     }
 
-    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-      return {
-        ok: false,
-        message: 'Perangkat sedang offline.'
-      };
+    if (navigator.onLine === false) {
+      showToast('Masih offline. Sinkronisasi belum dapat dijalankan.', 'warning');
+      return { ok: false, message: 'Offline', synced: 0, failed: 0 };
     }
 
-    isRunning = true;
-    setSyncState(true);
+    var repo = getRepo();
+    if (!repo || typeof repo.list !== 'function') {
+      return { ok: false, message: 'QueueRepo belum siap.', synced: 0, failed: 0 };
+    }
 
-    var limit = Number(options && options.limit || getConfig().SYNC_BATCH_SIZE || 20);
-    var queue = [];
-    var summary = {
-      ok: true,
-      total: 0,
-      success: 0,
-      failed: 0,
-      conflict: 0,
-      duplicate: 0,
-      message: 'Sinkronisasi selesai.'
-    };
-
+    isSyncing = true;
     try {
-      queue = await repo.getPending(limit);
-      summary.total = queue.length;
+      var queue = await repo.list();
+      queue = queue.filter(function (item) {
+        var status = normalizeStatus(item.sync_status || item.status);
+        return status === 'PENDING' || status === 'FAILED';
+      });
 
+      if (!queue.length) {
+        await updateBadge();
+        showToast('Tidak ada draft yang perlu disinkronkan.', 'info');
+        return { ok: true, synced: 0, failed: 0 };
+      }
+
+      var synced = 0;
+      var failed = 0;
       for (var i = 0; i < queue.length; i += 1) {
-        var outcome = await syncOne(queue[i]);
-        if (outcome.business_status === SYNC_OBS.BUSINESS_STATUS.SUCCESS) summary.success += 1;
-        else if (outcome.business_status === SYNC_OBS.BUSINESS_STATUS.CONFLICT) summary.conflict += 1;
-        else if (outcome.business_status === SYNC_OBS.BUSINESS_STATUS.DUPLICATE) summary.duplicate += 1;
-        else summary.failed += 1;
+        var result = await syncItem(queue[i]);
+        if (result && result.ok) synced += 1;
+        else failed += 1;
       }
 
-      if (state && typeof state.setLastSyncAt === 'function') {
-        state.setLastSyncAt(nowIso());
-      }
-      if (repo && typeof repo.syncLegacyMirror === 'function') {
-        await repo.syncLegacyMirror();
-      }
-
-      if (summary.total === 0) {
-        summary.message = 'Belum ada antrean untuk disinkronkan.';
-      } else if (summary.success === summary.total) {
-        summary.message = 'Semua antrean berhasil disinkronkan.';
-      } else if (summary.success > 0) {
-        summary.message = summary.success + ' berhasil, ' + summary.failed + ' gagal, ' + summary.conflict + ' conflict.';
-      } else if (summary.duplicate > 0 && summary.failed === 0 && summary.conflict === 0) {
-        summary.message = 'Antrean terdeteksi duplikat aman.';
-      } else {
-        summary.message = 'Sinkronisasi selesai dengan catatan.';
-      }
-
-      return summary;
+      lastSyncAt = nowIso();
+      await updateBadge();
+      if (failed) showToast('Sinkronisasi selesai. Berhasil: ' + synced + ', gagal: ' + failed, 'warning');
+      else showToast('Sinkronisasi selesai. Berhasil: ' + synced, 'success');
+      return { ok: failed === 0, synced: synced, failed: failed };
     } finally {
-      isRunning = false;
-      setSyncState(false);
+      isSyncing = false;
     }
   }
 
-  function bindNetworkAutoSync() {
-    if (window.__tpkSyncAutoBound === true) return;
+  async function retryOne(itemId) {
+    var repo = getRepo();
+    if (!repo || typeof repo.list !== 'function') return { ok: false, message: 'QueueRepo belum siap.' };
+    var rows = await repo.list();
+    var item = rows.find(function (row) { return String(row.id || row.client_submit_id) === String(itemId); });
+    if (!item) return { ok: false, message: 'Item antrean tidak ditemukan.' };
+    return syncItem(item);
+  }
+
+  function bindAutoSync() {
+    if (window.__tpkSyncAutoBound) return;
     window.__tpkSyncAutoBound = true;
 
     window.addEventListener('online', function () {
-      window.setTimeout(function () {
-        syncAll({ limit: Number(getConfig().SYNC_BATCH_SIZE || 20) })
-          .then(function (summary) {
-            if (summary && summary.total > 0) {
-              showToast(summary.message || 'Sinkronisasi otomatis selesai.', 'info');
-            }
-          })
-          .catch(function () {});
-      }, 700);
+      updateBadge();
+      window.setTimeout(function () { syncAll({ force: false }); }, 1500);
     });
+    window.addEventListener('offline', function () { updateBadge(); });
+    window.addEventListener('tpk:queue-changed', function () { updateBadge(); });
+
+    var repo = getRepo();
+    if (repo && typeof repo.onChange === 'function') repo.onChange(updateBadge);
+  }
+
+  function init() {
+    bindAutoSync();
+    updateBadge();
   }
 
   var SyncManager = {
-    init: function () {
-      if (isInitialized) return;
-      isInitialized = true;
-      bindNetworkAutoSync();
-    },
+    init: init,
+    bindAutoSync: bindAutoSync,
+    updateBadge: updateBadge,
+    getSummary: getSummary,
+    syncItem: syncItem,
     syncAll: syncAll,
-    syncOne: syncOne,
-    isSyncing: function () {
-      return !!isRunning;
-    }
+    retryOne: retryOne,
+    isSyncing: function () { return isSyncing; }
   };
 
   window.SyncManager = SyncManager;
-})(window);
+  init();
+})(window, document);
