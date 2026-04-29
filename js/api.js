@@ -791,6 +791,126 @@
     return null;
   }
 
+
+  // ==========================================
+  // PAKET 3D - Registrasi Dynamic Form Cache API
+  // Single fetch + local cache + idle prefetch helper.
+  // ==========================================
+  var REGISTRASI_FORM_PREFETCH_IN_FLIGHT = Object.create(null);
+
+  function mapRegistrasiJenisToFormId(jenis) {
+    var key = String(jenis || '').trim().toUpperCase();
+    var map = { CATIN: 'FRM1002', BUMIL: 'FRM1003', BUFAS: 'FRM1004', BADUTA: 'FRM1005' };
+    return map[key] || 'FRM1001';
+  }
+
+  function normalizeRegistrasiFormPayload(input) {
+    var src = typeof input === 'string' ? { jenis_sasaran: input } : (input || {});
+    var jenis = String(src.jenis_sasaran || src.jenis || '').trim().toUpperCase();
+    var formId = String(src.form_id || '').trim().toUpperCase() || mapRegistrasiJenisToFormId(jenis);
+    if (!jenis) {
+      var reverse = { FRM1002: 'CATIN', FRM1003: 'BUMIL', FRM1004: 'BUFAS', FRM1005: 'BADUTA' };
+      jenis = reverse[formId] || '';
+    }
+    return Object.assign({}, src, { form_id: formId, jenis_sasaran: jenis, module: 'REGISTRASI' });
+  }
+
+  function getRegistrasiFormCacheKey(formId, jenis) {
+    return 'tpk_form_definition_cache::REGISTRASI::' + String(formId || '').trim().toUpperCase() + '::' + String(jenis || '').trim().toUpperCase();
+  }
+
+  function getDefaultFormCacheTtlMs(options) {
+    var opts = options || {};
+    if (typeof opts.cacheTtlMs === 'number') return opts.cacheTtlMs;
+    try {
+      var cfg = getConfig();
+      if (cfg && cfg.CACHE && typeof cfg.CACHE.FORM_DEFINITION_CLIENT_TTL_MS === 'number') return cfg.CACHE.FORM_DEFINITION_CLIENT_TTL_MS;
+    } catch (err) {}
+    return 24 * 60 * 60 * 1000;
+  }
+
+  function isFreshSavedAt(savedAt, ttlMs) {
+    if (!savedAt) return false;
+    var t = Date.parse(savedAt);
+    if (!t || Number.isNaN(t)) return false;
+    return (Date.now() - t) <= Number(ttlMs || 0);
+  }
+
+  function readRegistrasiFormDefinitionCache(formId, jenis, options) {
+    var opts = options || {};
+    var ttlMs = getDefaultFormCacheTtlMs(opts);
+    var key = getRegistrasiFormCacheKey(formId, jenis);
+    var storage = getStorageApi();
+    var cache = null;
+    try { if (storage && typeof storage.getFormDefinitionCache === 'function') cache = storage.getFormDefinitionCache(formId, jenis, null); } catch (err) {}
+    if (!cache) cache = getStorageValue(key, null);
+    if (!cache || typeof cache !== 'object') return null;
+    var definition = cache.definition || cache.data || cache;
+    if (!definition || typeof definition !== 'object') return null;
+    var savedAt = cache.saved_at || cache.cached_at || cache.updated_at || '';
+    if (opts.allowStale !== true && !isFreshSavedAt(savedAt, ttlMs)) return null;
+    return {
+      ok: true,
+      code: 200,
+      message: 'Menampilkan cache lokal form registrasi.',
+      data: definition,
+      meta: Object.assign({}, cache.meta || {}, {
+        local_cache_hit: true,
+        offline_cache: true,
+        cache_source: 'local_form_definition_cache',
+        saved_at: savedAt,
+        form_id: formId,
+        jenis_sasaran: jenis
+      })
+    };
+  }
+
+  async function getRegistrasiFormDefinition(input, options) {
+    var opts = options || {};
+    var payload = normalizeRegistrasiFormPayload(input || {});
+    var formId = payload.form_id;
+    var jenis = payload.jenis_sasaran;
+    var cacheKey = formId + '::' + jenis;
+    if (opts.forceRefresh !== true && opts.noCache !== true) {
+      var cached = readRegistrasiFormDefinitionCache(formId, jenis, { cacheTtlMs: opts.cacheTtlMs, allowStale: opts.allowStale === true });
+      if (cached) return cached;
+    }
+    if (REGISTRASI_FORM_PREFETCH_IN_FLIGHT[cacheKey]) return REGISTRASI_FORM_PREFETCH_IN_FLIGHT[cacheKey];
+    var action = getActionName('GET_REGISTRASI_FORM_DEFINITION', 'getRegistrasiFormDefinition');
+    var requestPromise = post(action, payload, {
+      timeoutMs: typeof opts.timeoutMs === 'number' ? opts.timeoutMs : 30000,
+      retryCount: typeof opts.retryCount === 'number' ? opts.retryCount : 0,
+      readOnlyFallbackGet: opts.readOnlyFallbackGet === true,
+      meta: Object.assign({ single_fetch: true, prefetch: opts.prefetch === true, form_id: formId, jenis_sasaran: jenis }, opts.meta || {})
+    });
+    REGISTRASI_FORM_PREFETCH_IN_FLIGHT[cacheKey] = requestPromise;
+    try { return await requestPromise; } finally { delete REGISTRASI_FORM_PREFETCH_IN_FLIGHT[cacheKey]; }
+  }
+
+  async function prefetchRegistrasiFormDefinitions(options) {
+    var opts = options || {};
+    var jenisList = opts.jenisList || ['CATIN', 'BUMIL', 'BUFAS', 'BADUTA'];
+    var delayMs = typeof opts.delayMs === 'number' ? opts.delayMs : 450;
+    var results = [];
+    try { if (!getSessionToken()) return { ok: false, skipped: true, message: 'Prefetch form registrasi dilewati karena token belum tersedia.' }; }
+    catch (err) { return { ok: false, skipped: true, message: 'Prefetch form registrasi dilewati karena token belum tersedia.' }; }
+    for (var i = 0; i < jenisList.length; i += 1) {
+      var jenis = String(jenisList[i] || '').trim().toUpperCase();
+      if (!jenis) continue;
+      try {
+        var formId = mapRegistrasiJenisToFormId(jenis);
+        var cached = readRegistrasiFormDefinitionCache(formId, jenis, { cacheTtlMs: opts.cacheTtlMs });
+        if (cached) results.push({ jenis_sasaran: jenis, form_id: formId, skipped: true, reason: 'local_cache_fresh' });
+        else {
+          var result = await getRegistrasiFormDefinition({ jenis_sasaran: jenis, form_id: formId }, { prefetch: true, cacheTtlMs: opts.cacheTtlMs, timeoutMs: typeof opts.timeoutMs === 'number' ? opts.timeoutMs : 25000, retryCount: 0 });
+          results.push({ jenis_sasaran: jenis, form_id: formId, ok: !!(result && result.ok), code: result && result.code });
+        }
+      } catch (err2) { results.push({ jenis_sasaran: jenis, ok: false, message: err2 && err2.message ? err2.message : String(err2) }); }
+      if (delayMs > 0 && i < jenisList.length - 1) await sleep(delayMs);
+    }
+    return { ok: true, prefetched: results };
+  }
+
   function shouldUseOfflineCache(result) {
     if (!result || result.ok === false) return true;
     if (result.code === 0) return true;
@@ -1187,6 +1307,9 @@
     getAppBootstrapRef: getAppBootstrapRef,
     getTimRef: getTimRef,
     getSasaranListLite: getSasaranListLite,
+    getRegistrasiFormDefinition: getRegistrasiFormDefinition,
+    prefetchRegistrasiFormDefinitions: prefetchRegistrasiFormDefinitions,
+    readRegistrasiFormDefinitionCache: readRegistrasiFormDefinitionCache,
     reportClientError: reportClientError,
     reportClientPerformance: reportClientPerformance
   };
