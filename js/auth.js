@@ -157,6 +157,90 @@
     return merged;
   }
 
+  function isUsefulProfile(profile) {
+    var data = profile && typeof profile === 'object' ? profile : {};
+    return !!(
+      normalizeDisplayText(data.id_user || data.username || '') ||
+      normalizeDisplayText(data.nama_kader || data.nama_user || data.nama || '') ||
+      normalizeDisplayText(data.id_tim || data.nomor_tim || data.nama_tim || '')
+    );
+  }
+
+  function isProfileCompleteForDashboard(profile) {
+    var data = profile && typeof profile === 'object' ? profile : {};
+    var nama = normalizeDisplayText(data.nama_kader || data.nama_user || data.nama || '');
+    var unsur = normalizeDisplayText(data.unsur_tpk || data.unsur || '');
+    var tim = normalizeDisplayText(data.nomor_tim || data.nama_tim || data.id_tim || '');
+    var wilayah = normalizeDisplayText(
+      data.wilayah_tugas_label ||
+      data.wilayah_tugas ||
+      data.wilayah ||
+      data.desa_kelurahan ||
+      data.nama_desa ||
+      data.desa ||
+      data.dusun_rw ||
+      data.nama_dusun ||
+      data.dusun ||
+      ''
+    );
+
+    return !!(nama && unsur && tim && wilayah);
+  }
+
+  function setLoginHydrationFlag(isActive, stage) {
+    window.__TPK_LOGIN_HYDRATION_IN_PROGRESS = !!isActive;
+    window.__TPK_LOGIN_HYDRATION_STAGE = stage || '';
+    window.__TPK_LOGIN_HYDRATION_AT = Date.now();
+  }
+
+  function waitNextPaint() {
+    return new Promise(function (resolve) {
+      if (typeof window.requestAnimationFrame === 'function') {
+        window.requestAnimationFrame(function () { resolve(); });
+        return;
+      }
+      window.setTimeout(resolve, 0);
+    });
+  }
+
+  function loadEnhancedShell(reason) {
+    if (window.TPKAppLoader && typeof window.TPKAppLoader.loadEnhancedShell === 'function') {
+      return window.TPKAppLoader.loadEnhancedShell(reason || 'auth_hydration');
+    }
+    return Promise.resolve(false);
+  }
+
+  function showDashboardShellFast() {
+    if (window.TPKAppLoader && typeof window.TPKAppLoader.showDashboardShellQuick === 'function') {
+      window.TPKAppLoader.showDashboardShellQuick();
+      return;
+    }
+    openDashboard();
+  }
+
+  async function ensureDashboardRouteReady(profile) {
+    try {
+      await loadEnhancedShell('post_login_dashboard_route_3c_r3');
+    } catch (err) {}
+
+    if (window.Router && typeof window.Router.go === 'function') {
+      window.Router.go('dashboard', {
+        skipHeavyRefresh: true,
+        skipBootstrapRefresh: true,
+        source: 'auth_post_login_3c_r3'
+      });
+    }
+
+    if (profile && Object.keys(profile).length) {
+      if (window.AppBootstrap && typeof window.AppBootstrap.applyProfileToUi === 'function') {
+        window.AppBootstrap.applyProfileToUi(profile);
+      }
+      if (window.DashboardView && typeof window.DashboardView.applyDashboardProfile === 'function') {
+        window.DashboardView.applyDashboardProfile(profile);
+      }
+    }
+  }
+
   function showMessage(message, type) {
     var box = qs('loginMessage');
     if (!box) return;
@@ -335,53 +419,61 @@
     var data = (loginResult && loginResult.data) || {};
     var bootstrapLite = extractBootstrapLite(loginResult);
 
-    // 3B: jangan panggil refreshBootstrapLite lebih dulu.
-    // Profil lengkap setelah login harus datang dari getMyProfileLite -> user_profile_lite.
-    if (bootstrapLite && bootstrapLite.profile && Object.keys(bootstrapLite.profile).length) {
-      return bootstrapLite.profile;
+    // 3C-R3: session minimal dari login tidak dianggap profil lengkap.
+    // Ambil getMyProfileLite satu kali secara deterministik kecuali login sudah
+    // membawa bootstrap_lite.profile/profile yang lengkap.
+    var candidate = {};
+    if (bootstrapLite && bootstrapLite.profile && typeof bootstrapLite.profile === 'object') {
+      candidate = mergeProfileData(candidate, bootstrapLite.profile);
+    }
+    if (data.profile && typeof data.profile === 'object') {
+      candidate = mergeProfileData(candidate, data.profile);
+    }
+    if (data.session && typeof data.session === 'object') {
+      candidate = mergeProfileData(candidate, data.session);
     }
 
-    if (data.profile && typeof data.profile === 'object' && Object.keys(data.profile).length) {
-      return data.profile;
-    }
-
-    if (data.session && typeof data.session === 'object' && Object.keys(data.session).length) {
-      return data.session;
+    if (isProfileCompleteForDashboard(candidate)) {
+      return candidate;
     }
 
     if (window.Api && typeof window.Api.getMyProfileLite === 'function') {
       try {
-        var profileLiteResult = await window.Api.getMyProfileLite({ source: 'after_login_3b' });
+        var profileLiteResult = await window.Api.getMyProfileLite({ source: 'after_login_3c_r3' });
         if (profileLiteResult && profileLiteResult.ok && profileLiteResult.data && Object.keys(profileLiteResult.data).length) {
-          return profileLiteResult.data;
+          return mergeProfileData(candidate, profileLiteResult.data);
         }
       } catch (ignoreProfileLite) {}
+    }
+
+    if (isUsefulProfile(candidate)) {
+      return candidate;
     }
 
     // Fallback terakhir saja, bukan jalur utama login.
     if (!window.__TPK_APP_UPDATE_IN_PROGRESS && window.Api && typeof window.Api.refreshBootstrapLite === 'function') {
       try {
-        var refreshResult = await window.Api.refreshBootstrapLite({ source: 'after_login_fallback_3b' });
+        var refreshResult = await window.Api.refreshBootstrapLite({ source: 'after_login_fallback_3c_r3' });
         if (refreshResult && refreshResult.ok) {
           var refreshData = refreshResult.data || {};
           var refreshedBootstrapLite = refreshData.bootstrap_lite || {};
+          var refreshedProfile = refreshedBootstrapLite.profile || refreshData.profile || refreshData.session || {};
 
           if (refreshedBootstrapLite && Object.keys(refreshedBootstrapLite).length) {
             saveBootstrapLite(refreshedBootstrapLite);
             if (window.AppBootstrap && typeof window.AppBootstrap.applyBootstrapLite === 'function') {
-              window.AppBootstrap.applyBootstrapLite(refreshedBootstrapLite);
+              window.AppBootstrap.applyBootstrapLite(refreshedBootstrapLite, { refreshProfileRefs: false });
             }
-            return refreshedBootstrapLite.profile || refreshData.profile || refreshData.session || {};
           }
 
-          if (refreshData.profile && typeof refreshData.profile === 'object') {
-            return refreshData.profile;
+          if (refreshedProfile && typeof refreshedProfile === 'object') {
+            return mergeProfileData(candidate, refreshedProfile);
           }
         }
       } catch (ignoreRefresh) {}
     }
 
-    return {};
+    return candidate || {};
   }
 
   function applyProfileToUi(profile) {
@@ -460,37 +552,38 @@
     });
   }
 
-  function hydrateDashboardAfterLogin(loginResult) {
-    var startedAt = Date.now();
+  async function hydrateDashboardAfterLogin(loginResult, options) {
+    var opts = options || {};
+    var finalProfile = getStoredProfile();
 
-    function run() {
-      Promise.resolve().then(async function () {
-        try {
-          var resolvedProfile = await resolveProfileAfterLogin(loginResult);
+    try {
+      setLoginHydrationFlag(true, 'profile_lite');
+      var resolvedProfile = await resolveProfileAfterLogin(loginResult);
 
-          if (resolvedProfile && Object.keys(resolvedProfile).length) {
-            var mergedProfile = mergeProfileData(getStoredProfile(), resolvedProfile);
-            saveProfile(mergedProfile);
-            applyProfileToUi(mergedProfile);
-          }
+      if (resolvedProfile && Object.keys(resolvedProfile).length) {
+        finalProfile = mergeProfileData(getStoredProfile(), resolvedProfile);
+        saveProfile(finalProfile);
+        applyProfileToUi(finalProfile);
+      }
 
-          if (window.DashboardView && typeof window.DashboardView.applyDashboardProfile === 'function') {
-            window.DashboardView.applyDashboardProfile(getStoredProfile());
-          } else if (window.DashboardView && typeof window.DashboardView.refresh === 'function') {
-            window.DashboardView.refresh();
-          }
-        } catch (err) {
-          console.warn('Gagal memuat profil lanjutan setelah login:', err && err.message ? err.message : err);
-        }
-      });
+      setLoginHydrationFlag(true, 'dashboard_route');
+      await ensureDashboardRouteReady(finalProfile);
+
+      if (window.DashboardView && typeof window.DashboardView.applyDashboardProfile === 'function') {
+        window.DashboardView.applyDashboardProfile(finalProfile || {});
+      } else if (window.DashboardView && typeof window.DashboardView.refresh === 'function') {
+        window.DashboardView.refresh({ skipProfileRefresh: true, source: 'auth_post_login_3c_r3' });
+      }
+
+      return finalProfile;
+    } catch (err) {
+      console.warn('Gagal memuat profil lanjutan setelah login:', err && err.message ? err.message : err);
+      return finalProfile;
+    } finally {
+      if (opts.releaseGuard !== false) {
+        setLoginHydrationFlag(false, 'done');
+      }
     }
-
-    if (typeof window.requestIdleCallback === 'function') {
-      window.requestIdleCallback(run, { timeout: 1500 });
-      return;
-    }
-
-    window.setTimeout(run, Math.max(300, 1200 - (Date.now() - startedAt)));
   }
 
   async function handleLoginSubmit(event) {
@@ -508,9 +601,12 @@
       return;
     }
 
+    var loginSucceeded = false;
+
     try {
       isLoginSubmitting = true;
       setLoading(true);
+      setLoginHydrationFlag(true, 'login_submit');
 
       var result = await submitLogin(idUser, password);
 
@@ -525,18 +621,24 @@
       : 'Login gagal. Periksa kembali ID dan password.'),
     'error'
   );
+  setLoginHydrationFlag(false, 'login_failed');
   return;
 }
 
+      loginSucceeded = true;
       var wajibGantiPassword = !!(result.data && result.data.wajib_ganti_password);
       var bootstrapLite = extractBootstrapLite(result);
       var immediateProfile = extractImmediateProfile(result);
       var mergedImmediateProfile = mergeProfileData(getStoredProfile(), immediateProfile);
 
+      // 3C-R3: mulai muat router/bootstrap/ui di latar, tetapi auth.js tetap
+      // menjadi pemilik alur post-login agar refreshBootstrapLite tidak dobel.
+      loadEnhancedShell('post_login_prepare_3c_r3').catch(function () {});
+
       if (bootstrapLite && Object.keys(bootstrapLite).length) {
         saveBootstrapLite(bootstrapLite);
         if (window.AppBootstrap && typeof window.AppBootstrap.applyBootstrapLite === 'function') {
-          window.AppBootstrap.applyBootstrapLite(bootstrapLite);
+          window.AppBootstrap.applyBootstrapLite(bootstrapLite, { refreshProfileRefs: false });
         }
       }
 
@@ -545,18 +647,20 @@
         applyProfileToUi(mergedImmediateProfile);
       }
 
-      openDashboard();
+      showDashboardShellFast();
+      await waitNextPaint();
+
+      var hydratedProfile = await hydrateDashboardAfterLogin(result, { releaseGuard: true });
 
       if (window.DashboardView && typeof window.DashboardView.applyDashboardProfile === 'function') {
-        window.DashboardView.applyDashboardProfile(mergedImmediateProfile || {});
+        window.DashboardView.applyDashboardProfile(hydratedProfile || mergedImmediateProfile || {});
       }
-
-      hydrateDashboardAfterLogin(result);
 
       if (wajibGantiPassword) {
         showToast('Login berhasil. Akun ini masih perlu ganti password.', 'warning');
       }
     } catch (error) {
+      setLoginHydrationFlag(false, 'login_exception');
       console.error('LOGIN_ERROR', error);
 
       showMessage(
@@ -571,6 +675,9 @@
         });
       }
     } finally {
+      if (!loginSucceeded) {
+        setLoginHydrationFlag(false, 'login_end_without_success');
+      }
       setLoading(false);
       isLoginSubmitting = false;
     }
@@ -645,6 +752,8 @@
     login: submitLogin,
     logout: logout,
     clearLocalSession: clearLocalSession,
+    hydrateDashboardAfterLogin: hydrateDashboardAfterLogin,
+    isLoginHydrationInProgress: function () { return window.__TPK_LOGIN_HYDRATION_IN_PROGRESS === true; },
     isLogoutInProgress: function () { return isLogoutInProgress || window.__TPK_LOGOUT_IN_PROGRESS === true; }
   };
 
