@@ -400,11 +400,13 @@
     const manager = getDraftManager();
     if (manager && isFunction(manager.clearRegistrasiDraft)) {
       manager.clearRegistrasiDraft();
+      if (window.SyncManager && isFunction(window.SyncManager.updateBadge)) window.SyncManager.updateBadge();
       return;
     }
     try {
       localStorage.removeItem(REG_DRAFT_KEY);
     } catch (_) {}
+    if (window.SyncManager && isFunction(window.SyncManager.updateBadge)) window.SyncManager.updateBadge();
   }
 
   function isNetworkLikeError(err) {
@@ -434,6 +436,9 @@
         client_submit_id: safePayload.client_submit_id || '',
         sync_source: 'OFFLINE_QUEUE'
       });
+      if (window.SyncManager && isFunction(window.SyncManager.updateBadge)) {
+        window.SyncManager.updateBadge();
+      }
       return true;
     }
 
@@ -453,6 +458,10 @@
       if (window.AppState && isFunction(window.AppState.setSyncQueue)) {
         window.AppState.setSyncQueue(queue);
       }
+      if (window.SyncManager && isFunction(window.SyncManager.updateBadge)) {
+        window.SyncManager.updateBadge();
+      }
+      try { window.dispatchEvent(new CustomEvent('tpk:queue-changed')); } catch (_) {}
       return true;
     } catch (_) {
       return false;
@@ -547,6 +556,7 @@
       const form = byId('registrasi-form');
       const btnBack = byId('btn-back-from-registrasi');
       const btnSubmit = byId('btn-submit-registrasi');
+      const btnSaveDraft = byId('btn-save-reg-draft');
       const btnEditFromDetail = byId('btn-go-to-edit-sasaran');
       const jenisEl = byId('reg-jenis-sasaran');
 
@@ -564,6 +574,13 @@
             event.preventDefault();
             this.submit();
           }
+        });
+      }
+
+      if (btnSaveDraft) {
+        btnSaveDraft.addEventListener('click', (event) => {
+          event.preventDefault();
+          this.handleSaveDraft();
         });
       }
 
@@ -1590,6 +1607,22 @@
       if (getMode() !== 'create') return;
       const data = this.collectFormData();
       saveDraftLocal(data);
+      if (window.SyncManager && isFunction(window.SyncManager.updateBadge)) {
+        window.SyncManager.updateBadge();
+      }
+    },
+
+    handleSaveDraft() {
+      if (getMode() !== 'create') {
+        notify('Draft hanya tersedia untuk registrasi baru.', 'info');
+        return;
+      }
+      const data = this.collectFormData();
+      saveDraftLocal(data);
+      if (window.SyncManager && isFunction(window.SyncManager.updateBadge)) {
+        window.SyncManager.updateBadge();
+      }
+      notify('Draft registrasi tersimpan di perangkat.', 'success');
     },
 
     handleAnyFormChange() {
