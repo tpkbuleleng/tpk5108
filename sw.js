@@ -1,10 +1,11 @@
-const SW_VERSION = 'tpk-sw-3a-session-offline-recovery-20260428-02';
+const SW_VERSION = 'tpk-sw-3c-cold-start-shell-diet-20260429-01';
 const SHELL_CACHE = 'tpk-shell-' + SW_VERSION;
 const ASSET_CACHE = 'tpk-assets-' + SW_VERSION;
 
-// Core shell: cukup untuk membuka aplikasi, memulihkan sesi lokal,
-// menyimpan draft offline, dan menjalankan queue sync.
-// View tetap runtime-cache saat pernah dibuka.
+// 3C shell diet:
+// Precache hanya aset minimum untuk menampilkan halaman login.
+// Router, bootstrap, ui, view, db, queueRepo, dan syncManager tidak dipaksa precache saat cold start.
+// File tersebut akan masuk runtime cache setelah benar-benar dibutuhkan.
 const APP_SHELL = [
   './',
   './index.html',
@@ -16,14 +17,8 @@ const APP_SHELL = [
   './js/utils.js',
   './js/storage.js',
   './js/state.js',
-  './js/db.js',
-  './js/queueRepo.js',
   './js/api.js',
   './js/auth.js',
-  './js/router.js',
-  './js/bootstrap.js',
-  './js/ui.js',
-  './js/syncManager.js',
   './js/app.js'
 ];
 
@@ -47,12 +42,12 @@ function isSameOriginAsset(url) {
 
 async function safeCacheShell() {
   const cache = await caches.open(SHELL_CACHE);
+
   await Promise.all(APP_SHELL.map(async (asset) => {
     try {
       await cache.add(asset);
     } catch (err) {
       // Asset opsional tidak boleh membuat SW gagal install.
-      // Jika asset pernah dimuat sebelumnya, runtime cache tetap bisa dipakai.
     }
   }));
 }
@@ -74,6 +69,7 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil((async () => {
     const keys = await caches.keys();
+
     await Promise.all(keys.map((key) => {
       if (key !== SHELL_CACHE && key !== ASSET_CACHE) {
         return caches.delete(key);
@@ -138,8 +134,10 @@ self.addEventListener('fetch', (event) => {
       }).catch(() => null);
 
       if (cached) return cached;
+
       const network = await networkPromise;
       if (network) return network;
+
       return fetch(request);
     })());
   }
