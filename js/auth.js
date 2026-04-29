@@ -45,21 +45,90 @@
     return text;
   }
 
+  function firstDisplayValue() {
+    for (var i = 0; i < arguments.length; i += 1) {
+      var value = normalizeDisplayText(arguments[i]);
+      if (value) return value;
+    }
+    return '';
+  }
+
+  function normalizeDelimitedList(value) {
+    var text = normalizeDisplayText(value);
+    if (!text) return '';
+
+    // JSON array dari read model tetap ditampilkan sebagai daftar ringkas jika tidak ada label biasa.
+    if ((text.charAt(0) === '[' || text.charAt(0) === '{') && window.JSON) {
+      try {
+        var parsed = JSON.parse(text);
+        if (Array.isArray(parsed)) {
+          return parsed.map(function (item) {
+            if (item && typeof item === 'object') {
+              return normalizeDisplayText(item.dusun_rw || item.nama_dusun || item.desa_kelurahan || item.nama_desa || item.id_wilayah || '');
+            }
+            return normalizeDisplayText(item);
+          }).filter(Boolean).join(' / ');
+        }
+      } catch (ignoreJson) {}
+    }
+
+    return text;
+  }
+
+  function normalizeProfileForDashboard(profile) {
+    var data = profile && typeof profile === 'object' ? Object.assign({}, profile) : {};
+
+    var wilayahLabel = firstDisplayValue(data.wilayah_tugas, data.wilayah_tugas_label, data.wilayah);
+    var desaList = normalizeDelimitedList(data.desa_kelurahan || data.desa_kelurahan_list || data.nama_desa || data.desa);
+    var dusunList = normalizeDelimitedList(data.dusun_rw || data.dusun_rw_list || data.nama_dusun || data.dusun);
+    var kecamatan = firstDisplayValue(data.nama_kecamatan, data.kecamatan, data.id_kecamatan);
+    var unsur = firstDisplayValue(data.unsur, data.unsur_tpk);
+
+    data.unsur_tpk = firstDisplayValue(data.unsur_tpk, unsur);
+    data.unsur = firstDisplayValue(data.unsur, data.unsur_tpk);
+
+    data.wilayah_tugas = firstDisplayValue(data.wilayah_tugas, wilayahLabel);
+    data.wilayah_tugas_label = firstDisplayValue(data.wilayah_tugas_label, data.wilayah_tugas);
+    data.wilayah = firstDisplayValue(data.wilayah, data.wilayah_tugas);
+
+    data.desa_kelurahan = firstDisplayValue(data.desa_kelurahan, desaList);
+    data.nama_desa = firstDisplayValue(data.nama_desa, data.desa_kelurahan);
+    data.desa = firstDisplayValue(data.desa, data.desa_kelurahan);
+
+    data.dusun_rw = firstDisplayValue(data.dusun_rw, dusunList);
+    data.nama_dusun = firstDisplayValue(data.nama_dusun, data.dusun_rw);
+    data.dusun = firstDisplayValue(data.dusun, data.dusun_rw);
+
+    data.nama_kecamatan = firstDisplayValue(data.nama_kecamatan, kecamatan);
+    data.kecamatan = firstDisplayValue(data.kecamatan, data.nama_kecamatan);
+
+    return data;
+  }
+
   function parseWilayahDisplay(profile) {
-    var data = profile || {};
-    var wilayah = normalizeDisplayText(data.wilayah_tugas || data.wilayah || '');
+    var data = normalizeProfileForDashboard(profile || {});
+    var wilayah = normalizeDisplayText(data.wilayah_tugas || data.wilayah_tugas_label || data.wilayah || '');
     var desa = normalizeDisplayText(data.desa_kelurahan || data.nama_desa || data.desa || '');
     var dusun = normalizeDisplayText(data.dusun_rw || data.nama_dusun || data.dusun || '');
-    var kecamatan = normalizeDisplayText(data.nama_kecamatan || data.kecamatan || '');
+    var kecamatan = normalizeDisplayText(data.nama_kecamatan || data.kecamatan || data.id_kecamatan || '');
 
-    if (wilayah) {
-      var parts = wilayah.split(/\s*,\s*/).map(function(part) {
+    if (wilayah && (!desa || !dusun)) {
+      var dashParts = wilayah.split(/\s+-\s+/).map(function(part) {
         return String(part || '').trim();
       }).filter(Boolean);
 
-      if (!kecamatan && parts[0]) kecamatan = parts[0];
-      if (!desa && parts[1]) desa = parts[1];
-      if (!dusun && parts.length > 2) dusun = parts.slice(2).join(', ');
+      if (!desa && dashParts[0]) desa = dashParts[0];
+      if (!dusun && dashParts.length > 1) dusun = dashParts.slice(1).join(' - ');
+    }
+
+    if (wilayah && (!kecamatan || !desa || !dusun)) {
+      var commaParts = wilayah.split(/\s*,\s*/).map(function(part) {
+        return String(part || '').trim();
+      }).filter(Boolean);
+
+      if (!kecamatan && commaParts[0]) kecamatan = commaParts[0];
+      if (!desa && commaParts[1]) desa = commaParts[1];
+      if (!dusun && commaParts.length > 2) dusun = commaParts.slice(2).join(', ');
     }
 
     return {
@@ -137,8 +206,8 @@
   }
 
   function mergeProfileData(existingProfile, incomingProfile) {
-    var existing = existingProfile && typeof existingProfile === 'object' ? existingProfile : {};
-    var incoming = incomingProfile && typeof incomingProfile === 'object' ? incomingProfile : {};
+    var existing = normalizeProfileForDashboard(existingProfile && typeof existingProfile === 'object' ? existingProfile : {});
+    var incoming = normalizeProfileForDashboard(incomingProfile && typeof incomingProfile === 'object' ? incomingProfile : {});
     var merged = Object.assign({}, existing);
 
     Object.keys(incoming).forEach(function (key) {
@@ -154,7 +223,7 @@
       merged[key] = value;
     });
 
-    return merged;
+    return normalizeProfileForDashboard(merged);
   }
 
   function isUsefulProfile(profile) {
@@ -167,7 +236,7 @@
   }
 
   function isProfileCompleteForDashboard(profile) {
-    var data = profile && typeof profile === 'object' ? profile : {};
+    var data = normalizeProfileForDashboard(profile || {});
     var nama = normalizeDisplayText(data.nama_kader || data.nama_user || data.nama || '');
     var unsur = normalizeDisplayText(data.unsur_tpk || data.unsur || '');
     var tim = normalizeDisplayText(data.nomor_tim || data.nama_tim || data.id_tim || '');
@@ -176,9 +245,11 @@
       data.wilayah_tugas ||
       data.wilayah ||
       data.desa_kelurahan ||
+      data.desa_kelurahan_list ||
       data.nama_desa ||
       data.desa ||
       data.dusun_rw ||
+      data.dusun_rw_list ||
       data.nama_dusun ||
       data.dusun ||
       ''
@@ -220,14 +291,14 @@
 
   async function ensureDashboardRouteReady(profile) {
     try {
-      await loadEnhancedShell('post_login_dashboard_route_3c_r3');
+      await loadEnhancedShell('post_login_dashboard_route_3c_r4');
     } catch (err) {}
 
     if (window.Router && typeof window.Router.go === 'function') {
       window.Router.go('dashboard', {
         skipHeavyRefresh: true,
         skipBootstrapRefresh: true,
-        source: 'auth_post_login_3c_r3'
+        source: 'auth_post_login_3c_r4'
       });
     }
 
@@ -338,12 +409,16 @@
     var storage = getStorage();
     var appState = getAppState();
     var keys = getStorageKeys();
-    var data = profile || {};
+    var data = normalizeProfileForDashboard(profile || {});
 
     if (storage && typeof storage.setProfile === 'function') {
       storage.setProfile(data);
     } else if (storage && typeof storage.set === 'function' && keys.PROFILE) {
       storage.set(keys.PROFILE, data);
+    }
+
+    if (storage && typeof storage.setLastGoodProfile === 'function' && isProfileCompleteForDashboard(data)) {
+      storage.setLastGoodProfile(data);
     }
 
     if (appState && typeof appState.setProfile === 'function') {
@@ -439,7 +514,7 @@
 
     if (window.Api && typeof window.Api.getMyProfileLite === 'function') {
       try {
-        var profileLiteResult = await window.Api.getMyProfileLite({ source: 'after_login_3c_r3' });
+        var profileLiteResult = await window.Api.getMyProfileLite({ source: 'after_login_3c_r4' });
         if (profileLiteResult && profileLiteResult.ok && profileLiteResult.data && Object.keys(profileLiteResult.data).length) {
           return mergeProfileData(candidate, profileLiteResult.data);
         }
@@ -447,42 +522,41 @@
     }
 
     if (isUsefulProfile(candidate)) {
-      return candidate;
+      return normalizeProfileForDashboard(candidate);
     }
 
-    // Fallback terakhir saja, bukan jalur utama login.
+    // 3C-R4: refreshBootstrapLite bukan sumber final profil + wilayah.
+    // Ia hanya boleh memperbarui bootstrap/session ringan, bukan menimpa
+    // hasil final getMyProfileLite. Fallback ini tidak apply profil ke UI.
     if (!window.__TPK_APP_UPDATE_IN_PROGRESS && window.Api && typeof window.Api.refreshBootstrapLite === 'function') {
       try {
-        var refreshResult = await window.Api.refreshBootstrapLite({ source: 'after_login_fallback_3c_r3' });
+        var refreshResult = await window.Api.refreshBootstrapLite({ source: 'after_login_session_only_3c_r4' });
         if (refreshResult && refreshResult.ok) {
           var refreshData = refreshResult.data || {};
           var refreshedBootstrapLite = refreshData.bootstrap_lite || {};
-          var refreshedProfile = refreshedBootstrapLite.profile || refreshData.profile || refreshData.session || {};
-
           if (refreshedBootstrapLite && Object.keys(refreshedBootstrapLite).length) {
             saveBootstrapLite(refreshedBootstrapLite);
-            if (window.AppBootstrap && typeof window.AppBootstrap.applyBootstrapLite === 'function') {
-              window.AppBootstrap.applyBootstrapLite(refreshedBootstrapLite, { refreshProfileRefs: false });
+            if (window.AppBootstrap && typeof window.AppBootstrap.applyBootstrapToUi === 'function') {
+              window.AppBootstrap.applyBootstrapToUi({
+                app_name: refreshedBootstrapLite.app_name,
+                app_version: refreshedBootstrapLite.app_version
+              });
             }
-          }
-
-          if (refreshedProfile && typeof refreshedProfile === 'object') {
-            return mergeProfileData(candidate, refreshedProfile);
           }
         }
       } catch (ignoreRefresh) {}
     }
 
-    return candidate || {};
+    return normalizeProfileForDashboard(candidate || {});
   }
 
   function applyProfileToUi(profile) {
-    var data = profile || {};
+    var data = normalizeProfileForDashboard(profile || {});
     var wilayah = parseWilayahDisplay(data);
 
     setText('profile-nama', data.nama_kader || data.nama_user || data.nama || '-');
     setText('profile-unsur', data.unsur_tpk || data.unsur || '-');
-    setText('profile-id', data.id_user || '-');
+    setText('profile-id', data.id_user || data.username || '-');
     setText('profile-tim', getDisplayNomorTim(data));
     setTextAliases(['profile-desa', 'wilayah-desa', 'profile-desa-value'], wilayah.desa);
     setTextAliases(['profile-dusun', 'wilayah-dusun', 'profile-dusun-value'], wilayah.dusun);
@@ -572,7 +646,7 @@
       if (window.DashboardView && typeof window.DashboardView.applyDashboardProfile === 'function') {
         window.DashboardView.applyDashboardProfile(finalProfile || {});
       } else if (window.DashboardView && typeof window.DashboardView.refresh === 'function') {
-        window.DashboardView.refresh({ skipProfileRefresh: true, source: 'auth_post_login_3c_r3' });
+        window.DashboardView.refresh({ skipProfileRefresh: true, source: 'auth_post_login_3c_r4' });
       }
 
       return finalProfile;
@@ -633,12 +707,17 @@
 
       // 3C-R3: mulai muat router/bootstrap/ui di latar, tetapi auth.js tetap
       // menjadi pemilik alur post-login agar refreshBootstrapLite tidak dobel.
-      loadEnhancedShell('post_login_prepare_3c_r3').catch(function () {});
+      loadEnhancedShell('post_login_prepare_3c_r4').catch(function () {});
 
       if (bootstrapLite && Object.keys(bootstrapLite).length) {
         saveBootstrapLite(bootstrapLite);
-        if (window.AppBootstrap && typeof window.AppBootstrap.applyBootstrapLite === 'function') {
-          window.AppBootstrap.applyBootstrapLite(bootstrapLite, { refreshProfileRefs: false });
+        // 3C-R4: jangan apply bootstrapLite sebagai profil final setelah login.
+        // Data final profil + wilayah harus dari getMyProfileLite/user_profile_lite.
+        if (window.AppBootstrap && typeof window.AppBootstrap.applyBootstrapToUi === 'function') {
+          window.AppBootstrap.applyBootstrapToUi({
+            app_name: bootstrapLite.app_name,
+            app_version: bootstrapLite.app_version
+          });
         }
       }
 
@@ -753,6 +832,8 @@
     logout: logout,
     clearLocalSession: clearLocalSession,
     hydrateDashboardAfterLogin: hydrateDashboardAfterLogin,
+    normalizeProfileForDashboard: normalizeProfileForDashboard,
+    isProfileCompleteForDashboard: isProfileCompleteForDashboard,
     isLoginHydrationInProgress: function () { return window.__TPK_LOGIN_HYDRATION_IN_PROGRESS === true; },
     isLogoutInProgress: function () { return isLogoutInProgress || window.__TPK_LOGOUT_IN_PROGRESS === true; }
   };
