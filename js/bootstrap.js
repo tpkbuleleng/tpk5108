@@ -128,6 +128,10 @@
     return result && result.token_inactive === true || msg.indexOf('tidak aktif') >= 0 || msg.indexOf('dicabut') >= 0 || msg.indexOf('inactive') >= 0 || msg.indexOf('revoked') >= 0;
   }
 
+  function isLoginHydrationInProgress() {
+    return window.__TPK_LOGIN_HYDRATION_IN_PROGRESS === true;
+  }
+
   function safeToast(message, type) {
     if (window.UI && typeof window.UI.showToast === 'function') {
       window.UI.showToast(message, type || 'info');
@@ -142,6 +146,12 @@
     async init() {
       this.showSplashStatus('Menyiapkan aplikasi...');
       this.applyStaticBranding();
+
+      // 3C-R3: ketika auth.js sedang menangani login sukses dan mengambil
+      // getMyProfileLite, bootstrap tidak boleh ikut memanggil refreshBootstrapLite.
+      if (isLoginHydrationInProgress()) {
+        return true;
+      }
 
       var cachedBootstrapLite = this.getCachedBootstrapLite();
       var cachedProfile = this.getCachedProfile();
@@ -433,10 +443,17 @@
     },
 
     restoreSessionAndRouteBackground_(options) {
+      if (isLoginHydrationInProgress()) {
+        return;
+      }
+
       var self = this;
       var opts = options || {};
 
       function run() {
+        if (isLoginHydrationInProgress()) {
+          return;
+        }
         self.restoreSessionAndRoute(Object.assign({}, opts, {
           background: true,
           allowHeavyFallback: false,
@@ -470,6 +487,10 @@
       options = options || {};
       var initRunId = options.initRunId || 0;
 
+      if (isLoginHydrationInProgress() && options.forceRestore !== true) {
+        return true;
+      }
+
       try {
         if (!window.Storage || !window.Api) {
           return false;
@@ -483,7 +504,25 @@
         var result = null;
 
         if (typeof window.Api.refreshBootstrapLite === 'function') {
-          result = await window.Api.refreshBootstrapLite({});
+          var cachedLiteForCooldown = this.getCachedBootstrapLite ? this.getCachedBootstrapLite() : {};
+          var lastRefreshAt = Number(window.__TPK_LAST_REFRESH_BOOTSTRAP_LITE_AT || 0);
+          var canUseCooldownCache = !options.forceRefreshBootstrap && lastRefreshAt && (Date.now() - lastRefreshAt < 8000) && cachedLiteForCooldown && Object.keys(cachedLiteForCooldown).length;
+
+          if (canUseCooldownCache) {
+            result = {
+              ok: true,
+              data: {
+                bootstrap_lite: cachedLiteForCooldown,
+                profile: this.getCachedProfile ? this.getCachedProfile() : {}
+              },
+              source: 'bootstrap_cooldown_cache_3c_r3'
+            };
+          } else {
+            result = await window.Api.refreshBootstrapLite({ source: 'bootstrap_restore_3c_r3' });
+            if (result && result.ok) {
+              window.__TPK_LAST_REFRESH_BOOTSTRAP_LITE_AT = Date.now();
+            }
+          }
         }
 
         if ((!result || !result.ok) && options.allowHeavyFallback === true && typeof window.Api.bootstrapSession === 'function') {
@@ -647,6 +686,7 @@
 
     async refreshProfileFromBackendRefs_(profile) {
       var base = profile && typeof profile === 'object' ? Object.assign({}, profile) : this.getCachedProfile();
+      if (isLoginHydrationInProgress()) return base;
       if (!this.needsProfileRecovery(base)) return base;
       if (!window.Api) return base;
       if (this._profileRefreshInFlight === true) return base;
