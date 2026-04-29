@@ -34,21 +34,97 @@
     return text;
   }
 
+  function firstDisplayValue() {
+    for (var i = 0; i < arguments.length; i += 1) {
+      var value = normalizeDisplayText(arguments[i]);
+      if (value) return value;
+    }
+    return '';
+  }
+
+  function normalizeDelimitedList(value) {
+    var text = normalizeDisplayText(value);
+    if (!text) return '';
+
+    if ((text.charAt(0) === '[' || text.charAt(0) === '{') && window.JSON) {
+      try {
+        var parsed = JSON.parse(text);
+        if (Array.isArray(parsed)) {
+          return parsed.map(function (item) {
+            if (item && typeof item === 'object') {
+              return normalizeDisplayText(item.dusun_rw || item.nama_dusun || item.desa_kelurahan || item.nama_desa || item.id_wilayah || '');
+            }
+            return normalizeDisplayText(item);
+          }).filter(Boolean).join(' / ');
+        }
+      } catch (ignoreJson) {}
+    }
+
+    return text;
+  }
+
+  function normalizeProfileForDashboard(profile) {
+    var data = profile && typeof profile === 'object' ? Object.assign({}, profile) : {};
+
+    var wilayahLabel = firstDisplayValue(data.wilayah_tugas, data.wilayah_tugas_label, data.wilayah);
+    var desaList = normalizeDelimitedList(data.desa_kelurahan || data.desa_kelurahan_list || data.nama_desa || data.desa);
+    var dusunList = normalizeDelimitedList(data.dusun_rw || data.dusun_rw_list || data.nama_dusun || data.dusun);
+    var kecamatan = firstDisplayValue(data.nama_kecamatan, data.kecamatan, data.id_kecamatan);
+    var unsur = firstDisplayValue(data.unsur, data.unsur_tpk);
+
+    data.unsur_tpk = firstDisplayValue(data.unsur_tpk, unsur);
+    data.unsur = firstDisplayValue(data.unsur, data.unsur_tpk);
+
+    data.wilayah_tugas = firstDisplayValue(data.wilayah_tugas, wilayahLabel);
+    data.wilayah_tugas_label = firstDisplayValue(data.wilayah_tugas_label, data.wilayah_tugas);
+    data.wilayah = firstDisplayValue(data.wilayah, data.wilayah_tugas);
+
+    data.desa_kelurahan = firstDisplayValue(data.desa_kelurahan, desaList);
+    data.nama_desa = firstDisplayValue(data.nama_desa, data.desa_kelurahan);
+    data.desa = firstDisplayValue(data.desa, data.desa_kelurahan);
+
+    data.dusun_rw = firstDisplayValue(data.dusun_rw, dusunList);
+    data.nama_dusun = firstDisplayValue(data.nama_dusun, data.dusun_rw);
+    data.dusun = firstDisplayValue(data.dusun, data.dusun_rw);
+
+    data.nama_kecamatan = firstDisplayValue(data.nama_kecamatan, kecamatan);
+    data.kecamatan = firstDisplayValue(data.kecamatan, data.nama_kecamatan);
+
+    return data;
+  }
+
+  function isProfileCompleteForDashboard(profile) {
+    var data = normalizeProfileForDashboard(profile || {});
+    return !!(
+      normalizeDisplayText(data.nama_kader || data.nama_user || data.nama || '') &&
+      normalizeDisplayText(data.unsur_tpk || data.unsur || '') &&
+      normalizeDisplayText(data.nomor_tim || data.nama_tim || data.id_tim || '') &&
+      normalizeDisplayText(data.wilayah_tugas || data.wilayah_tugas_label || data.desa_kelurahan || data.dusun_rw || '')
+    );
+  }
+
   function parseWilayahDisplay(profile) {
-    var data = profile || {};
-    var wilayah = normalizeDisplayText(data.wilayah_tugas || data.wilayah || '');
+    var data = normalizeProfileForDashboard(profile || {});
+    var wilayah = normalizeDisplayText(data.wilayah_tugas || data.wilayah_tugas_label || data.wilayah || '');
     var desa = normalizeDisplayText(data.desa_kelurahan || data.nama_desa || data.desa || '');
     var dusun = normalizeDisplayText(data.dusun_rw || data.nama_dusun || data.dusun || '');
-    var kecamatan = normalizeDisplayText(data.nama_kecamatan || data.kecamatan || '');
+    var kecamatan = normalizeDisplayText(data.nama_kecamatan || data.kecamatan || data.id_kecamatan || '');
 
-    if (wilayah) {
-      var parts = wilayah.split(/\s*,\s*/).map(function(part) {
+    if (wilayah && (!desa || !dusun)) {
+      var dashParts = wilayah.split(/\s+-\s+/).map(function(part) {
         return String(part || '').trim();
       }).filter(Boolean);
+      if (!desa && dashParts[0]) desa = dashParts[0];
+      if (!dusun && dashParts.length > 1) dusun = dashParts.slice(1).join(' - ');
+    }
 
-      if (!kecamatan && parts[0]) kecamatan = parts[0];
-      if (!desa && parts[1]) desa = parts[1];
-      if (!dusun && parts.length > 2) dusun = parts.slice(2).join(', ');
+    if (wilayah && (!kecamatan || !desa || !dusun)) {
+      var commaParts = wilayah.split(/\s*,\s*/).map(function(part) {
+        return String(part || '').trim();
+      }).filter(Boolean);
+      if (!kecamatan && commaParts[0]) kecamatan = commaParts[0];
+      if (!desa && commaParts[1]) desa = commaParts[1];
+      if (!dusun && commaParts.length > 2) dusun = commaParts.slice(2).join(', ');
     }
 
     return {
@@ -71,8 +147,8 @@
   }
 
   function mergeProfileData(existingProfile, incomingProfile) {
-    var existing = existingProfile && typeof existingProfile === 'object' ? existingProfile : {};
-    var incoming = incomingProfile && typeof incomingProfile === 'object' ? incomingProfile : {};
+    var existing = normalizeProfileForDashboard(existingProfile && typeof existingProfile === 'object' ? existingProfile : {});
+    var incoming = normalizeProfileForDashboard(incomingProfile && typeof incomingProfile === 'object' ? incomingProfile : {});
     var merged = Object.assign({}, existing);
 
     Object.keys(incoming).forEach(function (key) {
@@ -88,7 +164,7 @@
       merged[key] = value;
     });
 
-    return merged;
+    return normalizeProfileForDashboard(merged);
   }
 
   function getCurrentRouteName() {
@@ -270,14 +346,16 @@
     },
 
     persistProfile(profile) {
-      var incoming = profile && typeof profile === 'object' ? profile : {};
+      var incoming = normalizeProfileForDashboard(profile && typeof profile === 'object' ? profile : {});
       if (!Object.keys(incoming).length) return;
       var data = mergeProfileData(this.getCachedProfile(), incoming);
       if (window.Storage && typeof window.Storage.setProfile === 'function') {
         window.Storage.setProfile(data);
       } else if (window.Storage && typeof window.Storage.set === 'function') {
         window.Storage.set(window.APP_CONFIG.STORAGE_KEYS.PROFILE, data);
-        if (typeof window.Storage.setLastGoodProfile === 'function') window.Storage.setLastGoodProfile(data);
+      }
+      if (window.Storage && typeof window.Storage.setLastGoodProfile === 'function' && isProfileCompleteForDashboard(data)) {
+        window.Storage.setLastGoodProfile(data);
       }
       if (window.AppState && typeof window.AppState.setProfile === 'function') {
         window.AppState.setProfile(data);
@@ -409,13 +487,28 @@
     },
 
     applyBootstrapLite(bootstrapLite, options) {
-      var payload = bootstrapLite && typeof bootstrapLite === 'object' ? bootstrapLite : {};
+      var payload = bootstrapLite && typeof bootstrapLite === 'object' ? Object.assign({}, bootstrapLite) : {};
       var opts = options || {};
-      var profile = mergeProfileData(this.getCachedProfile(), payload.profile || {});
+      var cachedProfile = normalizeProfileForDashboard(this.getCachedProfile());
+      var incomingProfile = normalizeProfileForDashboard(payload.profile || {});
+      var incomingComplete = isProfileCompleteForDashboard(incomingProfile);
+      var cachedComplete = isProfileCompleteForDashboard(cachedProfile);
+      var shouldApplyProfile = opts.allowPartialProfile === true || incomingComplete || cachedComplete;
+      var profile = shouldApplyProfile ? mergeProfileData(cachedProfile, incomingProfile) : {};
+      var payloadForStorage = Object.assign({}, payload);
+
+      // 3C-R4: refreshBootstrapLite/session minimal bukan sumber final profil + wilayah.
+      // Jika profil dari bootstrap tidak lengkap, jangan simpan sebagai bootstrap.profile
+      // agar tidak menutupi user_profile_lite.
+      if (!incomingComplete && opts.allowPartialProfile !== true) {
+        delete payloadForStorage.profile;
+      } else if (incomingComplete) {
+        payloadForStorage.profile = incomingProfile;
+      }
 
       if (opts.persist !== false) {
-        this.setCachedBootstrapLite(payload);
-        if (profile && Object.keys(profile).length) {
+        this.setCachedBootstrapLite(payloadForStorage);
+        if (profile && Object.keys(profile).length && shouldApplyProfile) {
           this.persistProfile(profile);
         }
       }
@@ -425,21 +518,24 @@
         app_version: payload.app_version || window.APP_CONFIG.APP_VERSION
       });
 
-      if (profile && Object.keys(profile).length) {
+      if (profile && Object.keys(profile).length && shouldApplyProfile) {
         this.applyProfileToUi(profile);
       }
 
       if (window.DashboardView && typeof window.DashboardView.applyBootstrapLite === 'function') {
-        window.DashboardView.applyBootstrapLite(payload);
-      } else if (window.DashboardView && typeof window.DashboardView.applyDashboardProfile === 'function' && profile && Object.keys(profile).length) {
+        window.DashboardView.applyBootstrapLite(payloadForStorage);
+      } else if (window.DashboardView && typeof window.DashboardView.applyDashboardProfile === 'function' && profile && Object.keys(profile).length && shouldApplyProfile) {
         window.DashboardView.applyDashboardProfile(profile);
       }
 
-      if (opts.refreshProfileRefs !== false && profile && Object.keys(profile).length) {
-        this.refreshProfileFromBackendRefs_(profile).catch(function () {});
+      if (opts.refreshProfileRefs !== false && !isLoginHydrationInProgress()) {
+        var recoveryBase = profile && Object.keys(profile).length ? profile : cachedProfile;
+        if (recoveryBase && Object.keys(recoveryBase).length) {
+          this.refreshProfileFromBackendRefs_(recoveryBase).catch(function () {});
+        }
       }
 
-      return payload;
+      return payloadForStorage;
     },
 
     restoreSessionAndRouteBackground_(options) {
@@ -515,10 +611,10 @@
                 bootstrap_lite: cachedLiteForCooldown,
                 profile: this.getCachedProfile ? this.getCachedProfile() : {}
               },
-              source: 'bootstrap_cooldown_cache_3c_r3'
+              source: 'bootstrap_cooldown_cache_3c_r4'
             };
           } else {
-            result = await window.Api.refreshBootstrapLite({ source: 'bootstrap_restore_3c_r3' });
+            result = await window.Api.refreshBootstrapLite({ source: 'bootstrap_restore_session_only_3c_r4' });
             if (result && result.ok) {
               window.__TPK_LAST_REFRESH_BOOTSTRAP_LITE_AT = Date.now();
             }
@@ -562,9 +658,11 @@
 
         var responseData = result.data || {};
         var bootstrapLite = responseData.bootstrap_lite || {};
-        var sessionProfile = responseData.profile || responseData.session || {};
+        var sessionProfile = normalizeProfileForDashboard(responseData.profile || responseData.session || {});
 
-        if (!bootstrapLite.profile && sessionProfile && Object.keys(sessionProfile).length) {
+        // 3C-R4: session minimal dari refreshBootstrapLite tidak dinaikkan menjadi
+        // bootstrapLite.profile kecuali benar-benar lengkap untuk dashboard.
+        if (!bootstrapLite.profile && sessionProfile && Object.keys(sessionProfile).length && isProfileCompleteForDashboard(sessionProfile)) {
           bootstrapLite.profile = sessionProfile;
         }
         if (!bootstrapLite.session && responseData.session) {
@@ -615,11 +713,11 @@
     },
 
     applyProfileToUi(profile) {
-      const data = profile || {};
+      const data = normalizeProfileForDashboard(profile || {});
       const wilayah = parseWilayahDisplay(data);
       this.setText('profile-nama', data.nama_kader || data.nama_user || data.nama || '-');
       this.setText('profile-unsur', data.unsur_tpk || data.unsur || '-');
-      this.setText('profile-id', data.id_user || '-');
+      this.setText('profile-id', data.id_user || data.username || '-');
       this.setText('profile-tim', getDisplayNomorTim(data));
       setTextAliases(['profile-desa', 'wilayah-desa', 'profile-desa-value'], wilayah.desa);
       setTextAliases(['profile-dusun', 'wilayah-dusun', 'profile-dusun-value'], wilayah.dusun);
@@ -629,11 +727,7 @@
 
 
     needsProfileRecovery(profile) {
-      var data = profile || {};
-      return !(normalizeDisplayText(data.unsur_tpk || data.unsur) &&
-        normalizeDisplayText(data.desa_kelurahan || data.nama_desa || data.desa) &&
-        normalizeDisplayText(data.dusun_rw || data.nama_dusun || data.dusun) &&
-        normalizeDisplayText(data.wilayah_tugas || data.wilayah));
+      return !isProfileCompleteForDashboard(profile || {});
     },
 
     mergeTimRefIntoProfile(profile, rows) {
@@ -696,27 +790,18 @@
       try {
         try {
           if (typeof window.Api.getMyProfileLite === 'function') {
-            var pResult = await window.Api.getMyProfileLite({ source: 'bootstrap_profile_recovery_3b' });
+            var pResult = await window.Api.getMyProfileLite({ source: 'bootstrap_profile_recovery_3c_r4' });
             if (pResult && pResult.ok && pResult.data) {
               updated = mergeProfileData(updated, pResult.data || {});
             }
           }
         } catch (ignoreProfile) {}
 
-        // 3B: getTimRef tidak dipanggil untuk tampilan profil biasa bila profile_lite sudah lengkap.
-        // getTimRef tetap tersedia untuk registrasi/ref/admin/debug.
-        if (this.needsProfileRecovery(updated)) {
-          try {
-            if (typeof window.Api.getTimRef === 'function') {
-              var tResult = await window.Api.getTimRef({ id_tim: updated.id_tim || base.id_tim || '', source: 'bootstrap_profile_recovery_fallback_3b' });
-              if (tResult && tResult.ok) {
-                var rows = Array.isArray(tResult.data) ? tResult.data : (tResult.data && Array.isArray(tResult.data.items) ? tResult.data.items : []);
-                updated = this.mergeTimRefIntoProfile(updated, rows);
-              }
-            }
-          } catch (ignoreTim) {}
-        }
+        // 3C-R4: getTimRef tidak dipakai untuk profil biasa.
+        // Profil + wilayah final harus datang dari getMyProfileLite/user_profile_lite.
+        // getTimRef tetap tersedia untuk registrasi/ref/debug, bukan dashboard profile recovery.
 
+        updated = normalizeProfileForDashboard(updated);
         if (updated && Object.keys(updated).length) {
           this.persistProfile(updated);
           this.applyProfileToUi(updated);
