@@ -18,6 +18,7 @@
   var dashboardLiteLastRun = 0;
   var registrasiPrefetchTimer = null;
   var registrasiPrefetchStarted = false;
+  var draftPendingTimer = null;
 
   var BASE_MENU = {
     daftar_sasaran: {
@@ -670,13 +671,19 @@
   }
 
   function syncNow() {
-    if (window.SyncView && typeof window.SyncView.syncAll === 'function') {
-      window.SyncView.syncAll();
-      return;
-    }
-
-    openSyncScreen();
-    showToast('Fitur sinkronisasi akan dijalankan dari halaman sinkronisasi.', 'info');
+    ensureQueueSupportLoaded().then(function () {
+      if (window.SyncManager && typeof window.SyncManager.syncAll === 'function') {
+        return window.SyncManager.syncAll({ force: true }).then(function () {
+          scheduleDraftPendingRefresh({ delayMs: 50 });
+        });
+      }
+      if (window.SyncView && typeof window.SyncView.syncAll === 'function') {
+        return window.SyncView.syncAll();
+      }
+      openSyncScreen();
+      showToast('Fitur sinkronisasi akan dijalankan dari halaman sinkronisasi.', 'info');
+      return null;
+    });
   }
 
   function updateNetworkBadge() {
@@ -1256,6 +1263,73 @@
   }
 
 
+  function loadDashboardSupportScript(src, globalName) {
+    if (!src) return Promise.resolve();
+    if (globalName && window[globalName]) return Promise.resolve();
+    var existing = Array.prototype.slice.call(document.querySelectorAll("script[data-dashboard-support-src]")).find(function (node) {
+      return node && node.dataset && node.dataset.dashboardSupportSrc === src;
+    });
+    if (existing) {
+      return new Promise(function (resolve) {
+        var tries = 0;
+        function waitReady() {
+          tries += 1;
+          if (!globalName || window[globalName] || tries > 40) return resolve();
+          window.setTimeout(waitReady, 100);
+        }
+        waitReady();
+      });
+    }
+    return new Promise(function (resolve) {
+      var script = document.createElement("script");
+      script.src = src;
+      script.async = true;
+      script.defer = true;
+      script.dataset.dashboardSupportSrc = src;
+      script.onload = function () { resolve(); };
+      script.onerror = function () { resolve(); };
+      document.head.appendChild(script);
+    });
+  }
+
+  function ensureQueueSupportLoaded() {
+    if (window.QueueRepo && window.SyncManager) return Promise.resolve();
+    return loadDashboardSupportScript("./js/db.js", "TPKDb")
+      .then(function () { return loadDashboardSupportScript("./js/queueRepo.js", "QueueRepo"); })
+      .then(function () { return loadDashboardSupportScript("./js/syncManager.js", "SyncManager"); });
+  }
+
+  function applyDraftPendingSummary(summary) {
+    summary = summary || {};
+    var pendingTotal = Number(summary.pending || 0) + Number(summary.failed || 0) + Number(summary.conflict || 0);
+    setText("stat-draft", pendingTotal);
+    if (window.AppState && typeof window.AppState.setSyncSummary === "function") {
+      window.AppState.setSyncSummary(summary);
+    }
+  }
+
+  function refreshDraftPendingCount() {
+    return ensureQueueSupportLoaded().then(function () {
+      if (window.SyncManager && typeof window.SyncManager.updateBadge === "function") {
+        return window.SyncManager.updateBadge().then(applyDraftPendingSummary);
+      }
+      if (window.QueueRepo && typeof window.QueueRepo.getSummary === "function") {
+        return window.QueueRepo.getSummary().then(applyDraftPendingSummary);
+      }
+      return null;
+    }).catch(function () { return null; });
+  }
+
+  function scheduleDraftPendingRefresh(options) {
+    var opts = options || {};
+    var delay = typeof opts.delayMs === "number" ? opts.delayMs : 900;
+    if (draftPendingTimer) window.clearTimeout(draftPendingTimer);
+    draftPendingTimer = window.setTimeout(function () {
+      draftPendingTimer = null;
+      refreshDraftPendingCount();
+    }, delay);
+  }
+
   function scheduleRegistrasiFormPrefetch(options) {
     var opts = options || {};
     var delay = typeof opts.delayMs === 'number' ? opts.delayMs : 2400;
@@ -1323,6 +1397,7 @@
     bindNetworkStatus();
     bindEscapeKey();
     scheduleDashboardLiteRefresh({ delayMs: 1200 });
+    scheduleDraftPendingRefresh({ delayMs: 950 });
     scheduleRegistrasiFormPrefetch({ delayMs: 2600 });
   }
 
@@ -1363,6 +1438,8 @@
     refresh: refresh,
     refreshDashboardLite: refreshDashboardLite,
     scheduleDashboardLiteRefresh: scheduleDashboardLiteRefresh,
+    scheduleDraftPendingRefresh: scheduleDraftPendingRefresh,
+    refreshDraftPendingCount: refreshDraftPendingCount,
     scheduleRegistrasiFormPrefetch: scheduleRegistrasiFormPrefetch,
     applyDashboardSummary: applyDashboardSummary,
     setRole: setRole,
