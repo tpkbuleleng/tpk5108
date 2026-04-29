@@ -1,8 +1,8 @@
-const SW_VERSION = 'tpk-sw-3c-r2-r3-login-hydration-guard-20260429-02';
+const SW_VERSION = 'tpk-sw-3c-r4-profile-apply-final-20260429-01';
 const SHELL_CACHE = 'tpk-shell-' + SW_VERSION;
 const ASSET_CACHE = 'tpk-assets-' + SW_VERSION;
 
-// 3C-R2/R3 shell diet:
+// 3C-R4 shell diet tetap mengikuti 3C-R2/R3:
 // Precache hanya aset minimum untuk menampilkan halaman login.
 // Router, bootstrap, ui, view, db, queueRepo, dan syncManager tidak dipaksa precache saat cold start.
 // File tersebut akan masuk runtime cache setelah benar-benar dibutuhkan.
