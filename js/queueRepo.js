@@ -1,348 +1,320 @@
-
 (function (window) {
   'use strict';
 
-  var STATUS = Object.freeze({
-    PENDING: 'PENDING',
-    PROCESSING: 'PROCESSING',
-    SUCCESS: 'SUCCESS',
-    FAILED: 'FAILED',
-    CONFLICT: 'CONFLICT',
-    DUPLICATE: 'DUPLICATE'
-  });
+  var LS_QUEUE_KEY = 'tpk_sync_queue_v1';
+  var REG_DRAFT_KEY = 'tpk_registrasi_draft_v_final';
+  var PEN_DRAFT_KEY = 'tpk_pendampingan_draft_v_final';
+  var listeners = [];
 
-  function nowIso() {
-    return new Date().toISOString();
+  function nowIso() { return new Date().toISOString(); }
+
+  function safeJsonParse(value, fallback) {
+    try { return value ? JSON.parse(value) : fallback; } catch (err) { return fallback; }
   }
 
   function clone(value) {
-    try {
-      return JSON.parse(JSON.stringify(value));
-    } catch (err) {
-      return value;
-    }
-  }
-
-  function getConfig() {
-    return window.APP_CONFIG || {};
-  }
-
-  function getStorageKeys() {
-    return getConfig().STORAGE_KEYS || {};
-  }
-
-  function getStorage() {
-    return window.Storage || null;
-  }
-
-  function getState() {
-    return window.AppState || null;
-  }
-
-  function getApi() {
-    return window.Api || null;
-  }
-
-  function getSessionToken() {
-    if (window.Api && typeof window.Api.getSessionToken === 'function') {
-      return String(window.Api.getSessionToken() || '');
-    }
-    var storage = getStorage();
-    var keys = getStorageKeys();
-    if (storage && typeof storage.get === 'function') {
-      return String(storage.get(keys.SESSION_TOKEN, '') || '');
-    }
-    return '';
-  }
-
-  function getDeviceId() {
-    if (window.Api && typeof window.Api.getOrCreateDeviceId === 'function') {
-      return String(window.Api.getOrCreateDeviceId() || '');
-    }
-    var storage = getStorage();
-    var keys = getStorageKeys();
-    if (storage && typeof storage.get === 'function') {
-      return String(storage.get(keys.DEVICE_ID, '') || '');
-    }
-    return '';
-  }
-
-  function getProfile() {
-    var state = getState();
-    if (state && typeof state.getProfile === 'function') {
-      return state.getProfile() || {};
-    }
-    var storage = getStorage();
-    var keys = getStorageKeys();
-    if (storage && typeof storage.get === 'function') {
-      return storage.get(keys.PROFILE, {}) || {};
-    }
-    return {};
-  }
-
-  function ensureQueueId(existing) {
-    if (existing) return String(existing);
-    return 'QUE-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8).toUpperCase();
-  }
-
-  function ensureClientSubmitId(payload, queueId) {
-    if (payload && payload.client_submit_id) return String(payload.client_submit_id);
-    if (window.ClientId && typeof window.ClientId.ensure === 'function') {
-      return window.ClientId.ensure('', 'SUB');
-    }
-    return 'SUB-' + (queueId || ensureQueueId(''));
+    try { return JSON.parse(JSON.stringify(value)); } catch (err) { return value; }
   }
 
   function normalizeStatus(value) {
-    var raw = String(value || STATUS.PENDING).trim().toUpperCase();
-    return STATUS[raw] || raw || STATUS.PENDING;
+    return String(value || 'PENDING').trim().toUpperCase() || 'PENDING';
   }
 
-  function normalizeItem(item) {
+  function getDb() {
+    return window.TPKDb || window.DB || null;
+  }
+
+  function getDeviceId() {
+    try {
+      if (window.Api && typeof window.Api.getDeviceId === 'function') return window.Api.getDeviceId();
+    } catch (err) {}
+    try {
+      var key = (window.APP_CONFIG && window.APP_CONFIG.STORAGE_KEYS && window.APP_CONFIG.STORAGE_KEYS.DEVICE_ID) || 'tpk_device_id';
+      return localStorage.getItem(key) || '';
+    } catch (err2) { return ''; }
+  }
+
+  function getAppVersion() {
+    return (window.APP_CONFIG && window.APP_CONFIG.APP_VERSION) || '';
+  }
+
+  function getProfile() {
+    try {
+      if (window.AppState && typeof window.AppState.getProfile === 'function') return window.AppState.getProfile() || {};
+      var key = (window.APP_CONFIG && window.APP_CONFIG.STORAGE_KEYS && window.APP_CONFIG.STORAGE_KEYS.PROFILE) || 'tpk_profile';
+      return safeJsonParse(localStorage.getItem(key), {}) || {};
+    } catch (err) { return {}; }
+  }
+
+  function readLegacyQueue() {
+    return safeJsonParse(localStorage.getItem(LS_QUEUE_KEY), []) || [];
+  }
+
+  function writeLegacyQueue(rows) {
+    try { localStorage.setItem(LS_QUEUE_KEY, JSON.stringify(rows || [])); } catch (err) {}
+  }
+
+  function buildId(prefix) {
+    return (prefix || 'Q') + '-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+  }
+
+  function getClientSubmitId(action, payload, meta) {
+    payload = payload || {};
+    meta = meta || {};
+    return meta.client_submit_id || payload.client_submit_id || buildId(action === 'registerSasaran' ? 'REG' : 'SUB');
+  }
+
+  function buildQueueItem(action, payload, meta) {
+    payload = Object.assign({}, payload || {});
+    meta = meta || {};
     var profile = getProfile();
-    var payload = item && typeof item.payload === 'object' ? clone(item.payload) : {};
-    var queueId = ensureQueueId(item && (item.queue_id || item.id));
+    var clientSubmitId = getClientSubmitId(action, payload, meta);
+    payload.client_submit_id = payload.client_submit_id || clientSubmitId;
+    payload.sync_source = payload.sync_source || meta.sync_source || 'OFFLINE_QUEUE';
 
     return {
-      queue_id: queueId,
-      id: queueId,
-      action: String(item && item.action || payload.action || '').trim(),
-      entity_type: String(item && item.entity_type || '').trim(),
-      entity_id_local: String(item && item.entity_id_local || '').trim(),
-      client_submit_id: ensureClientSubmitId(payload, queueId),
+      id: meta.id || clientSubmitId,
+      queue_id: meta.queue_id || clientSubmitId,
+      action: action || meta.action || '',
+      entity_type: meta.entity_type || (action === 'registerSasaran' ? 'SASARAN' : ''),
+      entity_id_ref: meta.entity_id_ref || payload.id_sasaran || '',
+      client_submit_id: clientSubmitId,
       payload: payload,
-      status: normalizeStatus(item && (item.status || item.sync_status)),
-      retry_count: Number(item && (item.retry_count || item.retries) || 0),
-      last_error: String(item && item.last_error || ''),
-      last_response_code: Number(item && item.last_response_code || 0),
-      created_at: String(item && item.created_at || nowIso()),
-      updated_at: String(item && item.updated_at || nowIso()),
-      id_user: String(item && item.id_user || profile.id_user || ''),
-      id_tim: String(item && item.id_tim || profile.id_tim || ''),
-      device_id: String(item && item.device_id || getDeviceId() || ''),
-      app_version: String(item && item.app_version || (getConfig().APP_VERSION || '')),
-      sync_source: String(item && item.sync_source || payload.sync_source || 'OFFLINE_QUEUE'),
-      is_archived: !!(item && item.is_archived)
+      id_pengguna: meta.id_pengguna || profile.id_user || profile.username || '',
+      id_tim: meta.id_tim || profile.id_tim || payload.id_tim || '',
+      device_id: meta.device_id || getDeviceId(),
+      app_version: meta.app_version || getAppVersion(),
+      sync_source: payload.sync_source || meta.sync_source || 'OFFLINE_QUEUE',
+      sync_status: normalizeStatus(meta.sync_status || 'PENDING'),
+      status: normalizeStatus(meta.sync_status || 'PENDING'),
+      retry_count: Number(meta.retry_count || 0),
+      last_error: meta.last_error || '',
+      created_at: meta.created_at || nowIso(),
+      updated_at: nowIso(),
+      last_synced_at: meta.last_synced_at || ''
     };
+  }
+
+  function notifyChange() {
+    try { window.dispatchEvent(new CustomEvent('tpk:queue-changed')); } catch (err) {}
+    listeners.forEach(function (fn) { try { fn(); } catch (err2) {} });
   }
 
   async function ensureDb() {
-    if (!window.AppDB || typeof window.AppDB.getAll !== 'function') {
-      throw new Error('AppDB belum tersedia.');
+    var db = getDb();
+    if (db && typeof db.init === 'function') {
+      try { await db.init(); } catch (err) {}
     }
-    return window.AppDB;
+    return db;
   }
 
-  function toLegacyMirror(items) {
-    return (items || []).filter(function (item) {
-      return !item.is_archived && item.status !== STATUS.SUCCESS && item.status !== STATUS.DUPLICATE;
-    }).map(function (item) {
-      return {
-        id: item.queue_id,
-        action: item.action,
-        payload: clone(item.payload || {}),
-        sync_status: item.status,
-        status: item.status,
-        created_at: item.created_at,
+  async function migrateLegacyQueue() {
+    var db = await ensureDb();
+    if (!db || typeof db.addQueue !== 'function') return false;
+    var legacy = readLegacyQueue();
+    if (!legacy.length) return true;
+
+    for (var i = 0; i < legacy.length; i += 1) {
+      var item = legacy[i] || {};
+      var payload = item.payload || {};
+      await db.addQueue(item.action || payload.action || 'registerSasaran', payload, {
+        id: item.id || item.client_submit_id || payload.client_submit_id,
+        entity_type: item.entity_type || 'SASARAN',
+        client_submit_id: item.client_submit_id || payload.client_submit_id || item.id,
+        sync_status: item.sync_status || item.status || 'PENDING',
+        retry_count: item.retry_count || 0,
         last_error: item.last_error || '',
-        retries: Number(item.retry_count || 0)
-      };
-    });
-  }
-
-  async function syncLegacyMirror() {
-    var db = await ensureDb();
-    var all = await db.getAll(db.STORES.SYNC_QUEUE);
-    var mirrored = toLegacyMirror(all);
-
-    var storage = getStorage();
-    var keys = getStorageKeys();
-    if (storage && typeof storage.set === 'function' && keys.SYNC_QUEUE) {
-      storage.set(keys.SYNC_QUEUE, mirrored);
+        created_at: item.created_at || item.saved_at || nowIso(),
+        sync_source: payload.sync_source || item.sync_source || 'OFFLINE_QUEUE'
+      });
     }
 
-    var state = getState();
-    if (state && typeof state.setSyncQueue === 'function') {
-      state.setSyncQueue(mirrored);
-    }
-
-    return mirrored;
-  }
-
-  async function save(item) {
-    var db = await ensureDb();
-    var normalized = normalizeItem(item);
-    normalized.updated_at = nowIso();
-    await db.put(db.STORES.SYNC_QUEUE, normalized);
-    await syncLegacyMirror();
-    return normalized;
-  }
-
-  async function getAll(options) {
-    var db = await ensureDb();
-    var items = await db.getAll(db.STORES.SYNC_QUEUE);
-    var opts = options || {};
-    var out = (items || []).map(normalizeItem).filter(function (item) {
-      if (opts.includeArchived === true) return true;
-      return !item.is_archived;
-    });
-
-    out.sort(function (a, b) {
-      return String(a.created_at || '').localeCompare(String(b.created_at || ''));
-    });
-
-    return out;
-  }
-
-  async function getById(queueId) {
-    var db = await ensureDb();
-    var item = await db.get(db.STORES.SYNC_QUEUE, queueId);
-    return item ? normalizeItem(item) : null;
+    try { localStorage.removeItem(LS_QUEUE_KEY); } catch (err) {}
+    notifyChange();
+    return true;
   }
 
   async function enqueue(action, payload, meta) {
-    var next = normalizeItem(Object.assign({}, meta || {}, {
-      action: action,
-      payload: clone(payload || {}),
-      status: STATUS.PENDING,
-      created_at: nowIso(),
-      updated_at: nowIso()
-    }));
-
-    await save(next);
-    try {
-      await window.AppDB.logAudit('QUEUE_ENQUEUE', {
-        queue_id: next.queue_id,
-        action: next.action,
-        client_submit_id: next.client_submit_id
-      });
-    } catch (err) {}
-    return next;
-  }
-
-  async function getByStatuses(statusList) {
-    var targets = (statusList || []).map(normalizeStatus);
-    var items = await getAll();
-    return items.filter(function (item) {
-      return targets.indexOf(item.status) >= 0;
-    });
-  }
-
-  async function getPending(limit) {
-    var items = await getByStatuses([STATUS.PENDING, STATUS.FAILED]);
-    if (limit && limit > 0) return items.slice(0, limit);
-    return items;
-  }
-
-  async function updateStatus(queueId, status, patch) {
-    var item = await getById(queueId);
-    if (!item) return null;
-
-    var next = Object.assign({}, item, clone(patch || {}), {
-      status: normalizeStatus(status),
-      updated_at: nowIso()
-    });
-
-    await save(next);
-    return next;
-  }
-
-  async function markProcessing(queueId) {
-    return updateStatus(queueId, STATUS.PROCESSING);
-  }
-
-  async function markSuccess(queueId, patch) {
-    return updateStatus(queueId, STATUS.SUCCESS, patch || {});
-  }
-
-  async function markDuplicate(queueId, patch) {
-    return updateStatus(queueId, STATUS.DUPLICATE, patch || {});
-  }
-
-  async function markConflict(queueId, patch) {
-    return updateStatus(queueId, STATUS.CONFLICT, patch || {});
-  }
-
-  async function markFailed(queueId, errorMessage, patch) {
-    var current = await getById(queueId);
-    var nextRetry = Number((current && current.retry_count) || 0) + 1;
-    return updateStatus(queueId, STATUS.FAILED, Object.assign({}, patch || {}, {
-      retry_count: nextRetry,
-      last_error: String(errorMessage || '')
-    }));
-  }
-
-  async function remove(queueId) {
+    var item = buildQueueItem(action, payload, meta || {});
     var db = await ensureDb();
-    await db.remove(db.STORES.SYNC_QUEUE, queueId);
-    await syncLegacyMirror();
-    return true;
-  }
 
-  async function archive(queueId) {
-    var item = await getById(queueId);
-    if (!item) return false;
-    item.is_archived = true;
-    item.updated_at = nowIso();
-    await save(item);
-    return true;
-  }
-
-  async function clearCompleted() {
-    var items = await getByStatuses([STATUS.SUCCESS, STATUS.DUPLICATE]);
-    for (var i = 0; i < items.length; i += 1) {
-      await archive(items[i].queue_id);
+    if (db && typeof db.addQueue === 'function') {
+      await db.addQueue(item.action, item.payload, item);
+    } else {
+      var rows = readLegacyQueue();
+      rows = rows.filter(function (row) { return String(row.id || row.client_submit_id) !== String(item.id); });
+      rows.push(item);
+      writeLegacyQueue(rows);
     }
-    await syncLegacyMirror();
+
+    try {
+      if (db && typeof db.addAudit === 'function') await db.addAudit('QUEUE_ENQUEUE', { id: item.id, action: item.action, entity_type: item.entity_type });
+    } catch (err) {}
+
+    notifyChange();
+    return item;
+  }
+
+  async function update(id, patch) {
+    var db = await ensureDb();
+    var updated = null;
+    if (db && typeof db.updateQueue === 'function') {
+      updated = await db.updateQueue(id, patch || {});
+    } else {
+      var rows = readLegacyQueue();
+      rows = rows.map(function (row) {
+        if (String(row.id || row.client_submit_id) === String(id)) {
+          updated = Object.assign({}, row, patch || {}, { updated_at: nowIso() });
+          if (updated.sync_status) updated.status = updated.sync_status;
+          return updated;
+        }
+        return row;
+      });
+      writeLegacyQueue(rows);
+    }
+    notifyChange();
+    return updated;
+  }
+
+  async function removeById(id) {
+    var db = await ensureDb();
+    if (db && typeof db.removeQueue === 'function') {
+      await db.removeQueue(id);
+    } else {
+      writeLegacyQueue(readLegacyQueue().filter(function (row) { return String(row.id || row.client_submit_id) !== String(id); }));
+    }
+    notifyChange();
     return true;
   }
 
-  async function stats() {
-    var items = await getAll();
-    var out = {
-      total: items.length,
-      pending: 0,
-      processing: 0,
-      success: 0,
-      failed: 0,
-      conflict: 0,
-      duplicate: 0
+  async function list(filter) {
+    await migrateLegacyQueue();
+    var db = await ensureDb();
+    if (db && typeof db.listQueue === 'function') return db.listQueue(filter || {});
+
+    var rows = readLegacyQueue();
+    var f = filter || {};
+    if (f.status) rows = rows.filter(function (row) { return normalizeStatus(row.sync_status || row.status) === normalizeStatus(f.status); });
+    if (f.action) rows = rows.filter(function (row) { return String(row.action || '') === String(f.action); });
+    if (f.keyword) {
+      var q = String(f.keyword || '').toLowerCase();
+      rows = rows.filter(function (row) { return JSON.stringify(row || {}).toLowerCase().indexOf(q) >= 0; });
+    }
+    rows.sort(function (a, b) { return String(b.created_at || '').localeCompare(String(a.created_at || '')); });
+    return rows;
+  }
+
+  async function getSummary() {
+    var rows = await list();
+    var summary = { total: rows.length, pending: 0, failed: 0, processing: 0, conflict: 0, success: 0 };
+    rows.forEach(function (row) {
+      var status = normalizeStatus(row.sync_status || row.status);
+      if (status === 'PENDING') summary.pending += 1;
+      else if (status === 'FAILED') summary.failed += 1;
+      else if (status === 'PROCESSING') summary.processing += 1;
+      else if (status === 'CONFLICT') summary.conflict += 1;
+      else if (status === 'SUCCESS') summary.success += 1;
+    });
+    return summary;
+  }
+
+  async function clearAll() {
+    var db = await ensureDb();
+    if (db && typeof db.clear === 'function' && db.stores && db.stores.QUEUE) await db.clear(db.stores.QUEUE);
+    writeLegacyQueue([]);
+    notifyChange();
+    return true;
+  }
+
+  async function saveDraft(draftKey, draftType, data, meta) {
+    var db = await ensureDb();
+    var wrapped = {
+      saved_at: nowIso(),
+      data: clone(data || {})
     };
 
-    items.forEach(function (item) {
-      var status = normalizeStatus(item.status);
-      if (status === STATUS.PENDING) out.pending += 1;
-      else if (status === STATUS.PROCESSING) out.processing += 1;
-      else if (status === STATUS.SUCCESS) out.success += 1;
-      else if (status === STATUS.FAILED) out.failed += 1;
-      else if (status === STATUS.CONFLICT) out.conflict += 1;
-      else if (status === STATUS.DUPLICATE) out.duplicate += 1;
-    });
+    if (db && typeof db.saveDraft === 'function') {
+      await db.saveDraft(draftKey, draftType, wrapped, meta || {});
+    }
 
-    return out;
+    try { localStorage.setItem(draftKey, JSON.stringify(wrapped)); } catch (err) {}
+    notifyChange();
+    return wrapped;
+  }
+
+  async function getDraft(draftKey) {
+    var db = await ensureDb();
+    if (db && typeof db.getDraft === 'function') {
+      var item = await db.getDraft(draftKey);
+      if (item && item.payload) return item.payload;
+    }
+    return safeJsonParse(localStorage.getItem(draftKey), null);
+  }
+
+  async function clearDraft(draftKey) {
+    var db = await ensureDb();
+    if (db && typeof db.clearDraft === 'function') await db.clearDraft(draftKey);
+    try { localStorage.removeItem(draftKey); } catch (err) {}
+    notifyChange();
+    return true;
+  }
+
+  function onChange(fn) {
+    if (typeof fn !== 'function') return function () {};
+    listeners.push(fn);
+    return function () {
+      listeners = listeners.filter(function (item) { return item !== fn; });
+    };
   }
 
   var QueueRepo = {
-    STATUS: STATUS,
-    normalizeItem: normalizeItem,
+    migrateLegacyQueue: migrateLegacyQueue,
     enqueue: enqueue,
-    save: save,
-    getAll: getAll,
-    getById: getById,
-    getPending: getPending,
-    getByStatuses: getByStatuses,
-    updateStatus: updateStatus,
-    markProcessing: markProcessing,
-    markSuccess: markSuccess,
-    markDuplicate: markDuplicate,
-    markConflict: markConflict,
-    markFailed: markFailed,
-    remove: remove,
-    archive: archive,
-    clearCompleted: clearCompleted,
-    stats: stats,
-    syncLegacyMirror: syncLegacyMirror
+    add: enqueue,
+    update: update,
+    removeById: removeById,
+    list: list,
+    getQueue: list,
+    getSummary: getSummary,
+    clearAll: clearAll,
+    saveDraft: saveDraft,
+    getDraft: getDraft,
+    clearDraft: clearDraft,
+    onChange: onChange,
+    normalizeStatus: normalizeStatus
+  };
+
+  var DraftManager = {
+    async getRegistrasiDraftAsync() { return getDraft(REG_DRAFT_KEY); },
+    getRegistrasiDraft: function () {
+      return safeJsonParse(localStorage.getItem(REG_DRAFT_KEY), null);
+    },
+    saveRegistrasiDraft: function (data) {
+      saveDraft(REG_DRAFT_KEY, 'REGISTRASI', data || {}, { source: 'registrasiView' });
+    },
+    clearRegistrasiDraft: function () {
+      clearDraft(REG_DRAFT_KEY);
+    },
+    enqueueOfflineRegistrasi: function (payload) {
+      return enqueue('registerSasaran', Object.assign({}, payload || {}, { sync_source: 'OFFLINE_QUEUE' }), {
+        entity_type: 'SASARAN',
+        client_submit_id: payload && payload.client_submit_id || '',
+        sync_source: 'OFFLINE_QUEUE'
+      });
+    },
+    getPendampinganDraft: function () {
+      return safeJsonParse(localStorage.getItem(PEN_DRAFT_KEY), null);
+    },
+    savePendampinganDraft: function (data) {
+      saveDraft(PEN_DRAFT_KEY, 'PENDAMPINGAN', data || {}, { source: 'pendampinganView' });
+    },
+    clearPendampinganDraft: function () {
+      clearDraft(PEN_DRAFT_KEY);
+    }
   };
 
   window.QueueRepo = QueueRepo;
+  window.DraftManager = DraftManager;
+
+  migrateLegacyQueue().catch(function () {});
 })(window);
