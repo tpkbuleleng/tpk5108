@@ -24,13 +24,19 @@
       { src: './js/views/sasaranDetailView.js?v=20260416-03', globalName: 'SasaranDetailView' }
     ],
     registrasi: [
-      { src: './js/views/registrasiView.js?v=20260417-01', globalName: 'RegistrasiView' }
+      { src: './js/db.js', globalName: 'TPKDb' },
+      { src: './js/queueRepo.js', globalName: 'QueueRepo' },
+      { src: './js/syncManager.js', globalName: 'SyncManager' },
+      { src: './js/views/registrasiView.js?v=20260430-3E', globalName: 'RegistrasiView' }
     ],
     pendampingan: [
       { src: './js/views/pendampinganView.js?v=20260417-02', globalName: 'PendampinganView' }
     ],
     sync: [
-      { src: './js/views/syncView.js', globalName: 'SyncView' }
+      { src: './js/db.js', globalName: 'TPKDb' },
+      { src: './js/queueRepo.js', globalName: 'QueueRepo' },
+      { src: './js/syncManager.js', globalName: 'SyncManager' },
+      { src: './js/views/syncView.js?v=20260430-3E', globalName: 'SyncView' }
     ],
     rekapKader: [
       { src: './js/views/rekapKaderView.js', globalName: 'RekapKaderView' }
@@ -180,9 +186,11 @@
       return Promise.resolve();
     }
 
-    return Promise.all(assets.map(function (asset) {
-      return loadScriptOnce(asset.src, asset.globalName);
-    }));
+    return assets.reduce(function (promise, asset) {
+      return promise.then(function () {
+        return loadScriptOnce(asset.src, asset.globalName);
+      });
+    }, Promise.resolve());
   }
 
   function invokeDefaultRouteReady(routeName) {
