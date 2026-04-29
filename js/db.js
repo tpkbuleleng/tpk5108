@@ -1,22 +1,12 @@
-
 (function (window) {
   'use strict';
 
-  var CONFIG = window.APP_CONFIG || {};
-  var DB_NAME = String(CONFIG.LOCAL_DB_NAME || 'tpk_local_vnext');
-  var DB_VERSION = Number(CONFIG.LOCAL_DB_VERSION || 1);
-
-  var STORES = Object.freeze({
-    META: 'meta',
-    BOOTSTRAP_CACHE: 'bootstrap_cache',
-    SASARAN_CACHE: 'sasaran_cache',
-    DRAFT_REGISTRASI: 'draft_registrasi',
-    DRAFT_PENDAMPINGAN: 'draft_pendampingan',
-    SYNC_QUEUE: 'sync_queue',
-    SYNC_RESULT_LOG: 'sync_result_log',
-    AUDIT_LOG_LOCAL: 'audit_log_local'
-  });
-
+  var DB_NAME = 'TPK_LOCAL_DB';
+  var DB_VERSION = 3;
+  var STORE_META = 'meta';
+  var STORE_QUEUE = 'sync_queue';
+  var STORE_DRAFT = 'drafts';
+  var STORE_AUDIT = 'audit_log_local';
   var dbPromise = null;
 
   function nowIso() {
@@ -24,248 +14,338 @@
   }
 
   function clone(value) {
+    if (value === undefined) return undefined;
+    try { return JSON.parse(JSON.stringify(value)); } catch (err) { return value; }
+  }
+
+  function canUseIdb() {
+    return typeof window.indexedDB !== 'undefined';
+  }
+
+  function normalizeStatus(value) {
+    return String(value || 'PENDING').trim().toUpperCase() || 'PENDING';
+  }
+
+  function fallbackKey(store) {
+    return 'tpk_idb_fallback_' + store;
+  }
+
+  function fallbackGetAll(store) {
     try {
-      return JSON.parse(JSON.stringify(value));
+      var raw = window.localStorage.getItem(fallbackKey(store));
+      var parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed : [];
     } catch (err) {
-      return value;
+      return [];
     }
   }
 
-  function promisifyRequest(request) {
-    return new Promise(function (resolve, reject) {
-      request.onsuccess = function () { resolve(request.result); };
-      request.onerror = function () { reject(request.error || new Error('IndexedDB request gagal.')); };
-    });
+  function fallbackSaveAll(store, rows) {
+    try {
+      window.localStorage.setItem(fallbackKey(store), JSON.stringify(rows || []));
+    } catch (err) {}
   }
 
-  function createStore(db, name, options, indexes) {
-    if (db.objectStoreNames.contains(name)) return;
-    var store = db.createObjectStore(name, options || { keyPath: 'id' });
-    (indexes || []).forEach(function (item) {
-      if (!item || !item.name || !item.keyPath) return;
-      store.createIndex(item.name, item.keyPath, { unique: !!item.unique });
-    });
-  }
-
-  function upgradeDb(db) {
-    createStore(db, STORES.META, { keyPath: 'key' }, [
-      { name: 'updated_at', keyPath: 'updated_at' }
-    ]);
-
-    createStore(db, STORES.BOOTSTRAP_CACHE, { keyPath: 'cache_key' }, [
-      { name: 'updated_at', keyPath: 'updated_at' },
-      { name: 'expires_at', keyPath: 'expires_at' }
-    ]);
-
-    createStore(db, STORES.SASARAN_CACHE, { keyPath: 'id_sasaran' }, [
-      { name: 'id_tim', keyPath: 'id_tim' },
-      { name: 'updated_at', keyPath: 'updated_at' },
-      { name: 'status_sasaran', keyPath: 'status_sasaran' }
-    ]);
-
-    createStore(db, STORES.DRAFT_REGISTRASI, { keyPath: 'draft_id' }, [
-      { name: 'id_user', keyPath: 'id_user' },
-      { name: 'id_tim', keyPath: 'id_tim' },
-      { name: 'updated_at', keyPath: 'updated_at' }
-    ]);
-
-    createStore(db, STORES.DRAFT_PENDAMPINGAN, { keyPath: 'draft_id' }, [
-      { name: 'id_user', keyPath: 'id_user' },
-      { name: 'id_tim', keyPath: 'id_tim' },
-      { name: 'id_sasaran', keyPath: 'id_sasaran' },
-      { name: 'updated_at', keyPath: 'updated_at' }
-    ]);
-
-    createStore(db, STORES.SYNC_QUEUE, { keyPath: 'queue_id' }, [
-      { name: 'status', keyPath: 'status' },
-      { name: 'action', keyPath: 'action' },
-      { name: 'client_submit_id', keyPath: 'client_submit_id' },
-      { name: 'updated_at', keyPath: 'updated_at' }
-    ]);
-
-    createStore(db, STORES.SYNC_RESULT_LOG, { keyPath: 'result_id' }, [
-      { name: 'queue_id', keyPath: 'queue_id' },
-      { name: 'status', keyPath: 'status' },
-      { name: 'created_at', keyPath: 'created_at' }
-    ]);
-
-    createStore(db, STORES.AUDIT_LOG_LOCAL, { keyPath: 'event_id' }, [
-      { name: 'event_type', keyPath: 'event_type' },
-      { name: 'created_at', keyPath: 'created_at' }
-    ]);
-  }
-
-  function open() {
+  function openDb() {
+    if (!canUseIdb()) return Promise.resolve(null);
     if (dbPromise) return dbPromise;
 
     dbPromise = new Promise(function (resolve, reject) {
-      if (!('indexedDB' in window)) {
-        reject(new Error('IndexedDB tidak didukung browser ini.'));
-        return;
-      }
+      var req = window.indexedDB.open(DB_NAME, DB_VERSION);
 
-      var request = window.indexedDB.open(DB_NAME, DB_VERSION);
+      req.onupgradeneeded = function (event) {
+        var db = event.target.result;
 
-      request.onupgradeneeded = function (event) {
-        upgradeDb(event.target.result);
+        if (!db.objectStoreNames.contains(STORE_META)) {
+          db.createObjectStore(STORE_META, { keyPath: 'key' });
+        }
+
+        if (!db.objectStoreNames.contains(STORE_QUEUE)) {
+          var queue = db.createObjectStore(STORE_QUEUE, { keyPath: 'id' });
+          queue.createIndex('by_status', 'sync_status', { unique: false });
+          queue.createIndex('by_action', 'action', { unique: false });
+          queue.createIndex('by_client_submit_id', 'client_submit_id', { unique: false });
+          queue.createIndex('by_created_at', 'created_at', { unique: false });
+        }
+
+        if (!db.objectStoreNames.contains(STORE_DRAFT)) {
+          var drafts = db.createObjectStore(STORE_DRAFT, { keyPath: 'draft_key' });
+          drafts.createIndex('by_type', 'draft_type', { unique: false });
+          drafts.createIndex('by_updated_at', 'updated_at', { unique: false });
+        }
+
+        if (!db.objectStoreNames.contains(STORE_AUDIT)) {
+          var audit = db.createObjectStore(STORE_AUDIT, { keyPath: 'id' });
+          audit.createIndex('by_event_type', 'event_type', { unique: false });
+          audit.createIndex('by_created_at', 'created_at', { unique: false });
+        }
       };
 
-      request.onsuccess = function () {
-        resolve(request.result);
-      };
-
-      request.onerror = function () {
-        reject(request.error || new Error('Gagal membuka IndexedDB.'));
-      };
-
-      request.onblocked = function () {
-        reject(new Error('IndexedDB sedang diblokir tab lain.'));
-      };
+      req.onsuccess = function (event) { resolve(event.target.result); };
+      req.onerror = function () { reject(req.error || new Error('Gagal membuka IndexedDB.')); };
+    }).catch(function (err) {
+      try { console.warn('IndexedDB tidak tersedia, fallback localStorage:', err && err.message ? err.message : err); } catch (e) {}
+      return null;
     });
 
     return dbPromise;
   }
 
-  async function withStore(storeName, mode, handler) {
-    var db = await open();
-    return new Promise(function (resolve, reject) {
-      var tx = db.transaction(storeName, mode);
-      var store = tx.objectStore(storeName);
-      var settled = false;
-
-      function safeResolve(value) {
-        if (settled) return;
-        settled = true;
-        resolve(value);
-      }
-
-      function safeReject(err) {
-        if (settled) return;
-        settled = true;
-        reject(err);
-      }
-
-      tx.oncomplete = function () {
-        if (!settled) safeResolve(undefined);
-      };
-      tx.onabort = function () {
-        safeReject(tx.error || new Error('Transaksi IndexedDB dibatalkan.'));
-      };
-      tx.onerror = function () {
-        safeReject(tx.error || new Error('Transaksi IndexedDB gagal.'));
-      };
-
-      try {
-        var result = handler(store, tx, db);
-        if (result && typeof result.then === 'function') {
-          result.then(safeResolve).catch(safeReject);
-        } else if (result !== undefined) {
-          safeResolve(result);
-        }
-      } catch (err) {
-        safeReject(err);
-      }
-    });
+  function txStore(db, storeName, mode) {
+    var tx = db.transaction(storeName, mode || 'readonly');
+    return tx.objectStore(storeName);
   }
 
-  async function get(storeName, key) {
-    return withStore(storeName, 'readonly', function (store) {
-      return promisifyRequest(store.get(key));
+  function requestToPromise(req) {
+    return new Promise(function (resolve, reject) {
+      req.onsuccess = function () { resolve(req.result); };
+      req.onerror = function () { reject(req.error || new Error('Operasi IndexedDB gagal.')); };
     });
   }
 
   async function put(storeName, value) {
-    return withStore(storeName, 'readwrite', function (store) {
-      return promisifyRequest(store.put(clone(value)));
-    });
+    var db = await openDb();
+    var item = clone(value || {});
+
+    if (!db) {
+      var rows = fallbackGetAll(storeName);
+      var key = storeName === STORE_DRAFT ? item.draft_key : (item.id || item.key);
+      var found = false;
+      rows = rows.map(function (row) {
+        var rowKey = storeName === STORE_DRAFT ? row.draft_key : (row.id || row.key);
+        if (rowKey === key) {
+          found = true;
+          return item;
+        }
+        return row;
+      });
+      if (!found) rows.push(item);
+      fallbackSaveAll(storeName, rows);
+      return item;
+    }
+
+    await requestToPromise(txStore(db, storeName, 'readwrite').put(item));
+    return item;
   }
 
-  async function add(storeName, value) {
-    return withStore(storeName, 'readwrite', function (store) {
-      return promisifyRequest(store.add(clone(value)));
-    });
+  async function get(storeName, key) {
+    var db = await openDb();
+    if (!db) {
+      var rows = fallbackGetAll(storeName);
+      return rows.find(function (row) {
+        var rowKey = storeName === STORE_DRAFT ? row.draft_key : (row.id || row.key);
+        return rowKey === key;
+      }) || null;
+    }
+    return requestToPromise(txStore(db, storeName, 'readonly').get(key));
   }
 
   async function remove(storeName, key) {
-    return withStore(storeName, 'readwrite', function (store) {
-      return promisifyRequest(store.delete(key));
+    var db = await openDb();
+    if (!db) {
+      var rows = fallbackGetAll(storeName).filter(function (row) {
+        var rowKey = storeName === STORE_DRAFT ? row.draft_key : (row.id || row.key);
+        return rowKey !== key;
+      });
+      fallbackSaveAll(storeName, rows);
+      return true;
+    }
+    await requestToPromise(txStore(db, storeName, 'readwrite').delete(key));
+    return true;
+  }
+
+  async function getAll(storeName) {
+    var db = await openDb();
+    if (!db) return fallbackGetAll(storeName);
+    var store = txStore(db, storeName, 'readonly');
+    if (typeof store.getAll === 'function') {
+      return requestToPromise(store.getAll());
+    }
+    return new Promise(function (resolve, reject) {
+      var out = [];
+      var req = store.openCursor();
+      req.onsuccess = function (event) {
+        var cursor = event.target.result;
+        if (cursor) {
+          out.push(cursor.value);
+          cursor.continue();
+        } else {
+          resolve(out);
+        }
+      };
+      req.onerror = function () { reject(req.error || new Error('Gagal membaca IndexedDB.')); };
     });
   }
 
   async function clear(storeName) {
-    return withStore(storeName, 'readwrite', function (store) {
-      return promisifyRequest(store.clear());
-    });
-  }
-
-  async function getAll(storeName) {
-    return withStore(storeName, 'readonly', function (store) {
-      if (typeof store.getAll === 'function') {
-        return promisifyRequest(store.getAll());
-      }
-      return new Promise(function (resolve, reject) {
-        var out = [];
-        var req = store.openCursor();
-        req.onsuccess = function () {
-          var cursor = req.result;
-          if (!cursor) {
-            resolve(out);
-            return;
-          }
-          out.push(cursor.value);
-          cursor.continue();
-        };
-        req.onerror = function () {
-          reject(req.error || new Error('Gagal membaca seluruh data store.'));
-        };
-      });
-    });
-  }
-
-  async function count(storeName) {
-    return withStore(storeName, 'readonly', function (store) {
-      return promisifyRequest(store.count());
-    });
-  }
-
-  async function getMeta(key, fallbackValue) {
-    var row = await get(STORES.META, key);
-    return row && row.value !== undefined ? row.value : fallbackValue;
+    var db = await openDb();
+    if (!db) {
+      fallbackSaveAll(storeName, []);
+      return true;
+    }
+    await requestToPromise(txStore(db, storeName, 'readwrite').clear());
+    return true;
   }
 
   async function setMeta(key, value) {
-    return put(STORES.META, {
-      key: String(key || ''),
-      value: clone(value),
-      updated_at: nowIso()
-    });
+    return put(STORE_META, { key: key, value: value, updated_at: nowIso() });
   }
 
-  async function logAudit(eventType, eventDetail) {
-    return put(STORES.AUDIT_LOG_LOCAL, {
-      event_id: 'AUD-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8).toUpperCase(),
-      event_type: String(eventType || 'UNKNOWN'),
-      event_detail: clone(eventDetail || {}),
+  async function getMeta(key, fallback) {
+    var row = await get(STORE_META, key);
+    return row && row.value !== undefined ? row.value : fallback;
+  }
+
+  async function saveDraft(draftKey, draftType, payload, meta) {
+    var item = {
+      draft_key: draftKey,
+      draft_type: draftType || 'GENERAL',
+      payload: clone(payload || {}),
+      meta: clone(meta || {}),
+      updated_at: nowIso(),
+      created_at: (meta && meta.created_at) || nowIso()
+    };
+    await put(STORE_DRAFT, item);
+    return item;
+  }
+
+  async function getDraft(draftKey) {
+    return get(STORE_DRAFT, draftKey);
+  }
+
+  async function clearDraft(draftKey) {
+    return remove(STORE_DRAFT, draftKey);
+  }
+
+  async function listDrafts(filter) {
+    var rows = await getAll(STORE_DRAFT);
+    var f = filter || {};
+    if (f.draft_type) {
+      rows = rows.filter(function (row) { return String(row.draft_type || '') === String(f.draft_type); });
+    }
+    rows.sort(function (a, b) { return String(b.updated_at || '').localeCompare(String(a.updated_at || '')); });
+    return rows;
+  }
+
+  function makeQueueItem(action, payload, meta) {
+    meta = meta || {};
+    payload = Object.assign({}, payload || {});
+    var clientSubmitId = meta.client_submit_id || payload.client_submit_id || ('QUEUE-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8));
+    if (!payload.client_submit_id) payload.client_submit_id = clientSubmitId;
+    if (!payload.sync_source) payload.sync_source = meta.sync_source || 'OFFLINE_QUEUE';
+
+    return {
+      id: meta.id || clientSubmitId,
+      action: action || meta.action || '',
+      entity_type: meta.entity_type || '',
+      entity_id_ref: meta.entity_id_ref || payload.id_sasaran || '',
+      client_submit_id: clientSubmitId,
+      payload: payload,
+      sync_source: payload.sync_source || meta.sync_source || 'OFFLINE_QUEUE',
+      sync_status: normalizeStatus(meta.sync_status || 'PENDING'),
+      retry_count: Number(meta.retry_count || 0),
+      last_error: meta.last_error || '',
+      created_at: meta.created_at || nowIso(),
+      updated_at: nowIso(),
+      last_synced_at: meta.last_synced_at || '',
+      app_version: meta.app_version || '',
+      device_id: meta.device_id || ''
+    };
+  }
+
+  async function addQueue(action, payload, meta) {
+    var item = makeQueueItem(action, payload, meta || {});
+    await put(STORE_QUEUE, item);
+    return item;
+  }
+
+  async function updateQueue(id, patch) {
+    var current = await get(STORE_QUEUE, id);
+    if (!current) return null;
+    var updated = Object.assign({}, current, patch || {}, { updated_at: nowIso() });
+    if (updated.sync_status) updated.sync_status = normalizeStatus(updated.sync_status);
+    await put(STORE_QUEUE, updated);
+    return updated;
+  }
+
+  async function removeQueue(id) {
+    return remove(STORE_QUEUE, id);
+  }
+
+  async function listQueue(filter) {
+    var rows = await getAll(STORE_QUEUE);
+    var f = filter || {};
+    if (f.status) {
+      rows = rows.filter(function (row) { return normalizeStatus(row.sync_status || row.status) === normalizeStatus(f.status); });
+    }
+    if (f.action) {
+      rows = rows.filter(function (row) { return String(row.action || '') === String(f.action); });
+    }
+    if (f.keyword) {
+      var q = String(f.keyword || '').toLowerCase();
+      rows = rows.filter(function (row) {
+        var text = JSON.stringify(row || {}).toLowerCase();
+        return text.indexOf(q) >= 0;
+      });
+    }
+    rows.sort(function (a, b) { return String(b.created_at || '').localeCompare(String(a.created_at || '')); });
+    return rows;
+  }
+
+  async function countQueue() {
+    var rows = await listQueue();
+    var out = { total: rows.length, pending: 0, failed: 0, processing: 0, conflict: 0, success: 0 };
+    rows.forEach(function (row) {
+      var status = normalizeStatus(row.sync_status || row.status);
+      if (status === 'PENDING') out.pending += 1;
+      else if (status === 'FAILED') out.failed += 1;
+      else if (status === 'PROCESSING') out.processing += 1;
+      else if (status === 'CONFLICT') out.conflict += 1;
+      else if (status === 'SUCCESS') out.success += 1;
+    });
+    return out;
+  }
+
+  async function addAudit(eventType, payload) {
+    var item = {
+      id: 'AUD-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8),
+      event_type: eventType || 'LOCAL_EVENT',
+      payload: clone(payload || {}),
       created_at: nowIso()
-    });
+    };
+    await put(STORE_AUDIT, item);
+    return item;
   }
 
-  var AppDB = {
+  var TPKDb = {
     DB_NAME: DB_NAME,
     DB_VERSION: DB_VERSION,
-    STORES: STORES,
-    open: open,
-    get: get,
+    stores: {
+      META: STORE_META,
+      QUEUE: STORE_QUEUE,
+      DRAFT: STORE_DRAFT,
+      AUDIT: STORE_AUDIT
+    },
+    init: openDb,
     put: put,
-    add: add,
+    get: get,
     remove: remove,
-    clear: clear,
     getAll: getAll,
-    count: count,
-    getMeta: getMeta,
+    clear: clear,
     setMeta: setMeta,
-    logAudit: logAudit
+    getMeta: getMeta,
+    saveDraft: saveDraft,
+    getDraft: getDraft,
+    clearDraft: clearDraft,
+    listDrafts: listDrafts,
+    addQueue: addQueue,
+    updateQueue: updateQueue,
+    removeQueue: removeQueue,
+    listQueue: listQueue,
+    countQueue: countQueue,
+    addAudit: addAudit
   };
 
-  window.AppDB = AppDB;
+  window.TPKDb = TPKDb;
+  window.DB = TPKDb;
 })(window);
