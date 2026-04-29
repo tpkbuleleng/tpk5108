@@ -853,74 +853,48 @@
       this.handleAnyFormChange();
     },
 
-    async getRegistrasiFormDefinition(jenisSasaran) {
+    async getRegistrasiFormDefinition(jenisSasaran, options) {
       const jenis = toUpper(jenisSasaran);
       const formId = mapJenisToFormId(jenis);
       const cacheKey = `${formId}:${jenis}`;
-
-      if (DEFINITION_CACHE[cacheKey]) {
+      const opts = options || {};
+      if (!jenis) return {};
+      if (DEFINITION_CACHE[cacheKey] && opts.forceRefresh !== true) {
         try {
-          Object.defineProperty(DEFINITION_CACHE[cacheKey], '__frontend_cache_hit', {
-            value: true,
-            configurable: true,
-            enumerable: false
-          });
+          Object.defineProperty(DEFINITION_CACHE[cacheKey], '__frontend_cache_hit', { value: true, configurable: true, enumerable: false });
+          Object.defineProperty(DEFINITION_CACHE[cacheKey], '__frontend_api_perf', { value: { api_ms: 0, local_cache_hit: true, backend_cached: false, cache_status: 'memory_hit' }, configurable: true, enumerable: false });
         } catch (_) {}
         return DEFINITION_CACHE[cacheKey];
       }
-
       let result = null;
       const apiStart = (window.performance && performance.now) ? performance.now() : Date.now();
-
       try {
-        if (window.RegistrasiService && isFunction(window.RegistrasiService.getRegistrasiFormDefinition)) {
+        const api = getApi();
+        if (api && isFunction(api.getRegistrasiFormDefinition)) {
+          result = await api.getRegistrasiFormDefinition({ jenis_sasaran: jenis, form_id: formId, module: 'REGISTRASI' }, { cacheFirst: true, cacheTtlMs: opts.cacheTtlMs, forceRefresh: opts.forceRefresh === true, prefetch: opts.prefetch === true, timeoutMs: opts.timeoutMs || 30000 });
+        } else if (window.RegistrasiService && isFunction(window.RegistrasiService.getRegistrasiFormDefinition)) {
           result = await window.RegistrasiService.getRegistrasiFormDefinition(jenis);
         } else if (window.RegistrasiService && isFunction(window.RegistrasiService.getFormDefinition)) {
           result = await window.RegistrasiService.getFormDefinition(jenis);
         } else {
-          result = await callApi('getRegistrasiFormDefinition', {
-            jenis_sasaran: jenis,
-            form_id: formId
-          });
+          result = await callApi('getRegistrasiFormDefinition', { jenis_sasaran: jenis, form_id: formId, module: 'REGISTRASI' });
         }
       } catch (_) {
-        result = await callApi('getRegistrasiFormDefinition', {
-          jenis_sasaran: jenis,
-          form_id: formId
-        });
+        result = await callApi('getRegistrasiFormDefinition', { jenis_sasaran: jenis, form_id: formId, module: 'REGISTRASI' });
       }
-
       const apiEnd = (window.performance && performance.now) ? performance.now() : Date.now();
-      const data = result && result.data ? result.data : result;
+      if (result && result.ok === false) throw new Error(result.message || 'Gagal memuat definisi form registrasi.');
+      const data = result && result.data ? result.data : (result || {});
       const meta = result && result.meta ? result.meta : (data && data.meta ? data.meta : {});
-
       if (data && typeof data === 'object') {
         try {
-          Object.defineProperty(data, '__meta', {
-            value: meta || {},
-            configurable: true,
-            enumerable: false
-          });
-          Object.defineProperty(data, '__frontend_api_perf', {
-            value: {
-              api_ms: Math.round(apiEnd - apiStart),
-              local_cache_hit: false,
-              backend_cached: !!(meta && meta.cached),
-              cache_put_ok: meta && Object.prototype.hasOwnProperty.call(meta, 'cache_put_ok') ? !!meta.cache_put_ok : undefined
-            },
-            configurable: true,
-            enumerable: false
-          });
+          Object.defineProperty(data, '__meta', { value: meta || {}, configurable: true, enumerable: false });
+          Object.defineProperty(data, '__frontend_api_perf', { value: { api_ms: Math.round(apiEnd - apiStart), local_cache_hit: !!(meta && (meta.local_cache_hit || meta.offline_cache || meta.cache_source === 'local_form_definition_cache')), backend_cached: !!(meta && meta.cached), cache_put_ok: meta && Object.prototype.hasOwnProperty.call(meta, 'cache_put_ok') ? !!meta.cache_put_ok : undefined, cache_status: meta && meta.local_cache_hit ? 'local_hit' : (meta && meta.cached ? 'backend_hit' : 'network_fetch') }, configurable: true, enumerable: false });
         } catch (_) {
           data.__meta = meta || {};
-          data.__frontend_api_perf = {
-            api_ms: Math.round(apiEnd - apiStart),
-            local_cache_hit: false,
-            backend_cached: !!(meta && meta.cached)
-          };
+          data.__frontend_api_perf = { api_ms: Math.round(apiEnd - apiStart), local_cache_hit: !!(meta && (meta.local_cache_hit || meta.offline_cache)), backend_cached: !!(meta && meta.cached) };
         }
       }
-
       DEFINITION_CACHE[cacheKey] = data || {};
       return DEFINITION_CACHE[cacheKey];
     },
@@ -1949,13 +1923,29 @@
 
     async function fetchMasterWilayahRowsV4() {
       if (Array.isArray(MASTER_WILAYAH_ROWS_CACHE_V4)) return MASTER_WILAYAH_ROWS_CACHE_V4;
+      const cacheKey = 'tpk_wilayah_bali_ref_cache_v1';
+      const ttlMs = 24 * 60 * 60 * 1000;
+      function readLocalRows(allowStale) {
+        try {
+          const cached = safeJsonParse(localStorage.getItem(cacheKey), null);
+          if (!cached || !Array.isArray(cached.rows)) return null;
+          const savedAt = Date.parse(cached.saved_at || '');
+          const fresh = savedAt && !Number.isNaN(savedAt) && (Date.now() - savedAt <= ttlMs);
+          if (!fresh && allowStale !== true) return null;
+          return cached.rows;
+        } catch (_) { return null; }
+      }
+      const localRows = readLocalRows(false);
+      if (localRows) { MASTER_WILAYAH_ROWS_CACHE_V4 = localRows; return MASTER_WILAYAH_ROWS_CACHE_V4; }
       try {
         const action = (window.APP_CONFIG && window.APP_CONFIG.API_ACTIONS && window.APP_CONFIG.API_ACTIONS.GET_WILAYAH_REF) || 'getWilayahRef';
         const result = await callApi(action, {});
         MASTER_WILAYAH_ROWS_CACHE_V4 = result && Array.isArray(result.data) ? result.data : [];
+        try { localStorage.setItem(cacheKey, JSON.stringify({ saved_at: new Date().toISOString(), rows: MASTER_WILAYAH_ROWS_CACHE_V4 })); } catch (_) {}
         return MASTER_WILAYAH_ROWS_CACHE_V4;
       } catch (_) {
-        MASTER_WILAYAH_ROWS_CACHE_V4 = [];
+        const staleRows = readLocalRows(true);
+        MASTER_WILAYAH_ROWS_CACHE_V4 = staleRows || [];
         return MASTER_WILAYAH_ROWS_CACHE_V4;
       }
     }
@@ -2828,6 +2818,25 @@
   })();
 
   window.RegistrasiForm = RegistrasiForm;
+
+  RegistrasiForm.prefetchDefinitions = async function (options) {
+    const opts = options || {};
+    const jenisList = opts.jenisList || ['CATIN', 'BUMIL', 'BUFAS', 'BADUTA'];
+    const api = getApi();
+    if (api && isFunction(api.prefetchRegistrasiFormDefinitions)) {
+      return api.prefetchRegistrasiFormDefinitions({ jenisList: jenisList, delayMs: typeof opts.delayMs === 'number' ? opts.delayMs : 450, timeoutMs: typeof opts.timeoutMs === 'number' ? opts.timeoutMs : 25000, cacheTtlMs: opts.cacheTtlMs });
+    }
+    const results = [];
+    for (let i = 0; i < jenisList.length; i += 1) {
+      const jenis = toUpper(jenisList[i]);
+      if (!jenis) continue;
+      try { const definition = await this.getRegistrasiFormDefinition(jenis, { prefetch: true }); results.push({ jenis_sasaran: jenis, ok: !!definition }); }
+      catch (err) { results.push({ jenis_sasaran: jenis, ok: false, message: err && err.message ? err.message : String(err) }); }
+      if (opts.delayMs && i < jenisList.length - 1) await new Promise((resolve) => window.setTimeout(resolve, opts.delayMs));
+    }
+    return { ok: true, prefetched: results };
+  };
+  window.RegistrasiView = window.RegistrasiView || RegistrasiForm;
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', function () {
