@@ -16,6 +16,8 @@
   var dashboardLiteTimer = null;
   var dashboardLiteInFlight = false;
   var dashboardLiteLastRun = 0;
+  var registrasiPrefetchTimer = null;
+  var registrasiPrefetchStarted = false;
 
   var BASE_MENU = {
     daftar_sasaran: {
@@ -1253,6 +1255,29 @@
     }, delay);
   }
 
+
+  function scheduleRegistrasiFormPrefetch(options) {
+    var opts = options || {};
+    var delay = typeof opts.delayMs === 'number' ? opts.delayMs : 2400;
+    if (registrasiPrefetchStarted && opts.force !== true) return;
+    if (registrasiPrefetchTimer) window.clearTimeout(registrasiPrefetchTimer);
+    var runner = function () {
+      registrasiPrefetchTimer = null;
+      if (registrasiPrefetchStarted && opts.force !== true) return;
+      registrasiPrefetchStarted = true;
+      var api = getApi();
+      if (!api || typeof api.prefetchRegistrasiFormDefinitions !== 'function') return;
+      api.prefetchRegistrasiFormDefinitions({ jenisList: ['CATIN', 'BUMIL', 'BUFAS', 'BADUTA'], delayMs: 650, timeoutMs: 25000 }).catch(function (err) {
+        try { console.warn('Prefetch form registrasi dilewati/gagal:', err && err.message ? err.message : err); } catch (e) {}
+      });
+    };
+    if (typeof window.requestIdleCallback === 'function') {
+      registrasiPrefetchTimer = window.setTimeout(function () { window.requestIdleCallback(runner, { timeout: 7000 }); }, delay);
+    } else {
+      registrasiPrefetchTimer = window.setTimeout(runner, delay);
+    }
+  }
+
   async function refreshDashboardLite(options) {
     var api = getApi();
     if (!api) return null;
@@ -1298,6 +1323,7 @@
     bindNetworkStatus();
     bindEscapeKey();
     scheduleDashboardLiteRefresh({ delayMs: 1200 });
+    scheduleRegistrasiFormPrefetch({ delayMs: 2600 });
   }
 
   function refresh() {
@@ -1337,6 +1363,7 @@
     refresh: refresh,
     refreshDashboardLite: refreshDashboardLite,
     scheduleDashboardLiteRefresh: scheduleDashboardLiteRefresh,
+    scheduleRegistrasiFormPrefetch: scheduleRegistrasiFormPrefetch,
     applyDashboardSummary: applyDashboardSummary,
     setRole: setRole,
     renderMenu: renderMenu,
