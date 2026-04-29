@@ -1,4 +1,4 @@
-const SW_VERSION = 'tpk-sw-3c-r4-profile-apply-final-20260429-01';
+const SW_VERSION = 'tpk-sw-3d-reg-form-prefetch-20260429-01';
 const SHELL_CACHE = 'tpk-shell-' + SW_VERSION;
 const ASSET_CACHE = 'tpk-assets-' + SW_VERSION;
 
