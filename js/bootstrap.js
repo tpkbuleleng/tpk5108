@@ -649,35 +649,48 @@
       var base = profile && typeof profile === 'object' ? Object.assign({}, profile) : this.getCachedProfile();
       if (!this.needsProfileRecovery(base)) return base;
       if (!window.Api) return base;
+      if (this._profileRefreshInFlight === true) return base;
 
+      this._profileRefreshInFlight = true;
       var updated = base;
       try {
-        if (typeof window.Api.getMyProfileLite === 'function') {
-          var pResult = await window.Api.getMyProfileLite({});
-          if (pResult && pResult.ok && pResult.data) {
-            updated = mergeProfileData(updated, pResult.data || {});
+        try {
+          if (typeof window.Api.getMyProfileLite === 'function') {
+            var pResult = await window.Api.getMyProfileLite({ source: 'bootstrap_profile_recovery_3b' });
+            if (pResult && pResult.ok && pResult.data) {
+              updated = mergeProfileData(updated, pResult.data || {});
+            }
+          }
+        } catch (ignoreProfile) {}
+
+        // 3B: getTimRef tidak dipanggil untuk tampilan profil biasa bila profile_lite sudah lengkap.
+        // getTimRef tetap tersedia untuk registrasi/ref/admin/debug.
+        if (this.needsProfileRecovery(updated)) {
+          try {
+            if (typeof window.Api.getTimRef === 'function') {
+              var tResult = await window.Api.getTimRef({ id_tim: updated.id_tim || base.id_tim || '', source: 'bootstrap_profile_recovery_fallback_3b' });
+              if (tResult && tResult.ok) {
+                var rows = Array.isArray(tResult.data) ? tResult.data : (tResult.data && Array.isArray(tResult.data.items) ? tResult.data.items : []);
+                updated = this.mergeTimRefIntoProfile(updated, rows);
+              }
+            }
+          } catch (ignoreTim) {}
+        }
+
+        if (updated && Object.keys(updated).length) {
+          this.persistProfile(updated);
+          this.applyProfileToUi(updated);
+          if (window.Storage && typeof window.Storage.setLastGoodProfile === 'function') {
+            window.Storage.setLastGoodProfile(updated);
+          }
+          if (window.DashboardView && typeof window.DashboardView.applyDashboardProfile === 'function') {
+            window.DashboardView.applyDashboardProfile(updated);
           }
         }
-      } catch (ignoreProfile) {}
-
-      try {
-        if (typeof window.Api.getTimRef === 'function') {
-          var tResult = await window.Api.getTimRef({ id_tim: updated.id_tim || base.id_tim || '' });
-          if (tResult && tResult.ok) {
-            var rows = Array.isArray(tResult.data) ? tResult.data : (tResult.data && Array.isArray(tResult.data.items) ? tResult.data.items : []);
-            updated = this.mergeTimRefIntoProfile(updated, rows);
-          }
-        }
-      } catch (ignoreTim) {}
-
-      if (updated && Object.keys(updated).length) {
-        this.persistProfile(updated);
-        this.applyProfileToUi(updated);
-        if (window.DashboardView && typeof window.DashboardView.applyDashboardProfile === 'function') {
-          window.DashboardView.applyDashboardProfile(updated);
-        }
+        return updated;
+      } finally {
+        this._profileRefreshInFlight = false;
       }
-      return updated;
     },
 
     safeUpdateApplication() {
