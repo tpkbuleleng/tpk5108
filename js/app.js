@@ -100,6 +100,10 @@
     return !!getSessionToken();
   }
 
+  function isLoginHydrationInProgress() {
+    return window.__TPK_LOGIN_HYDRATION_IN_PROGRESS === true;
+  }
+
   function showScreen(screenId) {
     if (!screenId) return false;
 
@@ -304,8 +308,16 @@
       if (!hasSessionToken()) return;
 
       window.clearInterval(timer);
+
       loadEnhancedShell('session_detected_after_login')
         .then(function () {
+          // 3C-R3: saat auth.js sedang menjalankan post-login hydration,
+          // app.js hanya menyiapkan router/bootstrap/ui. Jangan panggil
+          // AppBootstrap.init karena itu dapat memicu refreshBootstrapLite dobel.
+          if (isLoginHydrationInProgress()) {
+            return true;
+          }
+
           if (window.AppBootstrap && typeof window.AppBootstrap.init === 'function') {
             return window.AppBootstrap.init();
           }
@@ -397,7 +409,9 @@
     loadEnhancedShell: loadEnhancedShell,
     warmEnhancedShellSoon: warmEnhancedShellSoon,
     registerServiceWorker: registerServiceWorker,
-    hasSessionToken: hasSessionToken
+    hasSessionToken: hasSessionToken,
+    showDashboardShellQuick: showDashboardShellQuick,
+    showLoginQuick: showLoginQuick
   };
 
   if (document.readyState === 'loading') {
