@@ -1,4 +1,4 @@
-const SW_VERSION = 'tpk-sw-3e-r1-draft-queue-minimal-20260430-01';
+const SW_VERSION = 'tpk-sw-3c-r5-session-invalid-bootstrap-cooldown-20260502-01';
 const SHELL_CACHE = 'tpk-shell-' + SW_VERSION;
 const ASSET_CACHE = 'tpk-assets-' + SW_VERSION;
 
