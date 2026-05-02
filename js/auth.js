@@ -45,90 +45,21 @@
     return text;
   }
 
-  function firstDisplayValue() {
-    for (var i = 0; i < arguments.length; i += 1) {
-      var value = normalizeDisplayText(arguments[i]);
-      if (value) return value;
-    }
-    return '';
-  }
-
-  function normalizeDelimitedList(value) {
-    var text = normalizeDisplayText(value);
-    if (!text) return '';
-
-    // JSON array dari read model tetap ditampilkan sebagai daftar ringkas jika tidak ada label biasa.
-    if ((text.charAt(0) === '[' || text.charAt(0) === '{') && window.JSON) {
-      try {
-        var parsed = JSON.parse(text);
-        if (Array.isArray(parsed)) {
-          return parsed.map(function (item) {
-            if (item && typeof item === 'object') {
-              return normalizeDisplayText(item.dusun_rw || item.nama_dusun || item.desa_kelurahan || item.nama_desa || item.id_wilayah || '');
-            }
-            return normalizeDisplayText(item);
-          }).filter(Boolean).join(' / ');
-        }
-      } catch (ignoreJson) {}
-    }
-
-    return text;
-  }
-
-  function normalizeProfileForDashboard(profile) {
-    var data = profile && typeof profile === 'object' ? Object.assign({}, profile) : {};
-
-    var wilayahLabel = firstDisplayValue(data.wilayah_tugas, data.wilayah_tugas_label, data.wilayah);
-    var desaList = normalizeDelimitedList(data.desa_kelurahan || data.desa_kelurahan_list || data.nama_desa || data.desa);
-    var dusunList = normalizeDelimitedList(data.dusun_rw || data.dusun_rw_list || data.nama_dusun || data.dusun);
-    var kecamatan = firstDisplayValue(data.nama_kecamatan, data.kecamatan, data.id_kecamatan);
-    var unsur = firstDisplayValue(data.unsur, data.unsur_tpk);
-
-    data.unsur_tpk = firstDisplayValue(data.unsur_tpk, unsur);
-    data.unsur = firstDisplayValue(data.unsur, data.unsur_tpk);
-
-    data.wilayah_tugas = firstDisplayValue(data.wilayah_tugas, wilayahLabel);
-    data.wilayah_tugas_label = firstDisplayValue(data.wilayah_tugas_label, data.wilayah_tugas);
-    data.wilayah = firstDisplayValue(data.wilayah, data.wilayah_tugas);
-
-    data.desa_kelurahan = firstDisplayValue(data.desa_kelurahan, desaList);
-    data.nama_desa = firstDisplayValue(data.nama_desa, data.desa_kelurahan);
-    data.desa = firstDisplayValue(data.desa, data.desa_kelurahan);
-
-    data.dusun_rw = firstDisplayValue(data.dusun_rw, dusunList);
-    data.nama_dusun = firstDisplayValue(data.nama_dusun, data.dusun_rw);
-    data.dusun = firstDisplayValue(data.dusun, data.dusun_rw);
-
-    data.nama_kecamatan = firstDisplayValue(data.nama_kecamatan, kecamatan);
-    data.kecamatan = firstDisplayValue(data.kecamatan, data.nama_kecamatan);
-
-    return data;
-  }
-
   function parseWilayahDisplay(profile) {
-    var data = normalizeProfileForDashboard(profile || {});
-    var wilayah = normalizeDisplayText(data.wilayah_tugas || data.wilayah_tugas_label || data.wilayah || '');
+    var data = profile || {};
+    var wilayah = normalizeDisplayText(data.wilayah_tugas || data.wilayah || '');
     var desa = normalizeDisplayText(data.desa_kelurahan || data.nama_desa || data.desa || '');
     var dusun = normalizeDisplayText(data.dusun_rw || data.nama_dusun || data.dusun || '');
-    var kecamatan = normalizeDisplayText(data.nama_kecamatan || data.kecamatan || data.id_kecamatan || '');
+    var kecamatan = normalizeDisplayText(data.nama_kecamatan || data.kecamatan || '');
 
-    if (wilayah && (!desa || !dusun)) {
-      var dashParts = wilayah.split(/\s+-\s+/).map(function(part) {
+    if (wilayah) {
+      var parts = wilayah.split(/\s*,\s*/).map(function(part) {
         return String(part || '').trim();
       }).filter(Boolean);
 
-      if (!desa && dashParts[0]) desa = dashParts[0];
-      if (!dusun && dashParts.length > 1) dusun = dashParts.slice(1).join(' - ');
-    }
-
-    if (wilayah && (!kecamatan || !desa || !dusun)) {
-      var commaParts = wilayah.split(/\s*,\s*/).map(function(part) {
-        return String(part || '').trim();
-      }).filter(Boolean);
-
-      if (!kecamatan && commaParts[0]) kecamatan = commaParts[0];
-      if (!desa && commaParts[1]) desa = commaParts[1];
-      if (!dusun && commaParts.length > 2) dusun = commaParts.slice(2).join(', ');
+      if (!kecamatan && parts[0]) kecamatan = parts[0];
+      if (!desa && parts[1]) desa = parts[1];
+      if (!dusun && parts.length > 2) dusun = parts.slice(2).join(', ');
     }
 
     return {
@@ -206,8 +137,8 @@
   }
 
   function mergeProfileData(existingProfile, incomingProfile) {
-    var existing = normalizeProfileForDashboard(existingProfile && typeof existingProfile === 'object' ? existingProfile : {});
-    var incoming = normalizeProfileForDashboard(incomingProfile && typeof incomingProfile === 'object' ? incomingProfile : {});
+    var existing = existingProfile && typeof existingProfile === 'object' ? existingProfile : {};
+    var incoming = incomingProfile && typeof incomingProfile === 'object' ? incomingProfile : {};
     var merged = Object.assign({}, existing);
 
     Object.keys(incoming).forEach(function (key) {
@@ -223,93 +154,7 @@
       merged[key] = value;
     });
 
-    return normalizeProfileForDashboard(merged);
-  }
-
-  function isUsefulProfile(profile) {
-    var data = profile && typeof profile === 'object' ? profile : {};
-    return !!(
-      normalizeDisplayText(data.id_user || data.username || '') ||
-      normalizeDisplayText(data.nama_kader || data.nama_user || data.nama || '') ||
-      normalizeDisplayText(data.id_tim || data.nomor_tim || data.nama_tim || '')
-    );
-  }
-
-  function isProfileCompleteForDashboard(profile) {
-    var data = normalizeProfileForDashboard(profile || {});
-    var nama = normalizeDisplayText(data.nama_kader || data.nama_user || data.nama || '');
-    var unsur = normalizeDisplayText(data.unsur_tpk || data.unsur || '');
-    var tim = normalizeDisplayText(data.nomor_tim || data.nama_tim || data.id_tim || '');
-    var wilayah = normalizeDisplayText(
-      data.wilayah_tugas_label ||
-      data.wilayah_tugas ||
-      data.wilayah ||
-      data.desa_kelurahan ||
-      data.desa_kelurahan_list ||
-      data.nama_desa ||
-      data.desa ||
-      data.dusun_rw ||
-      data.dusun_rw_list ||
-      data.nama_dusun ||
-      data.dusun ||
-      ''
-    );
-
-    return !!(nama && unsur && tim && wilayah);
-  }
-
-  function setLoginHydrationFlag(isActive, stage) {
-    window.__TPK_LOGIN_HYDRATION_IN_PROGRESS = !!isActive;
-    window.__TPK_LOGIN_HYDRATION_STAGE = stage || '';
-    window.__TPK_LOGIN_HYDRATION_AT = Date.now();
-  }
-
-  function waitNextPaint() {
-    return new Promise(function (resolve) {
-      if (typeof window.requestAnimationFrame === 'function') {
-        window.requestAnimationFrame(function () { resolve(); });
-        return;
-      }
-      window.setTimeout(resolve, 0);
-    });
-  }
-
-  function loadEnhancedShell(reason) {
-    if (window.TPKAppLoader && typeof window.TPKAppLoader.loadEnhancedShell === 'function') {
-      return window.TPKAppLoader.loadEnhancedShell(reason || 'auth_hydration');
-    }
-    return Promise.resolve(false);
-  }
-
-  function showDashboardShellFast() {
-    if (window.TPKAppLoader && typeof window.TPKAppLoader.showDashboardShellQuick === 'function') {
-      window.TPKAppLoader.showDashboardShellQuick();
-      return;
-    }
-    openDashboard();
-  }
-
-  async function ensureDashboardRouteReady(profile) {
-    try {
-      await loadEnhancedShell('post_login_dashboard_route_3c_r4');
-    } catch (err) {}
-
-    if (window.Router && typeof window.Router.go === 'function') {
-      window.Router.go('dashboard', {
-        skipHeavyRefresh: true,
-        skipBootstrapRefresh: true,
-        source: 'auth_post_login_3c_r4'
-      });
-    }
-
-    if (profile && Object.keys(profile).length) {
-      if (window.AppBootstrap && typeof window.AppBootstrap.applyProfileToUi === 'function') {
-        window.AppBootstrap.applyProfileToUi(profile);
-      }
-      if (window.DashboardView && typeof window.DashboardView.applyDashboardProfile === 'function') {
-        window.DashboardView.applyDashboardProfile(profile);
-      }
-    }
+    return merged;
   }
 
   function showMessage(message, type) {
@@ -409,16 +254,12 @@
     var storage = getStorage();
     var appState = getAppState();
     var keys = getStorageKeys();
-    var data = normalizeProfileForDashboard(profile || {});
+    var data = profile || {};
 
     if (storage && typeof storage.setProfile === 'function') {
       storage.setProfile(data);
     } else if (storage && typeof storage.set === 'function' && keys.PROFILE) {
       storage.set(keys.PROFILE, data);
-    }
-
-    if (storage && typeof storage.setLastGoodProfile === 'function' && isProfileCompleteForDashboard(data)) {
-      storage.setLastGoodProfile(data);
     }
 
     if (appState && typeof appState.setProfile === 'function') {
@@ -494,69 +335,62 @@
     var data = (loginResult && loginResult.data) || {};
     var bootstrapLite = extractBootstrapLite(loginResult);
 
-    // 3C-R3: session minimal dari login tidak dianggap profil lengkap.
-    // Ambil getMyProfileLite satu kali secara deterministik kecuali login sudah
-    // membawa bootstrap_lite.profile/profile yang lengkap.
-    var candidate = {};
-    if (bootstrapLite && bootstrapLite.profile && typeof bootstrapLite.profile === 'object') {
-      candidate = mergeProfileData(candidate, bootstrapLite.profile);
-    }
-    if (data.profile && typeof data.profile === 'object') {
-      candidate = mergeProfileData(candidate, data.profile);
-    }
-    if (data.session && typeof data.session === 'object') {
-      candidate = mergeProfileData(candidate, data.session);
+    // 3B: jangan panggil refreshBootstrapLite lebih dulu.
+    // Profil lengkap setelah login harus datang dari getMyProfileLite -> user_profile_lite.
+    if (bootstrapLite && bootstrapLite.profile && Object.keys(bootstrapLite.profile).length) {
+      return bootstrapLite.profile;
     }
 
-    if (isProfileCompleteForDashboard(candidate)) {
-      return candidate;
+    if (data.profile && typeof data.profile === 'object' && Object.keys(data.profile).length) {
+      return data.profile;
+    }
+
+    if (data.session && typeof data.session === 'object' && Object.keys(data.session).length) {
+      return data.session;
     }
 
     if (window.Api && typeof window.Api.getMyProfileLite === 'function') {
       try {
-        var profileLiteResult = await window.Api.getMyProfileLite({ source: 'after_login_3c_r4' });
+        var profileLiteResult = await window.Api.getMyProfileLite({ source: 'after_login_3b' });
         if (profileLiteResult && profileLiteResult.ok && profileLiteResult.data && Object.keys(profileLiteResult.data).length) {
-          return mergeProfileData(candidate, profileLiteResult.data);
+          return profileLiteResult.data;
         }
       } catch (ignoreProfileLite) {}
     }
 
-    if (isUsefulProfile(candidate)) {
-      return normalizeProfileForDashboard(candidate);
-    }
-
-    // 3C-R4: refreshBootstrapLite bukan sumber final profil + wilayah.
-    // Ia hanya boleh memperbarui bootstrap/session ringan, bukan menimpa
-    // hasil final getMyProfileLite. Fallback ini tidak apply profil ke UI.
+    // Fallback terakhir saja, bukan jalur utama login.
     if (!window.__TPK_APP_UPDATE_IN_PROGRESS && window.Api && typeof window.Api.refreshBootstrapLite === 'function') {
       try {
-        var refreshResult = await window.Api.refreshBootstrapLite({ source: 'after_login_session_only_3c_r4' });
+        var refreshResult = await window.Api.refreshBootstrapLite({ source: 'after_login_fallback_3b' });
         if (refreshResult && refreshResult.ok) {
           var refreshData = refreshResult.data || {};
           var refreshedBootstrapLite = refreshData.bootstrap_lite || {};
+
           if (refreshedBootstrapLite && Object.keys(refreshedBootstrapLite).length) {
             saveBootstrapLite(refreshedBootstrapLite);
-            if (window.AppBootstrap && typeof window.AppBootstrap.applyBootstrapToUi === 'function') {
-              window.AppBootstrap.applyBootstrapToUi({
-                app_name: refreshedBootstrapLite.app_name,
-                app_version: refreshedBootstrapLite.app_version
-              });
+            if (window.AppBootstrap && typeof window.AppBootstrap.applyBootstrapLite === 'function') {
+              window.AppBootstrap.applyBootstrapLite(refreshedBootstrapLite);
             }
+            return refreshedBootstrapLite.profile || refreshData.profile || refreshData.session || {};
+          }
+
+          if (refreshData.profile && typeof refreshData.profile === 'object') {
+            return refreshData.profile;
           }
         }
       } catch (ignoreRefresh) {}
     }
 
-    return normalizeProfileForDashboard(candidate || {});
+    return {};
   }
 
   function applyProfileToUi(profile) {
-    var data = normalizeProfileForDashboard(profile || {});
+    var data = profile || {};
     var wilayah = parseWilayahDisplay(data);
 
     setText('profile-nama', data.nama_kader || data.nama_user || data.nama || '-');
     setText('profile-unsur', data.unsur_tpk || data.unsur || '-');
-    setText('profile-id', data.id_user || data.username || '-');
+    setText('profile-id', data.id_user || '-');
     setText('profile-tim', getDisplayNomorTim(data));
     setTextAliases(['profile-desa', 'wilayah-desa', 'profile-desa-value'], wilayah.desa);
     setTextAliases(['profile-dusun', 'wilayah-dusun', 'profile-dusun-value'], wilayah.dusun);
@@ -626,38 +460,37 @@
     });
   }
 
-  async function hydrateDashboardAfterLogin(loginResult, options) {
-    var opts = options || {};
-    var finalProfile = getStoredProfile();
+  function hydrateDashboardAfterLogin(loginResult) {
+    var startedAt = Date.now();
 
-    try {
-      setLoginHydrationFlag(true, 'profile_lite');
-      var resolvedProfile = await resolveProfileAfterLogin(loginResult);
+    function run() {
+      Promise.resolve().then(async function () {
+        try {
+          var resolvedProfile = await resolveProfileAfterLogin(loginResult);
 
-      if (resolvedProfile && Object.keys(resolvedProfile).length) {
-        finalProfile = mergeProfileData(getStoredProfile(), resolvedProfile);
-        saveProfile(finalProfile);
-        applyProfileToUi(finalProfile);
-      }
+          if (resolvedProfile && Object.keys(resolvedProfile).length) {
+            var mergedProfile = mergeProfileData(getStoredProfile(), resolvedProfile);
+            saveProfile(mergedProfile);
+            applyProfileToUi(mergedProfile);
+          }
 
-      setLoginHydrationFlag(true, 'dashboard_route');
-      await ensureDashboardRouteReady(finalProfile);
-
-      if (window.DashboardView && typeof window.DashboardView.applyDashboardProfile === 'function') {
-        window.DashboardView.applyDashboardProfile(finalProfile || {});
-      } else if (window.DashboardView && typeof window.DashboardView.refresh === 'function') {
-        window.DashboardView.refresh({ skipProfileRefresh: true, source: 'auth_post_login_3c_r4' });
-      }
-
-      return finalProfile;
-    } catch (err) {
-      console.warn('Gagal memuat profil lanjutan setelah login:', err && err.message ? err.message : err);
-      return finalProfile;
-    } finally {
-      if (opts.releaseGuard !== false) {
-        setLoginHydrationFlag(false, 'done');
-      }
+          if (window.DashboardView && typeof window.DashboardView.applyDashboardProfile === 'function') {
+            window.DashboardView.applyDashboardProfile(getStoredProfile());
+          } else if (window.DashboardView && typeof window.DashboardView.refresh === 'function') {
+            window.DashboardView.refresh();
+          }
+        } catch (err) {
+          console.warn('Gagal memuat profil lanjutan setelah login:', err && err.message ? err.message : err);
+        }
+      });
     }
+
+    if (typeof window.requestIdleCallback === 'function') {
+      window.requestIdleCallback(run, { timeout: 1500 });
+      return;
+    }
+
+    window.setTimeout(run, Math.max(300, 1200 - (Date.now() - startedAt)));
   }
 
   async function handleLoginSubmit(event) {
@@ -675,12 +508,9 @@
       return;
     }
 
-    var loginSucceeded = false;
-
     try {
       isLoginSubmitting = true;
       setLoading(true);
-      setLoginHydrationFlag(true, 'login_submit');
 
       var result = await submitLogin(idUser, password);
 
@@ -695,29 +525,22 @@
       : 'Login gagal. Periksa kembali ID dan password.'),
     'error'
   );
-  setLoginHydrationFlag(false, 'login_failed');
   return;
 }
 
-      loginSucceeded = true;
+      var freshLoginAt = Date.now();
+      window.__TPK_LAST_FRESH_LOGIN_AT = freshLoginAt;
+      window.__TPK_SKIP_BOOTSTRAP_REFRESH_UNTIL = freshLoginAt + 30000;
+
       var wajibGantiPassword = !!(result.data && result.data.wajib_ganti_password);
       var bootstrapLite = extractBootstrapLite(result);
       var immediateProfile = extractImmediateProfile(result);
       var mergedImmediateProfile = mergeProfileData(getStoredProfile(), immediateProfile);
 
-      // 3C-R3: mulai muat router/bootstrap/ui di latar, tetapi auth.js tetap
-      // menjadi pemilik alur post-login agar refreshBootstrapLite tidak dobel.
-      loadEnhancedShell('post_login_prepare_3c_r4').catch(function () {});
-
       if (bootstrapLite && Object.keys(bootstrapLite).length) {
         saveBootstrapLite(bootstrapLite);
-        // 3C-R4: jangan apply bootstrapLite sebagai profil final setelah login.
-        // Data final profil + wilayah harus dari getMyProfileLite/user_profile_lite.
-        if (window.AppBootstrap && typeof window.AppBootstrap.applyBootstrapToUi === 'function') {
-          window.AppBootstrap.applyBootstrapToUi({
-            app_name: bootstrapLite.app_name,
-            app_version: bootstrapLite.app_version
-          });
+        if (window.AppBootstrap && typeof window.AppBootstrap.applyBootstrapLite === 'function') {
+          window.AppBootstrap.applyBootstrapLite(bootstrapLite);
         }
       }
 
@@ -726,20 +549,18 @@
         applyProfileToUi(mergedImmediateProfile);
       }
 
-      showDashboardShellFast();
-      await waitNextPaint();
-
-      var hydratedProfile = await hydrateDashboardAfterLogin(result, { releaseGuard: true });
+      openDashboard();
 
       if (window.DashboardView && typeof window.DashboardView.applyDashboardProfile === 'function') {
-        window.DashboardView.applyDashboardProfile(hydratedProfile || mergedImmediateProfile || {});
+        window.DashboardView.applyDashboardProfile(mergedImmediateProfile || {});
       }
+
+      hydrateDashboardAfterLogin(result);
 
       if (wajibGantiPassword) {
         showToast('Login berhasil. Akun ini masih perlu ganti password.', 'warning');
       }
     } catch (error) {
-      setLoginHydrationFlag(false, 'login_exception');
       console.error('LOGIN_ERROR', error);
 
       showMessage(
@@ -754,9 +575,6 @@
         });
       }
     } finally {
-      if (!loginSucceeded) {
-        setLoginHydrationFlag(false, 'login_end_without_success');
-      }
       setLoading(false);
       isLoginSubmitting = false;
     }
@@ -831,10 +649,6 @@
     login: submitLogin,
     logout: logout,
     clearLocalSession: clearLocalSession,
-    hydrateDashboardAfterLogin: hydrateDashboardAfterLogin,
-    normalizeProfileForDashboard: normalizeProfileForDashboard,
-    isProfileCompleteForDashboard: isProfileCompleteForDashboard,
-    isLoginHydrationInProgress: function () { return window.__TPK_LOGIN_HYDRATION_IN_PROGRESS === true; },
     isLogoutInProgress: function () { return isLogoutInProgress || window.__TPK_LOGOUT_IN_PROGRESS === true; }
   };
 
