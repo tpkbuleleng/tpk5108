@@ -113,6 +113,7 @@
             '<button type="button" class="sa-btn" id="sa-back-dashboard">Dashboard</button>',
             '<button type="button" class="sa-btn sa-btn-soft" id="sa-refresh-cache">Perbarui Cache</button>',
             '<button type="button" class="sa-btn sa-btn-primary" id="sa-refresh">Perbarui Paksa</button>',
+            '<button type="button" class="sa-btn sa-btn-danger" id="sa-logout">Keluar</button>',
           '</div>',
         '</header>',
         '<section id="sa-summary"><div class="sa-loading">Memuat ringkasan...</div></section>',
@@ -437,11 +438,56 @@
     });
   }
 
+  async function logoutSuperAdmin() {
+    var ok = true;
+    try { ok = window.confirm('Keluar dari Dashboard Super Admin?'); } catch (err) {}
+    if (!ok) return;
+
+    try {
+      if (window.Auth && typeof window.Auth.logout === 'function') {
+        await window.Auth.logout();
+        return;
+      }
+      if (window.Api && typeof window.Api.post === 'function') {
+        await window.Api.post('logout', {});
+      }
+    } catch (err2) {
+      // logout lokal tetap dilakukan walau backend gagal merespons
+    }
+
+    try {
+      if (window.Api && typeof window.Api.clearSensitiveClientState === 'function') {
+        window.Api.clearSensitiveClientState({ keepDeviceId: true });
+      }
+    } catch (err3) {}
+
+    try {
+      if (window.Storage && window.APP_CONFIG && window.APP_CONFIG.STORAGE_KEYS) {
+        if (typeof window.Storage.remove === 'function') {
+          window.Storage.remove(window.APP_CONFIG.STORAGE_KEYS.SESSION_TOKEN);
+          window.Storage.remove(window.APP_CONFIG.STORAGE_KEYS.PROFILE);
+          window.Storage.remove(window.APP_CONFIG.STORAGE_KEYS.BOOTSTRAP_LITE);
+        }
+      }
+    } catch (err4) {}
+
+    try { localStorage.removeItem('tpk_session_token'); } catch (err5) {}
+    try {
+      if (window.Router && typeof window.Router.go === 'function') window.Router.go('login');
+      else window.location.reload();
+    } catch (err6) {
+      window.location.reload();
+    }
+  }
+
   function bindHeader() {
     var refresh = byId('sa-refresh');
     if (refresh) refresh.addEventListener('click', function () { refreshAll({ noCache: true }); });
     var refreshCache = byId('sa-refresh-cache');
     if (refreshCache) refreshCache.addEventListener('click', function () { refreshAll({ noCache: false }); });
+
+    var logout = byId('sa-logout');
+    if (logout) logout.addEventListener('click', logoutSuperAdmin);
     var back = byId('sa-back-dashboard');
     if (back) back.addEventListener('click', function () {
       var router = getRouter();
