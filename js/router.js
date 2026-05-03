@@ -5,6 +5,7 @@
     splash: 'splash-screen',
     login: 'login-screen',
     dashboard: 'dashboard-screen',
+    superAdmin: 'super-admin-screen',
     sasaranList: 'sasaran-list-screen',
     sasaranDetail: 'sasaran-detail-screen',
     registrasi: 'registrasi-screen',
@@ -16,6 +17,9 @@
   var ROUTE_ASSET_MAP = {
     dashboard: [
       { src: './js/views/dashboardView.js?v=20260502-3D-R2', globalName: 'DashboardView' }
+    ],
+    superAdmin: [
+      { src: './js/views/superAdminDashboardView.js?v=20260503-SA-MVP1', globalName: 'SuperAdminDashboardView' }
     ],
     sasaranList: [
       { src: './js/views/sasaranListView.js?v=20260417-01', globalName: 'SasaranListView' }
@@ -50,6 +54,11 @@
       splash: 'splash',
       login: 'login',
       dashboard: 'dashboard',
+
+      superAdmin: 'superAdmin',
+      super_admin: 'superAdmin',
+      'super-admin': 'superAdmin',
+      'super-admin-dashboard': 'superAdmin',
 
       'sasaran-list': 'sasaranList',
       sasaranList: 'sasaranList',
@@ -220,6 +229,11 @@
         return;
       }
 
+      if (routeName === 'superAdmin' && window.SuperAdminDashboardView && typeof window.SuperAdminDashboardView.init === 'function') {
+        window.SuperAdminDashboardView.init(target, { route: routeName, screenId: screenId });
+        return;
+      }
+
       if (routeName === 'sasaranList' && window.SasaranListView && typeof window.SasaranListView.init === 'function') {
         window.SasaranListView.init(target, { route: routeName, screenId: screenId });
         return;
@@ -333,6 +347,7 @@
     toSplash: function (options) { return this.go('splash', options); },
     toLogin: function (options) { return this.go('login', options); },
     toDashboard: function (options) { return this.go('dashboard', options); },
+    toSuperAdmin: function (options) { return this.go('superAdmin', options); },
     toSasaranList: function (options) { return this.go('sasaranList', options); },
     toSasaranDetail: function (options) { return this.go('sasaranDetail', options); },
     toRegistrasi: function (options) { return this.go('registrasi', options); },
