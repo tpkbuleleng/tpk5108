@@ -20,6 +20,15 @@
   var registrasiPrefetchStarted = false;
 
   var BASE_MENU = {
+    super_admin_monitor: {
+  key: 'super_admin_monitor',
+  title: 'Monitor Sistem',
+  description: 'Pantau performa, error, security, dan log aplikasi',
+  route: 'superAdmin',
+  action: 'openSuperAdminMonitor',
+  icon: '🛡️',
+  meta: 'Sistem'
+},  
     daftar_sasaran: {
       key: 'daftar_sasaran',
       title: 'Daftar Sasaran',
@@ -130,13 +139,11 @@
       'bantuan'
     ],
     SUPER_ADMIN: [
-      'daftar_sasaran',
-      'draft_sinkronisasi',
-      'sinkronisasi',
-      'rekap_saya',
-      'profil',
-      'bantuan'
-    ],
+  'super_admin_monitor',
+  'profil',
+  'bantuan'
+],
+
     MITRA: [
       'daftar_sasaran',
       'rekap_saya',
@@ -999,6 +1006,11 @@
     }
   }
 
+  function openSuperAdminMonitor() {
+  return go('superAdmin');
+}
+
+  
   function handleMenuAction(action, route) {
     switch (action) {
       case 'openRegistrasi':
@@ -1320,10 +1332,26 @@
     }
   }
 
+function redirectSuperAdminIfNeeded(role) {
+  var cleanRole = normalizeRole(role);
+  if (cleanRole !== 'SUPER_ADMIN') return false;
+
+  var router = getRouter();
+  if (router && typeof router.go === 'function') {
+    router.go('superAdmin', { source: 'dashboardView', reason: 'role_super_admin' });
+    return true;
+  }
+  return false;
+}
+
+  
   function init() {
     var profile = getProfile();
     var role = profile.role_akses || profile.role || 'KADER';
 
+    if (redirectSuperAdminIfNeeded(role)) {
+    return;
+    
     applyTheme(getThemeValue());
     cleanupDashboardText();
     applyDashboardProfile(profile);
