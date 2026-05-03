@@ -16,7 +16,7 @@
 
   var ROUTE_ASSET_MAP = {
     dashboard: [
-      { src: './js/views/dashboardView.js?v=20260502-3D-R2', globalName: 'DashboardView' }
+      { src: './js/views/dashboardView.js?v=20260503-SA-FIX1', globalName: 'DashboardView' }
     ],
     superAdmin: [
       { src: './js/views/superAdminDashboardView.js?v=20260503-SA-MVP1', globalName: 'SuperAdminDashboardView' }
