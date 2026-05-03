@@ -5,21 +5,18 @@
     splash: 'splash-screen',
     login: 'login-screen',
     dashboard: 'dashboard-screen',
-    superAdmin: 'super-admin-screen',
     sasaranList: 'sasaran-list-screen',
     sasaranDetail: 'sasaran-detail-screen',
     registrasi: 'registrasi-screen',
     pendampingan: 'pendampingan-screen',
     sync: 'sync-screen',
-    rekapKader: 'rekap-kader-screen'
+    rekapKader: 'rekap-kader-screen',
+    superAdmin: 'super-admin-screen'
   };
 
   var ROUTE_ASSET_MAP = {
     dashboard: [
       { src: './js/views/dashboardView.js?v=20260503-SA-FIX1', globalName: 'DashboardView' }
-    ],
-    superAdmin: [
-      { src: './js/views/superAdminDashboardView.js?v=20260503-SA-MVP1', globalName: 'SuperAdminDashboardView' }
     ],
     sasaranList: [
       { src: './js/views/sasaranListView.js?v=20260417-01', globalName: 'SasaranListView' }
@@ -38,6 +35,9 @@
     ],
     rekapKader: [
       { src: './js/views/rekapKaderView.js', globalName: 'RekapKaderView' }
+    ],
+    superAdmin: [
+      { src: './js/views/superAdminDashboardView.js?v=20260503-SA-MVP2', globalName: 'SuperAdminDashboardView' }
     ]
   };
 
@@ -54,11 +54,6 @@
       splash: 'splash',
       login: 'login',
       dashboard: 'dashboard',
-
-      superAdmin: 'superAdmin',
-      super_admin: 'superAdmin',
-      'super-admin': 'superAdmin',
-      'super-admin-dashboard': 'superAdmin',
 
       'sasaran-list': 'sasaranList',
       sasaranList: 'sasaranList',
@@ -82,7 +77,12 @@
       rekap: 'rekapKader',
       rekapKader: 'rekapKader',
       'rekap-kader': 'rekapKader',
-      rekap_kader: 'rekapKader'
+      rekap_kader: 'rekapKader',
+
+      superAdmin: 'superAdmin',
+      super_admin: 'superAdmin',
+      'super-admin': 'superAdmin',
+      'super-admin-dashboard': 'superAdmin'
     };
 
     return aliases[raw] || raw;
@@ -347,13 +347,13 @@
     toSplash: function (options) { return this.go('splash', options); },
     toLogin: function (options) { return this.go('login', options); },
     toDashboard: function (options) { return this.go('dashboard', options); },
-    toSuperAdmin: function (options) { return this.go('superAdmin', options); },
     toSasaranList: function (options) { return this.go('sasaranList', options); },
     toSasaranDetail: function (options) { return this.go('sasaranDetail', options); },
     toRegistrasi: function (options) { return this.go('registrasi', options); },
     toPendampingan: function (options) { return this.go('pendampingan', options); },
     toSyncScreen: function (options) { return this.go('sync', options); },
-    toRekapKader: function (options) { return this.go('rekapKader', options); }
+    toRekapKader: function (options) { return this.go('rekapKader', options); },
+    toSuperAdmin: function (options) { return this.go('superAdmin', options || {}); }
   };
 
   window.Router = Router;
