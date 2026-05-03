@@ -4,6 +4,8 @@
   var ROOT_ID = 'super-admin-root';
   var DEFAULT_LOG_TYPE = 'PERFORMANCE';
   var activeTab = 'performance';
+  var performanceFilter = 'ALL';
+  var monitorFilter = 'ALL';
   var lastSummary = null;
   var tabLoaded = {
     performance: false,
@@ -90,15 +92,15 @@
           '.sa-health-pill{display:inline-flex;align-items:center;gap:8px;border-radius:999px;padding:8px 12px;font-weight:900;background:rgba(255,255,255,.18);backdrop-filter:blur(8px)}',
           '.sa-health-pill.sa-status-green{background:#dcfce7;color:#166534}.sa-health-pill.sa-status-yellow{background:#fef3c7;color:#92400e}.sa-health-pill.sa-status-red{background:#fee2e2;color:#991b1b}',
           '.sa-hero h3{margin:8px 0 4px;font-size:1.2rem}.sa-hero p{margin:0;color:rgba(255,255,255,.85)}',
-          '.sa-hero-side{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.sa-mini{border:1px solid rgba(255,255,255,.24);background:rgba(255,255,255,.13);border-radius:16px;padding:10px}.sa-mini span{display:block;font-size:.78rem;color:rgba(255,255,255,.82)}.sa-mini strong{font-size:1.25rem}',
+          '.sa-hero-side{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.sa-mini{border:1px solid rgba(255,255,255,.24);background:rgba(255,255,255,.13);border-radius:16px;padding:10px;text-align:left;color:#fff}.sa-mini span{display:block;font-size:.78rem;color:rgba(255,255,255,.82)}.sa-mini strong{font-size:1.25rem}.sa-clickable{cursor:pointer;transition:transform .12s ease,box-shadow .12s ease}.sa-clickable:hover{transform:translateY(-1px);box-shadow:0 10px 22px rgba(15,23,42,.12)}',
           '.sa-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin:12px 0}',
           '.sa-card{background:var(--sa-card);border:1px solid var(--sa-line);border-radius:18px;padding:13px 14px;box-shadow:0 10px 24px rgba(15,23,42,.05);min-height:84px}.sa-card__label{display:block;color:var(--sa-muted);font-size:.78rem}.sa-card__value{display:block;font-size:1.55rem;margin:.16rem 0;color:#0f172a}.sa-card__hint{color:#94a3b8}.sa-card.sa-warn .sa-card__value{color:#b45309}.sa-card.sa-danger .sa-card__value{color:#b91c1c}',
-          '.sa-layout{display:grid;grid-template-columns:1.15fr .85fr;gap:12px;margin:12px 0}',
+          '.sa-layout{display:grid;grid-template-columns:1.1fr .72fr .88fr;gap:12px;margin:12px 0}',
           '.sa-panel{background:#fff;border:1px solid var(--sa-line);border-radius:20px;padding:14px;box-shadow:0 10px 28px rgba(15,23,42,.05)}',
-          '.sa-panel h3{margin:0 0 10px;font-size:1.03rem}.sa-panel h4{margin:12px 0 8px}.sa-list{margin:0;padding-left:20px}.sa-list li{margin:6px 0;line-height:1.35}',
+          '.sa-panel h3{margin:0 0 10px;font-size:1.03rem}.sa-panel h4{margin:12px 0 8px}.sa-list{margin:0;padding-left:20px}.sa-list li{margin:6px 0;line-height:1.35}.sa-critical-list{display:grid;gap:8px}.sa-critical-item{border:1px solid #e2e8f0;border-left-width:5px;border-radius:14px;padding:9px 10px;background:#fff}.sa-critical-item strong{display:block}.sa-critical-red{border-left-color:#ef4444;background:#fff7f7}.sa-critical-yellow{border-left-color:#f59e0b;background:#fffbeb}.sa-critical-green{border-left-color:#22c55e;background:#f0fdf4}',
           '.sa-table-wrap{overflow:auto;max-width:100%}.sa-table{width:100%;border-collapse:collapse;font-size:.84rem;white-space:nowrap}.sa-table th,.sa-table td{padding:9px 10px;border-bottom:1px solid #e2e8f0;text-align:left;vertical-align:top}.sa-table th{position:sticky;top:0;color:#475569;background:#f8fafc;z-index:1}.sa-table td.sa-wrap{white-space:normal;min-width:240px}',
           '.sa-tabs{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}.sa-tab{border:1px solid #cbd5e1;background:#fff;border-radius:999px;padding:9px 14px;font-weight:800;cursor:pointer}.sa-tab.active{background:#0f172a;color:#fff;border-color:#0f172a}',
-          '.sa-filter{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}.sa-filter input,.sa-filter select{border:1px solid #cbd5e1;border-radius:12px;padding:9px;min-width:160px;background:#fff}',
+          '.sa-filter{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}.sa-filter input,.sa-filter select{border:1px solid #cbd5e1;border-radius:12px;padding:9px;min-width:160px;background:#fff}.sa-quick-filter{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}.sa-chip{border:1px solid #cbd5e1;background:#fff;border-radius:999px;padding:7px 10px;font-weight:800;cursor:pointer}.sa-chip.active{background:#0f172a;color:#fff;border-color:#0f172a}',
           '.sa-badge{display:inline-flex;align-items:center;border-radius:999px;padding:4px 9px;font-weight:800;font-size:.72rem}.sa-status-green{background:#dcfce7;color:#166534}.sa-status-yellow{background:#fef3c7;color:#92400e}.sa-status-red{background:#fee2e2;color:#991b1b}',
           '.sa-muted{color:var(--sa-muted)}.sa-error{color:#991b1b;background:#fee2e2;border-radius:14px;padding:12px}.sa-loading{color:#475569;background:#f8fafc;border-radius:14px;padding:12px}.sa-footnote{font-size:.78rem;color:#64748b;margin-top:8px}',
           '@media(max-width:1240px){.sa-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.sa-hero-grid,.sa-layout{grid-template-columns:1fr}}',
@@ -110,9 +112,8 @@
             '<p>Command center ringkas untuk performa, error, security/session, log, dan kesehatan aplikasi TPK.</p>',
           '</div>',
           '<div class="sa-actions">',
-            '<button type="button" class="sa-btn" id="sa-back-dashboard">Dashboard</button>',
-            '<button type="button" class="sa-btn sa-btn-soft" id="sa-refresh-cache">Perbarui Cache</button>',
-            '<button type="button" class="sa-btn sa-btn-primary" id="sa-refresh">Perbarui Paksa</button>',
+            '<button type="button" class="sa-btn sa-btn-soft" id="sa-refresh-cache">Refresh Data</button>',
+            '<button type="button" class="sa-btn sa-btn-primary" id="sa-refresh">Refresh Paksa</button>',
             '<button type="button" class="sa-btn sa-btn-danger" id="sa-logout">Keluar</button>',
           '</div>',
         '</header>',
@@ -142,6 +143,8 @@
     var health = data.health_status || 'YELLOW';
     var coreGroups = data.core_performance || [];
     var monitorGroups = data.monitor_performance || [];
+    var critical = data.critical_status || {};
+    var criticalItems = critical.items || [];
 
     root.innerHTML = [
       '<section class="sa-hero">',
@@ -152,10 +155,10 @@
             '<p>Update: ', escapeHtml(fmt(data.generated_at)), ' · Service: ', escapeHtml(fmt(data.service_version)), ' · Ambang lambat: ', escapeHtml(fmt(data.slow_threshold_ms)), ' ms · Cache: ', escapeHtml(data.cache_hit ? 'HIT' : 'MISS'), '</p>',
           '</div>',
           '<div class="sa-hero-side">',
-            '<div class="sa-mini"><span>Core request</span><strong>', escapeHtml(fmtNumber(cards.core_request_today)), '</strong></div>',
-            '<div class="sa-mini"><span>Monitor request</span><strong>', escapeHtml(fmtNumber(cards.monitor_request_today)), '</strong></div>',
-            '<div class="sa-mini"><span>Core slow</span><strong>', escapeHtml(fmtNumber(cards.slow_endpoint_today)), '</strong></div>',
-            '<div class="sa-mini"><span>Monitor slow</span><strong>', escapeHtml(fmtNumber(cards.monitor_slow_today)), '</strong></div>',
+            '<button type="button" class="sa-mini sa-clickable" data-sa-shortcut="core_all"><span>Core request</span><strong>', escapeHtml(fmtNumber(cards.core_request_today)), '</strong></button>',
+            '<button type="button" class="sa-mini sa-clickable" data-sa-shortcut="monitor_all"><span>Monitor request</span><strong>', escapeHtml(fmtNumber(cards.monitor_request_today)), '</strong></button>',
+            '<button type="button" class="sa-mini sa-clickable" data-sa-shortcut="core_slow"><span>Core slow</span><strong>', escapeHtml(fmtNumber(cards.slow_endpoint_today)), '</strong></button>',
+            '<button type="button" class="sa-mini sa-clickable" data-sa-shortcut="monitor_slow"><span>Monitor slow</span><strong>', escapeHtml(fmtNumber(cards.monitor_slow_today)), '</strong></button>',
           '</div>',
         '</div>',
       '</section>',
@@ -180,8 +183,77 @@
           '<p class="sa-muted">Security group: ', escapeHtml(fmtNumber((data.security_groups || []).length)), '</p>',
           '<p class="sa-muted">Recent error sample: ', escapeHtml(fmtNumber((data.recent_errors || []).length)), '</p>',
         '</div>',
+        '<div class="sa-panel">',
+          '<h3>Status Kritis</h3>',
+          '<div class="sa-critical-list">',
+            (criticalItems.length ? criticalItems.map(function (item) {
+              var sev = String(item.severity || 'GREEN').toLowerCase();
+              return '<div class="sa-critical-item sa-critical-' + escapeHtml(sev) + '"><strong>' + escapeHtml(item.title || '-') + '</strong><span class="sa-muted">' + escapeHtml(item.message || '') + '</span></div>';
+            }).join('') : '<div class="sa-critical-item sa-critical-green"><strong>Normal</strong><span class="sa-muted">Tidak ada status kritis pada sampel log terbaru.</span></div>'),
+          '</div>',
+          '<p class="sa-footnote">Panel ini adalah early warning berbasis log terbaru, bukan pengganti audit manual.</p>',
+        '</div>',
       '</section>'
     ].join('');
+    bindSummaryShortcuts();
+  }
+
+  function setActiveTab(tab) {
+    activeTab = tab || activeTab;
+    var tabs = document.querySelectorAll('[data-sa-tab]');
+    Array.prototype.forEach.call(tabs, function (b) {
+      b.classList.toggle('active', b.getAttribute('data-sa-tab') === activeTab);
+    });
+  }
+
+  function bindSummaryShortcuts() {
+    var buttons = document.querySelectorAll('[data-sa-shortcut]');
+    Array.prototype.forEach.call(buttons, function (btn) {
+      if (btn.dataset.bound === '1') return;
+      btn.dataset.bound = '1';
+      btn.addEventListener('click', function () {
+        var key = btn.getAttribute('data-sa-shortcut');
+        if (key === 'core_all') { performanceFilter = 'ALL'; setActiveTab('performance'); tabLoaded.performance = true; return renderPerformanceFromSummary('CORE'); }
+        if (key === 'core_slow') { performanceFilter = 'SLOW'; setActiveTab('performance'); tabLoaded.performance = true; return renderPerformanceFromSummary('CORE'); }
+        if (key === 'monitor_all') { monitorFilter = 'ALL'; setActiveTab('monitor'); tabLoaded.monitor = true; return renderPerformanceFromSummary('MONITOR'); }
+        if (key === 'monitor_slow') { monitorFilter = 'SLOW'; setActiveTab('monitor'); tabLoaded.monitor = true; return renderPerformanceFromSummary('MONITOR'); }
+      });
+    });
+  }
+
+  function getFilteredPerformanceRows(rows, category) {
+    var list = rows || [];
+    var filter = category === 'MONITOR' ? monitorFilter : performanceFilter;
+    if (filter === 'SLOW') return list.filter(function (r) { return Number(r.slow_count || 0) > 0 || String(r.status || '').toUpperCase() === 'RED' || String(r.status || '').toUpperCase() === 'YELLOW'; });
+    if (filter === 'RED') return list.filter(function (r) { return String(r.status || '').toUpperCase() === 'RED'; });
+    if (filter === 'GREEN') return list.filter(function (r) { return String(r.status || '').toUpperCase() === 'GREEN'; });
+    return list;
+  }
+
+  function renderQuickFilters(category) {
+    var current = category === 'MONITOR' ? monitorFilter : performanceFilter;
+    var chips = [
+      { key: 'ALL', label: 'Semua' },
+      { key: 'SLOW', label: 'Lambat' },
+      { key: 'RED', label: 'Merah' },
+      { key: 'GREEN', label: 'Hijau' }
+    ];
+    return '<div class="sa-quick-filter" data-sa-filter-category="' + escapeHtml(category || 'CORE') + '">' + chips.map(function (c) {
+      return '<button type="button" class="sa-chip ' + (current === c.key ? 'active' : '') + '" data-sa-perf-filter="' + c.key + '">' + escapeHtml(c.label) + '</button>';
+    }).join('') + '</div>';
+  }
+
+  function bindQuickFilters(category) {
+    var wrap = document.querySelector('[data-sa-filter-category="' + (category || 'CORE') + '"]');
+    if (!wrap) return;
+    var chips = wrap.querySelectorAll('[data-sa-perf-filter]');
+    Array.prototype.forEach.call(chips, function (chip) {
+      chip.addEventListener('click', function () {
+        var filter = chip.getAttribute('data-sa-perf-filter') || 'ALL';
+        if (category === 'MONITOR') monitorFilter = filter; else performanceFilter = filter;
+        renderPerformanceFromSummary(category === 'MONITOR' ? 'MONITOR' : 'CORE');
+      });
+    });
   }
 
   function tableHtml(headers, rows) {
@@ -218,11 +290,15 @@
   function renderPerformance(data, title) {
     var target = byId('sa-tab-content');
     if (!target) return;
+    var category = String(data.category || 'CORE').toUpperCase();
+    var rows = getFilteredPerformanceRows(data.groups || [], category);
     target.innerHTML = [
       '<h3>', escapeHtml(title || 'Core App Performance'), '</h3>',
-      '<p class="sa-muted">Kategori: ', escapeHtml(data.category || 'CORE'), ' · Total baris dianalisis: ', escapeHtml(fmtNumber(data.total_rows)), ' · Source rows: ', escapeHtml(fmtNumber(data.source_rows)), ' · Ambang lambat: ', escapeHtml(fmt(data.slow_threshold_ms)), ' ms · Cache: ', escapeHtml(data.cache_hit ? 'HIT' : 'MISS'), '</p>',
-      tableHtml(performanceHeaders(), data.groups || [])
+      '<p class="sa-muted">Kategori: ', escapeHtml(category), ' · Total baris dianalisis: ', escapeHtml(fmtNumber(data.total_rows)), ' · Source rows: ', escapeHtml(fmtNumber(data.source_rows)), ' · Ambang lambat: ', escapeHtml(fmt(data.slow_threshold_ms)), ' ms · Cache: ', escapeHtml(data.cache_hit ? 'HIT' : 'MISS'), ' · Filter: ', escapeHtml(category === 'MONITOR' ? monitorFilter : performanceFilter), '</p>',
+      renderQuickFilters(category),
+      tableHtml(performanceHeaders(), rows)
     ].join('');
+    bindQuickFilters(category);
   }
 
   function renderPerformanceFromSummary(category) {
@@ -422,9 +498,8 @@
     var tabs = document.querySelectorAll('[data-sa-tab]');
     Array.prototype.forEach.call(tabs, function (btn) {
       btn.addEventListener('click', function () {
-        Array.prototype.forEach.call(tabs, function (b) { b.classList.remove('active'); });
-        btn.classList.add('active');
         var tab = btn.getAttribute('data-sa-tab');
+        setActiveTab(tab);
         if (tab === 'performance') return loadPerformance();
         if (tab === 'monitor') return loadMonitorPerformance();
         if (tab === 'errors') return loadErrors();
@@ -488,11 +563,6 @@
 
     var logout = byId('sa-logout');
     if (logout) logout.addEventListener('click', logoutSuperAdmin);
-    var back = byId('sa-back-dashboard');
-    if (back) back.addEventListener('click', function () {
-      var router = getRouter();
-      if (router && typeof router.go === 'function') router.go('dashboard');
-    });
   }
 
   async function reloadActiveTab(options) {
