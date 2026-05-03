@@ -48,6 +48,44 @@
     try { return n.toLocaleString('id-ID'); } catch (err) { return String(n); }
   }
 
+
+  function humanText(value) {
+    var text = String(value == null ? '' : value).trim();
+    if (!text) return '';
+    var map = {
+      CORE_APP_ONLY: 'Core App saja',
+      SUPER_ADMIN_ACTION: 'Aksi Super Admin',
+      LOG_USER_ERROR: 'Log User Error',
+      LOG_SECURITY_EVENT: 'Log Security Event',
+      LOG_PERFORMANCE: 'Log Performance',
+      TOKEN_STORE: 'Token Store',
+      ACTIVE_SESSION_INDEX: 'Active Session Index',
+      log_performance: 'log performance',
+      log_user_error: 'log user error',
+      log_user_login: 'log user login',
+      log_security_event: 'log security event',
+      super_admin_action_log: 'super admin action log'
+    };
+    if (map[text]) return map[text];
+    return text.replace(/_/g, ' ');
+  }
+
+  function humanLabel(value) {
+    var text = humanText(value);
+    if (!text) return '';
+    return text.replace(/\w/g, function (c) { return c.toUpperCase(); });
+  }
+
+  function displayCellValue(value, key) {
+    if (value === undefined || value === null || value === '') return '-';
+    var k = String(key || '').toLowerCase();
+    var text = String(value);
+    if (k.indexOf('request_id') >= 0 || k.indexOf('action_id') >= 0 || k === 'action' || k === 'aksi') return escapeHtml(text);
+    if (k.indexOf('waktu') >= 0 || k.indexOf('timestamp') >= 0 || k.indexOf('_at') >= 0) return escapeHtml(text);
+    if (k.indexOf('detail') >= 0 || k.indexOf('payload') >= 0 || k.indexOf('stack') >= 0 || k.indexOf('pesan') >= 0) return escapeHtml(humanText(text));
+    return escapeHtml(humanText(text));
+  }
+
   function statusClass(status) {
     var s = String(status || '').toUpperCase();
     if (s === 'GREEN') return 'sa-status-green';
@@ -151,7 +189,7 @@
         '<div class="sa-hero-grid">',
           '<div>',
             '<span class="sa-health-pill ', statusClass(health), '">Status Core App: ', escapeHtml(health), '</span>',
-            '<h3>Health Scope: ', escapeHtml(data.health_scope || 'CORE_APP_ONLY'), '</h3>',
+            '<h3>Health Scope: ', escapeHtml(humanText(data.health_scope || 'CORE_APP_ONLY')), '</h3>',
             '<p>Update: ', escapeHtml(fmt(data.generated_at)), ' · Service: ', escapeHtml(fmt(data.service_version)), ' · Ambang lambat: ', escapeHtml(fmt(data.slow_threshold_ms)), ' ms · Cache: ', escapeHtml(data.cache_hit ? 'HIT' : 'MISS'), '</p>',
           '</div>',
           '<div class="sa-hero-side">',
@@ -163,11 +201,11 @@
         '</div>',
       '</section>',
       '<section class="sa-grid">',
-        cardHtml('Request hari ini', cards.request_today, 'Semua log_performance'),
+        cardHtml('Request hari ini', cards.request_today, 'Semua log performance'),
         cardHtml('Core endpoint lambat', cards.slow_endpoint_today, 'Tidak termasuk monitor', cards.slow_endpoint_today > 0 ? 'sa-warn' : ''),
-        cardHtml('Error hari ini', cards.error_today, 'Dari log_user_error', cards.error_today > 0 ? 'sa-danger' : ''),
-        cardHtml('Security deny', cards.security_deny_today, 'Dari log_security_event', cards.security_deny_today > 0 ? 'sa-warn' : ''),
-        cardHtml('Login gagal', cards.login_failed_today, 'Dari log_user_login', cards.login_failed_today > 0 ? 'sa-warn' : ''),
+        cardHtml('Error hari ini', cards.error_today, 'Dari log user error', cards.error_today > 0 ? 'sa-danger' : ''),
+        cardHtml('Security deny', cards.security_deny_today, 'Dari log security event', cards.security_deny_today > 0 ? 'sa-warn' : ''),
+        cardHtml('Login gagal', cards.login_failed_today, 'Dari log user login', cards.login_failed_today > 0 ? 'sa-warn' : ''),
         cardHtml('App version', cards.app_version || '-', 'Versi backend aktif'),
       '</section>',
       '<section class="sa-layout">',
@@ -260,12 +298,12 @@
     rows = rows || [];
     return [
       '<div class="sa-table-wrap"><table class="sa-table"><thead><tr>',
-      headers.map(function (h) { return '<th>' + escapeHtml(h.label) + '</th>'; }).join(''),
+      headers.map(function (h) { return '<th>' + escapeHtml(humanLabel(h.label)) + '</th>'; }).join(''),
       '</tr></thead><tbody>',
       rows.length ? rows.map(function (row) {
         return '<tr>' + headers.map(function (h) {
           var cls = h.wrap ? ' class="sa-wrap"' : '';
-          var value = h.formatter ? h.formatter(row[h.key], row) : fmt(row[h.key]);
+          var value = h.formatter ? h.formatter(row[h.key], row) : displayCellValue(row[h.key], h.key);
           return '<td' + cls + '>' + value + '</td>';
         }).join('') + '</tr>';
       }).join('') : '<tr><td colspan="' + headers.length + '" class="sa-muted">Tidak ada data.</td></tr>',
@@ -278,10 +316,10 @@
       { key: 'action', label: 'Action' },
       { key: 'category', label: 'Kategori' },
       { key: 'count', label: 'Jumlah' },
-      { key: 'avg_ms', label: 'Avg ms' },
-      { key: 'max_ms', label: 'Max ms' },
-      { key: 'max_open_sheet_ms', label: 'Max open_sheet' },
-      { key: 'max_read_rows', label: 'Max read_rows' },
+      { key: 'avg_ms', label: 'Rata-rata ms' },
+      { key: 'max_ms', label: 'Maks ms' },
+      { key: 'max_open_sheet_ms', label: 'Maks buka sheet' },
+      { key: 'max_read_rows', label: 'Maks baca baris' },
       { key: 'slow_count', label: 'Lambat' },
       { key: 'status', label: 'Status', formatter: function (v) { return badgeStatus(v); } }
     ];
@@ -294,7 +332,7 @@
     var rows = getFilteredPerformanceRows(data.groups || [], category);
     target.innerHTML = [
       '<h3>', escapeHtml(title || 'Core App Performance'), '</h3>',
-      '<p class="sa-muted">Kategori: ', escapeHtml(category), ' · Total baris dianalisis: ', escapeHtml(fmtNumber(data.total_rows)), ' · Source rows: ', escapeHtml(fmtNumber(data.source_rows)), ' · Ambang lambat: ', escapeHtml(fmt(data.slow_threshold_ms)), ' ms · Cache: ', escapeHtml(data.cache_hit ? 'HIT' : 'MISS'), ' · Filter: ', escapeHtml(category === 'MONITOR' ? monitorFilter : performanceFilter), '</p>',
+      '<p class="sa-muted">Kategori: ', escapeHtml(humanText(category)), ' · Total baris dianalisis: ', escapeHtml(fmtNumber(data.total_rows)), ' · Sumber baris: ', escapeHtml(fmtNumber(data.source_rows)), ' · Ambang lambat: ', escapeHtml(fmt(data.slow_threshold_ms)), ' ms · Cache: ', escapeHtml(data.cache_hit ? 'HIT' : 'MISS'), ' · Filter: ', escapeHtml(category === 'MONITOR' ? monitorFilter : performanceFilter), '</p>',
       renderQuickFilters(category),
       tableHtml(performanceHeaders(), rows)
     ].join('');
@@ -413,7 +451,7 @@
 
   async function loadSummary(options) {
     var opts = options || {};
-    var result = await post('getSuperAdminSummary', { no_cache: opts.noCache === true, perf_rows: 260 });
+    var result = await post('getSuperAdminSummary', { no_cache: opts.noCache === true, perf_rows: 180 });
     if (!result || result.ok === false) {
       var root = byId('sa-summary');
       if (root) root.innerHTML = '<div class="sa-error">' + escapeHtml((result && result.message) || 'Gagal memuat ringkasan.') + '</div>';
@@ -439,7 +477,7 @@
       return;
     }
     setTabLoading('core performance');
-    var result = await post('getSuperAdminPerformance', { max_rows: 420, category: 'CORE', no_cache: opts.noCache === true });
+    var result = await post('getSuperAdminPerformance', { max_rows: 240, category: 'CORE', no_cache: opts.noCache === true });
     if (!result || result.ok === false) return setTabError(result && result.message);
     tabLoaded.performance = true;
     renderPerformance(getData(result), 'Core App Performance');
@@ -454,7 +492,7 @@
       return;
     }
     setTabLoading('monitor endpoint');
-    var result = await post('getSuperAdminPerformance', { max_rows: 420, category: 'MONITOR', no_cache: opts.noCache === true });
+    var result = await post('getSuperAdminPerformance', { max_rows: 240, category: 'MONITOR', no_cache: opts.noCache === true });
     if (!result || result.ok === false) return setTabError(result && result.message);
     tabLoaded.monitor = true;
     renderPerformance(getData(result), 'Monitor Endpoint Performance');
@@ -577,9 +615,19 @@
   async function refreshAll(options) {
     try {
       var opts = options || {};
-      var summary = await loadSummary({ noCache: opts.noCache === true });
-      if (summary) await reloadActiveTab(opts);
-      showToast(opts.noCache ? 'Dashboard Super Admin diperbarui paksa.' : 'Dashboard Super Admin diperbarui dari cache/server.', 'success');
+      var force = opts.noCache === true;
+      var summary = await loadSummary({ noCache: force });
+      if (summary) {
+        if (force) {
+          await reloadActiveTab(opts);
+        } else {
+          // Refresh Data dibuat ringan: cukup pakai ringkasan/cache backend.
+          // Detail endpoint hanya dipanggil saat Refresh Paksa atau saat tab dibuka manual.
+          if (activeTab === 'monitor') renderPerformanceFromSummary('MONITOR');
+          else if (activeTab === 'performance') renderPerformanceFromSummary('CORE');
+        }
+      }
+      showToast(force ? 'Dashboard Super Admin diperbarui paksa.' : 'Dashboard Super Admin diperbarui dari cache/ringkasan.', 'success');
     } catch (err) {
       showToast(err && err.message ? err.message : 'Gagal memperbarui dashboard.', 'error');
     }
