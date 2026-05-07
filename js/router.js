@@ -37,7 +37,7 @@
       { src: './js/views/rekapKaderView.js', globalName: 'RekapKaderView' }
     ],
     superAdmin: [
-      { src: './js/views/superAdminDashboardView.js?v=20260507-5E-R4C-R2-R1', globalName: 'SuperAdminDashboardView' }
+      { src: './js/views/superAdminDashboardView.js?v=20260507-5E-R4C-R2-R2', globalName: 'SuperAdminDashboardView' }
     ]
   };
 
@@ -136,52 +136,60 @@
   }
 
   function loadScriptOnce(src, globalName) {
-    if (!src) return Promise.resolve();
+  if (!src) return Promise.resolve();
 
-    if (isGlobalReady(globalName)) {
-      return Promise.resolve();
-    }
+  // R2-R2: global lama tidak boleh membuat router melewati asset versi baru.
+  // Jika src versi saat ini belum ada di DOM, script tetap dimuat walaupun globalName sudah tersedia.
+  // Ini mencegah superAdminDashboardView.js lama tetap aktif setelah ?v dinaikkan.
+  var currentScriptLoaded = hasScriptTag(src);
 
-    if (scriptPromises[src]) {
-      return scriptPromises[src];
-    }
+  if (isGlobalReady(globalName) && currentScriptLoaded) {
+    return Promise.resolve();
+  }
 
-    if (hasScriptTag(src) && !scriptPromises[src]) {
-      scriptPromises[src] = new Promise(function (resolve) {
-        var tries = 0;
-        function waitUntilReady() {
-          tries += 1;
-          if (isGlobalReady(globalName) || tries > 40) {
-            resolve();
-            return;
-          }
-          window.setTimeout(waitUntilReady, 100);
-        }
-        waitUntilReady();
-      });
-      return scriptPromises[src];
-    }
-
-    scriptPromises[src] = new Promise(function (resolve, reject) {
-      var script = document.createElement('script');
-      script.src = src;
-      script.async = true;
-      script.defer = true;
-      script.dataset.lazySrc = src;
-
-      script.onload = function () {
-        resolve();
-      };
-
-      script.onerror = function () {
-        reject(new Error('Gagal memuat script: ' + src));
-      };
-
-      document.body.appendChild(script);
-    });
-
+  if (scriptPromises[src]) {
     return scriptPromises[src];
   }
+
+  if (currentScriptLoaded && !scriptPromises[src]) {
+    scriptPromises[src] = new Promise(function (resolve) {
+      var tries = 0;
+      function waitUntilReady() {
+        tries += 1;
+        if (isGlobalReady(globalName) || tries > 40) {
+          resolve();
+          return;
+        }
+        window.setTimeout(waitUntilReady, 100);
+      }
+      waitUntilReady();
+    });
+    return scriptPromises[src];
+  }
+
+  scriptPromises[src] = new Promise(function (resolve, reject) {
+    var script = document.createElement('script');
+    script.src = src;
+    script.async = true;
+    script.defer = true;
+    script.dataset.lazySrc = src;
+    script.dataset.routeGlobal = globalName || '';
+    script.dataset.routeAssetPatch = '5E-R4C-R2-R2';
+
+    script.onload = function () {
+      resolve();
+    };
+
+    script.onerror = function () {
+      reject(new Error('Gagal memuat script: ' + src));
+    };
+
+    document.body.appendChild(script);
+  });
+
+  return scriptPromises[src];
+}
+
 
   function ensureRouteAssets(routeName) {
     var assets = getRouteAssets(routeName);
