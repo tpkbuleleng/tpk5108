@@ -37,7 +37,7 @@
       { src: './js/views/rekapKaderView.js', globalName: 'RekapKaderView' }
     ],
     superAdmin: [
-      { src: './js/views/superAdminDashboardView.js?v=20260506-SA-5E-R4B-DIAG', globalName: 'SuperAdminDashboardView' }
+      { src: './js/views/superAdminDashboardView.js?v=20260506-SA-5E-R4C FULL', globalName: 'SuperAdminDashboardView' }
     ]
   };
 
