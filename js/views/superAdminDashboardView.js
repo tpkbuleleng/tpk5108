@@ -974,6 +974,7 @@
       { key: 'slow_count', label: 'Lambat' },
       { key: 'bottleneck_class', label: 'Bottleneck', formatter: bottleneckBadge },
       { key: 'bottleneck_reason', label: 'Alasan', wrap: true, formatter: function (v) { return '<span class="sa-bottleneck-reason">' + escapeHtml(humanText(v || '-')) + '</span>'; } },
+      { key: 'trace_top_stage', label: 'Top Trace', formatter: function (v, row) { return escapeHtml(v ? (humanText(v) + ' ' + fmt(row.trace_top_stage_ms || 0) + ' ms') : '-'); } },
       { key: 'status', label: 'Status', formatter: function (v) { return badgeStatus(v); } }
     ];
   }
@@ -1013,13 +1014,14 @@
           '<span class="sa-bottleneck-pill ', String(r.status || '').toUpperCase() === 'RED' ? 'red' : 'warn', '">', escapeHtml(humanText(r.bottleneck_class || 'UNKNOWN_NEEDS_TRACE')), '</span>',
           '<p class="sa-muted" style="margin:6px 0 0">Max ', escapeHtml(fmt(r.max_ms || 0)), ' ms · Avg ', escapeHtml(fmt(r.avg_ms || 0)), ' ms · Sample ', escapeHtml(r.sample_request_id || '-'), '</p>',
           '<p class="sa-muted" style="margin:6px 0 0">', escapeHtml(humanText(r.bottleneck_reason || 'Belum ada alasan bottleneck.')), '</p>',
+          r.trace_stage_summary ? '<p class="sa-muted" style="margin:6px 0 0">Trace: ' + escapeHtml(humanText(r.trace_stage_summary)) + '</p>' : '',
         '</div>'
       ].join('');
     }).join('');
     return [
       '<div class="sa-panel">',
         '<h3>Core App Performance Drilldown</h3>',
-        '<p class="sa-muted">A9 tidak melonggarkan ambang ', escapeHtml(fmt(slowMs)), ' ms. Panel ini membedah penyebab YELLOW/RED berdasarkan log_performance: action, sample request_id, waktu, user/device termask, open_sheet_ms, read_rows, write_rows, cache, dan detail JSON ringkas.</p>',
+        '<p class="sa-muted">A9-R1 tidak melonggarkan ambang ', escapeHtml(fmt(slowMs)), ' ms. Panel ini membedah penyebab YELLOW/RED berdasarkan log_performance: action, sample request_id, waktu, user/device termask, open_sheet_ms, read_rows, write_rows, cache, detail JSON ringkas, dan trace stage login/logout.</p>',
         '<div class="sa-bottleneck-grid">', top, '</div>',
         '<p class="sa-footnote">Klik baris endpoint untuk membuka detail lengkap dan rekomendasi teknis. Token, password, NIK, spreadsheet_id, dan session_data tidak ditampilkan mentah.</p>',
       '</div>'
@@ -1356,7 +1358,8 @@
       var maxMs = Number(row.max_ms || 0);
       var avgMs = Number(row.avg_ms || 0);
       var cls = String(row.bottleneck_class || '').toUpperCase();
-      if (cls === 'TOKEN_SESSION_WRITE_OVERHEAD') return 'Login lambat berkorelasi dengan tulis token/session/audit. Bedah token_store, active_session_index, dan log login sebelum optimasi.';
+      if (cls === 'TRACE_INCOMPLETE') return 'Trace belum lengkap. Pastikan ApiRouter, AuthService, TokenService, dan SheetRepo profiler versi A9-R1 sudah terpasang, lalu ulangi login/logout untuk menghasilkan log baru.';
+      if (cls === 'TOKEN_SESSION_WRITE_OVERHEAD') return 'Login/logout lambat berkorelasi dengan token/session/middleware auth. Bedah token_store, active_session_index, token cache, dan revoke/append token sebelum optimasi.';
       if (cls === 'CACHE_MISS_OR_UNCACHED_READ') return 'Cache miss dominan. Periksa key CacheService, TTL, warm path, dan penggunaan read model.';
       if (openSheet > 1000) return 'Indikasi bottleneck akses spreadsheet. Audit openById, route workbook, dan cache referensi.';
       if (readRows > 1000) return 'Endpoint membaca banyak baris. Pertimbangkan list lite, paging, atau read model.';
@@ -1427,7 +1430,7 @@
       return ['id_pengguna_raw','role','session_status','online_session_count','offline_session_count','active_session_count','device_count','last_device_id','last_device_label','last_seen','last_login_at','last_action','last_request_id','total_request','slow_request','login_success','login_failed','activity_count','avg_ms','max_ms','devices','latest_events'];
     }
     if (type === 'performance' || type === 'monitor') {
-      return ['action','performance_group','category','status','count','sample_count','slow_count','severe_count','avg_ms','min_ms','max_ms','sample_at','latest_at','sample_request_id','sample_user','sample_role','sample_device_id','sample_app_version','open_sheet_ms','read_rows','write_rows','max_open_sheet_ms','max_read_rows','max_write_rows','cache_hit','cache_miss','bottleneck_class','bottleneck_reason','recommendation','detail_summary','sample_detail'];
+      return ['action','performance_group','category','status','count','sample_count','slow_count','severe_count','avg_ms','min_ms','max_ms','sample_at','latest_at','sample_request_id','sample_user','sample_role','sample_device_id','sample_app_version','open_sheet_ms','read_rows','write_rows','max_open_sheet_ms','max_read_rows','max_write_rows','cache_hit','cache_miss','bottleneck_class','bottleneck_reason','trace_stage_summary','trace_top_stage','trace_top_stage_ms','trace_version','trace_incomplete_reason','recommendation','detail_summary','sample_detail'];
     }
     if (type === 'workbook') {
       return ['workbook_key','workbook_type','workbook_name','sheet_name','status','severity','issue_type','check_type','header_status','missing_headers','unknown_headers','last_row','last_column','max_rows','max_columns','used_cells','allocated_cells','usage_pct','recommendation','catatan','checked_at'];
@@ -2527,3 +2530,21 @@
   };
 
 })(window, document);
+
+
+window.testSystemMonitorFrontendA9R1TraceEnrichment = function () {
+  var sample = [{
+    action: 'login', status: 'RED', count: 1, sample_count: 1, slow_count: 1,
+    avg_ms: 2600, max_ms: 2600,
+    bottleneck_class: 'TOKEN_SESSION_WRITE_OVERHEAD',
+    bottleneck_reason: 'Trace menunjukkan durasi dominan pada token/session/middleware auth.',
+    trace_stage_summary: 'top=token_create_append_object:900ms · token/session=1400ms',
+    trace_top_stage: 'token_create_append_object',
+    trace_top_stage_ms: 900,
+    sample_request_id: 'REQ-A9R1-FRONTEND-TEST'
+  }];
+  return {
+    ok: typeof renderCoreBottleneckSummary === 'function' && renderCoreBottleneckSummary(sample, { slow_threshold_ms: 1500 }).indexOf('Trace:') >= 0,
+    version: '5E-R4D-A9-R1-CORE-TRACE-ENRICHMENT-20260514'
+  };
+};
