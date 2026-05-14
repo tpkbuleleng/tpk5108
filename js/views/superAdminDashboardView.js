@@ -19,7 +19,7 @@
   var workbookLastPayload = null;
   var workbookStateLoaded = false;
   var WORKBOOK_STATE_KEY = 'tpk_sa_workbook_health_checked_v1';
-  var SYSTEM_MONITOR_FRONTEND_SYNC_VERSION = '5E-R4D-A8-R2-R3-FRONTEND-HEALTH-FINAL-PRESENTATION-YELLOW-EXPLANATION-POLISH-20260514';
+  var SYSTEM_MONITOR_FRONTEND_SYNC_VERSION = '5E-R4D-A9-CORE-APP-PERFORMANCE-YELLOW-DRILLDOWN-20260514';
   var PATCH_5E_R4C_R2_R2_VERSION = SYSTEM_MONITOR_FRONTEND_SYNC_VERSION;
   var PATCH_5E_R4C_R2_R1_VERSION = SYSTEM_MONITOR_FRONTEND_SYNC_VERSION;
   var PATCH_5E_R4C_R2_VERSION = SYSTEM_MONITOR_FRONTEND_SYNC_VERSION;
@@ -491,6 +491,7 @@
           '.sa-filter{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}.sa-filter input,.sa-filter select{border:1px solid #cbd5e1;border-radius:12px;padding:9px;min-width:160px;background:#fff}.sa-quick-filter{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}.sa-chip{border:1px solid #cbd5e1;background:#fff;border-radius:999px;padding:7px 10px;font-weight:800;cursor:pointer}.sa-chip.active{background:#0f172a;color:#fff;border-color:#0f172a}',
           '.sa-badge{display:inline-flex;align-items:center;border-radius:999px;padding:4px 9px;font-weight:800;font-size:.72rem}.sa-status-green{background:#dcfce7;color:#166534}.sa-status-yellow{background:#fef3c7;color:#92400e}.sa-status-red{background:#fee2e2;color:#991b1b}',
           '.sa-detail-grid{display:grid;gap:8px}.sa-detail-row{border:1px solid #e2e8f0;border-radius:12px;padding:8px;background:#f8fafc}.sa-detail-row small{display:block;color:#64748b;font-weight:800}.sa-detail-row span{overflow-wrap:anywhere}.sa-reco{border-left:4px solid #3b82f6;background:#eff6ff;border-radius:12px;padding:9px;margin-top:10px}',
+          '.sa-bottleneck-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin:10px 0}.sa-bottleneck-card{border:1px solid #e2e8f0;border-radius:16px;background:#fff;padding:10px}.sa-bottleneck-card strong{display:block;margin-bottom:4px}.sa-bottleneck-pill{display:inline-flex;align-items:center;border:1px solid #cbd5e1;border-radius:999px;padding:2px 8px;font-weight:800;font-size:.78rem;background:#f8fafc}.sa-bottleneck-pill.warn{border-color:#f59e0b;background:#fffbeb}.sa-bottleneck-pill.red{border-color:#ef4444;background:#fff7f7}.sa-bottleneck-reason{max-width:360px;white-space:normal}',
           '.sa-muted{color:var(--sa-muted)}.sa-error{color:#991b1b;background:#fee2e2;border-radius:14px;padding:12px}.sa-loading{color:#475569;background:#f8fafc;border-radius:14px;padding:12px}.sa-footnote{font-size:.78rem;color:#64748b;margin-top:8px}',
           '@media(max-width:1240px){.sa-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.sa-hero-grid,.sa-layout,.sa-workspace{grid-template-columns:1fr}.sa-inspector{position:static}}',
           '@media(max-width:760px){.super-admin-page{padding:12px;width:calc(100% - 24px)}.sa-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.sa-topbar{display:block}.sa-actions{margin-top:10px}.sa-hero-side{grid-template-columns:1fr}.sa-table{font-size:.78rem}}',
@@ -538,6 +539,7 @@
   function pickLatestKnownVersion(value, fallback) {
     var parts = splitVersionParts(value);
     var preferred = [
+      '5E-R4D-A9',
       '5E-R4D-A8-R2-R3',
       '5E-R4D-A8-R2-R2',
       '5E-R4D-A8-R2-R1',
@@ -579,6 +581,7 @@
       return 'UI A8-R1 synced · Backend Health final A5 verified';
     }
     if (kind === 'frontend') {
+      if (String(latest || '').indexOf('5E-R4D-A9') >= 0) return latest;
       if (String(latest || '').indexOf('5E-R4D-A8-R2-R3') >= 0) return latest;
       if (String(latest || '').indexOf('5E-R4D-A8-R2-R2') >= 0) return latest + ' · UI R2-R3 explanation polish active';
       if (String(latest || '').indexOf('5E-R4D-A8-R2-R1') >= 0) return latest + ' · UI R2-R2 active window ready';
@@ -951,6 +954,12 @@
     });
   }
 
+  function bottleneckBadge(value, row) {
+    var cls = String(value || '').toUpperCase();
+    var severity = cls === 'NONE' ? '' : (String(row && row.status || '').toUpperCase() === 'RED' ? ' red' : ' warn');
+    return '<span class="sa-bottleneck-pill' + severity + '">' + escapeHtml(humanText(cls || '-')) + '</span>';
+  }
+
   function performanceHeaders() {
     return [
       { key: 'action', label: 'Action' },
@@ -959,9 +968,12 @@
       { key: 'count', label: 'Jumlah' },
       { key: 'avg_ms', label: 'Rata-rata ms' },
       { key: 'max_ms', label: 'Maks ms' },
-      { key: 'max_open_sheet_ms', label: 'Maks buka sheet' },
-      { key: 'max_read_rows', label: 'Maks baca baris' },
+      { key: 'open_sheet_ms', label: 'Sample buka sheet' },
+      { key: 'read_rows', label: 'Sample baca' },
+      { key: 'write_rows', label: 'Sample tulis' },
       { key: 'slow_count', label: 'Lambat' },
+      { key: 'bottleneck_class', label: 'Bottleneck', formatter: bottleneckBadge },
+      { key: 'bottleneck_reason', label: 'Alasan', wrap: true, formatter: function (v) { return '<span class="sa-bottleneck-reason">' + escapeHtml(humanText(v || '-')) + '</span>'; } },
       { key: 'status', label: 'Status', formatter: function (v) { return badgeStatus(v); } }
     ];
   }
@@ -986,6 +998,34 @@
     ];
   }
 
+  function renderCoreBottleneckSummary(rows, data) {
+    rows = rows || [];
+    data = data || {};
+    var slowMs = Number(data.slow_threshold_ms || 1500) || 1500;
+    var slowRows = rows.filter(function (r) { return Number(r.slow_count || 0) > 0 || Number(r.max_ms || 0) > slowMs; });
+    if (!slowRows.length) {
+      return '<div class="sa-panel"><h3>Core App Performance Drilldown</h3><p class="sa-muted">Tidak ada endpoint core yang melewati ambang ' + escapeHtml(fmt(slowMs)) + ' ms pada periode ini.</p></div>';
+    }
+    var top = slowRows.slice(0, 4).map(function (r) {
+      return [
+        '<div class="sa-bottleneck-card">',
+          '<strong>', escapeHtml(r.action || '-'), '</strong>',
+          '<span class="sa-bottleneck-pill ', String(r.status || '').toUpperCase() === 'RED' ? 'red' : 'warn', '">', escapeHtml(humanText(r.bottleneck_class || 'UNKNOWN_NEEDS_TRACE')), '</span>',
+          '<p class="sa-muted" style="margin:6px 0 0">Max ', escapeHtml(fmt(r.max_ms || 0)), ' ms · Avg ', escapeHtml(fmt(r.avg_ms || 0)), ' ms · Sample ', escapeHtml(r.sample_request_id || '-'), '</p>',
+          '<p class="sa-muted" style="margin:6px 0 0">', escapeHtml(humanText(r.bottleneck_reason || 'Belum ada alasan bottleneck.')), '</p>',
+        '</div>'
+      ].join('');
+    }).join('');
+    return [
+      '<div class="sa-panel">',
+        '<h3>Core App Performance Drilldown</h3>',
+        '<p class="sa-muted">A9 tidak melonggarkan ambang ', escapeHtml(fmt(slowMs)), ' ms. Panel ini membedah penyebab YELLOW/RED berdasarkan log_performance: action, sample request_id, waktu, user/device termask, open_sheet_ms, read_rows, write_rows, cache, dan detail JSON ringkas.</p>',
+        '<div class="sa-bottleneck-grid">', top, '</div>',
+        '<p class="sa-footnote">Klik baris endpoint untuk membuka detail lengkap dan rekomendasi teknis. Token, password, NIK, spreadsheet_id, dan session_data tidak ditampilkan mentah.</p>',
+      '</div>'
+    ].join('');
+  }
+
   function renderPerformance(data, title) {
     var target = byId('sa-tab-content');
     if (!target) return;
@@ -996,6 +1036,7 @@
       '<p class="sa-muted">', escapeHtml(category === 'MONITOR' ? 'Monitor/Diagnostic Super Admin tidak memengaruhi Status Core App.' : 'Core App Performance hanya endpoint yang berdampak langsung pada aplikasi kader.'), '</p>',
       '<p class="sa-muted">Periode: ', escapeHtml(data.time_label || getTimeLabel()), ' · Kategori: ', escapeHtml(humanText(category)), ' · Total baris dianalisis: ', escapeHtml(fmtNumber(data.total_rows)), ' · Sumber baris: ', escapeHtml(fmtNumber(data.source_rows)), ' · Ambang lambat: ', escapeHtml(fmt(data.slow_threshold_ms)), ' ms · Cache: ', escapeHtml(data.cache_hit ? 'HIT' : 'MISS'), ' · Filter: ', escapeHtml(humanText(category === 'MONITOR' ? monitorFilter : performanceFilter)), '</p>',
       renderQuickFilters(category),
+      category === 'CORE' ? renderCoreBottleneckSummary(rows, data) : '',
       tableHtml(performanceHeaders(), rows, 'performance')
     ].join('');
     bindQuickFilters(category);
@@ -1026,7 +1067,7 @@
       slow_threshold_ms: data.slow_threshold_ms,
       total_rows: (data.core_performance || []).reduce(function (n, g) { return n + Number(g.count || 0); }, 0),
       source_rows: 0,
-      groups: data.core_performance || []
+      groups: data.core_performance_drilldown || data.core_performance || []
     }, 'Core App Performance');
   }
 
@@ -1308,12 +1349,18 @@
   function recommendationFor(type, row) {
     row = row || {};
     if (type === 'performance') {
-      var openSheet = Number(row.max_open_sheet_ms || 0);
-      var readRows = Number(row.max_read_rows || 0);
+      if (row.recommendation) return row.recommendation;
+      var openSheet = Number(row.open_sheet_ms || row.max_open_sheet_ms || 0);
+      var readRows = Number(row.read_rows || row.max_read_rows || 0);
+      var writeRows = Number(row.write_rows || row.max_write_rows || 0);
       var maxMs = Number(row.max_ms || 0);
       var avgMs = Number(row.avg_ms || 0);
+      var cls = String(row.bottleneck_class || '').toUpperCase();
+      if (cls === 'TOKEN_SESSION_WRITE_OVERHEAD') return 'Login lambat berkorelasi dengan tulis token/session/audit. Bedah token_store, active_session_index, dan log login sebelum optimasi.';
+      if (cls === 'CACHE_MISS_OR_UNCACHED_READ') return 'Cache miss dominan. Periksa key CacheService, TTL, warm path, dan penggunaan read model.';
       if (openSheet > 1000) return 'Indikasi bottleneck akses spreadsheet. Audit openById, route workbook, dan cache referensi.';
       if (readRows > 1000) return 'Endpoint membaca banyak baris. Pertimbangkan list lite, paging, atau read model.';
+      if (writeRows >= 2) return 'Ada beberapa operasi tulis pada request lambat. Audit tulis log/audit/token agar tidak membuka workbook berulang.';
       if (maxMs > 4000 && openSheet === 0) return 'Durasi tinggi tanpa open sheet besar. Kemungkinan cold start Apps Script, logging, atau token/session write.';
       if (avgMs > 1500) return 'Rata-rata endpoint melewati ambang. Prioritaskan optimasi endpoint ini. Perhatikan group performance agar Core App tidak tercampur monitor/diagnostic.';
       return 'Tidak ada rekomendasi kritis. Endpoint relatif stabil pada sampel ini.';
@@ -1380,7 +1427,7 @@
       return ['id_pengguna_raw','role','session_status','online_session_count','offline_session_count','active_session_count','device_count','last_device_id','last_device_label','last_seen','last_login_at','last_action','last_request_id','total_request','slow_request','login_success','login_failed','activity_count','avg_ms','max_ms','devices','latest_events'];
     }
     if (type === 'performance' || type === 'monitor') {
-      return ['action','performance_group','category','status','count','slow_count','severe_count','avg_ms','max_ms','max_open_sheet_ms','max_read_rows','cache_hit','cache_miss','latest_at','sample_request_id','sample_user','sample_device_id','sample_app_version','sample_detail'];
+      return ['action','performance_group','category','status','count','sample_count','slow_count','severe_count','avg_ms','min_ms','max_ms','sample_at','latest_at','sample_request_id','sample_user','sample_role','sample_device_id','sample_app_version','open_sheet_ms','read_rows','write_rows','max_open_sheet_ms','max_read_rows','max_write_rows','cache_hit','cache_miss','bottleneck_class','bottleneck_reason','recommendation','detail_summary','sample_detail'];
     }
     if (type === 'workbook') {
       return ['workbook_key','workbook_type','workbook_name','sheet_name','status','severity','issue_type','check_type','header_status','missing_headers','unknown_headers','last_row','last_column','max_rows','max_columns','used_cells','allocated_cells','usage_pct','recommendation','catatan','checked_at'];
@@ -2459,6 +2506,23 @@
       explanation_has_yellow: html.indexOf('YELLOW') >= 0,
       explanation_has_active_fatal: html.indexOf('Fatal aktif') >= 0 || html.indexOf('fatal aktif') >= 0,
       classification_label: humanText('HISTORICAL_FATAL_ONLY')
+    };
+  };
+
+
+  window.testSystemMonitorFrontendA9CorePerformanceDrilldown = function () {
+    var sample = [{
+      action: 'login', performance_group: 'CORE_APP', category: 'CORE', status: 'YELLOW', count: 2,
+      avg_ms: 1800, max_ms: 3148, open_sheet_ms: 220, read_rows: 12, write_rows: 2,
+      slow_count: 1, bottleneck_class: 'TOKEN_SESSION_WRITE_OVERHEAD', bottleneck_reason: 'Login lambat berkorelasi dengan tulis token/session/login audit.', sample_request_id: 'REQ-TEST'
+    }];
+    return {
+      ok: String(SYSTEM_MONITOR_FRONTEND_SYNC_VERSION).indexOf('5E-R4D-A9') >= 0 &&
+        typeof renderCoreBottleneckSummary === 'function' &&
+        renderCoreBottleneckSummary(sample, { slow_threshold_ms: 1500 }).indexOf('Core App Performance Drilldown') >= 0,
+      version: SYSTEM_MONITOR_FRONTEND_SYNC_VERSION,
+      has_bottleneck_badge: typeof bottleneckBadge === 'function',
+      has_drilldown_renderer: typeof renderCoreBottleneckSummary === 'function'
     };
   };
 
