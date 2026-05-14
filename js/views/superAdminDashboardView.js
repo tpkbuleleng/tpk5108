@@ -19,7 +19,7 @@
   var workbookLastPayload = null;
   var workbookStateLoaded = false;
   var WORKBOOK_STATE_KEY = 'tpk_sa_workbook_health_checked_v1';
-  var SYSTEM_MONITOR_FRONTEND_SYNC_VERSION = '5E-R4D-A8-R2-R1-CLIENT-PERFORMANCE-SIGNAL-FILTER-RUNTIME-GUARD-20260510';
+  var SYSTEM_MONITOR_FRONTEND_SYNC_VERSION = '5E-R4D-A8-R2-R2-FRONTEND-ACTIVE-EVIDENCE-WINDOW-LIFECYCLE-DOWNGRADE-20260510';
   var PATCH_5E_R4C_R2_R2_VERSION = SYSTEM_MONITOR_FRONTEND_SYNC_VERSION;
   var PATCH_5E_R4C_R2_R1_VERSION = SYSTEM_MONITOR_FRONTEND_SYNC_VERSION;
   var PATCH_5E_R4C_R2_VERSION = SYSTEM_MONITOR_FRONTEND_SYNC_VERSION;
@@ -522,6 +522,7 @@
   function pickLatestKnownVersion(value, fallback) {
     var parts = splitVersionParts(value);
     var preferred = [
+      '5E-R4D-A8-R2-R2',
       '5E-R4D-A8-R2-R1',
       '5E-R4D-A8-R2',
       '5E-R4D-A8-R1',
@@ -561,7 +562,8 @@
       return 'UI A8-R1 synced · Backend Health final A5 verified';
     }
     if (kind === 'frontend') {
-      if (String(latest || '').indexOf('5E-R4D-A8-R2-R1') >= 0) return latest;
+      if (String(latest || '').indexOf('5E-R4D-A8-R2-R2') >= 0) return latest;
+      if (String(latest || '').indexOf('5E-R4D-A8-R2-R1') >= 0) return latest + ' · UI R2-R2 active window ready';
       if (String(latest || '').indexOf('5E-R4D-A8-R2') >= 0) return latest + ' · UI R2-R1 guard active';
       if (String(latest || '').indexOf('5E-R4D-A8-R1') >= 0) return latest + ' · UI R2 evidence active';
       return '5E-R4D-A8-R2-FRONTEND-HEALTH-EVIDENCE-ACTIVE';
@@ -576,11 +578,14 @@
     if (kind === 'frontend') {
       var noise = Number((data.summary && data.summary.noise_filtered_count) || data.frontend_noise_filtered_count || 0) || 0;
       var evidence = Number((data.summary && data.summary.evidence_count) || data.frontend_evidence_count || 0) || 0;
-      var fatal = Number((data.summary && data.summary.fatal_error_count) || data.frontend_fatal_error_count || 0) || 0;
-      var observability = Number((data.summary && data.summary.observability_signal_count) || data.frontend_observability_signal_count || 0) || 0;
-      if (fatal > 0) return 'Fatal evidence: ' + fatal + ' · Observability: ' + observability + ' · Noise: ' + noise;
-      if (evidence > 0) return 'Evidence drilldown: ' + evidence + ' · Observability: ' + observability + ' · Noise: ' + noise;
-      return noise > 0 ? ('Noise eksternal difilter: ' + noise) : 'Frontend evidence drilldown aktif';
+      var activeFatal = Number((data.summary && data.summary.active_fatal_count) || data.frontend_active_fatal_count || data.frontend_fatal_error_count || 0) || 0;
+      var histFatal = Number((data.summary && data.summary.historical_fatal_count) || data.frontend_historical_fatal_count || 0) || 0;
+      var lifecycle = Number((data.summary && data.summary.lifecycle_warning_count) || data.frontend_lifecycle_warning_count || 0) || 0;
+      var transport = Number((data.summary && data.summary.transport_warning_count) || data.frontend_transport_warning_count || 0) || 0;
+      if (activeFatal > 0) return 'Active fatal: ' + activeFatal + ' · Historical: ' + histFatal + ' · Lifecycle: ' + lifecycle + ' · Noise: ' + noise;
+      if (histFatal > 0 || lifecycle > 0 || transport > 0) return 'Historical fatal: ' + histFatal + ' · Lifecycle: ' + lifecycle + ' · Transport: ' + transport + ' · Noise: ' + noise;
+      if (evidence > 0) return 'Evidence drilldown: ' + evidence + ' · Noise: ' + noise;
+      return noise > 0 ? ('Noise eksternal difilter: ' + noise) : 'Frontend active evidence window aktif';
     }
     if (!raw || raw === latest) return 'Backend health panel';
     return 'Versi backend mentah dipendekkan agar card stabil';
@@ -1310,11 +1315,14 @@
     if (type === 'security' || type === 'security_group') return 'Periksa reason code dan target aksi. Jika berulang, audit scope, role, token, atau device policy.';
     if (type === 'frontend_health') {
       var cls = String(row.classification || '').toUpperCase();
-      if (cls === 'DIRECT_FATAL_ERROR') return 'Bukti fatal langsung. Cocokkan request_id, action, dan stack/source sebelum mengganti asset.';
+      if (cls === 'DIRECT_ACTIVE_FATAL_ERROR') return 'Bukti fatal aktif. Cocokkan request_id, action, stack/source, dan versi asset sebelum mengganti file.';
+      if (cls === 'HISTORICAL_FATAL_ONLY') return 'Fatal historis masih terlihat di log, tetapi tidak ada fatal aktif dalam active evidence window. Pantau apakah jumlah aktif bertambah setelah hard refresh.';
+      if (cls === 'TRANSPORT_WARNING_ONLY') return 'Transport warning, misalnya logout/fetch dibatalkan. Tidak dianggap fatal kecuali fungsi logout gagal atau kejadian aktif meningkat.';
+      if (cls === 'LIFECYCLE_WARNING_ONLY') return 'Lifecycle warning, misalnya service worker register/update. Pantau update/offline, tetapi app shell tidak otomatis dianggap rusak.';
       if (cls === 'WEAK_SIGNAL_ONLY' && Number(row.observability_signal_count || 0) > 0) return 'Observability/client performance: bukan bukti asset rusak. Gunakan hanya sebagai korelasi dengan request_id/action.';
-      if (cls === 'REPEATED_RUNTIME_ERROR') return 'Runtime berulang melewati ambang. Cek pola evidence dan browser Console.';
-      if (String(row.status || '').toUpperCase() === 'YELLOW') return 'Indikasi belum fatal. Buka evidence samples; jangan simpulkan file rusak hanya dari nama modul.';
-      return 'Tidak ada sinyal valid untuk asset ini pada sampel terbaru atau hanya noise eksternal yang difilter.';
+      if (cls === 'REPEATED_ACTIVE_RUNTIME_ERROR') return 'Runtime aktif berulang melewati ambang. Cek pola evidence dan browser Console.';
+      if (String(row.status || '').toUpperCase() === 'YELLOW') return 'Indikasi belum fatal aktif. Buka evidence samples; jangan simpulkan file rusak hanya dari nama modul.';
+      return 'Tidak ada sinyal valid aktif untuk asset ini pada sampel terbaru atau hanya noise eksternal yang difilter.';
     }
     if (type === 'error') return 'Gunakan request_id untuk menelusuri performa, security event, dan aktivitas terkait.';
     return 'Klik request_id terkait di Log Explorer untuk penelusuran lanjutan.';
@@ -1360,7 +1368,7 @@
       return ['workbook_key','workbook_type','workbook_name','sheet_name','status','severity','issue_type','check_type','header_status','missing_headers','unknown_headers','last_row','last_column','max_rows','max_columns','used_cells','allocated_cells','usage_pct','recommendation','catatan','checked_at'];
     }
     if (type === 'frontend_health') {
-      return ['component_key','asset_path','asset_type','load_stage','expected_global','is_required','is_active','status','error_signal','signal_source','classification','evidence_count','fatal_error_count','runtime_error_count','weak_signal_count','observability_signal_count','direct_match_count','relevant_error_count','noise_filtered_count','last_error_at','last_request_id','last_action','last_module','last_message','evidence_samples','runtime_check','recommendation','catatan'];
+      return ['component_key','asset_path','asset_type','load_stage','expected_global','is_required','is_active','status','error_signal','signal_source','classification','evidence_count','active_evidence_count','historical_evidence_count','fatal_error_count','active_fatal_count','historical_fatal_count','total_fatal_error_count','runtime_error_count','active_runtime_count','historical_runtime_count','lifecycle_warning_count','transport_warning_count','service_worker_warning_count','weak_signal_count','observability_signal_count','direct_match_count','relevant_error_count','noise_filtered_count','last_active_error_at','last_any_error_at','last_error_at','last_request_id','last_action','last_module','last_message','active_window_minutes','active_cutoff_at','evidence_samples','runtime_check','recommendation','catatan'];
     }
     if (type === 'security' || type === 'security_group') {
       return ['waktu','latest_at','request_id','event_type','decision_status','reason_code','aksi','id_pengguna','role','device_id','app_version','target_entity','target_entity_id','detail','payload_ringkas','count'];
@@ -1895,7 +1903,11 @@
         { key: 'error_signal', label: 'Sinyal' },
         { key: 'classification', label: 'Klasifikasi' },
         { key: 'evidence_count', label: 'Evidence' },
-        { key: 'fatal_error_count', label: 'Fatal' },
+        { key: 'active_evidence_count', label: 'Aktif' },
+        { key: 'active_fatal_count', label: 'Fatal aktif' },
+        { key: 'historical_fatal_count', label: 'Fatal hist' },
+        { key: 'lifecycle_warning_count', label: 'Life' },
+        { key: 'transport_warning_count', label: 'Transport' },
         { key: 'weak_signal_count', label: 'Weak' },
         { key: 'observability_signal_count', label: 'Obs' },
         { key: 'noise_filtered_count', label: 'Noise' },
@@ -1930,10 +1942,10 @@
     var summary = data.summary || {};
     var title = kind === 'frontend' ? 'Frontend/PWA Health' : 'Backend Health';
     var note = kind === 'frontend'
-      ? 'Cek frontend berbasis frontend_asset_registry + evidence client log. R2-R1 membedakan fatal/direct runtime, indikasi weak, client performance/observability, dan noise eksternal/browser extension agar asset core tidak langsung RED hanya karena disebut di log.'
+      ? 'Cek frontend berbasis frontend_asset_registry + evidence client log. R2-R2 memakai active evidence window: fatal lama menjadi historical warning, sedangkan logout network error dan service worker register rejected diturunkan sebagai lifecycle/transport warning.'
       : 'Cek backend berbasis backend_service_registry + sinyal log_performance. Detail endpoint bisnis berat tetap on-demand.';
     var frontendNoiseInfo = kind === 'frontend'
-      ? (' · Error relevan: ' + fmtNumber(summary.relevant_error_count || data.frontend_relevant_error_count || 0) + ' · Evidence: ' + fmtNumber(summary.evidence_count || data.frontend_evidence_count || 0) + ' · Fatal: ' + fmtNumber(summary.fatal_error_count || data.frontend_fatal_error_count || 0) + ' · Weak: ' + fmtNumber(summary.weak_signal_count || data.frontend_weak_signal_count || 0) + ' · Observability: ' + fmtNumber(summary.observability_signal_count || data.frontend_observability_signal_count || 0) + ' · Noise eksternal difilter: ' + fmtNumber(summary.noise_filtered_count || data.frontend_noise_filtered_count || 0))
+      ? (' · Error relevan: ' + fmtNumber(summary.relevant_error_count || data.frontend_relevant_error_count || 0) + ' · Evidence: ' + fmtNumber(summary.evidence_count || data.frontend_evidence_count || 0) + ' · Active: ' + fmtNumber(summary.active_evidence_count || data.frontend_active_evidence_count || 0) + ' · Active fatal: ' + fmtNumber(summary.active_fatal_count || data.frontend_active_fatal_count || summary.fatal_error_count || data.frontend_fatal_error_count || 0) + ' · Historical fatal: ' + fmtNumber(summary.historical_fatal_count || data.frontend_historical_fatal_count || 0) + ' · Lifecycle: ' + fmtNumber(summary.lifecycle_warning_count || data.frontend_lifecycle_warning_count || 0) + ' · Transport: ' + fmtNumber(summary.transport_warning_count || data.frontend_transport_warning_count || 0) + ' · Obs: ' + fmtNumber(summary.observability_signal_count || data.frontend_observability_signal_count || 0) + ' · Noise eksternal difilter: ' + fmtNumber(summary.noise_filtered_count || data.frontend_noise_filtered_count || 0) + ' · Window: ' + fmtNumber(summary.active_window_minutes || data.frontend_active_window_minutes || 0) + ' menit')
       : '';
     var html = [
       '<h3>', escapeHtml(title), '</h3>',
@@ -1944,7 +1956,7 @@
         cardHtml('Kuning', summary.yellow || 0, 'Pantau/periksa', (summary.yellow || 0) > 0 ? 'sa-warn' : ''),
         cardHtml('Hijau', summary.green || 0, 'Sehat', ''),
         cardHtml(kind === 'frontend' ? 'Versi Frontend Health' : 'Versi Backend Health', componentHealthVersionLabel(data, kind), componentHealthVersionHint(data, kind), 'sa-version-card'),
-        cardHtml('Pola cek', kind === 'frontend' ? 'Evidence' : 'Log signal', kind === 'frontend' ? 'Registry + drilldown' : 'Ringan', ''),
+        cardHtml('Pola cek', kind === 'frontend' ? 'Active Evidence' : 'Log signal', kind === 'frontend' ? 'Registry + active window' : 'Ringan', ''),
       '</section>',
       '<div class="sa-panel" style="margin:10px 0"><h3>Catatan Pemeriksaan</h3><p class="sa-muted">', escapeHtml(note), '</p></div>',
       tableHtml(componentHealthHeaders(kind), rows, kind === 'frontend' ? 'frontend_health' : 'backend_health')
