@@ -19,7 +19,7 @@
   var workbookLastPayload = null;
   var workbookStateLoaded = false;
   var WORKBOOK_STATE_KEY = 'tpk_sa_workbook_health_checked_v1';
-  var SYSTEM_MONITOR_FRONTEND_SYNC_VERSION = '5E-R4D-A8-R2-R2-FRONTEND-ACTIVE-EVIDENCE-WINDOW-LIFECYCLE-DOWNGRADE-20260510';
+  var SYSTEM_MONITOR_FRONTEND_SYNC_VERSION = '5E-R4D-A8-R2-R3-FRONTEND-HEALTH-FINAL-PRESENTATION-YELLOW-EXPLANATION-POLISH-20260514';
   var PATCH_5E_R4C_R2_R2_VERSION = SYSTEM_MONITOR_FRONTEND_SYNC_VERSION;
   var PATCH_5E_R4C_R2_R1_VERSION = SYSTEM_MONITOR_FRONTEND_SYNC_VERSION;
   var PATCH_5E_R4C_R2_VERSION = SYSTEM_MONITOR_FRONTEND_SYNC_VERSION;
@@ -335,7 +335,23 @@
       CRITICAL: 'Kritis',
       HIGH: 'Tinggi',
       MEDIUM: 'Sedang',
-      LOW: 'Rendah'
+      LOW: 'Rendah',
+      NO_VALID_SIGNAL: 'Tanpa sinyal valid',
+      DIRECT_ACTIVE_FATAL_ERROR: 'Fatal aktif langsung',
+      DIRECT_FATAL_ERROR: 'Fatal langsung',
+      REPEATED_RUNTIME_ERROR: 'Runtime berulang',
+      REPEATED_ACTIVE_RUNTIME_ERROR: 'Runtime aktif berulang',
+      RUNTIME_BELOW_RED_THRESHOLD: 'Runtime di bawah ambang merah',
+      WEAK_SIGNAL_ONLY: 'Indikasi lemah saja',
+      HISTORICAL_FATAL_ONLY: 'Fatal historis saja',
+      TRANSPORT_WARNING_ONLY: 'Warning transport saja',
+      LIFECYCLE_WARNING_ONLY: 'Warning lifecycle saja',
+      OBSERVABILITY_ONLY: 'Observability saja',
+      ASSET_INACTIVE: 'Asset tidak aktif',
+      ACTIVE_FATAL: 'Fatal aktif',
+      HISTORICAL_FATAL: 'Fatal historis',
+      TRANSPORT_WARNING: 'Warning transport',
+      LIFECYCLE_WARNING: 'Warning lifecycle'
     };
     if (map[text]) return map[text];
     return text.replace(/_/g, ' ');
@@ -522,6 +538,7 @@
   function pickLatestKnownVersion(value, fallback) {
     var parts = splitVersionParts(value);
     var preferred = [
+      '5E-R4D-A8-R2-R3',
       '5E-R4D-A8-R2-R2',
       '5E-R4D-A8-R2-R1',
       '5E-R4D-A8-R2',
@@ -562,7 +579,8 @@
       return 'UI A8-R1 synced · Backend Health final A5 verified';
     }
     if (kind === 'frontend') {
-      if (String(latest || '').indexOf('5E-R4D-A8-R2-R2') >= 0) return latest;
+      if (String(latest || '').indexOf('5E-R4D-A8-R2-R3') >= 0) return latest;
+      if (String(latest || '').indexOf('5E-R4D-A8-R2-R2') >= 0) return latest + ' · UI R2-R3 explanation polish active';
       if (String(latest || '').indexOf('5E-R4D-A8-R2-R1') >= 0) return latest + ' · UI R2-R2 active window ready';
       if (String(latest || '').indexOf('5E-R4D-A8-R2') >= 0) return latest + ' · UI R2-R1 guard active';
       if (String(latest || '').indexOf('5E-R4D-A8-R1') >= 0) return latest + ' · UI R2 evidence active';
@@ -1315,14 +1333,14 @@
     if (type === 'security' || type === 'security_group') return 'Periksa reason code dan target aksi. Jika berulang, audit scope, role, token, atau device policy.';
     if (type === 'frontend_health') {
       var cls = String(row.classification || '').toUpperCase();
-      if (cls === 'DIRECT_ACTIVE_FATAL_ERROR') return 'Bukti fatal aktif. Cocokkan request_id, action, stack/source, dan versi asset sebelum mengganti file.';
-      if (cls === 'HISTORICAL_FATAL_ONLY') return 'Fatal historis masih terlihat di log, tetapi tidak ada fatal aktif dalam active evidence window. Pantau apakah jumlah aktif bertambah setelah hard refresh.';
-      if (cls === 'TRANSPORT_WARNING_ONLY') return 'Transport warning, misalnya logout/fetch dibatalkan. Tidak dianggap fatal kecuali fungsi logout gagal atau kejadian aktif meningkat.';
-      if (cls === 'LIFECYCLE_WARNING_ONLY') return 'Lifecycle warning, misalnya service worker register/update. Pantau update/offline, tetapi app shell tidak otomatis dianggap rusak.';
+      if (cls === 'DIRECT_ACTIVE_FATAL_ERROR' || cls === 'DIRECT_FATAL_ERROR') return 'RED berarti ada fatal aktif langsung pada asset. Cocokkan request_id, action, source, dan stack sebelum mengganti file.';
+      if (cls === 'HISTORICAL_FATAL_ONLY') return 'YELLOW historis: pernah ada fatal pada asset ini, tetapi tidak ada fatal aktif dalam active window. Pantau apakah jumlah aktif bertambah setelah patch terbaru.';
+      if (cls === 'TRANSPORT_WARNING_ONLY') return 'YELLOW transport: biasanya network/fetch warning pada lifecycle seperti logout. Bukan bukti file api.js rusak kecuali logout gagal fungsional atau warning aktif terus bertambah.';
+      if (cls === 'LIFECYCLE_WARNING_ONLY') return 'YELLOW lifecycle: service worker/register/update warning. Pantau fitur Perbarui Aplikasi/offline, tetapi app shell tidak dianggap rusak bila tidak ada fatal aktif.';
       if (cls === 'WEAK_SIGNAL_ONLY' && Number(row.observability_signal_count || 0) > 0) return 'Observability/client performance: bukan bukti asset rusak. Gunakan hanya sebagai korelasi dengan request_id/action.';
-      if (cls === 'REPEATED_ACTIVE_RUNTIME_ERROR') return 'Runtime aktif berulang melewati ambang. Cek pola evidence dan browser Console.';
-      if (String(row.status || '').toUpperCase() === 'YELLOW') return 'Indikasi belum fatal aktif. Buka evidence samples; jangan simpulkan file rusak hanya dari nama modul.';
-      return 'Tidak ada sinyal valid aktif untuk asset ini pada sampel terbaru atau hanya noise eksternal yang difilter.';
+      if (cls === 'REPEATED_ACTIVE_RUNTIME_ERROR' || cls === 'REPEATED_RUNTIME_ERROR') return 'Runtime aktif berulang melewati ambang. Cek pola evidence dan browser Console.';
+      if (String(row.status || '').toUpperCase() === 'YELLOW') return 'YELLOW berarti perlu pantau/periksa, bukan otomatis rusak. Buka evidence samples dan lihat Fatal Aktif sebelum menyimpulkan.';
+      return 'GREEN berarti tidak ada sinyal valid aktif untuk asset ini pada sampel terbaru atau hanya noise eksternal yang difilter.';
     }
     if (type === 'error') return 'Gunakan request_id untuk menelusuri performa, security event, dan aktivitas terkait.';
     return 'Klik request_id terkait di Log Explorer untuk penelusuran lanjutan.';
@@ -1893,6 +1911,86 @@
     renderSecurityRisk(getData(result));
   }
 
+
+  function getFrontendMetricValue(data, summary, key, legacyKey) {
+    summary = summary || {};
+    data = data || {};
+    var n = Number(summary[key]);
+    if (isFinite(n) && !isNaN(n)) return n;
+    n = Number(data[legacyKey || ('frontend_' + key)]);
+    if (isFinite(n) && !isNaN(n)) return n;
+    return 0;
+  }
+
+  function getFrontendPresentationMetrics(data) {
+    data = data || {};
+    var summary = data.summary || {};
+    return {
+      status: String(summary.status || 'GREEN').toUpperCase(),
+      red: Number(summary.red || 0) || 0,
+      yellow: Number(summary.yellow || 0) || 0,
+      green: Number(summary.green || 0) || 0,
+      activeEvidence: getFrontendMetricValue(data, summary, 'active_evidence_count', 'frontend_active_evidence_count'),
+      activeFatal: getFrontendMetricValue(data, summary, 'active_fatal_count', 'frontend_active_fatal_count'),
+      historicalFatal: getFrontendMetricValue(data, summary, 'historical_fatal_count', 'frontend_historical_fatal_count'),
+      lifecycle: getFrontendMetricValue(data, summary, 'lifecycle_warning_count', 'frontend_lifecycle_warning_count'),
+      transport: getFrontendMetricValue(data, summary, 'transport_warning_count', 'frontend_transport_warning_count'),
+      observability: getFrontendMetricValue(data, summary, 'observability_signal_count', 'frontend_observability_signal_count'),
+      weak: getFrontendMetricValue(data, summary, 'weak_signal_count', 'frontend_weak_signal_count'),
+      noise: getFrontendMetricValue(data, summary, 'noise_filtered_count', 'frontend_noise_filtered_count'),
+      windowMinutes: getFrontendMetricValue(data, summary, 'active_window_minutes', 'frontend_active_window_minutes')
+    };
+  }
+
+  function frontendStatusExplanationText(data) {
+    var m = getFrontendPresentationMetrics(data);
+    if (m.activeFatal > 0 || m.red > 0) {
+      return 'RED: ada fatal aktif pada active window. Prioritasnya cek request_id, action, source, dan stack pada baris merah.';
+    }
+    if (m.yellow > 0) {
+      return 'YELLOW: tidak ada fatal aktif, tetapi masih ada catatan historis/lifecycle/transport/weak signal yang perlu dipantau.';
+    }
+    return 'GREEN: tidak ada sinyal valid yang perlu ditindaklanjuti pada sampel frontend terbaru.';
+  }
+
+  function frontendYellowExplanationHtml(data) {
+    var m = getFrontendPresentationMetrics(data);
+    var activeWindow = m.windowMinutes ? (m.windowMinutes + ' menit') : 'periode aktif';
+    var headline = frontendStatusExplanationText(data);
+    return [
+      '<section class="sa-panel" style="margin:10px 0;background:#f8fbff">',
+        '<h3>Penjelasan Status Frontend/PWA</h3>',
+        '<p class="sa-muted"><strong>', escapeHtml(headline), '</strong></p>',
+        '<div class="sa-critical-list" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr));display:grid">',
+          '<div class="sa-critical-item sa-critical-red"><strong>RED = fatal aktif</strong><span class="sa-muted">Ada error runtime/fatal yang masih muncul dalam active window. Ini perlu dibedah sebagai masalah aktif.</span></div>',
+          '<div class="sa-critical-item sa-critical-yellow"><strong>YELLOW = warning / historis</strong><span class="sa-muted">Fatal lama, lifecycle service worker, transport logout/network, atau weak signal. Tidak otomatis berarti file masih rusak.</span></div>',
+          '<div class="sa-critical-item sa-critical-green"><strong>GREEN = tidak ada sinyal valid</strong><span class="sa-muted">Asset terdaftar dan tidak memiliki evidence error valid pada sampel terbaru.</span></div>',
+        '</div>',
+        '<p class="sa-footnote">Active window: ', escapeHtml(activeWindow),
+        ' · Fatal aktif: ', escapeHtml(fmtNumber(m.activeFatal)),
+        ' · Fatal historis: ', escapeHtml(fmtNumber(m.historicalFatal)),
+        ' · Lifecycle: ', escapeHtml(fmtNumber(m.lifecycle)),
+        ' · Transport: ', escapeHtml(fmtNumber(m.transport)),
+        ' · Observability: ', escapeHtml(fmtNumber(m.observability)),
+        ' · Noise eksternal: ', escapeHtml(fmtNumber(m.noise)), '</p>',
+      '</section>'
+    ].join('');
+  }
+
+  function frontendExtraCardsHtml(data) {
+    var m = getFrontendPresentationMetrics(data);
+    return [
+      '<section class="sa-grid" style="grid-template-columns:repeat(6,minmax(0,1fr));margin-top:0">',
+        cardHtml('Fatal aktif', m.activeFatal, 'RED hanya bila > 0', m.activeFatal > 0 ? 'sa-danger' : ''),
+        cardHtml('Fatal historis', m.historicalFatal, 'Catatan lama, bukan aktif', m.historicalFatal > 0 ? 'sa-warn' : ''),
+        cardHtml('Lifecycle', m.lifecycle, 'Service worker/update', m.lifecycle > 0 ? 'sa-warn' : ''),
+        cardHtml('Transport', m.transport, 'Logout/network/fetch', m.transport > 0 ? 'sa-warn' : ''),
+        cardHtml('Observability', m.observability, 'Client performance/log', ''),
+        cardHtml('Window aktif', m.windowMinutes || '-', 'Menit evidence aktif', ''),
+      '</section>'
+    ].join('');
+  }
+
   function componentHealthHeaders(kind) {
     if (kind === 'frontend') {
       return [
@@ -1904,12 +2002,12 @@
         { key: 'classification', label: 'Klasifikasi' },
         { key: 'evidence_count', label: 'Evidence' },
         { key: 'active_evidence_count', label: 'Aktif' },
-        { key: 'active_fatal_count', label: 'Fatal aktif' },
-        { key: 'historical_fatal_count', label: 'Fatal hist' },
-        { key: 'lifecycle_warning_count', label: 'Life' },
+        { key: 'active_fatal_count', label: 'Fatal Aktif' },
+        { key: 'historical_fatal_count', label: 'Fatal Historis' },
+        { key: 'lifecycle_warning_count', label: 'Lifecycle' },
         { key: 'transport_warning_count', label: 'Transport' },
         { key: 'weak_signal_count', label: 'Weak' },
-        { key: 'observability_signal_count', label: 'Obs' },
+        { key: 'observability_signal_count', label: 'Observability' },
         { key: 'noise_filtered_count', label: 'Noise' },
         { key: 'last_action', label: 'Action terakhir' },
         { key: 'last_request_id', label: 'Request ID' },
@@ -1942,7 +2040,7 @@
     var summary = data.summary || {};
     var title = kind === 'frontend' ? 'Frontend/PWA Health' : 'Backend Health';
     var note = kind === 'frontend'
-      ? 'Cek frontend berbasis frontend_asset_registry + evidence client log. R2-R2 memakai active evidence window: fatal lama menjadi historical warning, sedangkan logout network error dan service worker register rejected diturunkan sebagai lifecycle/transport warning.'
+      ? 'Cek frontend berbasis frontend_asset_registry + active evidence window. R2-R3 merapikan arti warna: RED untuk fatal aktif, YELLOW untuk historical/lifecycle/transport/weak warning, GREEN untuk tanpa sinyal valid.'
       : 'Cek backend berbasis backend_service_registry + sinyal log_performance. Detail endpoint bisnis berat tetap on-demand.';
     var frontendNoiseInfo = kind === 'frontend'
       ? (' · Error relevan: ' + fmtNumber(summary.relevant_error_count || data.frontend_relevant_error_count || 0) + ' · Evidence: ' + fmtNumber(summary.evidence_count || data.frontend_evidence_count || 0) + ' · Active: ' + fmtNumber(summary.active_evidence_count || data.frontend_active_evidence_count || 0) + ' · Active fatal: ' + fmtNumber(summary.active_fatal_count || data.frontend_active_fatal_count || summary.fatal_error_count || data.frontend_fatal_error_count || 0) + ' · Historical fatal: ' + fmtNumber(summary.historical_fatal_count || data.frontend_historical_fatal_count || 0) + ' · Lifecycle: ' + fmtNumber(summary.lifecycle_warning_count || data.frontend_lifecycle_warning_count || 0) + ' · Transport: ' + fmtNumber(summary.transport_warning_count || data.frontend_transport_warning_count || 0) + ' · Obs: ' + fmtNumber(summary.observability_signal_count || data.frontend_observability_signal_count || 0) + ' · Noise eksternal difilter: ' + fmtNumber(summary.noise_filtered_count || data.frontend_noise_filtered_count || 0) + ' · Window: ' + fmtNumber(summary.active_window_minutes || data.frontend_active_window_minutes || 0) + ' menit')
@@ -1958,6 +2056,8 @@
         cardHtml(kind === 'frontend' ? 'Versi Frontend Health' : 'Versi Backend Health', componentHealthVersionLabel(data, kind), componentHealthVersionHint(data, kind), 'sa-version-card'),
         cardHtml('Pola cek', kind === 'frontend' ? 'Active Evidence' : 'Log signal', kind === 'frontend' ? 'Registry + active window' : 'Ringan', ''),
       '</section>',
+      kind === 'frontend' ? frontendExtraCardsHtml(data) : '',
+      kind === 'frontend' ? frontendYellowExplanationHtml(data) : '',
       '<div class="sa-panel" style="margin:10px 0"><h3>Catatan Pemeriksaan</h3><p class="sa-muted">', escapeHtml(note), '</p></div>',
       tableHtml(componentHealthHeaders(kind), rows, kind === 'frontend' ? 'frontend_health' : 'backend_health')
     ].join('');
@@ -2332,6 +2432,33 @@
       core_count: core.length,
       diagnostic_count: diag.length,
       has_top_issue_normalizer: typeof normalizeTopIssues === 'function'
+    };
+  };
+
+
+  window.testSystemMonitorFrontendA8R2R3PresentationPolish = function () {
+    var sample = {
+      summary: {
+        status: 'YELLOW', red: 0, yellow: 3, green: 16,
+        active_fatal_count: 0,
+        historical_fatal_count: 4,
+        lifecycle_warning_count: 1,
+        transport_warning_count: 1,
+        observability_signal_count: 2,
+        noise_filtered_count: 0,
+        active_window_minutes: 10
+      }
+    };
+    var html = frontendYellowExplanationHtml(sample);
+    return {
+      ok: String(SYSTEM_MONITOR_FRONTEND_SYNC_VERSION).indexOf('5E-R4D-A8-R2-R3') >= 0 &&
+        html.indexOf('YELLOW') >= 0 &&
+        html.indexOf('fatal aktif') >= 0 &&
+        humanText('HISTORICAL_FATAL_ONLY') === 'Fatal historis saja',
+      version: SYSTEM_MONITOR_FRONTEND_SYNC_VERSION,
+      explanation_has_yellow: html.indexOf('YELLOW') >= 0,
+      explanation_has_active_fatal: html.indexOf('Fatal aktif') >= 0 || html.indexOf('fatal aktif') >= 0,
+      classification_label: humanText('HISTORICAL_FATAL_ONLY')
     };
   };
 
