@@ -971,6 +971,10 @@
       { key: 'open_sheet_ms', label: 'Sample buka sheet' },
       { key: 'read_rows', label: 'Sample baca' },
       { key: 'write_rows', label: 'Sample tulis' },
+      { key: 'cache_hit', label: 'Cache hit' },
+      { key: 'cache_miss', label: 'Cache miss' },
+      { key: 'metric_status', label: 'Metric', formatter: function (v) { return '<span class="sa-bottleneck-reason">' + escapeHtml(humanText(v || '-')) + '</span>'; } },
+      { key: 'router_writer_status', label: 'Writer', formatter: function (v) { return '<span class="sa-bottleneck-reason">' + escapeHtml(humanText(v || '-')) + '</span>'; } },
       { key: 'slow_count', label: 'Lambat' },
       { key: 'bottleneck_class', label: 'Bottleneck', formatter: bottleneckBadge },
       { key: 'bottleneck_reason', label: 'Alasan', wrap: true, formatter: function (v) { return '<span class="sa-bottleneck-reason">' + escapeHtml(humanText(v || '-')) + '</span>'; } },
@@ -1014,6 +1018,8 @@
           '<span class="sa-bottleneck-pill ', String(r.status || '').toUpperCase() === 'RED' ? 'red' : 'warn', '">', escapeHtml(humanText(r.bottleneck_class || 'UNKNOWN_NEEDS_TRACE')), '</span>',
           '<p class="sa-muted" style="margin:6px 0 0">Max ', escapeHtml(fmt(r.max_ms || 0)), ' ms · Avg ', escapeHtml(fmt(r.avg_ms || 0)), ' ms · Sample ', escapeHtml(r.sample_request_id || '-'), '</p>',
           '<p class="sa-muted" style="margin:6px 0 0">', escapeHtml(humanText(r.bottleneck_reason || 'Belum ada alasan bottleneck.')), '</p>',
+          '<p class="sa-muted" style="margin:6px 0 0">Metric: buka sheet ', escapeHtml(fmt(r.open_sheet_ms || r.max_open_sheet_ms || 0)), ' ms · baca ', escapeHtml(fmt(r.read_rows || r.max_read_rows || 0)), ' · tulis ', escapeHtml(fmt(r.write_rows || r.max_write_rows || 0)), ' · cache ', escapeHtml(fmt(r.cache_hit || 0)), '/', escapeHtml(fmt(r.cache_miss || 0)), '</p>',
+          (r.router_writer_status || r.metric_status) ? '<p class="sa-muted" style="margin:6px 0 0">Status: ' + escapeHtml(humanText((r.router_writer_status || '') + ' ' + (r.metric_status || ''))) + '</p>' : '',
           r.trace_stage_summary ? '<p class="sa-muted" style="margin:6px 0 0">Trace: ' + escapeHtml(humanText(r.trace_stage_summary)) + '</p>' : '',
         '</div>'
       ].join('');
@@ -1021,7 +1027,7 @@
     return [
       '<div class="sa-panel">',
         '<h3>Core App Performance Drilldown</h3>',
-        '<p class="sa-muted">A9-R1 tidak melonggarkan ambang ', escapeHtml(fmt(slowMs)), ' ms. Panel ini membedah penyebab YELLOW/RED berdasarkan log_performance: action, sample request_id, waktu, user/device termask, open_sheet_ms, read_rows, write_rows, cache, detail JSON ringkas, dan trace stage login/logout.</p>',
+        '<p class="sa-muted">A9-R3-R1 tidak melonggarkan ambang ', escapeHtml(fmt(slowMs)), ' ms. Panel ini sekarang memprioritaskan baris sampel yang memiliki top-level metrics log_performance: open_sheet_ms, read_rows, write_rows, cache_hit/cache_miss, writer status, detail JSON ringkas, dan trace stage login/logout bila tersedia.</p>',
         '<div class="sa-bottleneck-grid">', top, '</div>',
         '<p class="sa-footnote">Klik baris endpoint untuk membuka detail lengkap dan rekomendasi teknis. Token, password, NIK, spreadsheet_id, dan session_data tidak ditampilkan mentah.</p>',
       '</div>'
@@ -1358,7 +1364,10 @@
       var maxMs = Number(row.max_ms || 0);
       var avgMs = Number(row.avg_ms || 0);
       var cls = String(row.bottleneck_class || '').toUpperCase();
-      if (cls === 'TRACE_INCOMPLETE') return 'Trace belum lengkap. Pastikan ApiRouter, AuthService, TokenService, dan SheetRepo profiler versi A9-R1 sudah terpasang, lalu ulangi login/logout untuk menghasilkan log baru.';
+      if (cls === 'TRACE_INCOMPLETE') return 'Trace belum lengkap. Pastikan ApiRouter, AuthService, TokenService, dan SheetRepo profiler sudah terpasang, lalu ulangi login/logout untuk menghasilkan log baru.';
+      if (cls === 'TRACE_DETAIL_MISSING_BUT_METRICS_PRESENT') return 'Detail stage belum lengkap, tetapi top-level metric sudah ada. Gunakan open_sheet_ms/read_rows/write_rows untuk diagnosis awal sambil tetap memperkaya trace stage bila perlu.';
+      if (cls === 'SHEET_OPEN_BOTTLENECK') return 'open_sheet_ms tinggi atau mendominasi durasi request. Audit openById, RouteResolver, cache workbook route, dan hindari membuka spreadsheet berulang pada endpoint core.';
+      if (cls === 'ROUTER_WRITER_ACTIVE') return 'Writer router sudah aktif, tetapi bottleneck spesifik belum dominan. Buka detail metric dan trace stage untuk menentukan optimasi berikutnya.';
       if (cls === 'TOKEN_SESSION_WRITE_OVERHEAD') return 'Login/logout lambat berkorelasi dengan token/session/middleware auth. Bedah token_store, active_session_index, token cache, dan revoke/append token sebelum optimasi.';
       if (cls === 'CACHE_MISS_OR_UNCACHED_READ') return 'Cache miss dominan. Periksa key CacheService, TTL, warm path, dan penggunaan read model.';
       if (openSheet > 1000) return 'Indikasi bottleneck akses spreadsheet. Audit openById, route workbook, dan cache referensi.';
@@ -1430,7 +1439,7 @@
       return ['id_pengguna_raw','role','session_status','online_session_count','offline_session_count','active_session_count','device_count','last_device_id','last_device_label','last_seen','last_login_at','last_action','last_request_id','total_request','slow_request','login_success','login_failed','activity_count','avg_ms','max_ms','devices','latest_events'];
     }
     if (type === 'performance' || type === 'monitor') {
-      return ['action','performance_group','category','status','count','sample_count','slow_count','severe_count','avg_ms','min_ms','max_ms','sample_at','latest_at','sample_request_id','sample_user','sample_role','sample_device_id','sample_app_version','open_sheet_ms','read_rows','write_rows','max_open_sheet_ms','max_read_rows','max_write_rows','cache_hit','cache_miss','bottleneck_class','bottleneck_reason','trace_stage_summary','trace_top_stage','trace_top_stage_ms','trace_version','trace_incomplete_reason','recommendation','detail_summary','sample_detail'];
+      return ['action','performance_group','category','status','count','sample_count','slow_count','severe_count','avg_ms','min_ms','max_ms','sample_at','latest_at','sample_request_id','sample_user','sample_role','sample_device_id','sample_app_version','open_sheet_ms','read_rows','write_rows','max_open_sheet_ms','max_read_rows','max_write_rows','cache_hit','cache_miss','bottleneck_class','bottleneck_reason','metric_status','router_writer_status','router_writer_version','router_writer_function','sample_binding_status','top_level_metrics_present','trace_stage_summary','trace_top_stage','trace_top_stage_ms','trace_version','trace_incomplete_reason','recommendation','detail_summary','sample_detail'];
     }
     if (type === 'workbook') {
       return ['workbook_key','workbook_type','workbook_name','sheet_name','status','severity','issue_type','check_type','header_status','missing_headers','unknown_headers','last_row','last_column','max_rows','max_columns','used_cells','allocated_cells','usage_pct','recommendation','catatan','checked_at'];
@@ -2548,3 +2557,21 @@ window.testSystemMonitorFrontendA9R1TraceEnrichment = function () {
     version: '5E-R4D-A9-R1-CORE-TRACE-ENRICHMENT-20260514'
   };
 };
+
+
+  window.testSystemMonitorFrontendA9R3R1MetricBinding = function () {
+    var sample = [{
+      action: 'login', performance_group: 'CORE_APP', category: 'CORE', status: 'RED', count: 2,
+      avg_ms: 4164, max_ms: 7670, open_sheet_ms: 2963, read_rows: 0, write_rows: 0,
+      cache_hit: 2, cache_miss: 4, slow_count: 2,
+      bottleneck_class: 'SHEET_OPEN_BOTTLENECK',
+      bottleneck_reason: 'Kolom top-level open_sheet_ms tinggi atau mendominasi durasi request.',
+      metric_status: 'TOP_LEVEL_METRICS_PRESENT',
+      router_writer_status: 'ROUTER_WRITER_ACTIVE',
+      sample_request_id: 'REQ-FRONTEND-R3R1'
+    }];
+    return {
+      ok: renderCoreBottleneckSummary(sample, { slow_threshold_ms: 1500 }).indexOf('A9-R3-R1') >= 0 && performanceHeaders().some(function (h) { return h.key === 'metric_status'; }),
+      version: '5E-R4D-A9-R3-R1-MONITOR-DRILLDOWN-SAMPLE-BINDING-20260516'
+    };
+  };
