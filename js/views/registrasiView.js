@@ -4257,3 +4257,326 @@
   window.__TPK_REGISTRASI_SCOPE_BINDING_VERSION = VERSION;
 })(window, document);
 /* ===== READ MODEL BINDING R1-R1 end ===== */
+/* ===== READ MODEL BINDING R1-R2 start: getWilayahRef suppression + dynamic form in-flight guard ===== */
+(function (window, document) {
+  'use strict';
+
+  var RF = window.RegistrasiForm;
+  if (!RF || RF.__READ_MODEL_SCOPE_BINDING_R1_R2 === true) return;
+  RF.__READ_MODEL_SCOPE_BINDING_R1_R2 = true;
+
+  var VERSION = 'READ-MODEL-BINDING-R1-R2-REGISTRASI-WILAYAH-SUPPRESSION-FORM-GUARD-20260526';
+  var formDefinitionInFlight = Object.create(null);
+  var formDefinitionMemory = Object.create(null);
+  var loadDynamicInFlight = Object.create(null);
+
+  function s(value) {
+    return String(value == null ? '' : value).trim();
+  }
+
+  function up(value) {
+    return s(value).toUpperCase();
+  }
+
+  function byId(id) {
+    return document.getElementById(id);
+  }
+
+  function getRouteName() {
+    try {
+      if (window.Router && typeof window.Router.getCurrentRoute === 'function') {
+        return s(window.Router.getCurrentRoute());
+      }
+    } catch (err) {}
+    return '';
+  }
+
+  function isRegistrasiContext() {
+    var route = up(getRouteName());
+    if (route === 'REGISTRASI' || route === 'REGISTRATION') return true;
+    if (byId('reg-jenis-sasaran') || byId('registrasi-dynamic-fields')) return true;
+    try {
+      var title = document.querySelector('.screen.active, .app-screen.active, main, body');
+      return title && /registrasi\s+sasaran/i.test(title.textContent || '');
+    } catch (err) {
+      return false;
+    }
+  }
+
+  function readStorageJson(key) {
+    try {
+      if (window.Storage && typeof window.Storage.get === 'function') {
+        var v = window.Storage.get(key, null);
+        if (v) return v;
+      }
+    } catch (err) {}
+    try {
+      var raw = window.localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : null;
+    } catch (err2) {
+      return null;
+    }
+  }
+
+  function getProfileSync() {
+    var candidates = [];
+    try {
+      if (window.AppState && typeof window.AppState.getProfile === 'function') candidates.push(window.AppState.getProfile());
+    } catch (err) {}
+    try {
+      if (window.Storage && typeof window.Storage.getProfile === 'function') candidates.push(window.Storage.getProfile(null));
+    } catch (err2) {}
+    candidates.push(readStorageJson('tpk_profile'));
+    candidates.push(readStorageJson('tpk_last_good_profile'));
+    candidates.push(readStorageJson('tpk_bootstrap_lite'));
+    candidates.push(readStorageJson('tpk_app_bootstrap'));
+
+    for (var i = 0; i < candidates.length; i++) {
+      var item = candidates[i];
+      if (!item || typeof item !== 'object') continue;
+      if (item.profile && typeof item.profile === 'object') item = item.profile;
+      if (item.user_profile && typeof item.user_profile === 'object') item = item.user_profile;
+      if (item.data && item.data.profile && typeof item.data.profile === 'object') item = item.data.profile;
+      if (item.id_user || item.role_akses || item.id_tim || item.wilayah_tugas_list_json) return item;
+    }
+    return {};
+  }
+
+  function isKaderProfile(profile) {
+    return up(profile && (profile.role_akses || profile.role || profile.user_role)) === 'KADER';
+  }
+
+  function getSelectedJenis() {
+    var el = byId('reg-jenis-sasaran');
+    if (el && el.value) return up(el.value);
+    try {
+      if (RF && RF._currentDefinition && RF._currentDefinition.jenis_sasaran) return up(RF._currentDefinition.jenis_sasaran);
+    } catch (err) {}
+    return '';
+  }
+
+  function mapJenisToFormId(jenis) {
+    var key = up(jenis);
+    var map = { CATIN: 'FRM1002', BUMIL: 'FRM1003', BUFAS: 'FRM1004', BADUTA: 'FRM1005' };
+    return map[key] || 'FRM1001';
+  }
+
+  function getFormGuardKey(jenis) {
+    var j = up(jenis);
+    return mapJenisToFormId(j) + '::' + j;
+  }
+
+  function shouldSuppressGetWilayahRef(action, payload) {
+    var actionName = up(action);
+    if (actionName !== 'GETWILAYAHREF') return false;
+    if (!isRegistrasiContext()) return false;
+
+    var src = payload && typeof payload === 'object' ? payload : {};
+    if (src.allow_backend === true || src.force_backend === true || src.forceRefresh === true) return false;
+
+    var jenis = up(src.jenis_sasaran || src.jenis || getSelectedJenis());
+    var reason = up(src.reason || src.source || src.context || '');
+
+    // CATIN tetap boleh membaca referensi wilayah asal pasangan ketika memang dibutuhkan.
+    if (jenis === 'CATIN') return false;
+    if (reason.indexOf('CATIN') >= 0 || reason.indexOf('PASANGAN') >= 0 || reason.indexOf('ASAL') >= 0) return false;
+
+    var profile = getProfileSync();
+    return isKaderProfile(profile);
+  }
+
+  function createSuppressedWilayahRefResult(action, payload) {
+    var profile = getProfileSync();
+    var jenis = up((payload && (payload.jenis_sasaran || payload.jenis)) || getSelectedJenis());
+    var stat = window.__TPK_REGISTRASI_R1R2_STATS__ || { getWilayahRef_suppressed: 0, form_definition_inflight_join: 0, load_dynamic_inflight_join: 0, load_dynamic_skip_same_form: 0 };
+    stat.getWilayahRef_suppressed += 1;
+    stat.last_getWilayahRef_suppressed_at = new Date().toISOString();
+    stat.last_getWilayahRef_suppressed_reason = 'kader_scope_from_user_profile_lite';
+    window.__TPK_REGISTRASI_R1R2_STATS__ = stat;
+
+    try {
+      console.info('[TPK_REGISTRASI_R1R2] getWilayahRef suppressed for KADER registrasi scope', {
+        action: action,
+        jenis_sasaran: jenis,
+        id_user: profile && profile.id_user,
+        id_tim: profile && profile.id_tim,
+        source: VERSION
+      });
+    } catch (err) {}
+
+    return Promise.resolve({
+      ok: true,
+      code: 200,
+      message: 'getWilayahRef dilewati untuk KADER; wilayah registrasi memakai user_profile_lite.',
+      data: [],
+      meta: {
+        source: 'frontend_scope_guard',
+        read_model_scope_binding: VERSION,
+        skip_getWilayahRef_for_kader: true,
+        scope_source: 'user_profile_lite',
+        jenis_sasaran: jenis,
+        id_user: profile && profile.id_user || '',
+        id_tim: profile && profile.id_tim || ''
+      }
+    });
+  }
+
+  function patchApiPost() {
+    var api = window.Api;
+    if (!api || typeof api.post !== 'function' || api.__REGISTRASI_R1R2_WILAYAH_SUPPRESS === true) return;
+
+    var originalPost = api.post;
+    api.post = function (action, payload, options) {
+      if (shouldSuppressGetWilayahRef(action, payload)) {
+        return createSuppressedWilayahRefResult(action, payload);
+      }
+      return originalPost.apply(this, arguments);
+    };
+    api.__REGISTRASI_R1R2_WILAYAH_SUPPRESS = true;
+  }
+
+  function markDefinitionResult(result, source) {
+    if (result && typeof result === 'object') {
+      try {
+        Object.defineProperty(result, '__r1r2_form_guard_source', { value: source, configurable: true, enumerable: false });
+      } catch (err) {
+        result.__r1r2_form_guard_source = source;
+      }
+    }
+    return result;
+  }
+
+  function patchFormDefinitionGuard() {
+    if (typeof RF.getRegistrasiFormDefinition !== 'function' || RF.__REGISTRASI_R1R2_FORM_DEF_GUARD === true) return;
+
+    var originalGetDefinition = RF.getRegistrasiFormDefinition;
+    RF.getRegistrasiFormDefinition = async function (jenisSasaran, options) {
+      var jenis = up(jenisSasaran);
+      if (!jenis) return originalGetDefinition.apply(this, arguments);
+
+      var opts = options || {};
+      var key = getFormGuardKey(jenis);
+
+      if (opts.forceRefresh !== true && formDefinitionMemory[key]) {
+        return markDefinitionResult(formDefinitionMemory[key], 'r1r2_memory_hit');
+      }
+
+      if (opts.forceRefresh !== true && formDefinitionInFlight[key]) {
+        var stat = window.__TPK_REGISTRASI_R1R2_STATS__ || { getWilayahRef_suppressed: 0, form_definition_inflight_join: 0, load_dynamic_inflight_join: 0, load_dynamic_skip_same_form: 0 };
+        stat.form_definition_inflight_join += 1;
+        stat.last_form_definition_inflight_join_at = new Date().toISOString();
+        window.__TPK_REGISTRASI_R1R2_STATS__ = stat;
+        return markDefinitionResult(await formDefinitionInFlight[key], 'r1r2_inflight_join');
+      }
+
+      formDefinitionInFlight[key] = Promise.resolve()
+        .then(() => originalGetDefinition.apply(this, arguments))
+        .then((result) => {
+          if (result && typeof result === 'object' && opts.prefetch !== true) {
+            formDefinitionMemory[key] = result;
+          }
+          return markDefinitionResult(result, 'r1r2_backend_or_existing_cache');
+        })
+        .finally(() => {
+          delete formDefinitionInFlight[key];
+        });
+
+      return formDefinitionInFlight[key];
+    };
+
+    RF.__REGISTRASI_R1R2_FORM_DEF_GUARD = true;
+  }
+
+  function hasRenderedDynamicFields() {
+    var box = byId('registrasi-dynamic-fields');
+    if (!box) return false;
+    var text = s(box.textContent).toLowerCase();
+    if (!text) return false;
+    if (text.indexOf('pilih jenis sasaran untuk memuat') >= 0) return false;
+    if (text.indexOf('gagal memuat') >= 0) return false;
+    try {
+      return !!box.querySelector('input, select, textarea, [data-question-code], .dynamic-field, .form-field');
+    } catch (err) {
+      return text.length > 20;
+    }
+  }
+
+  function patchLoadDynamicGuard() {
+    if (typeof RF.loadDynamicFields !== 'function' || RF.__REGISTRASI_R1R2_LOAD_DYNAMIC_GUARD === true) return;
+
+    var originalLoadDynamic = RF.loadDynamicFields;
+    RF.loadDynamicFields = async function (jenisSasaran) {
+      var jenis = up(jenisSasaran);
+      if (!jenis) return originalLoadDynamic.apply(this, arguments);
+
+      var key = getFormGuardKey(jenis);
+      var currentFormId = s(this._currentFormId);
+      var expectedFormId = mapJenisToFormId(jenis);
+      var currentJenis = up(this._currentJenisSasaran || (this._currentDefinition && this._currentDefinition.jenis_sasaran));
+      var questions = Array.isArray(this._dynamicQuestions) ? this._dynamicQuestions : [];
+
+      if ((currentJenis === jenis || currentFormId === expectedFormId) && questions.length && hasRenderedDynamicFields()) {
+        var statSkip = window.__TPK_REGISTRASI_R1R2_STATS__ || { getWilayahRef_suppressed: 0, form_definition_inflight_join: 0, load_dynamic_inflight_join: 0, load_dynamic_skip_same_form: 0 };
+        statSkip.load_dynamic_skip_same_form += 1;
+        statSkip.last_load_dynamic_skip_same_form_at = new Date().toISOString();
+        window.__TPK_REGISTRASI_R1R2_STATS__ = statSkip;
+
+        try { if (typeof this.applyGenderLockByJenis === 'function') this.applyGenderLockByJenis(); } catch (err) {}
+        try { if (typeof this.applyJenisSpecificStaticFields === 'function') this.applyJenisSpecificStaticFields(); } catch (err2) {}
+        try { if (typeof this.updateConditionalDynamicFields === 'function') this.updateConditionalDynamicFields(); } catch (err3) {}
+        try { if (typeof this.handleAnyFormChange === 'function') this.handleAnyFormChange(); } catch (err4) {}
+        return { ok: true, skipped: true, reason: 'same_form_already_rendered', version: VERSION };
+      }
+
+      if (loadDynamicInFlight[key]) {
+        var statJoin = window.__TPK_REGISTRASI_R1R2_STATS__ || { getWilayahRef_suppressed: 0, form_definition_inflight_join: 0, load_dynamic_inflight_join: 0, load_dynamic_skip_same_form: 0 };
+        statJoin.load_dynamic_inflight_join += 1;
+        statJoin.last_load_dynamic_inflight_join_at = new Date().toISOString();
+        window.__TPK_REGISTRASI_R1R2_STATS__ = statJoin;
+        return loadDynamicInFlight[key];
+      }
+
+      loadDynamicInFlight[key] = Promise.resolve()
+        .then(() => originalLoadDynamic.apply(this, arguments))
+        .then((result) => {
+          this._currentJenisSasaran = jenis;
+          this._currentFormId = this._currentFormId || expectedFormId;
+          return result;
+        })
+        .finally(() => {
+          delete loadDynamicInFlight[key];
+        });
+
+      return loadDynamicInFlight[key];
+    };
+
+    RF.__REGISTRASI_R1R2_LOAD_DYNAMIC_GUARD = true;
+  }
+
+  function exposeDebug() {
+    window.__TPK_REGISTRASI_R1R2_VERSION__ = VERSION;
+    window.__TPK_REGISTRASI_R1R2_DEBUG__ = {
+      version: VERSION,
+      getStats: function () {
+        return window.__TPK_REGISTRASI_R1R2_STATS__ || { getWilayahRef_suppressed: 0, form_definition_inflight_join: 0, load_dynamic_inflight_join: 0, load_dynamic_skip_same_form: 0 };
+      },
+      clearMemory: function () {
+        formDefinitionInFlight = Object.create(null);
+        formDefinitionMemory = Object.create(null);
+        loadDynamicInFlight = Object.create(null);
+        window.__TPK_REGISTRASI_R1R2_STATS__ = { getWilayahRef_suppressed: 0, form_definition_inflight_join: 0, load_dynamic_inflight_join: 0, load_dynamic_skip_same_form: 0 };
+        return true;
+      }
+    };
+  }
+
+  patchApiPost();
+  patchFormDefinitionGuard();
+  patchLoadDynamicGuard();
+  exposeDebug();
+
+  // Api kadang dimuat/ditimpa setelah view; ulangi binding singkat tanpa mengganggu render.
+  window.setTimeout(patchApiPost, 0);
+  window.setTimeout(patchApiPost, 300);
+})(window, document);
+/* ===== READ MODEL BINDING R1-R2 end ===== */
