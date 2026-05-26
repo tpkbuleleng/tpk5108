@@ -3580,3 +3580,680 @@
   }
 })(window, document);
 /* ===== REGISTRASI PERFORMANCE INSTRUMENTATION FINAL 20260426 end ===== */
+/* ===== READ MODEL BINDING R1-R1 start: registrasi wilayah task binding from user_profile_lite ===== */
+(function (window, document) {
+  'use strict';
+
+  var RF = window.RegistrasiForm;
+  if (!RF || RF.__READ_MODEL_SCOPE_BINDING_R1_R1 === true) return;
+  RF.__READ_MODEL_SCOPE_BINDING_R1_R1 = true;
+
+  var VERSION = 'READ-MODEL-BINDING-R1-R1-REGISTRASI-SCOPE-20260526';
+
+  function byId(id) {
+    return document.getElementById(id);
+  }
+
+  function s(value) {
+    return String(value == null ? '' : value).replace(/\s+/g, ' ').trim();
+  }
+
+  function up(value) {
+    return s(value).toUpperCase();
+  }
+
+  function isObj(value) {
+    return !!value && typeof value === 'object' && !Array.isArray(value);
+  }
+
+  function clone(value) {
+    try {
+      return JSON.parse(JSON.stringify(value));
+    } catch (_) {
+      return value;
+    }
+  }
+
+  function first() {
+    for (var i = 0; i < arguments.length; i += 1) {
+      var value = arguments[i];
+      if (value !== undefined && value !== null && s(value) !== '') return value;
+    }
+    return '';
+  }
+
+  function safeJsonParse(value, fallback) {
+    if (value === undefined || value === null || value === '') return fallback;
+    if (typeof value === 'object') return value;
+    try {
+      return JSON.parse(String(value));
+    } catch (_) {
+      return fallback;
+    }
+  }
+
+  function readLocalJson(key, fallback) {
+    try {
+      var raw = window.localStorage.getItem(key);
+      if (raw === null || raw === undefined || raw === '') return fallback;
+      return JSON.parse(raw);
+    } catch (_) {
+      return fallback;
+    }
+  }
+
+  function writeProfile(profile) {
+    var data = isObj(profile) ? profile : {};
+    if (!Object.keys(data).length) return data;
+
+    try {
+      if (window.AppState && typeof window.AppState.setProfile === 'function') {
+        window.AppState.setProfile(data);
+      }
+    } catch (_) {}
+
+    try {
+      if (window.Session && typeof window.Session.setProfile === 'function') {
+        window.Session.setProfile(data);
+      }
+    } catch (_) {}
+
+    try {
+      if (window.Storage && typeof window.Storage.setProfile === 'function') {
+        window.Storage.setProfile(data);
+      } else if (window.Storage && typeof window.Storage.set === 'function') {
+        var key = window.APP_CONFIG && window.APP_CONFIG.STORAGE_KEYS
+          ? window.APP_CONFIG.STORAGE_KEYS.PROFILE
+          : 'tpk_profile';
+        window.Storage.set(key || 'tpk_profile', data);
+        if (typeof window.Storage.setLastGoodProfile === 'function') {
+          window.Storage.setLastGoodProfile(data);
+        }
+      } else {
+        window.localStorage.setItem('tpk_profile', JSON.stringify(data));
+        window.localStorage.setItem('tpk_last_good_profile', JSON.stringify(data));
+      }
+    } catch (_) {}
+
+    return data;
+  }
+
+  function meaningful(value) {
+    var text = s(value);
+    var upper = text.toUpperCase();
+    if (!text || upper === '-' || upper === 'NULL' || upper === 'UNDEFINED' || upper === 'N/A' || upper === 'NA') {
+      return '';
+    }
+    return text;
+  }
+
+  function mergeProfile(base, incoming) {
+    var out = Object.assign({}, isObj(base) ? base : {});
+    var src = isObj(incoming) ? incoming : {};
+    Object.keys(src).forEach(function (key) {
+      var value = src[key];
+      if (value === undefined || value === null) return;
+      if (typeof value === 'string' && !meaningful(value)) return;
+      out[key] = value;
+    });
+    return out;
+  }
+
+  function extractProfileFromApiResult(result) {
+    var data = result && result.data ? result.data : result;
+    if (!data) return {};
+    if (data.profile_lite && isObj(data.profile_lite)) return data.profile_lite;
+    if (data.profile && isObj(data.profile)) return data.profile;
+    if (data.user_profile_lite && isObj(data.user_profile_lite)) return data.user_profile_lite;
+    if (isObj(data) && (data.id_user || data.role_akses || data.nama_kader || data.wilayah_tugas_list_json)) return data;
+    return {};
+  }
+
+  function readBootstrapLiteProfile() {
+    var boot = {};
+    try {
+      if (window.Storage && typeof window.Storage.getBootstrapLite === 'function') {
+        boot = window.Storage.getBootstrapLite({}) || {};
+      } else if (window.Storage && typeof window.Storage.get === 'function') {
+        boot = window.Storage.get('tpk_bootstrap_lite', {}) || {};
+      } else {
+        boot = readLocalJson('tpk_bootstrap_lite', {}) || {};
+      }
+    } catch (_) {
+      boot = readLocalJson('tpk_bootstrap_lite', {}) || {};
+    }
+    return boot && isObj(boot.profile) ? boot.profile : {};
+  }
+
+  function getBestProfileSync() {
+    var profile = {};
+
+    try {
+      var lastGood = window.Storage && typeof window.Storage.getLastGoodProfile === 'function'
+        ? window.Storage.getLastGoodProfile({})
+        : readLocalJson('tpk_last_good_profile', {});
+      profile = mergeProfile(profile, lastGood);
+    } catch (_) {}
+
+    try {
+      var storageProfile = window.Storage && typeof window.Storage.getProfile === 'function'
+        ? window.Storage.getProfile({})
+        : (window.Storage && typeof window.Storage.get === 'function'
+          ? window.Storage.get((window.APP_CONFIG && window.APP_CONFIG.STORAGE_KEYS && window.APP_CONFIG.STORAGE_KEYS.PROFILE) || 'tpk_profile', {})
+          : readLocalJson('tpk_profile', {}));
+      profile = mergeProfile(profile, storageProfile);
+    } catch (_) {}
+
+    try {
+      if (window.AppState && typeof window.AppState.getProfile === 'function') {
+        profile = mergeProfile(profile, window.AppState.getProfile() || {});
+      }
+    } catch (_) {}
+
+    try {
+      if (window.Session && typeof window.Session.getProfile === 'function') {
+        profile = mergeProfile(profile, window.Session.getProfile() || {});
+      }
+    } catch (_) {}
+
+    profile = mergeProfile(profile, readBootstrapLiteProfile());
+
+    return profile;
+  }
+
+  function splitList(value) {
+    var text = s(value);
+    if (!text) return [];
+    return unique(text.split(/\s*(?:\||;|\/|,)\s*/).map(s).filter(Boolean));
+  }
+
+  function unique(values) {
+    var seen = Object.create(null);
+    var out = [];
+    (values || []).forEach(function (value) {
+      var text = meaningful(value);
+      if (!text) return;
+      var key = up(text);
+      if (seen[key]) return;
+      seen[key] = true;
+      out.push(text);
+    });
+    return out;
+  }
+
+  function parseJsonRows(value) {
+    var parsed = safeJsonParse(value, []);
+    if (Array.isArray(parsed)) return parsed;
+    if (isObj(parsed)) return [parsed];
+    return [];
+  }
+
+  function normalizeScopeRow(row, profile) {
+    var src = row || {};
+    var p = profile || {};
+    var scope = isObj(p.scope_wilayah) ? p.scope_wilayah : {};
+    var idWilayah = first(src.id_wilayah, src.id_wilayah_tugas, scope.id_wilayah, p.id_wilayah, p.id_wilayah_tugas);
+    var kecamatan = first(
+      src.nama_kecamatan,
+      src.kecamatan,
+      scope.nama_kecamatan,
+      scope.kecamatan,
+      p.nama_kecamatan,
+      p.kecamatan
+    );
+    var desa = first(
+      src.desa_kelurahan,
+      src.nama_desa,
+      src.nama_desa_kelurahan,
+      src.desa,
+      scope.desa_kelurahan,
+      scope.nama_desa,
+      scope.nama_desa_kelurahan,
+      p.desa_kelurahan,
+      p.nama_desa,
+      p.nama_desa_kelurahan,
+      p.desa_tim,
+      p.desa
+    );
+    var dusun = first(
+      src.dusun_rw,
+      src.nama_dusun,
+      src.nama_dusun_rw,
+      src.dusun,
+      scope.dusun_rw,
+      scope.nama_dusun,
+      scope.nama_dusun_rw,
+      p.dusun_rw,
+      p.nama_dusun,
+      p.nama_dusun_rw
+    );
+
+    if (!meaningful(kecamatan) && !meaningful(desa) && !meaningful(dusun) && !meaningful(idWilayah)) {
+      return null;
+    }
+
+    return {
+      id_wilayah: s(idWilayah),
+      kecamatan: s(kecamatan),
+      desa_kelurahan: s(desa),
+      dusun_rw: s(dusun),
+      urutan_wilayah: Number(first(src.urutan_wilayah, src.order, 1)) || 1
+    };
+  }
+
+  function uniqueRows(rows) {
+    var seen = Object.create(null);
+    var out = [];
+    (rows || []).forEach(function (row) {
+      if (!row) return;
+      var key = [row.id_wilayah, row.kecamatan, row.desa_kelurahan, row.dusun_rw].map(up).join('|');
+      if (!key.replace(/\|/g, '') || seen[key]) return;
+      seen[key] = true;
+      out.push(row);
+    });
+    out.sort(function (a, b) {
+      return Number(a.urutan_wilayah || 0) - Number(b.urutan_wilayah || 0);
+    });
+    return out;
+  }
+
+  function rowsFromProfile(profile) {
+    var p = profile || {};
+    var rows = [];
+
+    if (Array.isArray(p.wilayah_tugas_ringkas)) {
+      p.wilayah_tugas_ringkas.forEach(function (row) {
+        rows.push(normalizeScopeRow(row, p));
+      });
+    }
+
+    [
+      p.wilayah_tugas_list_json,
+      p.tim_wilayah_list_json,
+      p.scope_wilayah_list_json,
+      p.wilayah_scope_list_json
+    ].forEach(function (value) {
+      parseJsonRows(value).forEach(function (row) {
+        rows.push(normalizeScopeRow(row, p));
+      });
+    });
+
+    rows = uniqueRows(rows.filter(Boolean));
+    if (rows.length) return rows;
+
+    var scope = isObj(p.scope_wilayah) ? p.scope_wilayah : {};
+    var kecamatan = first(scope.nama_kecamatan, scope.kecamatan, p.nama_kecamatan, p.kecamatan);
+    var desaRaw = first(
+      scope.desa_kelurahan,
+      scope.nama_desa,
+      scope.nama_desa_kelurahan,
+      p.desa_kelurahan_list,
+      p.desa_kelurahan,
+      p.nama_desa,
+      p.nama_desa_kelurahan,
+      p.desa_tim,
+      p.desa
+    );
+    var dusunRaw = first(
+      scope.dusun_rw,
+      scope.nama_dusun,
+      scope.nama_dusun_rw,
+      p.dusun_rw_list,
+      p.dusun_rw,
+      p.nama_dusun,
+      p.nama_dusun_rw
+    );
+
+    var desaList = splitList(desaRaw);
+    var dusunList = splitList(dusunRaw);
+
+    if (!desaList.length && meaningful(desaRaw)) desaList = [meaningful(desaRaw)];
+    if (!dusunList.length && meaningful(dusunRaw)) dusunList = [meaningful(dusunRaw)];
+
+    if (desaList.length && dusunList.length) {
+      desaList.forEach(function (desa) {
+        dusunList.forEach(function (dusun) {
+          rows.push(normalizeScopeRow({
+            kecamatan: kecamatan,
+            desa_kelurahan: desa,
+            dusun_rw: dusun
+          }, p));
+        });
+      });
+    } else if (desaList.length) {
+      desaList.forEach(function (desa) {
+        rows.push(normalizeScopeRow({
+          kecamatan: kecamatan,
+          desa_kelurahan: desa,
+          dusun_rw: meaningful(dusunRaw)
+        }, p));
+      });
+    } else if (dusunList.length) {
+      dusunList.forEach(function (dusun) {
+        rows.push(normalizeScopeRow({
+          kecamatan: kecamatan,
+          desa_kelurahan: meaningful(desaRaw),
+          dusun_rw: dusun
+        }, p));
+      });
+    } else {
+      rows.push(normalizeScopeRow({
+        kecamatan: kecamatan,
+        desa_kelurahan: meaningful(desaRaw),
+        dusun_rw: meaningful(dusunRaw)
+      }, p));
+    }
+
+    return uniqueRows(rows.filter(Boolean));
+  }
+
+  function hasUsableScope(profile) {
+    var rows = rowsFromProfile(profile);
+    if (rows.length) return true;
+    return !!(meaningful(profile && (profile.nama_kecamatan || profile.kecamatan)) &&
+      meaningful(profile && (profile.desa_kelurahan || profile.nama_desa || profile.desa_tim || profile.desa)) &&
+      meaningful(profile && (profile.dusun_rw || profile.nama_dusun || profile.dusun_rw_list)));
+  }
+
+  async function getBestProfileForScope() {
+    var cached = getBestProfileSync();
+    if (hasUsableScope(cached)) return cached;
+
+    if (window.Api && typeof window.Api.getMyProfileLite === 'function') {
+      try {
+        var result = await window.Api.getMyProfileLite({ source: 'registrasi_scope_binding_r1_r1' });
+        if (result && result.ok !== false) {
+          var fresh = extractProfileFromApiResult(result);
+          if (Object.keys(fresh).length) {
+            var merged = mergeProfile(cached, fresh);
+            writeProfile(merged);
+            return merged;
+          }
+        }
+      } catch (_) {}
+    }
+
+    return cached;
+  }
+
+  function optionHtml(value) {
+    var v = String(value == null ? '' : value);
+    return '<option value="' + v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;') + '">' +
+      v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;') +
+      '</option>';
+  }
+
+  function fillSelect(select, values, selectedValue) {
+    if (!select) return [];
+    var selected = meaningful(selectedValue);
+    var opts = unique(values);
+    if (selected && opts.map(up).indexOf(up(selected)) < 0) opts.unshift(selected);
+    select.innerHTML = ['<option value="">Pilih</option>'].concat(opts.map(optionHtml)).join('');
+    if (selected) {
+      select.value = selected;
+    } else if (opts.length === 1) {
+      select.value = opts[0];
+    } else {
+      select.value = '';
+    }
+    return opts;
+  }
+
+  function lockSelect(select, locked) {
+    if (!select) return;
+    select.disabled = !!locked;
+    select.classList.toggle('is-locked', !!locked);
+    select.setAttribute('aria-readonly', locked ? 'true' : 'false');
+    select.setAttribute('data-readmodel-scope-locked', locked ? '1' : '0');
+  }
+
+  function isKader(profile) {
+    var role = up(first(profile && profile.role_akses, profile && profile.role));
+    return role === 'KADER';
+  }
+
+  function activeValue(id) {
+    var el = byId(id);
+    return meaningful(el && el.value);
+  }
+
+  function findActiveScopeRow(rows) {
+    var kec = up(activeValue('reg-kecamatan'));
+    var desa = up(activeValue('reg-desa'));
+    var dusun = up(activeValue('reg-dusun'));
+
+    return (rows || []).find(function (row) {
+      return (!kec || up(row.kecamatan) === kec) &&
+        (!desa || up(row.desa_kelurahan) === desa) &&
+        (!dusun || up(row.dusun_rw) === dusun);
+    }) || (rows && rows[0]) || null;
+  }
+
+  RF.getScopeFromProfile = function () {
+    var profile = getBestProfileSync();
+    var rows = rowsFromProfile(profile);
+    var firstRow = rows[0] || {};
+    return {
+      id_wilayah: first(firstRow.id_wilayah, profile.id_wilayah, profile.id_wilayah_tugas),
+      nama_kecamatan: first(firstRow.kecamatan, profile.nama_kecamatan, profile.kecamatan),
+      nama_desa: first(firstRow.desa_kelurahan, profile.nama_desa, profile.desa_kelurahan, profile.desa_tim, profile.desa),
+      nama_dusun: first(firstRow.dusun_rw, profile.nama_dusun, profile.dusun_rw, profile.dusun_rw_list)
+    };
+  };
+
+  RF.ensureScopeOptions = async function (preferred) {
+    var profile = await getBestProfileForScope();
+    var rows = rowsFromProfile(profile);
+    var fallback = preferred || {};
+    var kecEl = byId('reg-kecamatan');
+    var desaEl = byId('reg-desa');
+    var dusunEl = byId('reg-dusun');
+
+    var fallbackKecamatan = first(fallback.kecamatan, fallback.nama_kecamatan, profile.nama_kecamatan, profile.kecamatan);
+    var fallbackDesa = first(fallback.desa, fallback.desa_kelurahan, fallback.nama_desa, profile.desa_kelurahan, profile.nama_desa, profile.desa_tim, profile.desa);
+    var fallbackDusun = first(fallback.dusun, fallback.dusun_rw, fallback.nama_dusun, profile.dusun_rw, profile.nama_dusun, profile.dusun_rw_list);
+
+    if (!rows.length) {
+      var kecFallbackOptions = fillSelect(kecEl, [fallbackKecamatan], fallbackKecamatan);
+      var desaFallbackOptions = fillSelect(desaEl, [fallbackDesa], fallbackDesa);
+      var dusunFallbackOptions = fillSelect(dusunEl, splitList(fallbackDusun), splitList(fallbackDusun)[0] || fallbackDusun);
+      var lockFallback = isKader(profile);
+      lockSelect(kecEl, lockFallback && kecFallbackOptions.length <= 1);
+      lockSelect(desaEl, lockFallback && desaFallbackOptions.length <= 1);
+      lockSelect(dusunEl, lockFallback && dusunFallbackOptions.length <= 1);
+      this.__readModelScopeRows = rows;
+      this.__readModelScopeProfile = profile;
+      return rows;
+    }
+
+    var selectedKecamatan = first(fallback.kecamatan, activeValue('reg-kecamatan'), fallbackKecamatan);
+    var kecamatanOptions = unique(rows.map(function (row) { return row.kecamatan; }));
+    var finalKecamatanOptions = fillSelect(kecEl, kecamatanOptions, selectedKecamatan);
+
+    var currentKecamatan = activeValue('reg-kecamatan');
+    var rowsByKecamatan = currentKecamatan
+      ? rows.filter(function (row) { return up(row.kecamatan) === up(currentKecamatan); })
+      : rows.slice();
+
+    var selectedDesa = first(fallback.desa, activeValue('reg-desa'), fallbackDesa);
+    var desaOptions = unique(rowsByKecamatan.map(function (row) { return row.desa_kelurahan; }));
+    var finalDesaOptions = fillSelect(desaEl, desaOptions, selectedDesa);
+
+    var currentDesa = activeValue('reg-desa');
+    var rowsByDesa = currentDesa
+      ? rowsByKecamatan.filter(function (row) { return up(row.desa_kelurahan) === up(currentDesa); })
+      : rowsByKecamatan.slice();
+
+    var selectedDusun = first(fallback.dusun, activeValue('reg-dusun'), fallbackDusun);
+    var dusunOptions = unique(rowsByDesa.map(function (row) { return row.dusun_rw; }));
+    var finalDusunOptions = fillSelect(dusunEl, dusunOptions, selectedDusun);
+
+    var lockForKader = isKader(profile);
+    lockSelect(kecEl, lockForKader && finalKecamatanOptions.length <= 1);
+    lockSelect(desaEl, lockForKader && finalDesaOptions.length <= 1);
+    lockSelect(dusunEl, lockForKader && finalDusunOptions.length <= 1);
+
+    this.__readModelScopeRows = rows;
+    this.__readModelScopeProfile = profile;
+    this.__readModelScopeActiveRow = findActiveScopeRow(rows);
+    return rows;
+  };
+
+  RF.handleScopeCascadeChange = function (level) {
+    var preferred = {
+      kecamatan: activeValue('reg-kecamatan'),
+      desa: activeValue('reg-desa'),
+      dusun: activeValue('reg-dusun')
+    };
+
+    if (level === 'kecamatan') {
+      preferred.desa = '';
+      preferred.dusun = '';
+    }
+
+    if (level === 'desa') {
+      preferred.dusun = '';
+    }
+
+    return this.ensureScopeOptions(preferred)
+      .then(() => {
+        this.__readModelScopeActiveRow = findActiveScopeRow(this.__readModelScopeRows || []);
+        if (typeof this.handleAnyFormChange === 'function') this.handleAnyFormChange();
+      })
+      .catch(function () {});
+  };
+
+  RF.prefillScope = async function () {
+    var mode = typeof window.RegistrasiState !== 'undefined' && window.RegistrasiState && typeof window.RegistrasiState.getMode === 'function'
+      ? window.RegistrasiState.getMode()
+      : 'create';
+
+    var editItem = window.RegistrasiState && typeof window.RegistrasiState.getEditItem === 'function'
+      ? (window.RegistrasiState.getEditItem() || {})
+      : {};
+
+    var selected = window.SasaranState && typeof window.SasaranState.getSelected === 'function'
+      ? (window.SasaranState.getSelected() || {})
+      : {};
+
+    var profileScope = this.getScopeFromProfile ? this.getScopeFromProfile() : {};
+
+    var preferred = {
+      kecamatan: mode === 'edit'
+        ? first(editItem.nama_kecamatan, editItem.kecamatan, profileScope.nama_kecamatan)
+        : first(profileScope.nama_kecamatan, selected.nama_kecamatan, selected.kecamatan),
+      desa: mode === 'edit'
+        ? first(editItem.nama_desa, editItem.desa_kelurahan, editItem.nama_desa_kelurahan, profileScope.nama_desa)
+        : first(profileScope.nama_desa, selected.nama_desa, selected.desa_kelurahan, selected.nama_desa_kelurahan),
+      dusun: mode === 'edit'
+        ? first(editItem.nama_dusun, editItem.dusun_rw, editItem.nama_dusun_rw, profileScope.nama_dusun)
+        : first(profileScope.nama_dusun, selected.nama_dusun, selected.dusun_rw, selected.nama_dusun_rw)
+    };
+
+    await this.ensureScopeOptions(preferred);
+    this.__readModelScopeActiveRow = findActiveScopeRow(this.__readModelScopeRows || []);
+    return preferred;
+  };
+
+  var originalOpenCreate = RF.openCreate;
+  if (typeof originalOpenCreate === 'function') {
+    RF.openCreate = async function () {
+      var out = await originalOpenCreate.apply(this, arguments);
+      await this.prefillScope();
+      if (typeof this.renderValidation === 'function') this.renderValidation();
+      return out;
+    };
+  }
+
+  var originalOpenEdit = RF.openEdit;
+  if (typeof originalOpenEdit === 'function') {
+    RF.openEdit = async function (item) {
+      var out = await originalOpenEdit.apply(this, arguments);
+      await this.prefillScope();
+      if (typeof this.renderValidation === 'function') this.renderValidation();
+      return out;
+    };
+  }
+
+  var originalCollectFormData = RF.collectFormData;
+  if (typeof originalCollectFormData === 'function') {
+    RF.collectFormData = function () {
+      var data = originalCollectFormData.apply(this, arguments) || {};
+      data.answers = data.answers || {};
+
+      var activeRow = findActiveScopeRow(this.__readModelScopeRows || rowsFromProfile(getBestProfileSync()));
+      var profile = this.__readModelScopeProfile || getBestProfileSync();
+
+      data.answers.nama_kecamatan = first(data.answers.nama_kecamatan, activeValue('reg-kecamatan'), activeRow && activeRow.kecamatan, profile.nama_kecamatan, profile.kecamatan);
+      data.answers.kecamatan = first(data.answers.kecamatan, data.answers.nama_kecamatan);
+      data.answers.desa_kelurahan = first(data.answers.desa_kelurahan, activeValue('reg-desa'), activeRow && activeRow.desa_kelurahan, profile.desa_kelurahan, profile.nama_desa, profile.desa_tim, profile.desa);
+      data.answers.nama_desa = first(data.answers.nama_desa, data.answers.desa_kelurahan);
+      data.answers.dusun_rw = first(data.answers.dusun_rw, activeValue('reg-dusun'), activeRow && activeRow.dusun_rw, profile.dusun_rw, profile.nama_dusun);
+      data.answers.nama_dusun = first(data.answers.nama_dusun, data.answers.dusun_rw);
+
+      data.id_tim = first(data.id_tim, profile.id_tim);
+      data.nama_tim = first(data.nama_tim, profile.nama_tim, profile.nomor_tim, profile.id_tim);
+      data.id_wilayah = first(data.id_wilayah, activeRow && activeRow.id_wilayah, profile.id_wilayah, profile.id_wilayah_tugas);
+
+      return data;
+    };
+  }
+
+  var originalBuildPayload = RF.buildPayload;
+  if (typeof originalBuildPayload === 'function') {
+    RF.buildPayload = function (data, mode) {
+      var payload = originalBuildPayload.apply(this, arguments) || {};
+      var src = data || {};
+      if (src.id_tim && !payload.id_tim) payload.id_tim = src.id_tim;
+      if (src.id_wilayah && !payload.id_wilayah) payload.id_wilayah = src.id_wilayah;
+      if (src.nama_tim && !payload.nama_tim) payload.nama_tim = src.nama_tim;
+      payload.read_model_scope_binding = VERSION;
+      return payload;
+    };
+  }
+
+  function bindCascadeOnce() {
+    var kecEl = byId('reg-kecamatan');
+    var desaEl = byId('reg-desa');
+    var dusunEl = byId('reg-dusun');
+
+    if (kecEl && kecEl.dataset.readModelScopeBound !== '1') {
+      kecEl.dataset.readModelScopeBound = '1';
+      kecEl.addEventListener('change', function () {
+        RF.handleScopeCascadeChange('kecamatan');
+      });
+    }
+
+    if (desaEl && desaEl.dataset.readModelScopeBound !== '1') {
+      desaEl.dataset.readModelScopeBound = '1';
+      desaEl.addEventListener('change', function () {
+        RF.handleScopeCascadeChange('desa');
+      });
+    }
+
+    if (dusunEl && dusunEl.dataset.readModelScopeBound !== '1') {
+      dusunEl.dataset.readModelScopeBound = '1';
+      dusunEl.addEventListener('change', function () {
+        RF.__readModelScopeActiveRow = findActiveScopeRow(RF.__readModelScopeRows || []);
+        if (typeof RF.handleAnyFormChange === 'function') RF.handleAnyFormChange();
+      });
+    }
+  }
+
+  bindCascadeOnce();
+
+  window.setTimeout(function () {
+    bindCascadeOnce();
+    if (byId('reg-kecamatan') || byId('reg-desa') || byId('reg-dusun')) {
+      Promise.resolve()
+        .then(function () { return RF.prefillScope(); })
+        .then(function () {
+          if (typeof RF.renderValidation === 'function') RF.renderValidation();
+        })
+        .catch(function () {});
+    }
+  }, 0);
+
+  window.__TPK_REGISTRASI_SCOPE_BINDING_VERSION = VERSION;
+})(window, document);
+/* ===== READ MODEL BINDING R1-R1 end ===== */
