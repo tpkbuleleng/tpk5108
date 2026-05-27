@@ -1,7 +1,7 @@
 (function (window, document) {
   'use strict';
 
-  window.__PENDAMPINGAN_VIEW_BUILD = '20260527-RMB-R2-PENDAMPINGAN-DYNAMIC-FORM';
+  window.__PENDAMPINGAN_VIEW_BUILD = '20260527-RMB-R2-R1-PENDAMPINGAN-SELECT-REPAIR';
   console.log('PendampinganView build aktif:', window.__PENDAMPINGAN_VIEW_BUILD);
 
   var PENDAMPINGAN_DRAFT_KEY = 'tpk_pendampingan_draft';
@@ -771,11 +771,14 @@
   }
 
   function normalizeFieldType(q) {
-    var raw = normalizeUpper(q.field_type || q.input_type || q.type);
-    if (raw === 'DROPDOWN' || raw === 'RADIO' || raw === 'SEARCH_SELECT') return 'select';
-    if (raw === 'TEXTAREA') return 'textarea';
-    if (raw === 'DATE') return 'date';
-    if (raw === 'NUMBER' || raw === 'NUMBER_DECIMAL' || raw === 'DECIMAL' || raw === 'INTEGER') return 'number';
+    var raw = normalizeUpper(q.field_type || q.input_type || q.type || q.control_type || q.component_type);
+
+    // MASTER_FORM_QUESTION menggunakan nilai field_type seperti: select, number, textarea, date.
+    // Patch R2-R1: nilai SELECT sebelumnya jatuh ke default text sehingga dropdown berubah menjadi isian manual.
+    if (raw === 'SELECT' || raw === 'DROPDOWN' || raw === 'RADIO' || raw === 'SEARCH_SELECT' || raw === 'COMBOBOX') return 'select';
+    if (raw === 'TEXTAREA' || raw === 'LONG_TEXT' || raw === 'MULTILINE') return 'textarea';
+    if (raw === 'DATE' || raw === 'DATE_PICKER') return 'date';
+    if (raw === 'NUMBER' || raw === 'NUMBER_DECIMAL' || raw === 'DECIMAL' || raw === 'INTEGER' || raw === 'NUMERIC') return 'number';
     if (raw === 'TEXT_NUMERIC' || raw === 'NUMERIC_TEXT') return 'text_numeric';
     if (raw === 'HIDDEN') return 'hidden';
     return 'text';
