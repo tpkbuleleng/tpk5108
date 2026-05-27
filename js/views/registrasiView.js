@@ -5595,3 +5595,193 @@
   window.__TPK_REGISTRASI_POST_SUBMIT_UX_VERSION = VERSION;
 })(window, document);
 /* ===== READ MODEL BINDING R1-R3-R2 end ===== */
+
+
+/* ===== READ MODEL BINDING R1-R3-R3 start: Registrasi Draft Queue Binding ===== */
+(function (window, document) {
+  'use strict';
+
+  var VERSION = 'READ-MODEL-BINDING-R1-R3-R3-REGISTRASI-DRAFT-QUEUE-BINDING-20260527';
+  var DRAFT_KEY = 'tpk_registrasi_draft_v_final';
+  var RF = window.RegistrasiForm;
+
+  if (!RF || RF.__REGISTRASI_DRAFT_QUEUE_BINDING_R1R3R3 === true) return;
+  RF.__REGISTRASI_DRAFT_QUEUE_BINDING_R1R3R3 = true;
+
+  function isFunction(fn) { return typeof fn === 'function'; }
+  function safeTrim(value) { return String(value == null ? '' : value).trim(); }
+
+  function notify(message, type) {
+    try {
+      if (window.Notifier && isFunction(window.Notifier.show)) {
+        window.Notifier.show(message, type || 'info');
+        return;
+      }
+      if (window.UI && isFunction(window.UI.showToast)) {
+        window.UI.showToast(message, type || 'info');
+        return;
+      }
+    } catch (err) {}
+    try { window.alert(message); } catch (err2) {}
+  }
+
+  function emitQueueChanged() {
+    try { window.dispatchEvent(new CustomEvent('tpk:queue-changed', { detail: { version: VERSION } })); } catch (err) {}
+    try {
+      if (window.SyncManager && isFunction(window.SyncManager.updateBadge)) {
+        window.SyncManager.updateBadge();
+      }
+    } catch (err2) {}
+  }
+
+  function getCurrentDraftData() {
+    var data = {};
+    try {
+      if (isFunction(RF.collectFormData)) {
+        data = RF.collectFormData() || {};
+      }
+    } catch (err) {}
+
+    data = data && typeof data === 'object' ? data : {};
+    data.draft_type = 'REGISTRASI';
+    data.draft_status = 'DRAFT';
+    data.updated_at = new Date().toISOString();
+
+    if (!data.client_submit_id) {
+      try {
+        if (window.ClientId && isFunction(window.ClientId.ensure)) {
+          data.client_submit_id = window.ClientId.ensure('', 'REG');
+        }
+      } catch (err2) {}
+    }
+
+    if (!data.client_submit_id) {
+      data.client_submit_id = 'REG-DRAFT-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8).toUpperCase();
+    }
+
+    return data;
+  }
+
+  async function saveDraftFormal(showMessage) {
+    var data = getCurrentDraftData();
+
+    try {
+      if (window.QueueRepo && isFunction(window.QueueRepo.saveRegistrationDraft)) {
+        await window.QueueRepo.saveRegistrationDraft(data, {
+          source: 'registrasiView.saveDraftFormal',
+          version: VERSION
+        });
+      } else if (window.DraftManager && isFunction(window.DraftManager.saveRegistrasiDraft)) {
+        await window.DraftManager.saveRegistrasiDraft(data);
+      } else if (window.QueueRepo && isFunction(window.QueueRepo.saveDraft)) {
+        await window.QueueRepo.saveDraft(DRAFT_KEY, 'REGISTRASI', data, {
+          source: 'registrasiView.saveDraftFormal',
+          version: VERSION
+        });
+      } else {
+        window.localStorage.setItem(DRAFT_KEY, JSON.stringify({
+          saved_at: new Date().toISOString(),
+          data: data
+        }));
+      }
+
+      emitQueueChanged();
+      if (showMessage) notify('Draft registrasi berhasil disimpan dan masuk ke Draft Offline & Sinkronisasi.', 'success');
+      return true;
+    } catch (err) {
+      try {
+        window.localStorage.setItem(DRAFT_KEY, JSON.stringify({
+          saved_at: new Date().toISOString(),
+          data: data
+        }));
+        emitQueueChanged();
+        if (showMessage) notify('Draft registrasi tersimpan lokal. Jika belum tampil, tekan Refresh Daftar.', 'warning');
+        return true;
+      } catch (err2) {
+        if (showMessage) notify('Draft registrasi gagal disimpan di perangkat ini.', 'error');
+        return false;
+      }
+    }
+  }
+
+  async function clearDraftFormal() {
+    try {
+      if (window.QueueRepo && isFunction(window.QueueRepo.clearRegistrationDraft)) {
+        await window.QueueRepo.clearRegistrationDraft();
+      } else if (window.QueueRepo && isFunction(window.QueueRepo.clearDraft)) {
+        await window.QueueRepo.clearDraft(DRAFT_KEY);
+      } else if (window.DraftManager && isFunction(window.DraftManager.clearRegistrasiDraft)) {
+        await window.DraftManager.clearRegistrasiDraft();
+      }
+    } catch (err) {}
+
+    try { window.localStorage.removeItem(DRAFT_KEY); } catch (err2) {}
+    emitQueueChanged();
+    return true;
+  }
+
+  function buttonText(el) {
+    if (!el) return '';
+    var value = '';
+    try { value = el.value || ''; } catch (err) {}
+    return safeTrim(value || el.textContent || (el.getAttribute && (el.getAttribute('aria-label') || el.getAttribute('title'))) || '').toUpperCase();
+  }
+
+  function isDraftButton(el) {
+    if (!el) return false;
+    var id = safeTrim(el.id).toUpperCase();
+    var action = safeTrim(el.getAttribute && (el.getAttribute('data-action') || el.getAttribute('name'))).toUpperCase();
+    var text = buttonText(el);
+    return id.indexOf('DRAFT') >= 0 || action.indexOf('DRAFT') >= 0 || text.indexOf('SIMPAN DRAFT') >= 0;
+  }
+
+  function isResetButton(el) {
+    if (!el) return false;
+    var id = safeTrim(el.id).toUpperCase();
+    var action = safeTrim(el.getAttribute && (el.getAttribute('data-action') || el.getAttribute('name'))).toUpperCase();
+    var type = safeTrim(el.getAttribute && el.getAttribute('type')).toUpperCase();
+    var text = buttonText(el);
+    return id.indexOf('RESET') >= 0 || action.indexOf('RESET') >= 0 || type === 'RESET' || text === 'RESET';
+  }
+
+  document.addEventListener('click', function (event) {
+    var target = event.target;
+    if (!target || !target.closest) return;
+
+    var btn = target.closest('button, input[type="button"], input[type="submit"], input[type="reset"], a, [role="button"]');
+    if (!btn) return;
+
+    if (isDraftButton(btn)) {
+      window.setTimeout(function () {
+        saveDraftFormal(false);
+      }, 0);
+      return;
+    }
+
+    if (isResetButton(btn)) {
+      window.setTimeout(function () {
+        clearDraftFormal();
+      }, 0);
+    }
+  }, true);
+
+  var previousSubmit = RF.submit;
+  if (isFunction(previousSubmit)) {
+    RF.submit = async function () {
+      var result = await previousSubmit.apply(this, arguments);
+      if (result && result.ok === true) {
+        await clearDraftFormal();
+      }
+      return result;
+    };
+  }
+
+  window.__TPK_REGISTRASI_DRAFT_QUEUE_BINDING_R1R3R3_DEBUG__ = {
+    version: VERSION,
+    saveDraftFormal: saveDraftFormal,
+    clearDraftFormal: clearDraftFormal,
+    getCurrentDraftData: getCurrentDraftData
+  };
+  window.__TPK_REGISTRASI_DRAFT_QUEUE_BINDING_VERSION = VERSION;
+})(window, document);
+/* ===== READ MODEL BINDING R1-R3-R3 end ===== */
