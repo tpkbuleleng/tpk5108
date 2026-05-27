@@ -5269,3 +5269,329 @@
 })(window, document);
 /* ===== READ MODEL BINDING R1-R3-R1 end ===== */
 
+
+/* ===== READ MODEL BINDING R1-R3-R2 start: post-submit action UX ===== */
+(function (window, document) {
+  'use strict';
+
+  var VERSION = 'READ-MODEL-BINDING-R1-R3-R2-REGISTRASI-POST-SUBMIT-UX-20260527';
+  var RF = window.RegistrasiForm;
+  if (!RF || RF.__REGISTRASI_POST_SUBMIT_UX_R1R3R2 === true) return;
+  RF.__REGISTRASI_POST_SUBMIT_UX_R1R3R2 = true;
+
+  var DRAFT_KEY = 'tpk_registrasi_draft_v_final';
+  var lastSuccessContext = null;
+
+  function isFunction(fn) { return typeof fn === 'function'; }
+  function safeTrim(value) { return String(value == null ? '' : value).trim(); }
+  function up(value) { return safeTrim(value).toUpperCase(); }
+  function getMode() {
+    try {
+      if (window.RegistrasiState && isFunction(window.RegistrasiState.getMode)) {
+        return window.RegistrasiState.getMode() || 'create';
+      }
+    } catch (err) {}
+    return 'create';
+  }
+  function setMode(mode) {
+    try {
+      if (window.RegistrasiState && isFunction(window.RegistrasiState.setMode)) {
+        window.RegistrasiState.setMode(mode || 'create');
+      }
+    } catch (err) {}
+  }
+  function clearEditItem() {
+    try {
+      if (window.RegistrasiState && isFunction(window.RegistrasiState.clearEditItem)) {
+        window.RegistrasiState.clearEditItem();
+      }
+    } catch (err) {}
+  }
+  function getEditItem() {
+    try {
+      if (window.RegistrasiState && isFunction(window.RegistrasiState.getEditItem)) {
+        return window.RegistrasiState.getEditItem() || {};
+      }
+    } catch (err) {}
+    return {};
+  }
+  function notify(message, type) {
+    try {
+      if (window.Notifier && isFunction(window.Notifier.show)) {
+        window.Notifier.show(message, type || 'info');
+        return;
+      }
+      if (window.UI && isFunction(window.UI.showToast)) {
+        window.UI.showToast(message, type || 'info');
+        return;
+      }
+    } catch (err) {}
+    try { window.alert(message); } catch (err2) {}
+  }
+  function setLoading(isLoading, label) {
+    var btn = document.getElementById('btn-submit-registrasi');
+    if (!btn) return;
+    try {
+      if (!btn.__tpkOriginalText) btn.__tpkOriginalText = btn.textContent || btn.value || 'Submit Registrasi';
+      btn.disabled = !!isLoading;
+      if (btn.tagName && btn.tagName.toLowerCase() === 'input') {
+        btn.value = isLoading ? (label || 'Mengirim...') : btn.__tpkOriginalText;
+      } else {
+        btn.textContent = isLoading ? (label || 'Mengirim...') : btn.__tpkOriginalText;
+      }
+    } catch (err) {}
+  }
+  function extractErrorMessage(result, fallback) {
+    if (!result) return fallback || 'Gagal menyimpan data.';
+    if (typeof result === 'string') return result;
+    if (result.message) return result.message;
+    if (result.error) return String(result.error);
+    if (result.data && result.data.message) return result.data.message;
+    if (result.meta && result.meta.message) return result.meta.message;
+    return fallback || 'Gagal menyimpan data.';
+  }
+  function callRegister(payload) {
+    if (window.RegistrasiService && isFunction(window.RegistrasiService.registerSasaran)) {
+      return window.RegistrasiService.registerSasaran(payload);
+    }
+    if (window.RegistrasiService && isFunction(window.RegistrasiService.submitRegistrasi)) {
+      return window.RegistrasiService.submitRegistrasi(payload);
+    }
+    if (window.Api && isFunction(window.Api.post)) {
+      return window.Api.post('registerSasaran', payload || {});
+    }
+    return Promise.reject(new Error('API registerSasaran tidak tersedia.'));
+  }
+  function callUpdate(payload) {
+    if (window.RegistrasiService && isFunction(window.RegistrasiService.updateSasaran)) {
+      return window.RegistrasiService.updateSasaran(payload);
+    }
+    if (window.Api && isFunction(window.Api.post)) {
+      return window.Api.post('updateSasaran', payload || {});
+    }
+    return Promise.reject(new Error('API updateSasaran tidak tersedia.'));
+  }
+  function clearDrafts() {
+    try { window.localStorage.removeItem(DRAFT_KEY); } catch (err) {}
+  }
+  function getSavedId(result, payload, editItem) {
+    return safeTrim(
+      (result && result.data && (result.data.id_sasaran || result.data.id)) ||
+      (result && (result.id_sasaran || result.id)) ||
+      (payload && payload.id_sasaran) ||
+      (editItem && (editItem.id_sasaran || editItem.id)) ||
+      ''
+    );
+  }
+  function goToSasaranList() {
+    try {
+      if (window.Router && isFunction(window.Router.toSasaranList)) {
+        window.Router.toSasaranList();
+        return;
+      }
+      if (window.Router && isFunction(window.Router.go)) {
+        window.Router.go('sasaranList');
+        return;
+      }
+    } catch (err) {}
+    try { window.location.hash = '#sasaranList'; } catch (err2) {}
+  }
+  async function refreshSasaranListQuietly() {
+    try {
+      if (window.SasaranList && isFunction(window.SasaranList.loadAndRender)) {
+        await window.SasaranList.loadAndRender();
+      }
+    } catch (err) {}
+  }
+  function removeExistingModal() {
+    var old = document.getElementById('registrasi-post-submit-modal-r1r3r2');
+    if (old && old.parentNode) old.parentNode.removeChild(old);
+  }
+  function buildButton(label, primary) {
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = label;
+    btn.style.border = '1px solid rgba(37,99,235,.35)';
+    btn.style.borderRadius = '12px';
+    btn.style.padding = '11px 14px';
+    btn.style.fontWeight = '800';
+    btn.style.cursor = 'pointer';
+    btn.style.minHeight = '44px';
+    btn.style.flex = '1 1 180px';
+    if (primary) {
+      btn.style.background = 'linear-gradient(135deg,#1d4ed8,#2563eb)';
+      btn.style.color = '#fff';
+      btn.style.boxShadow = '0 10px 20px rgba(37,99,235,.22)';
+    } else {
+      btn.style.background = '#fff';
+      btn.style.color = '#0f172a';
+    }
+    return btn;
+  }
+  async function prepareCreateAgain() {
+    removeExistingModal();
+    clearDrafts();
+    setMode('create');
+    clearEditItem();
+    try { if (isFunction(RF.resetForm)) RF.resetForm(); } catch (err1) {}
+    try { if (isFunction(RF.applyModeUI)) RF.applyModeUI(); } catch (err2) {}
+    try { if (isFunction(RF.prefillScope)) await RF.prefillScope(); } catch (err3) {}
+    try { if (isFunction(RF.applyGenderLockByJenis)) RF.applyGenderLockByJenis(); } catch (err4) {}
+    try { if (isFunction(RF.applyJenisSpecificStaticFields)) RF.applyJenisSpecificStaticFields(); } catch (err5) {}
+    try { if (isFunction(RF.renderValidation)) RF.renderValidation(); } catch (err6) {}
+    try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (err7) { try { window.scrollTo(0, 0); } catch (_) {} }
+  }
+  function showSuccessActions(context) {
+    lastSuccessContext = context || {};
+    removeExistingModal();
+
+    var overlay = document.createElement('div');
+    overlay.id = 'registrasi-post-submit-modal-r1r3r2';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.style.position = 'fixed';
+    overlay.style.inset = '0';
+    overlay.style.zIndex = '99999';
+    overlay.style.display = 'flex';
+    overlay.style.alignItems = 'center';
+    overlay.style.justifyContent = 'center';
+    overlay.style.padding = '18px';
+    overlay.style.background = 'rgba(15,23,42,.45)';
+    overlay.style.backdropFilter = 'blur(2px)';
+
+    var card = document.createElement('div');
+    card.style.width = 'min(520px, 100%)';
+    card.style.background = '#fff';
+    card.style.border = '1px solid rgba(148,163,184,.35)';
+    card.style.borderRadius = '18px';
+    card.style.boxShadow = '0 24px 64px rgba(15,23,42,.22)';
+    card.style.padding = '20px';
+    card.style.fontFamily = 'inherit';
+    card.style.color = '#0f172a';
+
+    var title = document.createElement('div');
+    title.textContent = 'Registrasi sasaran berhasil disimpan';
+    title.style.fontSize = '18px';
+    title.style.fontWeight = '900';
+    title.style.marginBottom = '8px';
+
+    var desc = document.createElement('div');
+    var jenis = safeTrim(context && context.jenis_sasaran);
+    var nama = safeTrim(context && context.nama_sasaran);
+    desc.textContent = nama
+      ? (nama + (jenis ? ' (' + jenis + ')' : '') + ' sudah tersimpan. Pilih langkah berikutnya.')
+      : 'Data sasaran sudah tersimpan. Pilih langkah berikutnya.';
+    desc.style.fontSize = '14px';
+    desc.style.lineHeight = '1.45';
+    desc.style.color = '#334155';
+    desc.style.marginBottom = '16px';
+
+    var actions = document.createElement('div');
+    actions.style.display = 'flex';
+    actions.style.flexWrap = 'wrap';
+    actions.style.gap = '10px';
+
+    var again = buildButton('Registrasi Sasaran Lagi', true);
+    var list = buildButton('Lihat Daftar Sasaran', false);
+
+    again.addEventListener('click', function () {
+      prepareCreateAgain();
+    });
+    list.addEventListener('click', async function () {
+      removeExistingModal();
+      await refreshSasaranListQuietly();
+      goToSasaranList();
+    });
+
+    actions.appendChild(again);
+    actions.appendChild(list);
+    card.appendChild(title);
+    card.appendChild(desc);
+    card.appendChild(actions);
+    overlay.appendChild(card);
+    document.body.appendChild(overlay);
+
+    setTimeout(function () {
+      try { again.focus(); } catch (err) {}
+    }, 0);
+  }
+
+  var oldSubmit = RF.submit;
+  RF.submit = async function () {
+    var mode = getMode();
+
+    if (mode === 'edit') {
+      return oldSubmit.apply(this, arguments);
+    }
+
+    if (window.navigator && window.navigator.onLine === false) {
+      return oldSubmit.apply(this, arguments);
+    }
+
+    var data = isFunction(this.collectFormData) ? this.collectFormData() : {};
+    var issues = isFunction(this.validate) ? (this.validate(data) || []) : [];
+    var hasError = issues.some(function (item) { return item && item.type === 'error'; });
+
+    try { if (isFunction(this.renderValidation)) this.renderValidation(); } catch (err0) {}
+
+    if (hasError) {
+      notify('Periksa kembali form registrasi.', 'warning');
+      return;
+    }
+
+    var payload = isFunction(this.buildPayload) ? this.buildPayload(data, 'create') : data;
+    setLoading(true, 'Mengirim...');
+
+    try {
+      var result = await callRegister(payload);
+      if (!result || result.ok !== true) {
+        throw new Error(extractErrorMessage(result, 'Gagal menyimpan data sasaran.'));
+      }
+
+      clearDrafts();
+      setMode('create');
+      clearEditItem();
+      await refreshSasaranListQuietly();
+
+      var savedId = getSavedId(result, payload, getEditItem());
+      var answers = (data && data.answers) || (payload && payload.answers) || {};
+
+      try {
+        if (isFunction(this.resetForm)) this.resetForm();
+        if (isFunction(this.applyModeUI)) this.applyModeUI();
+        if (isFunction(this.prefillScope)) await this.prefillScope();
+        if (isFunction(this.applyGenderLockByJenis)) this.applyGenderLockByJenis();
+        if (isFunction(this.applyJenisSpecificStaticFields)) this.applyJenisSpecificStaticFields();
+        if (isFunction(this.renderValidation)) this.renderValidation();
+      } catch (resetErr) {}
+
+      showSuccessActions({
+        id_sasaran: savedId,
+        nama_sasaran: answers.nama_sasaran || data.nama_sasaran || '',
+        jenis_sasaran: answers.jenis_sasaran || data.jenis_sasaran || '',
+        result: result
+      });
+
+      return result;
+    } catch (err) {
+      try {
+        if (window.__TPK_REGISTRASI_R1R3R1_DEBUG__ && isFunction(window.__TPK_REGISTRASI_R1R3R1_DEBUG__.saveDraftNow)) {
+          window.__TPK_REGISTRASI_R1R3R1_DEBUG__.saveDraftNow();
+        }
+      } catch (draftErr) {}
+      notify(err && err.message ? err.message : 'Terjadi kesalahan saat menyimpan data.', 'error');
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  window.__TPK_REGISTRASI_POST_SUBMIT_UX_R1R3R2_DEBUG__ = {
+    version: VERSION,
+    lastSuccess: function () { return lastSuccessContext; },
+    showSuccessActions: showSuccessActions,
+    prepareCreateAgain: prepareCreateAgain
+  };
+  window.__TPK_REGISTRASI_POST_SUBMIT_UX_VERSION = VERSION;
+})(window, document);
+/* ===== READ MODEL BINDING R1-R3-R2 end ===== */
