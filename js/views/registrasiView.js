@@ -4862,3 +4862,410 @@
   window.__TPK_REGISTRASI_SUBMIT_FIX_VERSION = VERSION;
 })(window, document);
 /* ===== READ MODEL BINDING R1-R3 end ===== */
+/* ===== READ MODEL BINDING R1-R3-R1 start: CATIN domisili render + BUMIL option canonical + draft/reset binding ===== */
+(function (window, document) {
+  'use strict';
+
+  var RF = window.RegistrasiForm;
+  if (!RF || RF.__READ_MODEL_SCOPE_BINDING_R1_R3_R1 === true) return;
+  RF.__READ_MODEL_SCOPE_BINDING_R1_R3_R1 = true;
+
+  var VERSION = 'READ-MODEL-BINDING-R1-R3-R1-REGISTRASI-SUBMIT-UI-OPTION-FIX-20260527';
+  var DRAFT_KEY = 'tpk_registrasi_draft_v_final';
+
+  function s(value) {
+    return String(value === null || value === undefined ? '' : value).replace(/\s+/g, ' ').trim();
+  }
+
+  function up(value) {
+    return s(value).toUpperCase();
+  }
+
+  function lowerSnake(value) {
+    return s(value)
+      .replace(/\s+/g, '_')
+      .replace(/[^A-Za-z0-9_]/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .toLowerCase();
+  }
+
+  function firstNonEmpty() {
+    for (var i = 0; i < arguments.length; i += 1) {
+      var value = arguments[i];
+      if (value !== undefined && value !== null && s(value) !== '') return value;
+    }
+    return '';
+  }
+
+  function clone(obj) {
+    if (!obj || typeof obj !== 'object') return {};
+    try { return JSON.parse(JSON.stringify(obj)); } catch (err) {}
+    var out = Array.isArray(obj) ? [] : {};
+    Object.keys(obj).forEach(function (key) { out[key] = obj[key]; });
+    return out;
+  }
+
+  function isFunction(fn) {
+    return typeof fn === 'function';
+  }
+
+  function notify(message, type) {
+    try {
+      if (window.Notifier && isFunction(window.Notifier.show)) {
+        window.Notifier.show(message, type || 'info');
+        return;
+      }
+      if (window.UI && isFunction(window.UI.showToast)) {
+        window.UI.showToast(message, type || 'info');
+        return;
+      }
+    } catch (err) {}
+    try { window.alert(message); } catch (err2) {}
+  }
+
+  function normalizeOption(opt, index) {
+    opt = opt || {};
+    var value = firstNonEmpty(opt.value, opt.option_value, opt.code, opt.id, opt.label, opt.option_label);
+    var label = firstNonEmpty(opt.label, opt.option_label, opt.text, value);
+    return {
+      option_id: s(firstNonEmpty(opt.option_id, opt.id)),
+      value: s(value),
+      label: s(label),
+      order: Number(firstNonEmpty(opt.order, opt.option_order, index + 1)) || (index + 1),
+      parent_option_value: s(opt.parent_option_value || ''),
+      reference_key: s(opt.reference_key || ''),
+      is_risk_value: opt.is_risk_value === true
+    };
+  }
+
+  function normalizeQuestion(q, section, fallbackOrder) {
+    q = clone(q || {});
+    section = section || {};
+    var code = lowerSnake(firstNonEmpty(q.store_key, q.question_code, q.code, q.key, q.question_id));
+    if (!code) return null;
+
+    var fieldType = lowerSnake(firstNonEmpty(q.field_type, q.input_type, q.type, 'text'));
+    if (fieldType === 'dropdown' || fieldType === 'radio') fieldType = 'select';
+    if (fieldType !== 'select' && fieldType !== 'textarea' && fieldType !== 'date' && fieldType !== 'number') fieldType = 'text';
+
+    var options = Array.isArray(q.options) ? q.options.map(normalizeOption).filter(function (opt) { return !!opt.value; }) : [];
+    if (code === 'domisili_setelah_menikah' && options.length) fieldType = 'select';
+
+    return {
+      question_id: s(firstNonEmpty(q.question_id, 'OVR-' + code.toUpperCase())),
+      code: code,
+      label: s(firstNonEmpty(q.label, q.question_label, q.short_label, q.question_short_label, code)),
+      short_label: s(firstNonEmpty(q.short_label, q.question_short_label, q.label, q.question_label, code)),
+      help_text: s(q.help_text || ''),
+      placeholder: s(q.placeholder || ''),
+      field_type: fieldType,
+      data_type: lowerSnake(firstNonEmpty(q.data_type, 'string')),
+      is_required: q.is_required === true || up(q.is_required) === 'TRUE' || up(q.required) === 'TRUE',
+      validation_rule: s(q.validation_rule || ''),
+      visibility_rule: s(q.visibility_rule || ''),
+      requirement_rule: s(q.requirement_rule || ''),
+      readonly_rule: s(q.readonly_rule || ''),
+      default_value: firstNonEmpty(q.resolved_default_value, q.default_value),
+      is_editable: !(q.is_editable === false || up(q.is_editable) === 'FALSE'),
+      section_id: s(firstNonEmpty(q.section_id, section.section_id, 'SEC-CATIN-DOMISILI')),
+      section_label: s(firstNonEmpty(q.section_label, section.section_label, 'Domisili Setelah Menikah')),
+      section_order: Number(firstNonEmpty(q.section_order, section.section_order, 860)) || 860,
+      question_order: Number(firstNonEmpty(q.question_order, fallbackOrder, 10)) || 10,
+      min_value: firstNonEmpty(q.min_value, ''),
+      max_value: firstNonEmpty(q.max_value, ''),
+      options: options,
+      rules: Array.isArray(q.rules) ? q.rules : []
+    };
+  }
+
+  function flattenRawQuestions(definition) {
+    var out = [];
+    definition = definition || {};
+    (Array.isArray(definition.sections) ? definition.sections : []).forEach(function (section) {
+      (Array.isArray(section.questions) ? section.questions : []).forEach(function (q, idx) {
+        var nq = normalizeQuestion(q, section, idx + 1);
+        if (nq) out.push(nq);
+      });
+    });
+    (Array.isArray(definition.questions) ? definition.questions : []).forEach(function (q, idx) {
+      var nq = normalizeQuestion(q, null, idx + 1);
+      if (nq) out.push(nq);
+    });
+    (Array.isArray(definition.fields) ? definition.fields : []).forEach(function (q, idx) {
+      var nq = normalizeQuestion(q, null, idx + 1);
+      if (nq) out.push(nq);
+    });
+    return out;
+  }
+
+  function findRawQuestion(definition, codes) {
+    var wanted = {};
+    (codes || []).forEach(function (code) { wanted[lowerSnake(code)] = true; });
+    var list = flattenRawQuestions(definition);
+    for (var i = 0; i < list.length; i += 1) {
+      if (wanted[list[i].code]) return list[i];
+    }
+    return null;
+  }
+
+  function hasQuestion(definition, code) {
+    var target = lowerSnake(code);
+    var list = flattenRawQuestions(definition);
+    return list.some(function (q) { return q.code === target; });
+  }
+
+  function addQuestionToDefinition(definition, question) {
+    if (!question) return definition;
+    var out = Object.assign({}, definition || {});
+    var sections = (Array.isArray(out.sections) ? out.sections : []).map(function (section) {
+      return Object.assign({}, section, { questions: (section.questions || []).slice() });
+    });
+
+    var sectionId = s(question.section_id || 'SEC-CATIN-DOMISILI');
+    var section = null;
+    for (var i = 0; i < sections.length; i += 1) {
+      if (s(sections[i].section_id) === sectionId) {
+        section = sections[i];
+        break;
+      }
+    }
+
+    if (!section) {
+      section = {
+        section_id: sectionId,
+        section_label: s(question.section_label || 'Domisili Setelah Menikah'),
+        section_order: Number(question.section_order || 860) || 860,
+        questions: []
+      };
+      sections.push(section);
+    }
+
+    if (!(section.questions || []).some(function (q) { return lowerSnake(firstNonEmpty(q.code, q.store_key, q.question_code, q.question_id)) === lowerSnake(question.code); })) {
+      section.questions.push(question);
+    }
+
+    sections.forEach(function (sec) {
+      sec.questions = (sec.questions || []).sort(function (a, b) {
+        return Number(a.question_order || 0) - Number(b.question_order || 0);
+      });
+    });
+    sections.sort(function (a, b) { return Number(a.section_order || 0) - Number(b.section_order || 0); });
+
+    out.sections = sections.filter(function (sec) { return sec.questions && sec.questions.length; });
+    var flat = [];
+    out.sections.forEach(function (sec) { (sec.questions || []).forEach(function (q) { flat.push(q); }); });
+    out.questions = flat;
+    return out;
+  }
+
+  function buildFallbackDomisiliQuestion() {
+    return normalizeQuestion({
+      question_id: 'OVR-CATIN-DOMISILI-SETELAH-MENIKAH',
+      store_key: 'domisili_setelah_menikah',
+      question_code: 'DOMISILI_SETELAH_MENIKAH',
+      code: 'domisili_setelah_menikah',
+      label: 'Domisili Setelah Menikah',
+      short_label: 'Domisili Setelah Menikah',
+      help_text: 'Isi domisili rencana setelah menikah.',
+      placeholder: 'Contoh: ikut suami / ikut istri / rumah sendiri',
+      field_type: 'text',
+      data_type: 'string',
+      is_required: false,
+      section_id: 'SEC-CATIN-DOMISILI',
+      section_label: 'Domisili Setelah Menikah',
+      section_order: 860,
+      question_order: 10,
+      options: [],
+      rules: []
+    }, { section_id: 'SEC-CATIN-DOMISILI', section_label: 'Domisili Setelah Menikah', section_order: 860 }, 10);
+  }
+
+  var oldNormalizeDefinition = typeof RF.normalizeDefinition === 'function' ? RF.normalizeDefinition : null;
+  if (oldNormalizeDefinition) {
+    RF.normalizeDefinition = function (definition, jenisSasaran, refs) {
+      var out = oldNormalizeDefinition.apply(this, arguments) || {};
+      if (up(jenisSasaran) !== 'CATIN') return out;
+      if (hasQuestion(out, 'domisili_setelah_menikah')) return out;
+
+      var source = findRawQuestion(definition, [
+        'domisili_setelah_menikah',
+        'DOMISILI_SETELAH_MENIKAH',
+        'domisili_menikah',
+        'alamat_domisili_setelah_menikah'
+      ]);
+
+      if (source) {
+        source = Object.assign({}, source, {
+          code: 'domisili_setelah_menikah',
+          store_key: 'domisili_setelah_menikah',
+          question_code: 'DOMISILI_SETELAH_MENIKAH',
+          section_id: 'SEC-CATIN-DOMISILI',
+          section_label: 'Domisili Setelah Menikah',
+          section_order: 860,
+          question_order: 10,
+          is_editable: true
+        });
+      } else {
+        source = buildFallbackDomisiliQuestion();
+      }
+
+      return addQuestionToDefinition(out, normalizeQuestion(source, {
+        section_id: 'SEC-CATIN-DOMISILI',
+        section_label: 'Domisili Setelah Menikah',
+        section_order: 860
+      }, 10));
+    };
+  }
+
+  function normalizeBumilKehamilanValue(value) {
+    var raw = s(value);
+    if (!raw) return '';
+    var key = lowerSnake(raw);
+    var map = {
+      ya_ingin_hamil_segera: 'YA_INGIN_HAMIL_SEGERA',
+      ingin_hamil_segera: 'YA_INGIN_HAMIL_SEGERA',
+      ya_hamil_segera: 'YA_INGIN_HAMIL_SEGERA',
+      tidak_ingin_hamil_nanti: 'TIDAK_INGIN_HAMIL_NANTI',
+      tidak_hamil_nanti: 'TIDAK_INGIN_HAMIL_NANTI',
+      ingin_hamil_nanti: 'TIDAK_INGIN_HAMIL_NANTI',
+      tidak_ingin_hamil_lagi: 'TIDAK_INGIN_HAMIL_LAGI',
+      tidak_hamil_lagi: 'TIDAK_INGIN_HAMIL_LAGI',
+      tidak_ingin_hamil: 'TIDAK_INGIN_HAMIL_LAGI'
+    };
+    if (map[key]) return map[key];
+    return up(raw).replace(/[^A-Z0-9]+/g, '_').replace(/_+/g, '_').replace(/^_+|_+$/g, '');
+  }
+
+  function getDynamicInput(code) {
+    var target = lowerSnake(code);
+    return document.querySelector('[data-reg-question-code="' + target + '"]') || document.getElementById('dyn-' + target);
+  }
+
+  function getDynamicInputValue(code) {
+    var el = getDynamicInput(code);
+    return el ? s(el.value) : '';
+  }
+
+  var oldBuildPayload = typeof RF.buildPayload === 'function' ? RF.buildPayload : null;
+  if (oldBuildPayload) {
+    RF.buildPayload = function (data, mode) {
+      var payload = oldBuildPayload.apply(this, arguments) || {};
+      var jenis = up(payload.jenis_sasaran || (payload.answers && payload.answers.jenis_sasaran));
+      payload.answers = payload.answers || {};
+
+      if (jenis === 'BUMIL') {
+        var selected = firstNonEmpty(
+          getDynamicInputValue('kehamilan_diinginkan'),
+          payload.answers.kehamilan_diinginkan,
+          payload.answers.KEHAMILAN_DIINGINKAN
+        );
+        if (selected) {
+          payload.answers.kehamilan_diinginkan = normalizeBumilKehamilanValue(selected);
+          payload.answers.KEHAMILAN_DIINGINKAN = payload.answers.kehamilan_diinginkan;
+        }
+      }
+
+      if (jenis === 'CATIN') {
+        var domisili = getDynamicInputValue('domisili_setelah_menikah');
+        if (domisili) {
+          payload.answers.domisili_setelah_menikah = domisili;
+          payload.answers.DOMISILI_SETELAH_MENIKAH = domisili;
+        } else {
+          delete payload.answers.domisili_setelah_menikah;
+          delete payload.answers.DOMISILI_SETELAH_MENIKAH;
+        }
+
+        if (!s(payload.answers.data_pasangan)) {
+          var parts = [];
+          if (s(payload.answers.nama_pasangan)) parts.push('Nama: ' + s(payload.answers.nama_pasangan));
+          if (s(payload.answers.nik_pasangan)) parts.push('NIK: ' + s(payload.answers.nik_pasangan).replace(/\D+/g, '').slice(0, 16));
+          if (parts.length) payload.answers.data_pasangan = parts.join(' | ');
+        }
+      }
+
+      payload.__frontend_submit_guard_version = VERSION;
+      return payload;
+    };
+  }
+
+  function saveDraftNow() {
+    var data = null;
+    if (isFunction(RF.collectFormData)) {
+      data = RF.collectFormData();
+    }
+    if (!data || typeof data !== 'object') data = {};
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ saved_at: new Date().toISOString(), data: data }));
+    } catch (err) {
+      notify('Draft tidak dapat disimpan di perangkat ini.', 'error');
+      return false;
+    }
+    notify('Draft registrasi berhasil disimpan di perangkat.', 'success');
+    return true;
+  }
+
+  async function resetFormNow() {
+    try { localStorage.removeItem(DRAFT_KEY); } catch (err) {}
+    try { if (isFunction(RF.resetForm)) RF.resetForm(); } catch (err2) {}
+    try { if (isFunction(RF.applyModeUI)) RF.applyModeUI(); } catch (err3) {}
+    try { if (isFunction(RF.prefillScope)) await RF.prefillScope(); } catch (err4) {}
+    try { if (isFunction(RF.applyGenderLockByJenis)) RF.applyGenderLockByJenis(); } catch (err5) {}
+    try { if (isFunction(RF.applyJenisSpecificStaticFields)) RF.applyJenisSpecificStaticFields(); } catch (err6) {}
+    try { if (isFunction(RF.renderValidation)) RF.renderValidation(); } catch (err7) {}
+    notify('Form registrasi sudah direset.', 'info');
+  }
+
+  function buttonText(el) {
+    if (!el) return '';
+    var value = '';
+    try { value = el.value || ''; } catch (err) {}
+    return up(firstNonEmpty(value, el.textContent, el.getAttribute && el.getAttribute('aria-label'), el.getAttribute && el.getAttribute('title')));
+  }
+
+  function isDraftButton(el) {
+    var id = up(el && el.id);
+    var action = up(el && el.getAttribute && (el.getAttribute('data-action') || el.getAttribute('name')));
+    var text = buttonText(el);
+    return id.indexOf('DRAFT') >= 0 || action.indexOf('DRAFT') >= 0 || text.indexOf('SIMPAN DRAFT') >= 0;
+  }
+
+  function isResetButton(el) {
+    var id = up(el && el.id);
+    var action = up(el && el.getAttribute && (el.getAttribute('data-action') || el.getAttribute('name')));
+    var text = buttonText(el);
+    var type = up(el && el.getAttribute && el.getAttribute('type'));
+    return id.indexOf('RESET') >= 0 || action.indexOf('RESET') >= 0 || text === 'RESET' || type === 'RESET';
+  }
+
+  document.addEventListener('click', function (event) {
+    var target = event.target;
+    if (!target || !target.closest) return;
+    var btn = target.closest('button, input[type="button"], input[type="reset"], a, [role="button"]');
+    if (!btn) return;
+
+    if (isDraftButton(btn)) {
+      event.preventDefault();
+      event.stopPropagation();
+      saveDraftNow();
+      return;
+    }
+
+    if (isResetButton(btn)) {
+      event.preventDefault();
+      event.stopPropagation();
+      resetFormNow();
+    }
+  }, true);
+
+  window.__TPK_REGISTRASI_R1R3R1_DEBUG__ = {
+    version: VERSION,
+    normalizeDefinitionPatched: !!oldNormalizeDefinition,
+    buildPayloadPatched: !!oldBuildPayload,
+    saveDraftNow: saveDraftNow,
+    resetFormNow: resetFormNow
+  };
+  window.__TPK_REGISTRASI_SUBMIT_FIX_VERSION = VERSION;
+})(window, document);
+/* ===== READ MODEL BINDING R1-R3-R1 end ===== */
+
