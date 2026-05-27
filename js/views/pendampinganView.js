@@ -1,7 +1,7 @@
 (function (window, document) {
   'use strict';
 
-  window.__PENDAMPINGAN_VIEW_BUILD = '20260420-01-final';
+  window.__PENDAMPINGAN_VIEW_BUILD = '20260527-RMB-R2-PENDAMPINGAN-DYNAMIC-FORM';
   console.log('PendampinganView build aktif:', window.__PENDAMPINGAN_VIEW_BUILD);
 
   var PENDAMPINGAN_DRAFT_KEY = 'tpk_pendampingan_draft';
@@ -12,6 +12,8 @@
   var currentDynamicFields = [];
   var currentJenisSasaran = '';
   var currentOpenToken = 0;
+  var currentFormDefinition = null;
+  var pendampinganFormCache = Object.create(null);
   var isInitialized = false;
 
   function byId(id) {
@@ -397,12 +399,6 @@
     return item;
   }
 
-  function getFormIdByJenis(jenisSasaran) {
-    var config = getConfig();
-    var formIds = config.FORM_IDS || {};
-    var key = normalizeUpper(jenisSasaran);
-    return formIds[key] || formIds.UMUM || 'FRM0001';
-  }
 
   function getStatusBadgeClass(status) {
     var value = normalizeUpper(status);
@@ -506,314 +502,401 @@
     return months;
   }
 
+  function boolValue(value, defaultValue) {
+    if (value === true || value === false) return value;
+    var raw = String(value === undefined || value === null ? '' : value).trim().toUpperCase();
+    if (!raw) return !!defaultValue;
+    if (raw === 'TRUE' || raw === '1' || raw === 'YA' || raw === 'YES' || raw === 'Y') return true;
+    if (raw === 'FALSE' || raw === '0' || raw === 'TIDAK' || raw === 'NO' || raw === 'N') return false;
+    return !!defaultValue;
+  }
+
+  function isYesValue(value) {
+    var raw = normalizeUpper(value);
+    return raw === 'YA' || raw === 'YES' || raw === 'Y' || raw === 'TRUE' || raw === '1' || raw.indexOf('YA,') === 0;
+  }
+
   function field(id, label, type, required, options) {
     options = options || {};
     return {
       id: id,
+      code: options.code || id,
+      question_id: options.question_id || '',
+      store_key: options.store_key || id,
+      question_code: options.question_code || String(id || '').toUpperCase(),
       label: label,
       type: type,
+      data_type: options.data_type || '',
       required: !!required,
+      base_required: !!required,
       options: options.options || [],
       placeholder: options.placeholder || '',
       helpText: options.helpText || '',
       section: options.section || 'Lainnya',
+      section_order: Number(options.section_order || 999),
+      question_order: Number(options.question_order || 999),
       showIf: options.showIf || null,
+      requiredIf: options.requiredIf || null,
       min: options.min,
       max: options.max,
+      maxLength: options.maxLength,
       step: options.step,
-      readonly: !!options.readonly
+      readonly: !!options.readonly,
+      hidden: !!options.hidden,
+      raw: options.raw || null
     };
   }
 
-  function yesNoOptions() {
-    return ['Ya', 'Tidak'];
+  function getFallbackOptions(referenceKey) {
+    var key = normalizeUpper(referenceKey);
+    if (key === 'OPT_YA_TIDAK') return [{ value: 'YA', label: 'Ya' }, { value: 'TIDAK', label: 'Tidak' }];
+    if (key === 'OPT_JKN_TYPE') return [
+      { value: 'BPJS_PBI', label: 'BPJS PBI' },
+      { value: 'BPJS_NON_PBI', label: 'BPJS Non-PBI / Mandiri' },
+      { value: 'JAMKESDA', label: 'Jamkesda' },
+      { value: 'LAINNYA', label: 'Lainnya' }
+    ];
+    if (key === 'OPT_BANSOS_TYPE') return [
+      { value: 'PKH', label: 'PKH' },
+      { value: 'BPNT_SEMBAKO', label: 'BPNT / Sembako' },
+      { value: 'BLT_DESA', label: 'BLT Desa' },
+      { value: 'BANTUAN_PANGAN', label: 'Bantuan Pangan' },
+      { value: 'PMT', label: 'PMT' },
+      { value: 'LAINNYA', label: 'Lainnya' }
+    ];
+    if (key === 'OPT_MBG_FREQ') return [
+      { value: 'SETIAP_HARI', label: 'Setiap Hari' },
+      { value: 'LIMA_HARI_PER_MINGGU', label: '5 Hari Per Minggu' },
+      { value: 'TIGA_EMPAT_HARI_PER_MINGGU', label: '3–4 Hari per Minggu' },
+      { value: 'SATU_DUA_HARI_PER_MINGGU', label: '1–2 Hari per Minggu' },
+      { value: 'TIDAK_TERATUR', label: 'Tidak Teratur' }
+    ];
+    if (key === 'OPT_JENIS_KB') return [
+      { value: 'PIL', label: 'Pil' },
+      { value: 'SUNTIK', label: 'Suntik' },
+      { value: 'IMPLAN', label: 'Implan' },
+      { value: 'IUD', label: 'IUD' },
+      { value: 'KONDOM', label: 'Kondom' },
+      { value: 'MOW', label: 'MOW' },
+      { value: 'MOP', label: 'MOP' },
+      { value: 'MAL', label: 'MAL' },
+      { value: 'LAINNYA', label: 'Lainnya' }
+    ];
+    if (key === 'OPT_IMUNISASI_RELEVAN') return [
+      { value: 'SESUAI_UMUR_LENGKAP', label: 'Sesuai Umur / Lengkap' },
+      { value: 'BELUM_LENGKAP', label: 'Belum Lengkap' },
+      { value: 'BELUM_PERNAH', label: 'Belum Pernah Imunisasi' },
+      { value: 'TIDAK_TAHU', label: 'Tidak Tahu' }
+    ];
+    return [];
   }
 
-  function jknTypeOptions() {
-    return ['BPJS PBI', 'BPJS Non-PBI', 'Swasta', 'Tidak tahu'];
-  }
-
-  function bansosStatusOptions() {
-    return ['Ya, sudah mendapatkan bansos', 'Tidak'];
-  }
-
-  function bansosJenisOptions() {
-    return ['PKH', 'BPNT/Sembako', 'BLT', 'Bantuan Lokal Desa', 'Lainnya'];
-  }
-
-  function mbgFreqOptions() {
-    return ['1 hari', '2 hari', '3 hari', '4 hari', '5 hari', '6 hari', '7 hari'];
-  }
-
-  function upfOptions() {
-    return ['Masih', 'Tidak'];
-  }
-
-  function kbJenisOptions() {
-    return ['Pil', 'Suntik', 'Implan', 'IUD', 'Kondom', 'MOW/MOP', 'Lainnya'];
-  }
-
-  function riwayatPenyakitOptions() {
-    return ['Tidak Ada', 'Hipertensi', 'Diabetes', 'Anemia', 'Lainnya'];
-  }
-
-  function imunisasiOptionsByAge(ageMonths) {
-    if (ageMonths === null || ageMonths === undefined) {
-      return ['HB0', 'BCG', 'Polio', 'DPT-HB-Hib', 'Campak-Rubella', 'Lainnya', 'Belum diketahui'];
-    }
-    if (ageMonths <= 1) return ['HB0', 'BCG', 'Polio 1'];
-    if (ageMonths <= 3) return ['BCG', 'Polio 1', 'DPT-HB-Hib 1', 'Polio 2'];
-    if (ageMonths <= 5) return ['DPT-HB-Hib 2', 'Polio 3', 'DPT-HB-Hib 3', 'Polio 4'];
-    if (ageMonths <= 9) return ['IPV', 'Campak-Rubella'];
-    if (ageMonths <= 18) return ['DPT-HB-Hib Lanjutan', 'Campak-Rubella Lanjutan'];
-    return ['Campak-Rubella Lanjutan', 'Imunisasi tambahan sesuai usia', 'Belum diketahui'];
-  }
-
-  function getQuestionBank(jenisSasaran, selected) {
+  function getFallbackQuestionBank(jenisSasaran) {
     var jenis = normalizeUpper(jenisSasaran);
-    var ageMonths = getAgeMonths(selected && selected.tanggal_lahir);
-
+    var yesNo = getFallbackOptions('OPT_YA_TIDAK');
     var common = [
-      field('kepesertaan_jkn', 'Kepesertaan JKN', 'select', true, {
-        options: yesNoOptions(),
-        helpText: 'Status JKN sasaran.',
-        section: 'Pendampingan Umum'
-      }),
-      field('jenis_jkn', 'Jenis JKN', 'select', false, {
-        options: jknTypeOptions(),
-        helpText: 'Diisi jika sasaran memiliki JKN.',
-        section: 'Pendampingan Umum',
-        showIf: { field: 'kepesertaan_jkn', equals: 'Ya' }
-      }),
-      field('memberikan_kie', 'Memberikan KIE/Penyuluhan', 'select', true, {
-        options: yesNoOptions(),
-        helpText: 'Penyuluhan pada kunjungan.',
-        section: 'Pendampingan Umum'
-      }),
-      field('memfasilitasi_rujukan', 'Memfasilitasi Rujukan', 'select', true, {
-        options: yesNoOptions(),
-        helpText: 'Rujukan pada kunjungan.',
-        section: 'Pendampingan Umum'
-      }),
-      field('pemberian_bansos', 'Pemberian Bansos', 'select', true, {
-        options: bansosStatusOptions(),
-        helpText: 'Bansos oleh TPK.',
-        section: 'Pendampingan Umum'
-      }),
-      field('jenis_bansos', 'Jenis Bansos', 'select', false, {
-        options: bansosJenisOptions(),
-        helpText: 'Diisi jika bansos diberikan.',
-        section: 'Pendampingan Umum',
-        showIf: { field: 'pemberian_bansos', equals: 'Ya, sudah mendapatkan bansos' }
-      }),
-      field('catatan_pendampingan', 'Catatan Pendampingan', 'textarea', false, {
-        placeholder: 'Catatan kunjungan',
-        section: 'Pendampingan Umum'
-      })
+      field('memberikan_kie', 'Memberikan KIE/Penyuluhan', 'select', true, { options: yesNo, section: 'Pendampingan Umum' }),
+      field('memfasilitasi_rujukan', 'Memfasilitasi Rujukan', 'select', true, { options: yesNo, section: 'Pendampingan Umum' }),
+      field('kepesertaan_jkn', 'Kepesertaan JKN', 'select', true, { options: yesNo, section: 'JKN' }),
+      field('jenis_jkn', 'Jenis JKN', 'select', false, { options: getFallbackOptions('OPT_JKN_TYPE'), section: 'JKN', showIf: { field: 'kepesertaan_jkn', equals: 'YA' }, requiredIf: { field: 'kepesertaan_jkn', equals: 'YA' } }),
+      field('pemberian_bansos', 'Pemberian Bansos', 'select', true, { options: yesNo, section: 'Bansos' }),
+      field('jenis_bansos', 'Jenis Bansos', 'select', false, { options: getFallbackOptions('OPT_BANSOS_TYPE'), section: 'Bansos', showIf: { field: 'pemberian_bansos', equals: 'YA' }, requiredIf: { field: 'pemberian_bansos', equals: 'YA' } }),
+      field('mbg_diterima', 'MBG Diterima', 'select', true, { options: yesNo, section: 'MBG 3B' }),
+      field('frekuensi_mbg', 'Frekuensi MBG', 'select', false, { options: getFallbackOptions('OPT_MBG_FREQ'), section: 'MBG 3B', showIf: { field: 'mbg_diterima', equals: 'YA' }, requiredIf: { field: 'mbg_diterima', equals: 'YA' } })
     ];
 
     if (jenis === 'BADUTA') {
       return [
-        field('berat_badan', 'Berat Badan', 'number', true, {
-          placeholder: 'Masukkan kg',
-          helpText: 'Berat badan saat kunjungan.',
-          min: 1,
-          max: 30,
-          step: 0.1,
-          section: 'Skrining BADUTA'
-        }),
-        field('panjang_tinggi_badan', 'Panjang/Tinggi Badan', 'number', true, {
-          placeholder: 'Masukkan cm',
-          helpText: 'Panjang/Tinggi badan saat kunjungan.',
-          min: 30,
-          max: 130,
-          step: 0.1,
-          section: 'Skrining BADUTA'
-        }),
-        field('imunisasi_relevan', 'Imunisasi Relevan', 'select', false, {
-          options: imunisasiOptionsByAge(ageMonths),
-          helpText: 'Tampilkan selektif sesuai umur/riwayat.',
-          section: 'Skrining BADUTA'
-        }),
-        field('mbg_diterima', 'MBG Diterima', 'select', true, {
-          options: yesNoOptions(),
-          helpText: 'Status MBG sasaran.',
-          section: 'MBG 3B'
-        }),
-        field('frekuensi_mbg', 'Frekuensi MBG', 'select', false, {
-          options: mbgFreqOptions(),
-          helpText: 'Diisi jika MBG diterima.',
-          section: 'MBG 3B',
-          showIf: { field: 'mbg_diterima', equals: 'Ya' }
-        })
+        field('bb', 'Berat Badan', 'number', false, { min: 0.5, max: 30, step: 0.1, section: 'Evaluasi Pertumbuhan' }),
+        field('pb_tb', 'Panjang/Tinggi Badan', 'number', false, { min: 20, max: 150, step: 0.1, section: 'Evaluasi Pertumbuhan' }),
+        field('imunisasi_relevan', 'Imunisasi Relevan', 'select', false, { options: getFallbackOptions('OPT_IMUNISASI_RELEVAN'), section: 'KIE / Edukasi' })
       ].concat(common);
     }
 
     if (jenis === 'BUMIL') {
       return [
-        field('usia_hamil_minggu', 'Usia Kehamilan (Minggu)', 'number', true, {
-          placeholder: 'Contoh: 24',
-          min: 1,
-          max: 45,
-          step: 1,
-          section: 'Skrining BUMIL'
-        }),
-        field('periksa_tbjj', 'Melakukan Pengukuran TBJJ', 'select', true, {
-          options: yesNoOptions(),
-          section: 'Skrining BUMIL'
-        }),
-        field('hasil_tbjj', 'Hasil TBJJ (gram)', 'number', false, {
-          placeholder: 'Contoh: 1200',
-          min: 100,
-          max: 6000,
-          step: 1,
-          section: 'Skrining BUMIL',
-          showIf: { field: 'periksa_tbjj', equals: 'Ya' }
-        }),
-        field('periksa_tfu', 'Melakukan Pengukuran TFU', 'select', true, {
-          options: yesNoOptions(),
-          section: 'Skrining BUMIL'
-        }),
-        field('hasil_tfu', 'Hasil TFU', 'number', false, {
-          placeholder: 'Contoh: 28',
-          min: 1,
-          max: 60,
-          step: 0.1,
-          section: 'Skrining BUMIL',
-          showIf: { field: 'periksa_tfu', equals: 'Ya' }
-        }),
-        field('berat_badan', 'Berat Badan (Kg)', 'number', true, {
-          placeholder: 'Masukkan kg',
-          min: 25,
-          max: 200,
-          step: 0.1,
-          section: 'Skrining BUMIL'
-        }),
-        field('tinggi_badan', 'Tinggi Badan (Cm)', 'number', true, {
-          placeholder: 'Masukkan cm',
-          min: 100,
-          max: 220,
-          step: 0.1,
-          section: 'Skrining BUMIL'
-        }),
-        field('imt', 'IMT', 'number', false, {
-          placeholder: 'Otomatis',
-          readonly: true,
-          step: 0.01,
-          section: 'Skrining BUMIL'
-        }),
-        field('periksa_hb', 'Melakukan Pemeriksaan HB', 'select', true, {
-          options: yesNoOptions(),
-          section: 'Skrining BUMIL'
-        }),
-        field('kadar_hb', 'Kadar HB', 'number', false, {
-          placeholder: 'Contoh: 11.2',
-          min: 1,
-          max: 20,
-          step: 0.1,
-          section: 'Skrining BUMIL',
-          showIf: { field: 'periksa_hb', equals: 'Ya' }
-        }),
-        field('lila', 'LILA (Cm)', 'number', true, {
-          placeholder: 'Contoh: 23.5',
-          min: 1,
-          max: 60,
-          step: 0.1,
-          section: 'Skrining BUMIL'
-        }),
-        field('riwayat_penyakit', 'Riwayat Penyakit', 'select', false, {
-          options: riwayatPenyakitOptions(),
-          section: 'Skrining BUMIL'
-        }),
-        field('rokok_atau_asap', 'Merokok/Terpapar Asap Rokok', 'select', true, {
-          options: yesNoOptions(),
-          section: 'Skrining BUMIL'
-        }),
-        field('dapat_ttd', 'Sudah Mendapatkan TTD', 'select', true, {
-          options: yesNoOptions(),
-          section: 'Pendampingan Umum'
-        }),
-        field('minum_ttd', 'Sudah Meminum TTD', 'select', false, {
-          options: yesNoOptions(),
-          section: 'Pendampingan Umum',
-          showIf: { field: 'dapat_ttd', equals: 'Ya' }
-        }),
-        field('mbg_diterima', 'MBG Diterima', 'select', true, {
-          options: yesNoOptions(),
-          section: 'MBG 3B'
-        }),
-        field('frekuensi_mbg', 'Frekuensi MBG', 'select', false, {
-          options: mbgFreqOptions(),
-          section: 'MBG 3B',
-          showIf: { field: 'mbg_diterima', equals: 'Ya' }
-        }),
-        field('frekuensi_menu_basah', 'Frekuensi Menu Basah', 'select', false, {
-          options: mbgFreqOptions(),
-          section: 'MBG 3B',
-          showIf: { field: 'mbg_diterima', equals: 'Ya' }
-        }),
-        field('pemberian_upf', 'Pemberian Makanan UPF', 'select', false, {
-          options: upfOptions(),
-          section: 'MBG 3B',
-          showIf: { field: 'mbg_diterima', equals: 'Ya' }
-        }),
-        field('distribusi_mbg_tpk', 'Frekuensi Distribusi MBG oleh TPK', 'select', false, {
-          options: mbgFreqOptions(),
-          section: 'MBG 3B',
-          showIf: { field: 'mbg_diterima', equals: 'Ya' }
-        })
+        field('bb', 'Berat Badan', 'number', false, { min: 20, max: 200, step: 0.1, section: 'Evaluasi Gizi dan HB' }),
+        field('tb', 'Tinggi Badan', 'number', false, { min: 80, max: 220, step: 0.1, section: 'Evaluasi Gizi dan HB' }),
+        field('lila', 'LILA', 'number', false, { min: 5, max: 60, step: 0.1, section: 'Evaluasi Gizi dan HB' }),
+        field('periksa_hb', 'Periksa HB', 'select', true, { options: yesNo, section: 'Evaluasi Gizi dan HB' }),
+        field('kadar_hb', 'Kadar HB', 'number', false, { min: 1, max: 25, step: 0.1, section: 'Evaluasi Gizi dan HB', showIf: { field: 'periksa_hb', equals: 'YA' }, requiredIf: { field: 'periksa_hb', equals: 'YA' } })
       ].concat(common);
     }
 
     if (jenis === 'BUFAS') {
       return [
-        field('kondisi_ibu', 'Kondisi Ibu', 'select', true, {
-          options: ['Baik', 'Perlu Pemantauan', 'Perlu Rujukan'],
-          section: 'Skrining BUFAS'
-        }),
-        field('asi_eksklusif', 'ASI Eksklusif', 'select', true, {
-          options: yesNoOptions(),
-          section: 'Skrining BUFAS'
-        }),
-        field('vitamin_a_nifas', 'Mendapat Vitamin A Nifas', 'select', true, {
-          options: yesNoOptions(),
-          section: 'Skrining BUFAS'
-        }),
-        field('kb_pasca_persalinan', 'KB Pasca Persalinan', 'select', true, {
-          options: yesNoOptions(),
-          section: 'Skrining BUFAS'
-        }),
-        field('jenis_kb', 'Jenis KB', 'select', false, {
-          options: kbJenisOptions(),
-          section: 'Skrining BUFAS',
-          showIf: { field: 'kb_pasca_persalinan', equals: 'Ya' }
-        }),
-        field('mbg_diterima', 'MBG Diterima', 'select', true, {
-          options: yesNoOptions(),
-          section: 'MBG 3B'
-        }),
-        field('frekuensi_mbg', 'Frekuensi MBG', 'select', false, {
-          options: mbgFreqOptions(),
-          section: 'MBG 3B',
-          showIf: { field: 'mbg_diterima', equals: 'Ya' }
-        })
+        field('kb_pasca', 'KB Pasca Persalinan', 'select', true, { options: yesNo, section: 'Evaluasi KB Pasca Persalinan' }),
+        field('jenis_kb', 'Jenis KB', 'select', false, { options: getFallbackOptions('OPT_JENIS_KB'), section: 'Evaluasi KB Pasca Persalinan', showIf: { field: 'kb_pasca', equals: 'YA' }, requiredIf: { field: 'kb_pasca', equals: 'YA' } })
       ].concat(common);
     }
 
     return [
-      field('pemeriksaan_kesehatan', 'Pemeriksaan Kesehatan', 'select', true, {
-        options: yesNoOptions(),
-        section: 'Pendampingan CATIN'
-      }),
-      field('edukasi_gizi', 'Edukasi Gizi', 'select', true, {
-        options: yesNoOptions(),
-        section: 'Pendampingan CATIN'
-      }),
-      field('konsumsi_ttd', 'Konsumsi TTD', 'select', false, {
-        options: yesNoOptions(),
-        section: 'Pendampingan CATIN'
-      })
+      field('ctn_periksa', 'CATIN Sudah Diperiksa', 'select', true, { options: yesNo, section: 'Evaluasi Skrining' }),
+      field('ctn_tgl_periksa', 'Tanggal Pemeriksaan CATIN', 'date', false, { section: 'Evaluasi Skrining', showIf: { field: 'ctn_periksa', equals: 'YA' }, requiredIf: { field: 'ctn_periksa', equals: 'YA' } })
     ].concat(common);
+  }
+
+  function getFormIdByJenis(jenisSasaran) {
+    var config = getConfig();
+    var jenis = normalizeUpper(jenisSasaran);
+    var pendMap = (config.FORM && config.FORM.PENDAMPINGAN_JENIS_TO_FORM) || config.PENDAMPINGAN_FORM_IDS || {};
+    var candidate = pendMap[jenis] || pendMap.DEFAULT || '';
+    if (candidate && String(candidate).toUpperCase().indexOf('FRM000') === 0) return String(candidate).toUpperCase();
+
+    var legacyMap = config.FORM_IDS || {};
+    candidate = legacyMap[jenis] || legacyMap.UMUM || '';
+    if (candidate && String(candidate).toUpperCase().indexOf('FRM000') === 0) return String(candidate).toUpperCase();
+
+    var fallback = { CATIN: 'FRM0002', BUMIL: 'FRM0003', BUFAS: 'FRM0004', BADUTA: 'FRM0005' };
+    return fallback[jenis] || 'FRM0001';
+  }
+
+  function buildPendampinganFormCacheKey(formId, jenis) {
+    return 'tpk_form_definition_cache::PENDAMPINGAN::' + normalizeUpper(formId) + '::' + normalizeUpper(jenis);
+  }
+
+  function readPendampinganFormCache(formId, jenis) {
+    var key = buildPendampinganFormCacheKey(formId, jenis);
+    try {
+      var raw = JSON.parse(localStorage.getItem(key) || 'null');
+      if (raw && raw.definition && typeof raw.definition === 'object') return raw.definition;
+      if (raw && raw.data && typeof raw.data === 'object') return raw.data;
+    } catch (err) {}
+    return null;
+  }
+
+  function writePendampinganFormCache(formId, jenis, definition) {
+    var key = buildPendampinganFormCacheKey(formId, jenis);
+    try {
+      localStorage.setItem(key, JSON.stringify({
+        saved_at: new Date().toISOString(),
+        form_id: formId,
+        jenis_sasaran: jenis,
+        definition: definition || {}
+      }));
+    } catch (err) {}
+  }
+
+  async function fetchPendampinganFormDefinition(jenisSasaran, options) {
+    var opts = options || {};
+    var jenis = normalizeUpper(jenisSasaran);
+    var formId = getFormIdByJenis(jenis);
+    var cacheKey = formId + '::' + jenis;
+
+    if (opts.forceRefresh !== true && pendampinganFormCache[cacheKey]) {
+      return pendampinganFormCache[cacheKey];
+    }
+
+    var cached = readPendampinganFormCache(formId, jenis);
+    if (cached && opts.forceRefresh !== true) {
+      pendampinganFormCache[cacheKey] = cached;
+      return cached;
+    }
+
+    var api = getApi();
+    if (!api || typeof api.post !== 'function') {
+      if (cached) return cached;
+      throw new Error('Api.post belum tersedia untuk memuat form pendampingan.');
+    }
+
+    var result = await api.post(getActionName('GET_PENDAMPINGAN_FORM_DEFINITION', 'getPendampinganFormDefinition'), {
+      module: 'PENDAMPINGAN',
+      jenis_sasaran: jenis,
+      form_id: formId,
+      include_questions: true
+    }, {
+      includeAuth: true,
+      timeoutMs: typeof opts.timeoutMs === 'number' ? opts.timeoutMs : 30000,
+      retryCount: 0,
+      meta: {
+        source: 'pendampingan_dynamic_form_binding',
+        form_id: formId,
+        jenis_sasaran: jenis
+      }
+    });
+
+    if (!result || result.ok === false) {
+      if (cached) return cached;
+      throw new Error((result && result.message) || 'Definisi form pendampingan gagal dimuat.');
+    }
+
+    var definition = result.data || {};
+    pendampinganFormCache[cacheKey] = definition;
+    writePendampinganFormCache(formId, jenis, definition);
+    return definition;
+  }
+
+  function getDefinitionQuestions(definition) {
+    var def = definition || {};
+    var questions = [];
+
+    if (Array.isArray(def.questions) && def.questions.length) {
+      questions = def.questions.slice();
+    }
+
+    if (!questions.length && Array.isArray(def.fields) && def.fields.length) {
+      questions = def.fields.slice();
+    }
+
+    if (!questions.length && Array.isArray(def.sections)) {
+      def.sections.forEach(function (section) {
+        (section.questions || section.fields || []).forEach(function (q) {
+          questions.push(Object.assign({}, q, {
+            section_id: q.section_id || section.section_id || '',
+            section_label: q.section_label || section.section_label || section.section_name || '',
+            section_order: q.section_order || section.section_order || 999
+          }));
+        });
+      });
+    }
+
+    return questions;
+  }
+
+  function normalizeOption(opt, index) {
+    if (opt === undefined || opt === null) return null;
+    if (typeof opt !== 'object') {
+      var text = String(opt);
+      return { value: text, label: text, order: index + 1 };
+    }
+    var value = String(opt.value || opt.option_value || opt.id || opt.code || opt.label || opt.option_label || '').trim();
+    var label = String(opt.label || opt.option_label || opt.text || opt.name || value).trim();
+    if (!value && !label) return null;
+    return {
+      value: value || label,
+      label: label || value,
+      order: Number(opt.order || opt.option_order || index + 1) || (index + 1),
+      parent_option_value: opt.parent_option_value || opt.parent_value || ''
+    };
+  }
+
+  function normalizeFieldType(q) {
+    var raw = normalizeUpper(q.field_type || q.input_type || q.type);
+    if (raw === 'DROPDOWN' || raw === 'RADIO' || raw === 'SEARCH_SELECT') return 'select';
+    if (raw === 'TEXTAREA') return 'textarea';
+    if (raw === 'DATE') return 'date';
+    if (raw === 'NUMBER' || raw === 'NUMBER_DECIMAL' || raw === 'DECIMAL' || raw === 'INTEGER') return 'number';
+    if (raw === 'TEXT_NUMERIC' || raw === 'NUMERIC_TEXT') return 'text_numeric';
+    if (raw === 'HIDDEN') return 'hidden';
+    return 'text';
+  }
+
+  function isNumericField(field) {
+    if (!field) return false;
+    var type = normalizeUpper(field.type);
+    var dataType = normalizeUpper(field.data_type);
+    return type === 'NUMBER' || dataType === 'INTEGER' || dataType === 'DECIMAL' || dataType === 'NUMBER';
+  }
+
+  function resolveStep(q, type) {
+    var dataType = normalizeUpper(q.data_type);
+    if (type !== 'number') return undefined;
+    if (dataType === 'INTEGER') return 1;
+    return 0.1;
+  }
+
+  function normalizeQuestionToField(q, sectionFallback) {
+    q = q || {};
+    var storeKey = normalizeSpaces(q.store_key || q.save_key || q.column_target || '');
+    var code = normalizeSpaces(q.question_code || q.code || '');
+    var questionId = normalizeSpaces(q.question_id || q.id || '');
+    var id = storeKey || (code ? code.toLowerCase() : '') || questionId;
+    var type = normalizeFieldType(q);
+    var options = (Array.isArray(q.options) ? q.options : [])
+      .map(normalizeOption)
+      .filter(Boolean)
+      .sort(function (a, b) { return Number(a.order || 0) - Number(b.order || 0); });
+
+    if (!options.length && q.reference_key) options = getFallbackOptions(q.reference_key);
+
+    var min = q.min_value !== undefined && q.min_value !== null && String(q.min_value).trim() !== '' ? Number(q.min_value) : undefined;
+    var max = q.max_value !== undefined && q.max_value !== null && String(q.max_value).trim() !== '' ? Number(q.max_value) : undefined;
+
+    return field(id, q.question_label || q.label || q.question_short_label || code || id, type, boolValue(q.is_required, false), {
+      question_id: questionId,
+      store_key: storeKey || id,
+      question_code: code,
+      code: code || id,
+      data_type: q.data_type || '',
+      options: options,
+      placeholder: q.placeholder || '',
+      helpText: q.help_text || q.description || '',
+      section: q.section_label || q.section_name || (sectionFallback && sectionFallback.section_label) || 'Pendampingan',
+      section_order: q.section_order || (sectionFallback && sectionFallback.section_order) || 999,
+      question_order: q.question_order || 999,
+      min: isNaN(min) ? undefined : min,
+      max: isNaN(max) ? undefined : max,
+      maxLength: q.max_length ? Number(q.max_length) : undefined,
+      step: resolveStep(q, type),
+      readonly: boolValue(q.readonly, false) || boolValue(q.is_editable, true) === false || boolValue(q.is_editable_resolved, true) === false,
+      hidden: type === 'hidden',
+      raw: q
+    });
+  }
+
+  function isSkippedSystemQuestion(field) {
+    var key = normalizeUpper(field && (field.store_key || field.id));
+    return key === 'ID_SASARAN' ||
+      key === 'TANGGAL_PENDAMPINGAN' ||
+      key === 'CATATAN_PENDAMPINGAN' ||
+      key === 'FORM_ID' ||
+      key === 'JENIS_SASARAN';
+  }
+
+  function applyBackendRulesToFields(fields) {
+    var byCode = {};
+    var byId = {};
+    var byKey = {};
+
+    fields.forEach(function (field) {
+      if (field.question_code) byCode[normalizeUpper(field.question_code)] = field;
+      if (field.question_id) byId[normalizeUpper(field.question_id)] = field;
+      if (field.id) byKey[normalizeUpper(field.id)] = field;
+      if (field.store_key) byKey[normalizeUpper(field.store_key)] = field;
+    });
+
+    fields.forEach(function (field) {
+      var rules = (field.raw && Array.isArray(field.raw.rules)) ? field.raw.rules : [];
+      rules.forEach(function (rule) {
+        var action = normalizeUpper(rule.action || '');
+        var triggerRaw = normalizeUpper(rule.trigger_field || rule.field || '');
+        var target = byCode[triggerRaw] || byId[triggerRaw] || byKey[triggerRaw] || null;
+        if (!target) return;
+
+        var cond = {
+          field: target.id,
+          operator: normalizeUpper(rule.operator || 'EQ'),
+          equals: normalizeSpaces(rule.trigger_value),
+          raw: rule
+        };
+
+        if (action === 'SHOW') field.showIf = cond;
+        if (action === 'REQUIRE') field.requiredIf = cond;
+      });
+    });
+
+    return fields;
+  }
+
+  function buildFieldsFromDefinition(definition, jenisSasaran) {
+    var questions = getDefinitionQuestions(definition);
+    if (!questions.length) return getFallbackQuestionBank(jenisSasaran);
+
+    var fields = questions
+      .map(function (q) { return normalizeQuestionToField(q, null); })
+      .filter(function (field) { return field && !field.hidden && !isSkippedSystemQuestion(field); });
+
+    fields = applyBackendRulesToFields(fields);
+    return fields.sort(function (a, b) {
+      if (Number(a.section_order || 0) !== Number(b.section_order || 0)) return Number(a.section_order || 0) - Number(b.section_order || 0);
+      return Number(a.question_order || 0) - Number(b.question_order || 0);
+    });
+  }
+
+  function getQuestionBank(jenisSasaran, selected) {
+    var def = currentFormDefinition || null;
+    if (def) return buildFieldsFromDefinition(def, jenisSasaran);
+    return getFallbackQuestionBank(jenisSasaran, selected);
   }
 
   function getFieldById(fieldId) {
@@ -895,16 +978,40 @@
     return values;
   }
 
+  function evaluateDynamicCondition(condition, values) {
+    if (!condition || !condition.field) return true;
+    values = values || {};
+    var actual = normalizeSpaces(values[condition.field]);
+    var expected = normalizeSpaces(condition.equals);
+    var op = normalizeUpper(condition.operator || 'EQ');
+
+    if (op === 'EQ' || op === 'ANY_EQ') return normalizeUpper(actual) === normalizeUpper(expected);
+    if (op === 'NE' || op === 'NOT_EQ') return normalizeUpper(actual) !== normalizeUpper(expected);
+    if (op === 'IN') {
+      var parts = expected.split('|').map(function (x) { return normalizeUpper(x); });
+      return parts.indexOf(normalizeUpper(actual)) >= 0;
+    }
+    return normalizeUpper(actual) === normalizeUpper(expected);
+  }
+
+  function isFieldRequiredNow(field, values) {
+    if (!field) return false;
+    if (field.required) return true;
+    if (field.requiredIf) return evaluateDynamicCondition(field.requiredIf, values || {});
+    return false;
+  }
+
   function getVisibleDynamicFields(values) {
     return currentDynamicFields.filter(function (field) {
       if (!field.showIf) return true;
-      return normalizeSpaces(values[field.showIf.field]) === normalizeSpaces(field.showIf.equals);
+      return evaluateDynamicCondition(field.showIf, values || {});
     });
   }
 
   function computeDerived(values) {
-    var bb = parseFloat(String(values.berat_badan || '').replace(',', '.'));
-    var tb = parseFloat(String(values.tinggi_badan || values.panjang_tinggi_badan || '').replace(',', '.'));
+    values = values || {};
+    var bb = parseFloat(String(values.bb || values.berat_badan || '').replace(',', '.'));
+    var tb = parseFloat(String(values.tb || values.panjang_tinggi_badan || values.pb_tb || '').replace(',', '.'));
     if (!isNaN(bb) && !isNaN(tb) && tb > 0) {
       values.imt = (bb / Math.pow(tb / 100, 2)).toFixed(2);
       var field = getFieldById('imt');
@@ -925,7 +1032,7 @@
 
       var isVisible = true;
       if (field.showIf) {
-        isVisible = normalizeSpaces(values[field.showIf.field]) === normalizeSpaces(field.showIf.equals);
+        isVisible = evaluateDynamicCondition(field.showIf, values);
       }
 
       wrap.style.display = isVisible ? '' : 'none';
@@ -943,8 +1050,9 @@
   }
 
   function renderDynamicField(field, value) {
-    var requiredMark = field.required ? ' *' : '';
+    var requiredMark = isFieldRequiredNow(field, collectDynamicFields()) ? ' *' : '';
     var inputHtml = '';
+    var safeValue = value !== undefined && value !== null ? value : (field.raw && field.raw.resolved_default_value ? field.raw.resolved_default_value : '');
 
     if (field.type === 'textarea') {
       inputHtml = [
@@ -953,8 +1061,9 @@
         ' data-dynamic-field="' + escapeHtml(field.id) + '"',
         ' rows="3"',
         field.placeholder ? ' placeholder="' + escapeHtml(field.placeholder) + '"' : '',
+        field.readonly ? ' readonly' : '',
         '>',
-        escapeHtml(value || ''),
+        escapeHtml(safeValue || ''),
         '</textarea>'
       ].join('');
     } else if (field.type === 'select') {
@@ -962,12 +1071,13 @@
         '<select',
         ' id="dyn-pen-' + escapeHtml(field.id) + '"',
         ' data-dynamic-field="' + escapeHtml(field.id) + '"',
+        field.readonly ? ' disabled' : '',
         '>',
         '<option value="">Pilih</option>',
         (field.options || []).map(function (opt) {
           var optionValue = typeof opt === 'object' ? String(opt.value || opt.label || '') : String(opt);
           var optionLabel = typeof opt === 'object' ? String(opt.label || opt.value || '') : optionValue;
-          var selected = String(value || '') === optionValue ? ' selected' : '';
+          var selected = String(safeValue || '') === optionValue || String(safeValue || '') === optionLabel ? ' selected' : '';
           return '<option value="' + escapeHtml(optionValue) + '"' + selected + '>' + escapeHtml(optionLabel) + '</option>';
         }).join(''),
         '</select>'
@@ -975,24 +1085,31 @@
     } else if (field.type === 'checkbox') {
       inputHtml = [
         '<label class="compact-checkbox-row">',
-        '<input type="checkbox" id="dyn-pen-' + escapeHtml(field.id) + '"',
-        value ? ' checked' : '',
+        '<input type="checkbox" id="dyn-pen-' + escapeHtml(field.id) + '" data-dynamic-field="' + escapeHtml(field.id) + '"',
+        safeValue ? ' checked' : '',
+        field.readonly ? ' disabled' : '',
         ' />',
         '<span>Pilih</span>',
         '</label>'
       ].join('');
     } else {
-      var inputType = field.type === 'date' ? 'date' : 'number';
+      var inputType = 'text';
+      if (field.type === 'date') inputType = 'date';
+      else if (field.type === 'number') inputType = 'number';
+      else if (field.type === 'text_numeric') inputType = 'text';
+
       var attrs = [];
       attrs.push(' id="dyn-pen-' + escapeHtml(field.id) + '"');
       attrs.push(' data-dynamic-field="' + escapeHtml(field.id) + '"');
       attrs.push(' type="' + escapeHtml(inputType) + '"');
+      if (field.type === 'text_numeric') attrs.push(' inputmode="numeric" pattern="[0-9]*"');
       if (field.placeholder) attrs.push(' placeholder="' + escapeHtml(field.placeholder) + '"');
-      if (typeof field.min === 'number') attrs.push(' min="' + escapeHtml(field.min) + '"');
-      if (typeof field.max === 'number') attrs.push(' max="' + escapeHtml(field.max) + '"');
-      if (typeof field.step === 'number') attrs.push(' step="' + escapeHtml(field.step) + '"');
+      if (typeof field.min === 'number' && field.type === 'number') attrs.push(' min="' + escapeHtml(field.min) + '"');
+      if (typeof field.max === 'number' && field.type === 'number') attrs.push(' max="' + escapeHtml(field.max) + '"');
+      if (typeof field.step === 'number' && field.type === 'number') attrs.push(' step="' + escapeHtml(field.step) + '"');
+      if (field.maxLength && field.type !== 'number') attrs.push(' maxlength="' + escapeHtml(field.maxLength) + '"');
       if (field.readonly) attrs.push(' readonly');
-      attrs.push(' value="' + escapeHtml(clampNumber(value || '', field)) + '"');
+      attrs.push(' value="' + escapeHtml(field.type === 'number' ? clampNumber(safeValue || '', field) : (safeValue || '')) + '"');
       inputHtml = '<input' + attrs.join('') + ' />';
     }
 
@@ -1082,6 +1199,16 @@
       isInitialized = true;
       this.bindEvents();
       this.bindAutosave();
+
+      var self = this;
+      setTimeout(function () {
+        try {
+          var selected = getSelectedSasaran() || {};
+          if (isPendampinganScreenActive() && (selected.id_sasaran || selected.id)) {
+            self.openCreate(selected, { skipRoute: true, force: true });
+          }
+        } catch (err) {}
+      }, 0);
     },
 
     openCreate: async function (selectedItem, options) {
@@ -1131,7 +1258,7 @@
         this.applyModeUI();
         this.renderHeader(normalizeHeaderItem(selected));
         this.prefillIdentity();
-        renderQuestionBank(jenis, {});
+        await this.loadDynamicFields(jenis, {});
 
         if (openToken !== currentOpenToken) return;
         this.tryLoadDraftForSelected();
@@ -1219,7 +1346,7 @@
         this.resetForm();
         this.applyModeUI();
         this.renderHeader(headerItem);
-        renderQuestionBank(item.jenis_sasaran || '', item.extra_fields || {});
+        await this.loadDynamicFields(item.jenis_sasaran || '', { values: item.extra_fields || {} });
         this.fillForm(item);
         this.renderValidation();
       } catch (err) {
@@ -1233,6 +1360,24 @@
 
     openEdit: function (idPendampingan, options) {
       return this.openEditById(idPendampingan, options || {});
+    },
+
+    open: function (options) {
+      this.init();
+      var selected = getSelectedSasaran() || {};
+      if (selected && (selected.id_sasaran || selected.id)) {
+        return this.openCreate(selected, Object.assign({ skipRoute: true, force: true }, options || {}));
+      }
+      this.applyModeUI();
+      this.prefillIdentity();
+      this.renderHeader({});
+      setHTML('pendampingan-dynamic-fields', '<p class="muted-text">Pilih sasaran dari Daftar Sasaran untuk mulai lapor pendampingan.</p>');
+      this.renderValidation();
+      return null;
+    },
+
+    loadAndRender: function () {
+      return this.open({ force: true });
     },
 
     applyModeUI: function () {
@@ -1299,8 +1444,22 @@
     },
 
     loadDynamicFields: async function (jenisSasaran, options) {
-      var values = options && options.values ? options.values : {};
-      renderQuestionBank(jenisSasaran, values);
+      var opts = options || {};
+      var values = opts.values || {};
+      var jenis = normalizeUpper(jenisSasaran || (getSelectedSasaran() || {}).jenis_sasaran || '');
+
+      setHTML('pendampingan-dynamic-fields', '<p class="muted-text">Memuat definisi form pendampingan...</p>');
+      currentFormDefinition = null;
+
+      try {
+        currentFormDefinition = await fetchPendampinganFormDefinition(jenis, opts);
+      } catch (err) {
+        currentFormDefinition = null;
+        showToast((err && err.message) || 'Definisi form backend tidak tersedia. Memakai fallback lokal.', 'warning');
+      }
+
+      renderQuestionBank(jenis, values);
+      this.renderValidation();
     },
 
     fillForm: function (item) {
@@ -1316,8 +1475,30 @@
 
     fillDynamicFields: function (extra) {
       var safeExtra = extra && typeof extra === 'object' ? extra : {};
+      var aliases = {
+        bb: ['bb', 'BB', 'berat_badan'],
+        tb: ['tb', 'TB', 'tinggi_badan'],
+        pb_tb: ['pb_tb', 'PB_TB', 'panjang_tinggi_badan'],
+        periksa_hb: ['periksa_hb', 'PERIKSA_HB'],
+        kadar_hb: ['kadar_hb', 'KADAR_HB'],
+        ctn_periksa: ['ctn_periksa', 'CTN_PERIKSA', 'pemeriksaan_kesehatan'],
+        ctn_tgl_periksa: ['ctn_tgl_periksa', 'CTN_TGL_PERIKSA'],
+        kb_pasca: ['kb_pasca', 'KB_PASCA', 'kb_pasca_persalinan']
+      };
+
+      function pickValue(field) {
+        var keys = [field.id, field.store_key, field.question_code, field.question_id]
+          .concat(aliases[field.id] || []);
+        for (var i = 0; i < keys.length; i += 1) {
+          var key = keys[i];
+          if (!key) continue;
+          if (safeExtra[key] !== undefined && safeExtra[key] !== null) return safeExtra[key];
+        }
+        return '';
+      }
+
       currentDynamicFields.forEach(function (field) {
-        setDynamicValue(field, safeExtra[field.id]);
+        setDynamicValue(field, pickValue(field));
       });
       applyDynamicRules();
     },
@@ -1395,11 +1576,26 @@
       }
 
       visibleFields.forEach(function (field) {
-        if (!field.required) return;
         var value = extra[field.id];
         var missing = field.type === 'checkbox' ? value !== true : !isRequired(value);
-        if (missing) {
+        if (isFieldRequiredNow(field, extra) && missing) {
           issues.push({ type: 'error', text: field.label + ' wajib diisi.' });
+          return;
+        }
+
+        if (isRequired(value) && isNumericField(field)) {
+          var num = parseFloat(String(value).replace(',', '.'));
+          if (isNaN(num)) {
+            issues.push({ type: 'error', text: field.label + ' harus berupa angka.' });
+            return;
+          }
+          if (typeof field.min === 'number' && num < field.min) {
+            issues.push({ type: 'error', text: field.label + ' minimal ' + field.min + '.' });
+            return;
+          }
+          if (typeof field.max === 'number' && num > field.max) {
+            issues.push({ type: 'error', text: field.label + ' maksimal ' + field.max + '.' });
+          }
         }
       });
 
@@ -1437,25 +1633,25 @@
         numericError('lila', 'LILA harus antara 1 sampai 60.');
       }
 
-      if (extra.periksa_hb === 'Ya' && !isRequired(extra.kadar_hb)) {
+      if (isYesValue(extra.periksa_hb) && !isRequired(extra.kadar_hb)) {
         issues.push({ type: 'error', text: 'Kadar HB wajib diisi jika pemeriksaan HB dilakukan.' });
       }
-      if (extra.periksa_tbjj === 'Ya' && !isRequired(extra.hasil_tbjj)) {
+      if (isYesValue(extra.periksa_tbjj) && !isRequired(extra.hasil_tbjj)) {
         issues.push({ type: 'error', text: 'Hasil TBJJ wajib diisi jika pengukuran TBJJ dilakukan.' });
       }
-      if (extra.periksa_tfu === 'Ya' && !isRequired(extra.hasil_tfu)) {
+      if (isYesValue(extra.periksa_tfu) && !isRequired(extra.hasil_tfu)) {
         issues.push({ type: 'error', text: 'Hasil TFU wajib diisi jika pengukuran TFU dilakukan.' });
       }
-      if (extra.dapat_ttd === 'Ya' && !isRequired(extra.minum_ttd)) {
+      if (isYesValue(extra.dapat_ttd) && !isRequired(extra.minum_ttd)) {
         issues.push({ type: 'error', text: 'Status minum TTD wajib diisi jika TTD sudah didapat.' });
       }
-      if (extra.kepesertaan_jkn === 'Ya' && !isRequired(extra.jenis_jkn)) {
+      if (isYesValue(extra.kepesertaan_jkn) && !isRequired(extra.jenis_jkn)) {
         issues.push({ type: 'error', text: 'Jenis JKN wajib diisi jika sasaran memiliki JKN.' });
       }
-      if (extra.pemberian_bansos === 'Ya, sudah mendapatkan bansos' && !isRequired(extra.jenis_bansos)) {
+      if (isYesValue(extra.pemberian_bansos) && !isRequired(extra.jenis_bansos)) {
         issues.push({ type: 'error', text: 'Jenis bansos wajib diisi jika bansos sudah didapat.' });
       }
-      if (extra.mbg_diterima === 'Ya' && !isRequired(extra.frekuensi_mbg)) {
+      if (isYesValue(extra.mbg_diterima) && !isRequired(extra.frekuensi_mbg)) {
         issues.push({ type: 'error', text: 'Frekuensi MBG wajib diisi jika sasaran menerima MBG.' });
       }
 
@@ -1539,12 +1735,13 @@
           self.autosaveDraft();
           showToast('Draft pendampingan disimpan.', 'success');
         }],
-        ['btn-reset-pendampingan', function () {
+        ['btn-reset-pendampingan', async function () {
           clearLocalDraft();
+          var selected = getSelectedSasaran() || {};
           self.resetForm();
           self.applyModeUI();
           self.prefillIdentity();
-          renderQuestionBank(getSelectedSasaran().jenis_sasaran || '', {});
+          await self.loadDynamicFields(selected.jenis_sasaran || '', { forceRefresh: false });
           self.renderValidation();
         }]
       ].forEach(function (entry) {
@@ -1600,6 +1797,11 @@
             tanggal_pendampingan: data.tanggal_pendampingan,
             status_kunjungan: data.status_kunjungan,
             catatan_umum: data.catatan_umum,
+            module: 'PENDAMPINGAN',
+            jenis_sasaran: data.jenis_sasaran,
+            form_id: data.form_id,
+            answers: data.extra_fields,
+            dynamic_fields: data.extra_fields,
             extra_fields: data.extra_fields,
             extra_fields_json: JSON.stringify(data.extra_fields || {}),
             edit_reason: data.edit_reason,
@@ -1625,6 +1827,9 @@
             nama_dusun: data.nama_dusun,
             client_submit_id: data.client_submit_id,
             sync_source: 'ONLINE',
+            module: 'PENDAMPINGAN',
+            answers: data.extra_fields,
+            dynamic_fields: data.extra_fields,
             extra_fields: data.extra_fields,
             extra_fields_json: JSON.stringify(data.extra_fields || {})
           };
