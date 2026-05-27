@@ -5785,3 +5785,79 @@
   window.__TPK_REGISTRASI_DRAFT_QUEUE_BINDING_VERSION = VERSION;
 })(window, document);
 /* ===== READ MODEL BINDING R1-R3-R3 end ===== */
+
+
+/* ===== READ MODEL BINDING R1-R3-R4 start: Manual draft performance event guard ===== */
+(function (window, document) {
+  'use strict';
+
+  var VERSION = 'READ-MODEL-BINDING-R1-R3-R4-MANUAL-DRAFT-PERF-20260527';
+  if (window.__TPK_REGISTRASI_MANUAL_DRAFT_PERF_R1R3R4 === true) return;
+  window.__TPK_REGISTRASI_MANUAL_DRAFT_PERF_R1R3R4 = true;
+
+  function safeTrim(value) { return String(value == null ? '' : value).trim(); }
+  function isFunction(fn) { return typeof fn === 'function'; }
+  function buttonText(el) {
+    if (!el) return '';
+    var value = '';
+    try { value = el.value || ''; } catch (err) {}
+    return safeTrim(value || el.textContent || (el.getAttribute && (el.getAttribute('aria-label') || el.getAttribute('title'))) || '').toUpperCase();
+  }
+  function isDraftButton(el) {
+    if (!el) return false;
+    var id = safeTrim(el.id).toUpperCase();
+    var action = safeTrim(el.getAttribute && (el.getAttribute('data-action') || el.getAttribute('name'))).toUpperCase();
+    var text = buttonText(el);
+    return id.indexOf('DRAFT') >= 0 || action.indexOf('DRAFT') >= 0 || text.indexOf('SIMPAN DRAFT') >= 0;
+  }
+  function getDataSafe() {
+    try {
+      if (window.RegistrasiForm && isFunction(window.RegistrasiForm.collectFormData)) return window.RegistrasiForm.collectFormData() || {};
+    } catch (err) {}
+    return {};
+  }
+  function reportManualDraftSaved() {
+    try {
+      if (!window.Api || !isFunction(window.Api.reportClientPerformance)) return;
+      if (window.navigator && window.navigator.onLine === false) return;
+      var data = getDataSafe();
+      var answers = data.answers || {};
+      window.Api.reportClientPerformance('registrasi_draft_saved', {
+        action: 'registrasi_draft_saved',
+        modul: 'registrasiView.js',
+        source_layer: 'CLIENT',
+        event_type: 'CLIENT_PERFORMANCE',
+        performance_group: 'DRAFT_WORKFLOW',
+        client_metric_classification: 'CLIENT_EVENT_WORKFLOW',
+        observability_only: true,
+        exclude_from_frontend_health: true,
+        draft_type: 'REGISTRASI',
+        jenis_sasaran: answers.jenis_sasaran || data.jenis_sasaran || '',
+        client_submit_id: data.client_submit_id || '',
+        manual_draft_event: true,
+        draft_perf_version: VERSION
+      }).catch(function () {});
+    } catch (err) {}
+  }
+
+  document.addEventListener('click', function (event) {
+    var target = event.target;
+    if (!target || !target.closest) return;
+    var btn = target.closest('button, input[type="button"], input[type="submit"], input[type="reset"], a, [role="button"]');
+    if (!isDraftButton(btn)) return;
+
+    // Tombol Simpan Draft bersifat lokal. Cegah submit form tidak sengaja,
+    // tetapi biarkan binding R1-R3-R3 yang sudah tersimpan tetap bekerja.
+    try { event.preventDefault(); } catch (err) {}
+    window.setTimeout(function () {
+      reportManualDraftSaved();
+      try { if (window.SyncManager && isFunction(window.SyncManager.updateBadge)) window.SyncManager.updateBadge(); } catch (err2) {}
+    }, 250);
+  }, true);
+
+  window.__TPK_REGISTRASI_MANUAL_DRAFT_PERF_R1R3R4_DEBUG__ = {
+    version: VERSION,
+    reportManualDraftSaved: reportManualDraftSaved
+  };
+})(window, document);
+/* ===== READ MODEL BINDING R1-R3-R4 end ===== */

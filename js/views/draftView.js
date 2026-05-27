@@ -1,7 +1,7 @@
 (function (window, document) {
   'use strict';
 
-  var VERSION = 'READ-MODEL-BINDING-R1-R3-R3-DRAFT-VIEW-20260527';
+  var VERSION = 'READ-MODEL-BINDING-R1-R3-R4-DRAFT-CONTINUE-AUDIT-20260527';
   var REG_DRAFT_KEY = 'tpk_registrasi_draft_v_final';
   var PEN_DRAFT_KEY = 'tpk_pendampingan_draft_v_final';
   var currentRoot = null;
@@ -47,6 +47,24 @@
 
   function getRepo() { return window.QueueRepo || null; }
   function getSyncManager() { return window.SyncManager || null; }
+
+
+  function reportClientEvent(eventName, detail) {
+    try {
+      if (!window.Api || typeof window.Api.reportClientPerformance !== 'function') return;
+      if (window.navigator && window.navigator.onLine === false) return;
+      window.Api.reportClientPerformance(eventName, Object.assign({
+        modul: 'draftView.js',
+        view: 'Draft Offline & Sinkronisasi',
+        source_layer: 'CLIENT',
+        event_type: 'CLIENT_PERFORMANCE',
+        performance_group: 'DRAFT_WORKFLOW',
+        observability_only: true,
+        exclude_from_frontend_health: true,
+        draft_view_version: VERSION
+      }, detail || {})).catch(function () {});
+    } catch (err) {}
+  }
 
   function normalizeStatus(value) {
     var repo = getRepo();
@@ -223,7 +241,15 @@
 
   function renderDraftCard(row) {
     var item = summarizeDraft(row);
-    var isReg = up(row.draft_type) === 'REGISTRASI';
+    var rawData = unwrapDraftData(row) || {};
+    var answers = getDraftAnswers(row) || {};
+    var key = String(item.draft_key || row.draft_key || '').toLowerCase();
+    var jenis = up(firstNonEmpty(answers.jenis_sasaran, rawData.jenis_sasaran, item.jenis_sasaran));
+    var isReg = up(row.draft_type) === 'REGISTRASI' ||
+      up(rawData.draft_type) === 'REGISTRASI' ||
+      key.indexOf('registrasi') >= 0 ||
+      key === REG_DRAFT_KEY.toLowerCase() ||
+      ['CATIN', 'BUMIL', 'BUFAS', 'BADUTA'].indexOf(jenis) >= 0;
     return [
       '<article class="tpk-draft-card" data-draft-key="' + escapeHtml(item.draft_key) + '">',
       '  <div class="tpk-draft-card-head">',
@@ -446,9 +472,18 @@
       if (openBtn) {
         event.preventDefault();
         var key = openBtn.getAttribute('data-draft-open');
-        var draft = findDraftByKey(key);
+        var draft = findDraftByKey(key) || { draft_key: key || REG_DRAFT_KEY };
         await restoreDraftToLocal(draft);
-        goToRoute('registrasi');
+        reportClientEvent('registrasi_draft_opened', {
+          action: 'registrasi_draft_opened',
+          draft_key: key || REG_DRAFT_KEY,
+          draft_type: 'REGISTRASI'
+        });
+        if (window.RegistrasiForm && typeof window.RegistrasiForm.openCreate === 'function') {
+          await window.RegistrasiForm.openCreate();
+        } else {
+          goToRoute('registrasi');
+        }
         return;
       }
 
@@ -462,6 +497,11 @@
         else {
           try { window.localStorage.removeItem(draftKey); } catch (err) {}
         }
+        reportClientEvent('registrasi_draft_deleted', {
+          action: 'registrasi_draft_deleted',
+          draft_key: draftKey,
+          draft_type: draftKey === REG_DRAFT_KEY ? 'REGISTRASI' : ''
+        });
         await refresh();
         notify('Draft dihapus.', 'success');
         return;
@@ -574,5 +614,5 @@
   window.syncView = DraftView;
   window.renderDraftView = render;
   window.renderSyncView = render;
-  window.__TPK_DRAFT_VIEW_R1R3R3_VERSION = VERSION;
+  window.__TPK_DRAFT_VIEW_R1R3R4_VERSION = VERSION;
 })(window, document);
