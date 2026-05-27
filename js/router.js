@@ -31,7 +31,7 @@
       { src: './js/views/pendampinganView.js?v=20260417-02', globalName: 'PendampinganView' }
     ],
     sync: [
-      { src: './js/views/draftView.js?v=20260527-R1R3R4-DRAFT-AUDIT', globalName: 'DraftView' }
+      { src: './js/views/draftView.js?v=20260527-R1R3R4-R1-BACK', globalName: 'DraftView' }
     ],
     rekapKader: [
       { src: './js/views/rekapKaderView.js', globalName: 'RekapKaderView' }
