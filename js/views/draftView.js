@@ -1,7 +1,7 @@
 (function (window, document) {
   'use strict';
 
-  var VERSION = 'READ-MODEL-BINDING-R1-R3-R4-R1-DRAFT-BACK-BUTTON-20260527';
+  var VERSION = 'READ-MODEL-BINDING-R1-R3-R4-R2-DRAFT-HEADER-ALIGN-20260527';
   var REG_DRAFT_KEY = 'tpk_registrasi_draft_v_final';
   var PEN_DRAFT_KEY = 'tpk_pendampingan_draft_v_final';
   var currentRoot = null;
@@ -319,13 +319,17 @@
   function renderShell(summary) {
     return [
       '<style>',
-      '.tpk-draft-wrap{max-width:1120px;margin:0 auto;padding:18px 14px 44px;color:#071f44;font-family:inherit}',
-      '.tpk-draft-header{background:linear-gradient(135deg,#38bdf8,#1d4ed8);color:#fff;border-radius:18px;padding:14px 16px;margin-bottom:14px;box-shadow:0 12px 28px rgba(37,99,235,.14);display:flex;align-items:center;justify-content:space-between;gap:12px}',
-      '.tpk-draft-header-title{min-width:0}',
-      '.tpk-draft-back-btn{border:1px solid rgba(255,255,255,.65);background:rgba(255,255,255,.16);color:#fff;border-radius:12px;padding:9px 12px;font-weight:900;cursor:pointer;white-space:nowrap;box-shadow:0 8px 18px rgba(15,23,42,.12)}',
+      '.tpk-draft-page{color:#071f44;font-family:inherit}',
+      '.tpk-draft-topbar{width:100vw;margin-left:calc(50% - 50vw);margin-right:calc(50% - 50vw);min-height:68px;background:linear-gradient(135deg,#38bdf8,#1d4ed8);color:#fff;display:grid;grid-template-columns:92px minmax(0,1fr) 120px;align-items:center;gap:10px;padding:8px 12px;box-sizing:border-box;box-shadow:0 10px 24px rgba(37,99,235,.22)}',
+      '.tpk-draft-brand{display:flex;align-items:center;justify-content:flex-start;min-width:0}',
+      '.tpk-draft-brand-mark{width:42px;height:42px;border-radius:999px;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.55);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:950;letter-spacing:.3px;box-shadow:0 8px 18px rgba(15,23,42,.16)}',
+      '.tpk-draft-topbar-title{text-align:center;min-width:0}',
+      '.tpk-draft-topbar-title h2{font-size:18px;line-height:1.15;margin:0 0 3px;font-weight:950}',
+      '.tpk-draft-topbar-title p{margin:0;font-size:11px;opacity:.92;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+      '.tpk-draft-topbar-actions{display:flex;align-items:center;justify-content:flex-end}',
+      '.tpk-draft-back-btn{border:1px solid rgba(255,255,255,.65);background:rgba(255,255,255,.16);color:#fff;border-radius:14px;padding:9px 12px;font-weight:900;cursor:pointer;white-space:nowrap;box-shadow:0 8px 18px rgba(15,23,42,.12)}',
       '.tpk-draft-back-btn:active{transform:translateY(1px)}',
-      '.tpk-draft-header h2{font-size:18px;margin:0 0 3px;font-weight:900}',
-      '.tpk-draft-header p{margin:0;font-size:12px;opacity:.92}',
+      '.tpk-draft-wrap{max-width:1120px;margin:0 auto;padding:18px 14px 44px}',
       '.tpk-draft-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:14px}',
       '.tpk-draft-stat{background:#fff;border:1px solid #c9ddfb;border-radius:16px;padding:14px;box-shadow:0 10px 22px rgba(15,23,42,.05)}',
       '.tpk-draft-stat small{display:block;color:#58708f;font-size:12px;margin-bottom:5px}',
@@ -353,16 +357,18 @@
       '.tpk-draft-badge-processing{background:#eef2ff;color:#4338ca;border-color:#c7d2fe}',
       '.tpk-draft-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}',
       '.tpk-draft-empty{border:1px dashed #bdd2ee;border-radius:16px;padding:18px;text-align:center;color:#425c7a;background:#f8fbff}',
-      '@media(max-width:720px){.tpk-draft-grid,.tpk-draft-filter,.tpk-draft-actions-row,.tpk-draft-actions{grid-template-columns:1fr}.tpk-draft-card-head{display:block}.tpk-draft-badge{margin-top:8px}.tpk-draft-header{align-items:flex-start}.tpk-draft-back-btn{padding:8px 10px;font-size:12px}}',
+      '@media(max-width:720px){.tpk-draft-topbar{grid-template-columns:54px minmax(0,1fr) auto;min-height:62px;padding:7px 8px}.tpk-draft-brand-mark{width:36px;height:36px;font-size:10px}.tpk-draft-topbar-title h2{font-size:15px}.tpk-draft-topbar-title p{font-size:10px}.tpk-draft-grid,.tpk-draft-filter,.tpk-draft-actions-row,.tpk-draft-actions{grid-template-columns:1fr}.tpk-draft-card-head{display:block}.tpk-draft-badge{margin-top:8px}.tpk-draft-back-btn{padding:8px 10px;font-size:12px}}',
       '</style>',
-      '<div class="tpk-draft-wrap">',
-      '  <div class="tpk-draft-header">',
-      '    <div class="tpk-draft-header-title">',
+      '<div class="tpk-draft-page">',
+      '  <header class="tpk-draft-topbar">',
+      '    <div class="tpk-draft-brand"><div class="tpk-draft-brand-mark">TPK</div></div>',
+      '    <div class="tpk-draft-topbar-title">',
       '      <h2>Draft Offline & Sinkronisasi</h2>',
       '      <p id="sync-screen-meta">Antrean: ' + escapeHtml(summary.queue_total) + ' | Draft: ' + escapeHtml(summary.drafts) + ' | Pending: ' + escapeHtml(summary.pending) + ' | Gagal: ' + escapeHtml(summary.failed) + '</p>',
       '    </div>',
-      '    <button type="button" class="tpk-draft-back-btn" data-draft-back>← Kembali</button>',
-      '  </div>',
+      '    <div class="tpk-draft-topbar-actions"><button type="button" class="tpk-draft-back-btn" data-draft-back>← Kembali</button></div>',
+      '  </header>',
+      '  <div class="tpk-draft-wrap">',
       '  <div class="tpk-draft-grid">',
       '    <div class="tpk-draft-stat"><small>Total Draft</small><strong>' + escapeHtml(summary.drafts) + '</strong></div>',
       '    <div class="tpk-draft-stat"><small>Pending</small><strong>' + escapeHtml(summary.pending) + '</strong></div>',
@@ -386,6 +392,7 @@
       '  <div class="tpk-draft-panel">',
       '    <div class="tpk-draft-panel-title">Daftar Draft</div>',
       '    <div data-draft-list></div>',
+      '  </div>',
       '  </div>',
       '</div>'
     ].join('');
