@@ -648,3 +648,128 @@
   window.__TPK_DRAFT_QUEUE_BINDING_R1R3R3_VERSION = VERSION;
 })(window);
 /* ===== READ MODEL BINDING R1-R3-R3 end ===== */
+
+
+/* ===== READ MODEL BINDING R1-R3-R4 start: Draft local audit binding ===== */
+(function (window) {
+  'use strict';
+
+  var VERSION = 'READ-MODEL-BINDING-R1-R3-R4-DRAFT-LOCAL-AUDIT-20260527';
+  var REG_DRAFT_KEY = 'tpk_registrasi_draft_v_final';
+  var FALLBACK_AUDIT_KEY = 'tpk_local_audit_fallback_v1';
+  var lastAuditSignature = '';
+  var lastAuditAt = 0;
+
+  if (!window.QueueRepo || window.QueueRepo.__DRAFT_LOCAL_AUDIT_R1R3R4 === true) return;
+  var QR = window.QueueRepo;
+  QR.__DRAFT_LOCAL_AUDIT_R1R3R4 = true;
+
+  function nowIso() { return new Date().toISOString(); }
+  function isFunction(fn) { return typeof fn === 'function'; }
+  function safeTrim(value) { return String(value == null ? '' : value).trim(); }
+  function clone(value) { try { return JSON.parse(JSON.stringify(value)); } catch (err) { return value; } }
+  function getDb() { return window.TPKDb || window.DB || null; }
+  function getProfile() {
+    try { if (window.AppState && isFunction(window.AppState.getProfile)) return window.AppState.getProfile() || {}; } catch (err) {}
+    return {};
+  }
+  function readFallbackAudit() {
+    try { var raw = window.localStorage.getItem(FALLBACK_AUDIT_KEY); return raw ? JSON.parse(raw) : []; } catch (err) { return []; }
+  }
+  function writeFallbackAudit(row) {
+    try {
+      var rows = readFallbackAudit();
+      rows.push(row);
+      if (rows.length > 200) rows = rows.slice(rows.length - 200);
+      window.localStorage.setItem(FALLBACK_AUDIT_KEY, JSON.stringify(rows));
+    } catch (err) {}
+  }
+  function shouldAuditManualDraft(meta) {
+    var source = safeTrim(meta && meta.source).toLowerCase();
+    return source.indexOf('savedraftformal') >= 0 ||
+      source.indexOf('manual') >= 0 ||
+      source.indexOf('draftview') >= 0;
+  }
+  async function writeLocalAudit(eventType, detail) {
+    var safeDetail = clone(detail || {});
+    var sig = eventType + '|' + safeTrim(safeDetail.draft_key) + '|' + safeTrim(safeDetail.client_submit_id) + '|' + safeTrim(safeDetail.source);
+    var now = Date.now();
+    if (sig === lastAuditSignature && now - lastAuditAt < 1500) return null;
+    lastAuditSignature = sig;
+    lastAuditAt = now;
+
+    var profile = getProfile();
+    var row = {
+      event_type: eventType || 'LOCAL_EVENT',
+      source_layer: 'CLIENT_LOCAL',
+      module: 'queueRepo.js',
+      detail: safeDetail,
+      id_user: safeTrim(profile.id_user || profile.username || ''),
+      id_tim: safeTrim(profile.id_tim || ''),
+      app_version: (window.APP_CONFIG && window.APP_CONFIG.APP_VERSION) || '',
+      created_at: nowIso(),
+      local_audit_version: VERSION
+    };
+
+    try {
+      var db = getDb();
+      if (db && isFunction(db.addAudit)) return await db.addAudit(eventType, row);
+    } catch (err) {}
+    writeFallbackAudit(row);
+    return row;
+  }
+
+  var oldSaveRegistrationDraft = QR.saveRegistrationDraft;
+  if (isFunction(oldSaveRegistrationDraft)) {
+    QR.saveRegistrationDraft = async function (data, meta) {
+      var result = await oldSaveRegistrationDraft.apply(QR, arguments);
+      if (shouldAuditManualDraft(meta || {})) {
+        await writeLocalAudit('REGISTRASI_DRAFT_SAVED', {
+          draft_key: REG_DRAFT_KEY,
+          draft_type: 'REGISTRASI',
+          client_submit_id: data && data.client_submit_id || '',
+          jenis_sasaran: data && data.answers && data.answers.jenis_sasaran || data && data.jenis_sasaran || '',
+          source: meta && meta.source || '',
+          status: 'DRAFT'
+        });
+      }
+      return result;
+    };
+  }
+
+  var oldClearDraft = QR.clearDraft;
+  if (isFunction(oldClearDraft)) {
+    QR.clearDraft = async function (draftKey) {
+      var key = safeTrim(draftKey || '');
+      var result = await oldClearDraft.apply(QR, arguments);
+      if (key === REG_DRAFT_KEY || key.toLowerCase().indexOf('registrasi') >= 0) {
+        await writeLocalAudit('REGISTRASI_DRAFT_CLEARED', {
+          draft_key: key || REG_DRAFT_KEY,
+          draft_type: 'REGISTRASI',
+          source: 'QueueRepo.clearDraft',
+          status: 'CLEARED'
+        });
+      }
+      return result;
+    };
+  }
+
+  var oldClearRegistrationDraft = QR.clearRegistrationDraft || QR.clearRegistrasiDraft;
+  QR.clearRegistrationDraft = QR.clearRegistrasiDraft = async function () {
+    var result = oldClearRegistrationDraft && isFunction(oldClearRegistrationDraft)
+      ? await oldClearRegistrationDraft.apply(QR, arguments)
+      : (isFunction(QR.clearDraft) ? await QR.clearDraft(REG_DRAFT_KEY) : true);
+    await writeLocalAudit('REGISTRASI_DRAFT_CLEARED', {
+      draft_key: REG_DRAFT_KEY,
+      draft_type: 'REGISTRASI',
+      source: 'QueueRepo.clearRegistrationDraft',
+      status: 'CLEARED'
+    });
+    return result;
+  };
+
+  QR.writeLocalAudit = QR.writeLocalAudit || writeLocalAudit;
+  QR.getLocalAuditFallback = QR.getLocalAuditFallback || readFallbackAudit;
+  window.__TPK_DRAFT_LOCAL_AUDIT_R1R3R4_VERSION = VERSION;
+})(window);
+/* ===== READ MODEL BINDING R1-R3-R4 end ===== */
