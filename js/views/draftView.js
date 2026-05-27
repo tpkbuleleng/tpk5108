@@ -1,7 +1,7 @@
 (function (window, document) {
   'use strict';
 
-  var VERSION = 'READ-MODEL-BINDING-R1-R3-R4-DRAFT-CONTINUE-AUDIT-20260527';
+  var VERSION = 'READ-MODEL-BINDING-R1-R3-R4-R1-DRAFT-BACK-BUTTON-20260527';
   var REG_DRAFT_KEY = 'tpk_registrasi_draft_v_final';
   var PEN_DRAFT_KEY = 'tpk_pendampingan_draft_v_final';
   var currentRoot = null;
@@ -320,7 +320,10 @@
     return [
       '<style>',
       '.tpk-draft-wrap{max-width:1120px;margin:0 auto;padding:18px 14px 44px;color:#071f44;font-family:inherit}',
-      '.tpk-draft-header{background:linear-gradient(135deg,#38bdf8,#1d4ed8);color:#fff;border-radius:18px;padding:16px 18px;margin-bottom:14px;box-shadow:0 12px 28px rgba(37,99,235,.14)}',
+      '.tpk-draft-header{background:linear-gradient(135deg,#38bdf8,#1d4ed8);color:#fff;border-radius:18px;padding:14px 16px;margin-bottom:14px;box-shadow:0 12px 28px rgba(37,99,235,.14);display:flex;align-items:center;justify-content:space-between;gap:12px}',
+      '.tpk-draft-header-title{min-width:0}',
+      '.tpk-draft-back-btn{border:1px solid rgba(255,255,255,.65);background:rgba(255,255,255,.16);color:#fff;border-radius:12px;padding:9px 12px;font-weight:900;cursor:pointer;white-space:nowrap;box-shadow:0 8px 18px rgba(15,23,42,.12)}',
+      '.tpk-draft-back-btn:active{transform:translateY(1px)}',
       '.tpk-draft-header h2{font-size:18px;margin:0 0 3px;font-weight:900}',
       '.tpk-draft-header p{margin:0;font-size:12px;opacity:.92}',
       '.tpk-draft-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:14px}',
@@ -350,12 +353,15 @@
       '.tpk-draft-badge-processing{background:#eef2ff;color:#4338ca;border-color:#c7d2fe}',
       '.tpk-draft-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}',
       '.tpk-draft-empty{border:1px dashed #bdd2ee;border-radius:16px;padding:18px;text-align:center;color:#425c7a;background:#f8fbff}',
-      '@media(max-width:720px){.tpk-draft-grid,.tpk-draft-filter,.tpk-draft-actions-row,.tpk-draft-actions{grid-template-columns:1fr}.tpk-draft-card-head{display:block}.tpk-draft-badge{margin-top:8px}}',
+      '@media(max-width:720px){.tpk-draft-grid,.tpk-draft-filter,.tpk-draft-actions-row,.tpk-draft-actions{grid-template-columns:1fr}.tpk-draft-card-head{display:block}.tpk-draft-badge{margin-top:8px}.tpk-draft-header{align-items:flex-start}.tpk-draft-back-btn{padding:8px 10px;font-size:12px}}',
       '</style>',
       '<div class="tpk-draft-wrap">',
       '  <div class="tpk-draft-header">',
-      '    <h2>Draft Offline & Sinkronisasi</h2>',
-      '    <p id="sync-screen-meta">Antrean: ' + escapeHtml(summary.queue_total) + ' | Draft: ' + escapeHtml(summary.drafts) + ' | Pending: ' + escapeHtml(summary.pending) + ' | Gagal: ' + escapeHtml(summary.failed) + '</p>',
+      '    <div class="tpk-draft-header-title">',
+      '      <h2>Draft Offline & Sinkronisasi</h2>',
+      '      <p id="sync-screen-meta">Antrean: ' + escapeHtml(summary.queue_total) + ' | Draft: ' + escapeHtml(summary.drafts) + ' | Pending: ' + escapeHtml(summary.pending) + ' | Gagal: ' + escapeHtml(summary.failed) + '</p>',
+      '    </div>',
+      '    <button type="button" class="tpk-draft-back-btn" data-draft-back>← Kembali</button>',
       '  </div>',
       '  <div class="tpk-draft-grid">',
       '    <div class="tpk-draft-stat"><small>Total Draft</small><strong>' + escapeHtml(summary.drafts) + '</strong></div>',
@@ -414,14 +420,42 @@
           window.Router.toRegistrasi();
           return true;
         }
+        if (name === 'dashboard' && isFunction(window.Router.toDashboard)) {
+          window.Router.toDashboard();
+          return true;
+        }
         if (isFunction(window.Router.go)) {
           window.Router.go(name);
+          return true;
+        }
+        if (isFunction(window.Router.navigate)) {
+          window.Router.navigate(name);
           return true;
         }
       }
     } catch (err) {}
 
     try { window.location.hash = '#' + name; return true; } catch (err2) {}
+    return false;
+  }
+
+  function goBackFromDraft() {
+    try {
+      if (window.AppState && typeof window.AppState.set === 'function') {
+        window.AppState.set('currentView', 'dashboard');
+      }
+    } catch (err) {}
+
+    if (goToRoute('dashboard')) return true;
+
+    try {
+      if (window.history && window.history.length > 1) {
+        window.history.back();
+        return true;
+      }
+    } catch (err2) {}
+
+    try { window.location.hash = '#dashboard'; return true; } catch (err3) {}
     return false;
   }
 
@@ -441,6 +475,13 @@
     root.addEventListener('click', async function (event) {
       var target = event.target;
       if (!target || !target.closest) return;
+
+      var backBtn = target.closest('[data-draft-back]');
+      if (backBtn) {
+        event.preventDefault();
+        goBackFromDraft();
+        return;
+      }
 
       var refreshBtn = target.closest('[data-draft-refresh]');
       if (refreshBtn) {
@@ -605,7 +646,8 @@
     init: init,
     refresh: refresh,
     loadRows: loadRows,
-    countSummary: countSummary
+    countSummary: countSummary,
+    goBackFromDraft: goBackFromDraft
   };
 
   window.DraftView = DraftView;
