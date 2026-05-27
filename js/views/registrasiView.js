@@ -4580,3 +4580,285 @@
   window.setTimeout(patchApiPost, 300);
 })(window, document);
 /* ===== READ MODEL BINDING R1-R2 end ===== */
+/* ===== READ MODEL BINDING R1-R3 start: submit actual save CATIN/BUMIL guard ===== */
+(function (window, document) {
+  'use strict';
+
+  var RF = window.RegistrasiForm;
+  if (!RF || RF.__READ_MODEL_SCOPE_BINDING_R1_R3 === true) return;
+  RF.__READ_MODEL_SCOPE_BINDING_R1_R3 = true;
+
+  var VERSION = 'READ-MODEL-BINDING-R1-R3-SUBMIT-ACTUAL-SAVE-CATIN-BUMIL-GUARD-20260527';
+
+  function s(value) {
+    return String(value == null ? '' : value).trim();
+  }
+
+  function up(value) {
+    return s(value).toUpperCase();
+  }
+
+  function lowerSnake(value) {
+    return s(value)
+      .replace(/\s+/g, '_')
+      .replace(/[^A-Za-z0-9_]/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .toLowerCase();
+  }
+
+  function firstNonEmpty() {
+    for (var i = 0; i < arguments.length; i += 1) {
+      var value = arguments[i];
+      if (value !== undefined && value !== null && s(value) !== '') return value;
+    }
+    return '';
+  }
+
+  function cloneObject(obj) {
+    if (!obj || typeof obj !== 'object') return {};
+    try { return JSON.parse(JSON.stringify(obj)); } catch (err) {}
+    var out = Array.isArray(obj) ? [] : {};
+    Object.keys(obj).forEach(function (key) { out[key] = obj[key]; });
+    return out;
+  }
+
+  function normalizeOption(opt, index) {
+    opt = opt || {};
+    var value = firstNonEmpty(opt.value, opt.option_value, opt.code, opt.id);
+    var label = firstNonEmpty(opt.label, opt.option_label, opt.text, value);
+    return {
+      option_id: s(opt.option_id || opt.id || ''),
+      value: s(value),
+      label: s(label),
+      order: Number(firstNonEmpty(opt.order, opt.option_order, index + 1)) || (index + 1),
+      parent_option_value: s(opt.parent_option_value || ''),
+      reference_key: s(opt.reference_key || ''),
+      is_risk_value: opt.is_risk_value === true
+    };
+  }
+
+  function normalizeQuestion(q, fallbackSection, fallbackOrder) {
+    q = cloneObject(q || {});
+    var code = lowerSnake(firstNonEmpty(q.store_key, q.question_code, q.code, q.key, q.question_id));
+    if (!code) return null;
+
+    var section = fallbackSection || {};
+    var fieldType = lowerSnake(firstNonEmpty(q.field_type, q.input_type, q.type, 'text'));
+    if (fieldType === 'dropdown' || fieldType === 'radio') fieldType = 'select';
+    if (fieldType !== 'select' && fieldType !== 'textarea' && fieldType !== 'date' && fieldType !== 'number') fieldType = 'text';
+
+    q.code = code;
+    q.question_id = s(firstNonEmpty(q.question_id, 'OVR-' + code.toUpperCase()));
+    q.label = s(firstNonEmpty(q.label, q.question_label, q.short_label, code));
+    q.short_label = s(firstNonEmpty(q.short_label, q.question_short_label, q.label));
+    q.help_text = s(q.help_text || '');
+    q.placeholder = s(q.placeholder || '');
+    q.field_type = fieldType;
+    q.data_type = lowerSnake(firstNonEmpty(q.data_type, 'string'));
+    q.is_required = q.is_required === true || up(q.is_required) === 'TRUE' || up(q.required) === 'TRUE';
+    q.is_editable = !(q.is_editable === false || up(q.is_editable) === 'FALSE');
+    q.section_id = s(firstNonEmpty(q.section_id, section.section_id, 'SEC-CATIN-DOMISILI'));
+    q.section_label = s(firstNonEmpty(q.section_label, section.section_label, 'Domisili Setelah Menikah'));
+    q.section_order = Number(firstNonEmpty(q.section_order, section.section_order, 860)) || 860;
+    q.question_order = Number(firstNonEmpty(q.question_order, fallbackOrder, 10)) || 10;
+    q.options = Array.isArray(q.options) ? q.options.map(normalizeOption).filter(function (opt) { return opt.value !== ''; }) : [];
+    q.rules = Array.isArray(q.rules) ? q.rules : [];
+    return q;
+  }
+
+  function flattenQuestionsFromDefinition(definition) {
+    var out = [];
+    definition = definition || {};
+
+    (Array.isArray(definition.sections) ? definition.sections : []).forEach(function (section) {
+      (Array.isArray(section.questions) ? section.questions : []).forEach(function (q, idx) {
+        var normalized = normalizeQuestion(q, section, idx + 1);
+        if (normalized) out.push(normalized);
+      });
+    });
+
+    (Array.isArray(definition.questions) ? definition.questions : []).forEach(function (q, idx) {
+      var normalized = normalizeQuestion(q, null, idx + 1);
+      if (normalized) out.push(normalized);
+    });
+
+    return out;
+  }
+
+  function findQuestionByCode(definition, codes) {
+    var wanted = {};
+    (codes || []).forEach(function (code) { wanted[lowerSnake(code)] = true; });
+    var list = flattenQuestionsFromDefinition(definition);
+    for (var i = 0; i < list.length; i += 1) {
+      if (wanted[lowerSnake(list[i].code)]) return list[i];
+    }
+    return null;
+  }
+
+  function outputHasQuestion(definition, code) {
+    var target = lowerSnake(code);
+    var list = flattenQuestionsFromDefinition(definition || {});
+    return list.some(function (q) { return lowerSnake(q.code) === target; });
+  }
+
+  function sortQuestions(questions) {
+    return (questions || []).sort(function (a, b) {
+      return Number(a.question_order || 0) - Number(b.question_order || 0);
+    });
+  }
+
+  function sortSections(sections) {
+    return (sections || []).sort(function (a, b) {
+      return Number(a.section_order || 0) - Number(b.section_order || 0);
+    });
+  }
+
+  function rebuildFlatQuestions(sections) {
+    var flat = [];
+    (sections || []).forEach(function (section) {
+      (section.questions || []).forEach(function (q) { flat.push(q); });
+    });
+    return flat;
+  }
+
+  function addQuestionSection(definition, question) {
+    if (!question) return definition;
+    var out = Object.assign({}, definition || {});
+    var sections = (Array.isArray(out.sections) ? out.sections : []).map(function (section) {
+      return Object.assign({}, section, { questions: (section.questions || []).slice() });
+    });
+
+    var sectionId = s(question.section_id || 'SEC-CATIN-DOMISILI');
+    var existing = null;
+    for (var i = 0; i < sections.length; i += 1) {
+      if (s(sections[i].section_id) === sectionId) {
+        existing = sections[i];
+        break;
+      }
+    }
+
+    if (!existing) {
+      existing = {
+        section_id: sectionId,
+        section_label: s(question.section_label || 'Domisili Setelah Menikah'),
+        section_order: Number(question.section_order || 860) || 860,
+        questions: []
+      };
+      sections.push(existing);
+    }
+
+    if (!(existing.questions || []).some(function (q) { return lowerSnake(q.code) === lowerSnake(question.code); })) {
+      existing.questions.push(question);
+      existing.questions = sortQuestions(existing.questions);
+    }
+
+    out.sections = sortSections(sections).filter(function (section) {
+      return section.questions && section.questions.length;
+    });
+    out.questions = rebuildFlatQuestions(out.sections);
+    return out;
+  }
+
+  function normalizeBumilKehamilanValue(value) {
+    var raw = s(value);
+    if (!raw) return '';
+    var key = lowerSnake(raw);
+    var map = {
+      ya_ingin_hamil_segera: 'YA_INGIN_HAMIL_SEGERA',
+      ya_ingin_hamil_segera_: 'YA_INGIN_HAMIL_SEGERA',
+      ya_ingin_hamil_segera__:'YA_INGIN_HAMIL_SEGERA',
+      tidak_ingin_hamil_nanti: 'TIDAK_INGIN_HAMIL_NANTI',
+      tidak_ingin_hamil_lagi: 'TIDAK_INGIN_HAMIL_LAGI',
+      tidak_ingin_hamil_lagi_: 'TIDAK_INGIN_HAMIL_LAGI',
+      tidak_ingin_hamil_lagi__:'TIDAK_INGIN_HAMIL_LAGI'
+    };
+    if (map[key]) return map[key];
+    return up(raw).replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  }
+
+  function getDynamicInputValue(code) {
+    var target = lowerSnake(code);
+    var el = document.querySelector('[data-reg-question-code="' + target + '"]') || document.getElementById('dyn-' + target);
+    if (!el) return '';
+    return s(el.value);
+  }
+
+  var oldApplyDefinitionOverrides = typeof RF.applyDefinitionOverrides === 'function' ? RF.applyDefinitionOverrides : null;
+  if (oldApplyDefinitionOverrides) {
+    RF.applyDefinitionOverrides = function (definition, jenisSasaran, refs) {
+      var out = oldApplyDefinitionOverrides.apply(this, arguments) || definition || {};
+      if (up(jenisSasaran) !== 'CATIN') return out;
+
+      if (!outputHasQuestion(out, 'domisili_setelah_menikah')) {
+        var sourceQuestion = findQuestionByCode(definition, [
+          'domisili_setelah_menikah',
+          'DOMISILI_SETELAH_MENIKAH',
+          'domisili_menikah',
+          'alamat_domisili_setelah_menikah'
+        ]);
+
+        if (sourceQuestion) {
+          sourceQuestion = normalizeQuestion(Object.assign({}, sourceQuestion, {
+            section_id: 'SEC-CATIN-DOMISILI',
+            section_label: 'Domisili Setelah Menikah',
+            section_order: 860,
+            question_order: 10,
+            code: 'domisili_setelah_menikah',
+            store_key: 'domisili_setelah_menikah'
+          }), { section_id: 'SEC-CATIN-DOMISILI', section_label: 'Domisili Setelah Menikah', section_order: 860 }, 10);
+          out = addQuestionSection(out, sourceQuestion);
+        }
+      }
+
+      return out;
+    };
+  }
+
+  var oldBuildPayload = typeof RF.buildPayload === 'function' ? RF.buildPayload : null;
+  if (oldBuildPayload) {
+    RF.buildPayload = function (data, mode) {
+      var payload = oldBuildPayload.apply(this, arguments) || {};
+      var jenis = up(payload.jenis_sasaran || (payload.answers && payload.answers.jenis_sasaran));
+      payload.answers = payload.answers || {};
+
+      if (jenis === 'BUMIL') {
+        var bumilValue = firstNonEmpty(
+          getDynamicInputValue('kehamilan_diinginkan'),
+          payload.answers.kehamilan_diinginkan,
+          payload.answers.KEHAMILAN_DIINGINKAN
+        );
+        if (bumilValue) payload.answers.kehamilan_diinginkan = normalizeBumilKehamilanValue(bumilValue);
+      }
+
+      if (jenis === 'CATIN') {
+        var domisiliInputValue = getDynamicInputValue('domisili_setelah_menikah');
+        if (domisiliInputValue) {
+          payload.answers.domisili_setelah_menikah = domisiliInputValue;
+        } else if (payload.answers.domisili_setelah_menikah) {
+          // Jangan kirim hasil gabungan asal pasangan sebagai jawaban select domisili setelah menikah.
+          // Jika field domisili belum tampil/terisi, biarkan backend/frontend validasi sebagai kosong.
+          delete payload.answers.domisili_setelah_menikah;
+        }
+
+        if (!s(payload.answers.data_pasangan)) {
+          var pasanganParts = [];
+          if (s(payload.answers.nama_pasangan)) pasanganParts.push('Nama: ' + s(payload.answers.nama_pasangan));
+          if (s(payload.answers.nik_pasangan)) pasanganParts.push('NIK: ' + s(payload.answers.nik_pasangan).replace(/\D+/g, '').slice(0, 16));
+          if (pasanganParts.length) payload.answers.data_pasangan = pasanganParts.join(' | ');
+        }
+      }
+
+      payload.__frontend_submit_guard_version = VERSION;
+      return payload;
+    };
+  }
+
+  window.__TPK_REGISTRASI_R1R3_DEBUG__ = {
+    version: VERSION,
+    hasDefinitionOverride: !!oldApplyDefinitionOverrides,
+    hasBuildPayloadOverride: !!oldBuildPayload
+  };
+  window.__TPK_REGISTRASI_SUBMIT_FIX_VERSION = VERSION;
+})(window, document);
+/* ===== READ MODEL BINDING R1-R3 end ===== */
