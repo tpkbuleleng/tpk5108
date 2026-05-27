@@ -28,7 +28,7 @@
       { src: './js/views/registrasiView.js?v=20260527-R1R3R4-DRAFT-AUDIT', globalName: 'RegistrasiView' }
     ],
     pendampingan: [
-      { src: './js/views/pendampinganView.js?v=20260527-RMB-R2-PEND-FORM', globalName: 'PendampinganView' }
+      { src: './js/views/pendampinganView.js?v=20260527-RMB-R2-R1-PEND-SELECT', globalName: 'PendampinganView' }
     ],
     sync: [
       { src: './js/views/draftView.js?v=20260527-R1R3R4-R2-HEADER', globalName: 'DraftView' }
