@@ -391,3 +391,260 @@
 
   migrateLegacyQueue().catch(function () {});
 })(window);
+
+
+/* ===== READ MODEL BINDING R1-R3-R3 start: Draft Queue Binding compatibility ===== */
+(function (window) {
+  'use strict';
+
+  var VERSION = 'READ-MODEL-BINDING-R1-R3-R3-DRAFT-QUEUE-BINDING-20260527';
+  var REG_DRAFT_KEY = 'tpk_registrasi_draft_v_final';
+  var PEN_DRAFT_KEY = 'tpk_pendampingan_draft_v_final';
+  var LEGACY_QUEUE_KEY = 'tpk_sync_queue_v1';
+
+  if (!window.QueueRepo || window.QueueRepo.__DRAFT_QUEUE_BINDING_R1R3R3 === true) return;
+  var QR = window.QueueRepo;
+  QR.__DRAFT_QUEUE_BINDING_R1R3R3 = true;
+
+  function nowIso() { return new Date().toISOString(); }
+
+  function clone(value) {
+    try { return JSON.parse(JSON.stringify(value)); } catch (err) { return value; }
+  }
+
+  function safeJsonParse(value, fallback) {
+    try { return value ? JSON.parse(value) : fallback; } catch (err) { return fallback; }
+  }
+
+  function getDb() {
+    return window.TPKDb || window.DB || null;
+  }
+
+  function normalizeStatus(value) {
+    if (typeof QR.normalizeStatus === 'function') return QR.normalizeStatus(value);
+    return String(value || 'PENDING').trim().toUpperCase() || 'PENDING';
+  }
+
+  function emitChange() {
+    try { window.dispatchEvent(new CustomEvent('tpk:queue-changed', { detail: { version: VERSION } })); } catch (err) {}
+    try {
+      if (window.SyncManager && typeof window.SyncManager.updateBadge === 'function') {
+        window.SyncManager.updateBadge();
+      }
+    } catch (err2) {}
+  }
+
+  function readLegacyQueue() {
+    return safeJsonParse(window.localStorage && window.localStorage.getItem(LEGACY_QUEUE_KEY), []) || [];
+  }
+
+  function writeLegacyQueue(rows) {
+    try { window.localStorage.setItem(LEGACY_QUEUE_KEY, JSON.stringify(rows || [])); } catch (err) {}
+  }
+
+  async function getQueueRows(filter) {
+    if (typeof QR.list === 'function') return QR.list(filter || {});
+    return readLegacyQueue();
+  }
+
+  async function getById(id) {
+    var key = String(id || '').trim();
+    if (!key) return null;
+    var rows = await getQueueRows({});
+    return (rows || []).find(function (row) {
+      return String(row.id || row.queue_id || row.client_submit_id || '') === key;
+    }) || null;
+  }
+
+  async function saveQueueItem(item) {
+    var safe = clone(item || {});
+    var id = String(safe.id || safe.queue_id || safe.client_submit_id || '').trim();
+    if (!id) {
+      id = 'QUE-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+    }
+
+    safe.id = id;
+    safe.queue_id = safe.queue_id || id;
+    safe.client_submit_id = safe.client_submit_id || (safe.payload && safe.payload.client_submit_id) || id;
+    safe.sync_status = normalizeStatus(safe.sync_status || safe.status || 'PENDING');
+    safe.status = safe.sync_status;
+    safe.updated_at = nowIso();
+    safe.created_at = safe.created_at || nowIso();
+
+    var db = getDb();
+    if (db && typeof db.addQueue === 'function') {
+      await db.addQueue(safe.action || (safe.payload && safe.payload.action) || 'registerSasaran', safe.payload || {}, safe);
+    } else {
+      var rows = readLegacyQueue().filter(function (row) {
+        return String(row.id || row.queue_id || row.client_submit_id || '') !== id;
+      });
+      rows.push(safe);
+      writeLegacyQueue(rows);
+    }
+
+    emitChange();
+    return safe;
+  }
+
+  async function saveDraftItem(item) {
+    var safe = clone(item || {});
+    var draftKey = String(safe.draft_key || REG_DRAFT_KEY).trim();
+    var draftType = String(safe.draft_type || 'REGISTRASI').trim().toUpperCase();
+    var payload = safe.payload !== undefined ? safe.payload : { saved_at: nowIso(), data: safe.data || {} };
+    var meta = Object.assign({}, safe.meta || {}, { source: 'QueueRepo.save', version: VERSION });
+
+    if (typeof QR.saveDraft === 'function') {
+      await QR.saveDraft(draftKey, draftType, payload && payload.data ? payload.data : payload, meta);
+    } else {
+      try { window.localStorage.setItem(draftKey, JSON.stringify(payload)); } catch (err) {}
+      var db = getDb();
+      if (db && typeof db.saveDraft === 'function') {
+        await db.saveDraft(draftKey, draftType, payload, meta);
+      }
+      emitChange();
+    }
+
+    return {
+      draft_key: draftKey,
+      draft_type: draftType,
+      payload: payload,
+      meta: meta,
+      updated_at: nowIso()
+    };
+  }
+
+  if (typeof QR.getById !== 'function') {
+    QR.getById = getById;
+  }
+
+  if (typeof QR.save !== 'function') {
+    QR.save = async function (item) {
+      if (item && (item.draft_key || item.draft_type)) {
+        return saveDraftItem(item);
+      }
+      return saveQueueItem(item || {});
+    };
+  }
+
+  if (typeof QR.stats !== 'function') {
+    QR.stats = async function () {
+      if (typeof QR.getSummary === 'function') return QR.getSummary();
+      var rows = await getQueueRows({});
+      var summary = { total: rows.length, pending: 0, failed: 0, processing: 0, conflict: 0, success: 0, drafts: 0, draft_only: 0 };
+      rows.forEach(function (row) {
+        var status = normalizeStatus(row.sync_status || row.status);
+        if (status === 'PENDING') summary.pending += 1;
+        else if (status === 'FAILED') summary.failed += 1;
+        else if (status === 'PROCESSING') summary.processing += 1;
+        else if (status === 'CONFLICT') summary.conflict += 1;
+        else if (status === 'SUCCESS') summary.success += 1;
+      });
+      if (typeof QR.listDrafts === 'function') {
+        try {
+          var drafts = await QR.listDrafts({});
+          summary.drafts = drafts.length;
+          summary.draft_only = drafts.length;
+        } catch (err) {}
+      }
+      summary.actionable = summary.pending + summary.failed + summary.conflict;
+      summary.dashboard_pending = summary.actionable + summary.drafts;
+      return summary;
+    };
+  }
+
+  if (typeof QR.syncLegacyMirror !== 'function') {
+    QR.syncLegacyMirror = async function () {
+      var rows = await getQueueRows({});
+      writeLegacyQueue(rows || []);
+      emitChange();
+      return rows || [];
+    };
+  }
+
+  if (typeof QR.saveRegistrationDraft !== 'function') {
+    QR.saveRegistrationDraft = async function (data, meta) {
+      if (typeof QR.saveDraft === 'function') {
+        return QR.saveDraft(REG_DRAFT_KEY, 'REGISTRASI', data || {}, Object.assign({ source: 'registrasiView', version: VERSION }, meta || {}));
+      }
+      return saveDraftItem({
+        draft_key: REG_DRAFT_KEY,
+        draft_type: 'REGISTRASI',
+        payload: { saved_at: nowIso(), data: data || {} },
+        meta: Object.assign({ source: 'registrasiView', version: VERSION }, meta || {})
+      });
+    };
+  }
+
+  if (typeof QR.clearRegistrationDraft !== 'function') {
+    QR.clearRegistrationDraft = async function () {
+      if (typeof QR.clearDraft === 'function') return QR.clearDraft(REG_DRAFT_KEY);
+      try { window.localStorage.removeItem(REG_DRAFT_KEY); } catch (err) {}
+      emitChange();
+      return true;
+    };
+  }
+
+  window.DraftManager = window.DraftManager || {};
+  var DM = window.DraftManager;
+
+  DM.getRegistrasiDraftAsync = function () {
+    if (typeof QR.getDraft === 'function') return QR.getDraft(REG_DRAFT_KEY);
+    return Promise.resolve(safeJsonParse(window.localStorage.getItem(REG_DRAFT_KEY), null));
+  };
+
+  DM.getRegistrasiDraft = function () {
+    return safeJsonParse(window.localStorage.getItem(REG_DRAFT_KEY), null);
+  };
+
+  DM.saveRegistrasiDraft = function (data) {
+    return QR.saveRegistrationDraft(data || {}, { source: 'DraftManager.saveRegistrasiDraft' });
+  };
+
+  DM.clearRegistrasiDraft = function () {
+    return QR.clearRegistrationDraft();
+  };
+
+  DM.enqueueOfflineRegistrasi = function (payload) {
+    if (typeof QR.enqueue === 'function') {
+      return QR.enqueue('registerSasaran', Object.assign({}, payload || {}, { sync_source: 'OFFLINE_QUEUE' }), {
+        entity_type: 'SASARAN',
+        client_submit_id: payload && payload.client_submit_id || '',
+        sync_source: 'OFFLINE_QUEUE'
+      });
+    }
+    return saveQueueItem({
+      action: 'registerSasaran',
+      entity_type: 'SASARAN',
+      client_submit_id: payload && payload.client_submit_id || '',
+      payload: Object.assign({}, payload || {}, { sync_source: 'OFFLINE_QUEUE' }),
+      sync_status: 'PENDING'
+    });
+  };
+
+  DM.getPendampinganDraftAsync = function () {
+    if (typeof QR.getDraft === 'function') return QR.getDraft(PEN_DRAFT_KEY);
+    return Promise.resolve(safeJsonParse(window.localStorage.getItem(PEN_DRAFT_KEY), null));
+  };
+
+  DM.getPendampinganDraft = function () {
+    return safeJsonParse(window.localStorage.getItem(PEN_DRAFT_KEY), null);
+  };
+
+  DM.savePendampinganDraft = function (data) {
+    if (typeof QR.saveDraft === 'function') return QR.saveDraft(PEN_DRAFT_KEY, 'PENDAMPINGAN', data || {}, { source: 'DraftManager.savePendampinganDraft', version: VERSION });
+    return saveDraftItem({ draft_key: PEN_DRAFT_KEY, draft_type: 'PENDAMPINGAN', payload: { saved_at: nowIso(), data: data || {} } });
+  };
+
+  DM.clearPendampinganDraft = function () {
+    if (typeof QR.clearDraft === 'function') return QR.clearDraft(PEN_DRAFT_KEY);
+    try { window.localStorage.removeItem(PEN_DRAFT_KEY); } catch (err) {}
+    emitChange();
+    return Promise.resolve(true);
+  };
+
+  try { QR.syncLegacyMirror(); } catch (err) {}
+  emitChange();
+
+  window.__TPK_DRAFT_QUEUE_BINDING_R1R3R3_VERSION = VERSION;
+})(window);
+/* ===== READ MODEL BINDING R1-R3-R3 end ===== */
