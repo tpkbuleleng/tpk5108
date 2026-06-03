@@ -1,7 +1,7 @@
 (function (window, document) {
   'use strict';
 
-  window.__PENDAMPINGAN_VIEW_BUILD = '20260527-RMB-R2-R1-PENDAMPINGAN-SELECT-REPAIR';
+  window.__PENDAMPINGAN_VIEW_BUILD = '20260603-QBR2-CHECKBOX-BADUTA-AGE-BUMIL-FINAL-BRANCH';
   console.log('PendampinganView build aktif:', window.__PENDAMPINGAN_VIEW_BUILD);
 
   var PENDAMPINGAN_DRAFT_KEY = 'tpk_pendampingan_draft';
@@ -502,6 +502,152 @@
     return months;
   }
 
+  function parseDateLoose(value) {
+    var raw = normalizeSpaces(value);
+    if (!raw) return null;
+
+    var m = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (m) {
+      var y1 = Number(m[1]);
+      var mo1 = Number(m[2]);
+      var d1 = Number(m[3]);
+      var dt1 = new Date(y1, mo1 - 1, d1);
+      if (dt1.getFullYear() === y1 && dt1.getMonth() === mo1 - 1 && dt1.getDate() === d1) return dt1;
+    }
+
+    m = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+    if (m) {
+      var d2 = Number(m[1]);
+      var mo2 = Number(m[2]);
+      var y2 = Number(m[3]);
+      var dt2 = new Date(y2, mo2 - 1, d2);
+      if (dt2.getFullYear() === y2 && dt2.getMonth() === mo2 - 1 && dt2.getDate() === d2) return dt2;
+    }
+
+    var dt = new Date(raw);
+    return isNaN(dt.getTime()) ? null : dt;
+  }
+
+  function getAgeMonthsAt(dateStr, referenceDateStr) {
+    var dob = parseDateLoose(dateStr);
+    if (!dob) return null;
+    var ref = parseDateLoose(referenceDateStr) || new Date();
+    var months = (ref.getFullYear() - dob.getFullYear()) * 12 + (ref.getMonth() - dob.getMonth());
+    if (ref.getDate() < dob.getDate()) months -= 1;
+    if (months < 0) months = 0;
+    return months;
+  }
+
+  function pickDeepValue(source, keys) {
+    source = source || {};
+    keys = keys || [];
+
+    for (var i = 0; i < keys.length; i += 1) {
+      var key = keys[i];
+      if (!key) continue;
+      if (source[key] !== undefined && source[key] !== null && source[key] !== '') return source[key];
+    }
+
+    var jsonKeys = ['data_laporan', 'payload_json', 'extra_fields_json'];
+    for (var j = 0; j < jsonKeys.length; j += 1) {
+      var raw = source[jsonKeys[j]];
+      var parsed = parseJsonSafely(raw, null);
+      if (!parsed || typeof parsed !== 'object') continue;
+
+      var nestedSources = [parsed, parsed.answers, parsed.baseline_snapshot, parsed.baseline_snapshot && parsed.baseline_snapshot.data_laporan];
+      for (var n = 0; n < nestedSources.length; n += 1) {
+        var obj = nestedSources[n];
+        if (!obj || typeof obj !== 'object') continue;
+        for (var k = 0; k < keys.length; k += 1) {
+          var nestedKey = keys[k];
+          if (obj[nestedKey] !== undefined && obj[nestedKey] !== null && obj[nestedKey] !== '') return obj[nestedKey];
+        }
+      }
+    }
+
+    return '';
+  }
+
+  function resolvePendampinganKe(selected) {
+    selected = selected || getSelectedSasaran() || {};
+
+    var direct = pickDeepValue(selected, ['pendampingan_ke', 'PENDAMPINGAN_KE', 'kunjungan_ke', 'KUNJUNGAN_KE']);
+    if (direct !== '') {
+      var d = Number(direct);
+      if (!isNaN(d) && d > 0) return Math.max(1, Math.round(d));
+    }
+
+    var count = pickDeepValue(selected, [
+      'jumlah_pendampingan', 'total_pendampingan', 'pendampingan_count',
+      'jumlah_pendampingan_sasaran', 'TOTAL_PENDAMPINGAN'
+    ]);
+    if (count !== '') {
+      var c = Number(count);
+      if (!isNaN(c) && c >= 0) return Math.max(1, Math.round(c) + 1);
+    }
+
+    return 1;
+  }
+
+  function resolveBadutaAgeMonths(values) {
+    var selected = getSelectedSasaran() || {};
+    var direct = pickDeepValue(selected, [
+      'usia_baduta_bulan', 'USIA_BADUTA_BULAN', 'usia_bulan', 'umur_bulan',
+      'umur_bulan_saat_ini', 'umur_bulan_saat_register', 'usia_sasaran_bulan'
+    ]);
+    if (direct !== '') {
+      var n = Number(direct);
+      if (!isNaN(n) && n >= 0) return Math.floor(n);
+    }
+
+    var tgl = pickDeepValue(selected, [
+      'tanggal_lahir', 'tgl_lahir', 'tanggal_lahir_sasaran', 'TANGGAL_LAHIR',
+      'tgl_lahir_sasaran', 'dob'
+    ]);
+    var refDate = (values && (values.tanggal_pendampingan || values.TANGGAL_PENDAMPINGAN)) ||
+      ((byId('pen-tanggal') && byId('pen-tanggal').value) || todayIso());
+    var age = getAgeMonthsAt(tgl, refDate);
+    if (age !== null && age !== undefined && !isNaN(age)) return age;
+
+    // Fallback aman: jika tanggal lahir tidak ada di object sasaran, jangan menyembunyikan imunisasi.
+    return 24;
+  }
+
+  function getDynamicContextValues(values) {
+    var ctx = {};
+    var selected = getSelectedSasaran() || {};
+    var pendKe = resolvePendampinganKe(selected);
+    var ageMonths = resolveBadutaAgeMonths(values || {});
+
+    ctx.pendampingan_ke = pendKe;
+    ctx.PENDAMPINGAN_KE = pendKe;
+    ctx.usia_baduta_bulan = ageMonths;
+    ctx.USIA_BADUTA_BULAN = ageMonths;
+
+    return ctx;
+  }
+
+  function normalizeTriggerKey(token, lookup) {
+    var raw = normalizeSpaces(token);
+    var upper = normalizeUpper(raw);
+    lookup = lookup || {};
+    var target = (lookup.byCode && lookup.byCode[upper]) ||
+      (lookup.byId && lookup.byId[upper]) ||
+      (lookup.byKey && lookup.byKey[upper]) || null;
+    if (target && target.id) return target.id;
+    return raw.toLowerCase();
+  }
+
+  function splitMultiValue(value) {
+    if (Array.isArray(value)) {
+      return value.map(function (v) { return normalizeSpaces(v); }).filter(Boolean);
+    }
+    var raw = normalizeSpaces(value);
+    if (!raw) return [];
+    return raw.split(/[|;,]/).map(function (v) { return normalizeSpaces(v); }).filter(Boolean);
+  }
+
+
   function boolValue(value, defaultValue) {
     if (value === true || value === false) return value;
     var raw = String(value === undefined || value === null ? '' : value).trim().toUpperCase();
@@ -652,7 +798,8 @@
   }
 
   function buildPendampinganFormCacheKey(formId, jenis) {
-    return 'tpk_form_definition_cache::PENDAMPINGAN::' + normalizeUpper(formId) + '::' + normalizeUpper(jenis);
+    var version = normalizeUpper(window.__PENDAMPINGAN_VIEW_BUILD || 'QBR2');
+    return 'tpk_form_definition_cache::PENDAMPINGAN::' + version + '::' + normalizeUpper(formId) + '::' + normalizeUpper(jenis);
   }
 
   function readPendampinganFormCache(formId, jenis) {
@@ -773,9 +920,9 @@
   function normalizeFieldType(q) {
     var raw = normalizeUpper(q.field_type || q.input_type || q.type || q.control_type || q.component_type);
 
-    // MASTER_FORM_QUESTION menggunakan nilai field_type seperti: select, number, textarea, date.
-    // Patch R2-R1: nilai SELECT sebelumnya jatuh ke default text sehingga dropdown berubah menjadi isian manual.
     if (raw === 'SELECT' || raw === 'DROPDOWN' || raw === 'RADIO' || raw === 'SEARCH_SELECT' || raw === 'COMBOBOX') return 'select';
+    if (raw === 'CHECKBOX_GROUP' || raw === 'MULTI_CHECKBOX' || raw === 'CHECKBOX_LIST' || raw === 'MULTISELECT') return 'checkbox_group';
+    if (raw === 'CHECKBOX') return 'checkbox';
     if (raw === 'TEXTAREA' || raw === 'LONG_TEXT' || raw === 'MULTILINE') return 'textarea';
     if (raw === 'DATE' || raw === 'DATE_PICKER') return 'date';
     if (raw === 'NUMBER' || raw === 'NUMBER_DECIMAL' || raw === 'DECIMAL' || raw === 'INTEGER' || raw === 'NUMERIC') return 'number';
@@ -811,6 +958,7 @@
       .sort(function (a, b) { return Number(a.order || 0) - Number(b.order || 0); });
 
     if (!options.length && q.reference_key) options = getFallbackOptions(q.reference_key);
+    if (type === 'checkbox' && options.length) type = 'checkbox_group';
 
     var min = q.min_value !== undefined && q.min_value !== null && String(q.min_value).trim() !== '' ? Number(q.min_value) : undefined;
     var max = q.max_value !== undefined && q.max_value !== null && String(q.max_value).trim() !== '' ? Number(q.max_value) : undefined;
@@ -858,18 +1006,27 @@
       if (field.store_key) byKey[normalizeUpper(field.store_key)] = field;
     });
 
+    var lookup = { byCode: byCode, byId: byId, byKey: byKey };
+
     fields.forEach(function (field) {
       var rules = (field.raw && Array.isArray(field.raw.rules)) ? field.raw.rules : [];
       rules.forEach(function (rule) {
         var action = normalizeUpper(rule.action || '');
-        var triggerRaw = normalizeUpper(rule.trigger_field || rule.field || '');
-        var target = byCode[triggerRaw] || byId[triggerRaw] || byKey[triggerRaw] || null;
-        if (!target) return;
+        var triggerRaw = normalizeSpaces(rule.trigger_field || rule.field || '');
+        if (!triggerRaw) return;
+
+        var triggerFields = triggerRaw.split('|').map(function (part) {
+          return normalizeTriggerKey(part, lookup);
+        }).filter(Boolean);
+
+        if (!triggerFields.length) return;
 
         var cond = {
-          field: target.id,
+          field: triggerFields[0],
+          fields: triggerFields,
           operator: normalizeUpper(rule.operator || 'EQ'),
           equals: normalizeSpaces(rule.trigger_value),
+          values: normalizeSpaces(rule.trigger_value).split('|').map(function (x) { return normalizeSpaces(x); }),
           raw: rule
         };
 
@@ -932,6 +1089,14 @@
   function readDynamicValue(field) {
     var el = byId('dyn-pen-' + field.id);
     if (!el) return '';
+
+    if (field.type === 'checkbox_group') {
+      var checked = Array.prototype.slice.call(el.querySelectorAll('input[type="checkbox"]:checked'))
+        .map(function (input) { return normalizeSpaces(input.value); })
+        .filter(Boolean);
+      return checked.join('|');
+    }
+
     if (field.type === 'checkbox') return !!el.checked;
     return normalizeSpaces(el.value);
   }
@@ -960,6 +1125,14 @@
     var el = byId('dyn-pen-' + field.id);
     if (!el) return;
 
+    if (field.type === 'checkbox_group') {
+      var values = splitMultiValue(value).map(function (v) { return normalizeUpper(v); });
+      Array.prototype.slice.call(el.querySelectorAll('input[type="checkbox"]')).forEach(function (input) {
+        input.checked = values.indexOf(normalizeUpper(input.value)) >= 0;
+      });
+      return;
+    }
+
     if (field.type === 'checkbox') {
       el.checked = !!value;
       return;
@@ -977,24 +1150,70 @@
     var values = {};
     currentDynamicFields.forEach(function (field) {
       values[field.id] = readDynamicValue(field);
+      if (field.store_key) values[field.store_key] = values[field.id];
+      if (field.question_code) values[field.question_code] = values[field.id];
     });
-    return values;
+    return Object.assign(values, getDynamicContextValues(values));
   }
 
   function evaluateDynamicCondition(condition, values) {
-    if (!condition || !condition.field) return true;
-    values = values || {};
-    var actual = normalizeSpaces(values[condition.field]);
-    var expected = normalizeSpaces(condition.equals);
+    if (!condition || (!condition.field && !condition.fields)) return true;
+    values = Object.assign({}, values || {}, getDynamicContextValues(values || {}));
+
+    var fields = condition.fields && condition.fields.length ? condition.fields : [condition.field];
+    var expectedList = condition.values && condition.values.length ? condition.values : [condition.equals];
     var op = normalizeUpper(condition.operator || 'EQ');
 
-    if (op === 'EQ' || op === 'ANY_EQ') return normalizeUpper(actual) === normalizeUpper(expected);
-    if (op === 'NE' || op === 'NOT_EQ') return normalizeUpper(actual) !== normalizeUpper(expected);
-    if (op === 'IN') {
-      var parts = expected.split('|').map(function (x) { return normalizeUpper(x); });
-      return parts.indexOf(normalizeUpper(actual)) >= 0;
+    function actualFor(fieldName) {
+      if (!fieldName) return '';
+      if (Object.prototype.hasOwnProperty.call(values, fieldName)) return values[fieldName];
+      if (Object.prototype.hasOwnProperty.call(values, normalizeUpper(fieldName))) return values[normalizeUpper(fieldName)];
+      if (Object.prototype.hasOwnProperty.call(values, String(fieldName).toLowerCase())) return values[String(fieldName).toLowerCase()];
+      return '';
     }
-    return normalizeUpper(actual) === normalizeUpper(expected);
+
+    function eq(a, b) {
+      return normalizeUpper(a) === normalizeUpper(b);
+    }
+
+    function num(v) {
+      var n = Number(String(v == null ? '' : v).replace(',', '.'));
+      return isNaN(n) ? null : n;
+    }
+
+    var actual = actualFor(fields[0]);
+    var expected = expectedList[0] || '';
+
+    if (op === 'AND_EQ') {
+      for (var i = 0; i < fields.length; i += 1) {
+        if (!eq(actualFor(fields[i]), expectedList[i] || '')) return false;
+      }
+      return true;
+    }
+
+    if (op === 'ANY_EQ') {
+      for (var a = 0; a < fields.length; a += 1) {
+        if (eq(actualFor(fields[a]), expected)) return true;
+      }
+      return false;
+    }
+
+    if (op === 'EQ') return eq(actual, expected);
+    if (op === 'NE' || op === 'NOT_EQ') return !eq(actual, expected);
+    if (op === 'IN') {
+      return expectedList.map(function (x) { return normalizeUpper(x); }).indexOf(normalizeUpper(actual)) >= 0;
+    }
+    if (op === 'NOT_EMPTY') return normalizeSpaces(actual) !== '';
+
+    var left = num(actual);
+    var right = num(expected);
+    if (left === null || right === null) return false;
+    if (op === 'GTE' || op === 'GE' || op === '>=') return left >= right;
+    if (op === 'GT' || op === '>') return left > right;
+    if (op === 'LTE' || op === 'LE' || op === '<=') return left <= right;
+    if (op === 'LT' || op === '<') return left < right;
+
+    return eq(actual, expected);
   }
 
   function isFieldRequiredNow(field, values) {
@@ -1042,12 +1261,19 @@
 
       var input = byId('dyn-pen-' + field.id);
       if (input) {
-        input.disabled = !isVisible;
-        if (!isVisible) {
-          if (field.type === 'checkbox') input.checked = false;
-          else if (!field.readonly) input.value = '';
-          values[field.id] = '';
+        if (field.type === 'checkbox_group') {
+          Array.prototype.slice.call(input.querySelectorAll('input[type="checkbox"]')).forEach(function (cb) {
+            cb.disabled = !isVisible || field.readonly;
+            if (!isVisible) cb.checked = false;
+          });
+        } else {
+          input.disabled = !isVisible;
+          if (!isVisible) {
+            if (field.type === 'checkbox') input.checked = false;
+            else if (!field.readonly) input.value = '';
+          }
         }
+        if (!isVisible) values[field.id] = '';
       }
     });
   }
@@ -1084,6 +1310,30 @@
           return '<option value="' + escapeHtml(optionValue) + '"' + selected + '>' + escapeHtml(optionLabel) + '</option>';
         }).join(''),
         '</select>'
+      ].join('');
+    } else if (field.type === 'checkbox_group') {
+      var selectedValues = splitMultiValue(safeValue).map(function (x) { return normalizeUpper(x); });
+      inputHtml = [
+        '<div class="checkbox-group" id="dyn-pen-' + escapeHtml(field.id) + '" data-dynamic-field="' + escapeHtml(field.id) + '" role="group">',
+        (field.options || []).map(function (opt, index) {
+          var optionValue = typeof opt === 'object' ? String(opt.value || opt.label || '') : String(opt);
+          var optionLabel = typeof opt === 'object' ? String(opt.label || opt.value || '') : optionValue;
+          var checked = selectedValues.indexOf(normalizeUpper(optionValue)) >= 0 || selectedValues.indexOf(normalizeUpper(optionLabel)) >= 0 ? ' checked' : '';
+          return [
+            '<label class="compact-checkbox-row compact-checkbox-option">',
+            '<input type="checkbox"',
+            ' id="dyn-pen-' + escapeHtml(field.id) + '-' + index + '"',
+            ' name="dyn-pen-' + escapeHtml(field.id) + '"',
+            ' data-dynamic-field="' + escapeHtml(field.id) + '"',
+            ' value="' + escapeHtml(optionValue) + '"',
+            checked,
+            field.readonly ? ' disabled' : '',
+            ' />',
+            '<span>' + escapeHtml(optionLabel) + '</span>',
+            '</label>'
+          ].join('');
+        }).join(''),
+        '</div>'
       ].join('');
     } else if (field.type === 'checkbox') {
       inputHtml = [
@@ -1181,11 +1431,7 @@
 
       if (field.type === 'textarea' || field.type === 'number') {
         el.addEventListener('input', function () {
-          if (field.type === 'number') {
-            // allow typing, clamp on change/blur
-          } else {
-            applyDynamicRules();
-          }
+          if (field.type !== 'number') applyDynamicRules();
           PendampinganView.renderValidation();
           PendampinganView.autosaveDraft();
         });
