@@ -1,7 +1,7 @@
 (function (window, document) {
   'use strict';
 
-  window.__PENDAMPINGAN_VIEW_BUILD = '20260603-QBR2-CHECKBOX-BADUTA-AGE-BUMIL-FINAL-BRANCH';
+  window.__PENDAMPINGAN_VIEW_BUILD = '20260604-QBR2-R1-CHECKBOX-UX-EMPTY-SECTION-EXCLUSIVE-GUARD';
   console.log('PendampinganView build aktif:', window.__PENDAMPINGAN_VIEW_BUILD);
 
   var PENDAMPINGAN_DRAFT_KEY = 'tpk_pendampingan_draft';
@@ -1146,6 +1146,120 @@
     el.value = value !== undefined && value !== null ? value : '';
   }
 
+
+  function normalizeCheckboxChoice(value) {
+    return normalizeUpper(value)
+      .replace(/[_\-]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function getCheckboxOptionText(input) {
+    if (!input) return '';
+    var label = input.closest ? input.closest('label') : null;
+    var labelText = label ? normalizeSpaces(label.textContent || '') : '';
+    return normalizeCheckboxChoice([input.value || '', labelText].join(' '));
+  }
+
+  function isExclusiveCheckboxOption(input) {
+    var text = getCheckboxOptionText(input);
+    if (!text) return false;
+
+    return text === 'TIDAK ADA' ||
+      text.indexOf('TIDAK ADA ') === 0 ||
+      text.indexOf(' TIDAK ADA') >= 0 ||
+      text === 'TIDAK MEMILIKI' ||
+      text.indexOf('TIDAK MEMILIKI ') === 0 ||
+      text === 'TIDAK TERDAPAT';
+  }
+
+  function applyCheckboxExclusiveRules(fieldId, changedInput) {
+    var group = byId('dyn-pen-' + fieldId);
+    if (!group) return;
+
+    var inputs = Array.prototype.slice.call(group.querySelectorAll('input[type="checkbox"]'));
+    if (!inputs.length) return;
+
+    var exclusiveInputs = inputs.filter(isExclusiveCheckboxOption);
+    if (!exclusiveInputs.length) return;
+
+    if (changedInput && changedInput.checked && isExclusiveCheckboxOption(changedInput)) {
+      inputs.forEach(function (input) {
+        if (input !== changedInput) input.checked = false;
+      });
+      return;
+    }
+
+    var hasNonExclusiveChecked = inputs.some(function (input) {
+      return input.checked && !isExclusiveCheckboxOption(input);
+    });
+
+    if (hasNonExclusiveChecked) {
+      exclusiveInputs.forEach(function (input) {
+        input.checked = false;
+      });
+    }
+  }
+
+  function ensureR2R1QuestionBankStyle() {
+    if (document.getElementById('pendampingan-qbr2-r1-style')) return;
+
+    var style = document.createElement('style');
+    style.id = 'pendampingan-qbr2-r1-style';
+    style.textContent = [
+      '#pendampingan-dynamic-fields .form-group.form-group-checkbox-group{grid-column:span 2;}',
+      '#pendampingan-dynamic-fields .checkbox-group{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px 14px;align-items:start;padding:6px 0;}',
+      '#pendampingan-dynamic-fields .checkbox-group .compact-checkbox-row{display:flex;align-items:center;justify-content:flex-start;gap:9px;min-height:32px;margin:0;padding:4px 0;font-weight:600;line-height:1.25;text-align:left;}',
+      '#pendampingan-dynamic-fields .checkbox-group .compact-checkbox-row span{display:inline-block;}',
+      '#pendampingan-dynamic-fields .checkbox-group input[type="checkbox"]{width:18px;height:18px;min-width:18px;margin:0;flex:0 0 auto;}',
+      '#pendampingan-dynamic-fields .pendampingan-section-card.is-empty-dynamic-section{display:none!important;}',
+      '@media(max-width:720px){#pendampingan-dynamic-fields .form-group.form-group-checkbox-group{grid-column:1/-1;}#pendampingan-dynamic-fields .checkbox-group{grid-template-columns:1fr;}}'
+    ].join('\n');
+
+    document.head.appendChild(style);
+  }
+
+  function polishCheckboxGroups() {
+    ensureR2R1QuestionBankStyle();
+
+    currentDynamicFields.forEach(function (field) {
+      if (!field || field.type !== 'checkbox_group') return;
+
+      var wrap = byId('qwrap-' + field.id);
+      if (wrap) wrap.classList.add('form-group-checkbox-group');
+
+      var group = byId('dyn-pen-' + field.id);
+      if (!group) return;
+      group.classList.add('checkbox-group-r2r1');
+      Array.prototype.slice.call(group.querySelectorAll('label')).forEach(function (label) {
+        label.classList.add('compact-checkbox-option-r2r1');
+      });
+    });
+  }
+
+  function syncEmptySectionVisibility() {
+    var cards = Array.prototype.slice.call(document.querySelectorAll('#pendampingan-dynamic-fields .pendampingan-section-card'));
+    cards.forEach(function (card) {
+      var groups = Array.prototype.slice.call(card.querySelectorAll('.form-group[id^="qwrap-"]'));
+      if (!groups.length) {
+        card.classList.remove('is-empty-dynamic-section');
+        return;
+      }
+
+      var hasVisible = groups.some(function (wrap) {
+        return wrap && wrap.style.display !== 'none';
+      });
+
+      card.classList.toggle('is-empty-dynamic-section', !hasVisible);
+    });
+  }
+
+  function applyPostRenderPolish() {
+    polishCheckboxGroups();
+    syncEmptySectionVisibility();
+  }
+
+
   function collectDynamicFields() {
     var values = {};
     currentDynamicFields.forEach(function (field) {
@@ -1276,6 +1390,8 @@
         if (!isVisible) values[field.id] = '';
       }
     });
+
+    syncEmptySectionVisibility();
   }
 
   function renderDynamicField(field, value) {
@@ -1399,6 +1515,7 @@
     setHTML('pendampingan-dynamic-fields', html);
     bindDynamicEvents();
     applyDynamicRules();
+    applyPostRenderPolish();
   }
 
   function bindDynamicEvents() {
@@ -1408,22 +1525,36 @@
 
       el.dataset.bound = '1';
 
+      if (field.type === 'checkbox_group') {
+        el.addEventListener('change', function (event) {
+          applyCheckboxExclusiveRules(field.id, event && event.target);
+          applyDynamicRules();
+          applyPostRenderPolish();
+          PendampinganView.renderValidation();
+          PendampinganView.autosaveDraft();
+        });
+        return;
+      }
+
       if (field.type === 'number') {
         el.addEventListener('change', function () {
           el.value = clampNumber(el.value, field);
           applyDynamicRules();
+          applyPostRenderPolish();
           PendampinganView.renderValidation();
           PendampinganView.autosaveDraft();
         });
         el.addEventListener('blur', function () {
           el.value = clampNumber(el.value, field);
           applyDynamicRules();
+          applyPostRenderPolish();
           PendampinganView.renderValidation();
           PendampinganView.autosaveDraft();
         });
       } else {
         el.addEventListener('change', function () {
           applyDynamicRules();
+          applyPostRenderPolish();
           PendampinganView.renderValidation();
           PendampinganView.autosaveDraft();
         });
