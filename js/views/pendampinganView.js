@@ -1,7 +1,7 @@
 (function (window, document) {
   'use strict';
 
-  window.__PENDAMPINGAN_VIEW_BUILD = '20260604-QBR2-R1-CHECKBOX-UX-EMPTY-SECTION-EXCLUSIVE-GUARD';
+  window.__PENDAMPINGAN_VIEW_BUILD = '20260604-QBR2-R2-COMPACT-CHECKBOX-MULTIVALUE-BINDING';
   console.log('PendampinganView build aktif:', window.__PENDAMPINGAN_VIEW_BUILD);
 
   var PENDAMPINGAN_DRAFT_KEY = 'tpk_pendampingan_draft';
@@ -1091,6 +1091,7 @@
     if (!el) return '';
 
     if (field.type === 'checkbox_group') {
+      applyCheckboxExclusiveRules(field.id, null);
       var checked = Array.prototype.slice.call(el.querySelectorAll('input[type="checkbox"]:checked'))
         .map(function (input) { return normalizeSpaces(input.value); })
         .filter(Boolean);
@@ -1128,8 +1129,14 @@
     if (field.type === 'checkbox_group') {
       var values = splitMultiValue(value).map(function (v) { return normalizeUpper(v); });
       Array.prototype.slice.call(el.querySelectorAll('input[type="checkbox"]')).forEach(function (input) {
-        input.checked = values.indexOf(normalizeUpper(input.value)) >= 0;
+        var optionLabel = '';
+        var label = input.closest ? input.closest('label') : null;
+        if (label) optionLabel = normalizeSpaces(label.textContent || '');
+        input.checked =
+          values.indexOf(normalizeUpper(input.value)) >= 0 ||
+          values.indexOf(normalizeUpper(optionLabel)) >= 0;
       });
+      applyCheckboxExclusiveRules(field.id, null);
       return;
     }
 
@@ -1201,38 +1208,57 @@
     }
   }
 
-  function ensureR2R1QuestionBankStyle() {
-    if (document.getElementById('pendampingan-qbr2-r1-style')) return;
+  function ensureR2R2QuestionBankStyle() {
+    var oldStyle = document.getElementById('pendampingan-qbr2-r1-style');
+    if (oldStyle && oldStyle.parentNode) oldStyle.parentNode.removeChild(oldStyle);
 
-    var style = document.createElement('style');
-    style.id = 'pendampingan-qbr2-r1-style';
+    var style = document.getElementById('pendampingan-qbr2-r2-style');
+    if (!style) {
+      style = document.createElement('style');
+      style.id = 'pendampingan-qbr2-r2-style';
+      document.head.appendChild(style);
+    }
+
     style.textContent = [
-      '#pendampingan-dynamic-fields .form-group.form-group-checkbox-group{grid-column:span 2;}',
-      '#pendampingan-dynamic-fields .checkbox-group{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px 14px;align-items:start;padding:6px 0;}',
-      '#pendampingan-dynamic-fields .checkbox-group .compact-checkbox-row{display:flex;align-items:center;justify-content:flex-start;gap:9px;min-height:32px;margin:0;padding:4px 0;font-weight:600;line-height:1.25;text-align:left;}',
-      '#pendampingan-dynamic-fields .checkbox-group .compact-checkbox-row span{display:inline-block;}',
-      '#pendampingan-dynamic-fields .checkbox-group input[type="checkbox"]{width:18px;height:18px;min-width:18px;margin:0;flex:0 0 auto;}',
+      '#pendampingan-dynamic-fields .form-group.form-group-checkbox-group{grid-column:1/-1!important;margin-bottom:8px!important;}',
+      '#pendampingan-dynamic-fields .form-group.form-group-checkbox-group>label{margin-bottom:7px!important;}',
+      '#pendampingan-dynamic-fields .checkbox-group,#pendampingan-dynamic-fields .pendampingan-checkbox-grid{display:grid!important;grid-template-columns:repeat(auto-fit,minmax(210px,1fr))!important;gap:6px 18px!important;align-items:start!important;width:100%!important;padding:2px 0!important;}',
+      '#pendampingan-dynamic-fields .checkbox-group .compact-checkbox-row,#pendampingan-dynamic-fields .pendampingan-checkbox-option{display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:flex-start!important;gap:8px!important;min-height:28px!important;margin:0!important;padding:2px 0!important;font-weight:700!important;line-height:1.22!important;text-align:left!important;cursor:pointer!important;}',
+      '#pendampingan-dynamic-fields .checkbox-group .compact-checkbox-row span,#pendampingan-dynamic-fields .pendampingan-checkbox-label{display:inline!important;margin:0!important;padding:0!important;line-height:1.22!important;}',
+      '#pendampingan-dynamic-fields .checkbox-group input[type="checkbox"],#pendampingan-dynamic-fields .pendampingan-checkbox-input{appearance:auto!important;-webkit-appearance:checkbox!important;width:16px!important;min-width:16px!important;max-width:16px!important;height:16px!important;min-height:16px!important;max-height:16px!important;margin:0!important;padding:0!important;flex:0 0 16px!important;border-radius:3px!important;box-shadow:none!important;accent-color:var(--primary,#0b57d0)!important;}',
+      '#pendampingan-dynamic-fields .pendampingan-checkbox-help{grid-column:1/-1!important;margin-top:4px!important;}',
       '#pendampingan-dynamic-fields .pendampingan-section-card.is-empty-dynamic-section{display:none!important;}',
-      '@media(max-width:720px){#pendampingan-dynamic-fields .form-group.form-group-checkbox-group{grid-column:1/-1;}#pendampingan-dynamic-fields .checkbox-group{grid-template-columns:1fr;}}'
+      '@media(max-width:720px){#pendampingan-dynamic-fields .checkbox-group,#pendampingan-dynamic-fields .pendampingan-checkbox-grid{grid-template-columns:1fr!important;gap:5px 0!important;}}'
     ].join('\n');
-
-    document.head.appendChild(style);
   }
 
   function polishCheckboxGroups() {
-    ensureR2R1QuestionBankStyle();
+    ensureR2R2QuestionBankStyle();
 
     currentDynamicFields.forEach(function (field) {
       if (!field || field.type !== 'checkbox_group') return;
 
       var wrap = byId('qwrap-' + field.id);
-      if (wrap) wrap.classList.add('form-group-checkbox-group');
+      if (wrap) {
+        wrap.classList.add('form-group-checkbox-group');
+        wrap.dataset.multiValueField = '1';
+      }
 
       var group = byId('dyn-pen-' + field.id);
       if (!group) return;
-      group.classList.add('checkbox-group-r2r1');
+      group.classList.add('checkbox-group-r2r2', 'pendampingan-checkbox-grid');
+      group.dataset.multiValueSeparator = '|';
+
       Array.prototype.slice.call(group.querySelectorAll('label')).forEach(function (label) {
-        label.classList.add('compact-checkbox-option-r2r1');
+        label.classList.add('compact-checkbox-option-r2r2', 'pendampingan-checkbox-option');
+      });
+
+      Array.prototype.slice.call(group.querySelectorAll('input[type="checkbox"]')).forEach(function (input) {
+        input.classList.add('pendampingan-checkbox-input');
+      });
+
+      Array.prototype.slice.call(group.querySelectorAll('span')).forEach(function (span) {
+        span.classList.add('pendampingan-checkbox-label');
       });
     });
   }
@@ -1380,6 +1406,7 @@
             cb.disabled = !isVisible || field.readonly;
             if (!isVisible) cb.checked = false;
           });
+          if (isVisible) applyCheckboxExclusiveRules(field.id, null);
         } else {
           input.disabled = !isVisible;
           if (!isVisible) {
@@ -1430,14 +1457,14 @@
     } else if (field.type === 'checkbox_group') {
       var selectedValues = splitMultiValue(safeValue).map(function (x) { return normalizeUpper(x); });
       inputHtml = [
-        '<div class="checkbox-group" id="dyn-pen-' + escapeHtml(field.id) + '" data-dynamic-field="' + escapeHtml(field.id) + '" role="group">',
+        '<div class="checkbox-group pendampingan-checkbox-grid" id="dyn-pen-' + escapeHtml(field.id) + '" data-dynamic-field="' + escapeHtml(field.id) + '" data-multivalue-separator="|" role="group">',
         (field.options || []).map(function (opt, index) {
           var optionValue = typeof opt === 'object' ? String(opt.value || opt.label || '') : String(opt);
           var optionLabel = typeof opt === 'object' ? String(opt.label || opt.value || '') : optionValue;
           var checked = selectedValues.indexOf(normalizeUpper(optionValue)) >= 0 || selectedValues.indexOf(normalizeUpper(optionLabel)) >= 0 ? ' checked' : '';
           return [
-            '<label class="compact-checkbox-row compact-checkbox-option">',
-            '<input type="checkbox"',
+            '<label class="compact-checkbox-row compact-checkbox-option pendampingan-checkbox-option">',
+            '<input type="checkbox" class="pendampingan-checkbox-input"',
             ' id="dyn-pen-' + escapeHtml(field.id) + '-' + index + '"',
             ' name="dyn-pen-' + escapeHtml(field.id) + '"',
             ' data-dynamic-field="' + escapeHtml(field.id) + '"',
@@ -1445,7 +1472,7 @@
             checked,
             field.readonly ? ' disabled' : '',
             ' />',
-            '<span>' + escapeHtml(optionLabel) + '</span>',
+            '<span class="pendampingan-checkbox-label">' + escapeHtml(optionLabel) + '</span>',
             '</label>'
           ].join('');
         }).join(''),
@@ -1486,7 +1513,7 @@
       '<div class="form-group" id="qwrap-' + escapeHtml(field.id) + '">',
       '<label for="dyn-pen-' + escapeHtml(field.id) + '">' + escapeHtml(field.label) + requiredMark + '</label>',
       inputHtml,
-      field.helpText ? '<small class="muted-text">' + escapeHtml(field.helpText) + '</small>' : '',
+      field.helpText ? '<small class="muted-text' + (field.type === 'checkbox_group' ? ' pendampingan-checkbox-help' : '') + '">' + escapeHtml(field.helpText) + '</small>' : '',
       '</div>'
     ].join('');
   }
