@@ -3047,3 +3047,89 @@ textarea, .form-group textarea { min-height: 82px; }
   .menu-card,
   .menu-card.menu-card--compact { min-height: 88px; }
 }
+/* =========================================================
+   PENDAMPINGAN QUESTION BANK R2-R2
+   Compact Checkbox UI & Multi-Value Frontend Binding
+   Catatan:
+   - Mengunci checkbox agar tidak terdampak rule global input { width:100% }.
+   - Checkbox group memakai grid ringkas dan tetap responsif.
+   - Nilai tetap dikirim oleh pendampinganView.js sebagai pipe-delimited string.
+   ========================================================= */
+#pendampingan-dynamic-fields .form-group.form-group-checkbox-group {
+  grid-column: 1 / -1 !important;
+  margin-bottom: 8px !important;
+}
+
+#pendampingan-dynamic-fields .form-group.form-group-checkbox-group > label {
+  margin-bottom: 7px !important;
+}
+
+#pendampingan-dynamic-fields .checkbox-group,
+#pendampingan-dynamic-fields .pendampingan-checkbox-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)) !important;
+  gap: 6px 18px !important;
+  align-items: start !important;
+  width: 100% !important;
+  padding: 2px 0 !important;
+}
+
+#pendampingan-dynamic-fields .checkbox-group .compact-checkbox-row,
+#pendampingan-dynamic-fields .pendampingan-checkbox-option {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 8px !important;
+  min-height: 28px !important;
+  margin: 0 !important;
+  padding: 2px 0 !important;
+  font-weight: 700 !important;
+  line-height: 1.22 !important;
+  text-align: left !important;
+  cursor: pointer !important;
+}
+
+#pendampingan-dynamic-fields .checkbox-group .compact-checkbox-row span,
+#pendampingan-dynamic-fields .pendampingan-checkbox-label {
+  display: inline !important;
+  width: auto !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 1.22 !important;
+}
+
+#pendampingan-dynamic-fields .checkbox-group input[type="checkbox"],
+#pendampingan-dynamic-fields .pendampingan-checkbox-input {
+  appearance: auto !important;
+  -webkit-appearance: checkbox !important;
+  width: 16px !important;
+  min-width: 16px !important;
+  max-width: 16px !important;
+  height: 16px !important;
+  min-height: 16px !important;
+  max-height: 16px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  flex: 0 0 16px !important;
+  border-radius: 3px !important;
+  box-shadow: none !important;
+  accent-color: var(--primary, #0b57d0) !important;
+}
+
+#pendampingan-dynamic-fields .pendampingan-checkbox-help {
+  grid-column: 1 / -1 !important;
+  margin-top: 4px !important;
+}
+
+#pendampingan-dynamic-fields .pendampingan-section-card.is-empty-dynamic-section {
+  display: none !important;
+}
+
+@media (max-width: 720px) {
+  #pendampingan-dynamic-fields .checkbox-group,
+  #pendampingan-dynamic-fields .pendampingan-checkbox-grid {
+    grid-template-columns: 1fr !important;
+    gap: 5px 0 !important;
+  }
+}
