@@ -1,7 +1,7 @@
 (function (window, document) {
   'use strict';
 
-  window.__PENDAMPINGAN_VIEW_BUILD = '20260604-QBR2-R2-COMPACT-CHECKBOX-MULTIVALUE-BINDING';
+  window.__PENDAMPINGAN_VIEW_BUILD = '20260604-QBR2-R4-CANONICAL-SUBMIT-CLEANUP';
   console.log('PendampinganView build aktif:', window.__PENDAMPINGAN_VIEW_BUILD);
 
   var PENDAMPINGAN_DRAFT_KEY = 'tpk_pendampingan_draft';
@@ -1286,14 +1286,36 @@
   }
 
 
-  function collectDynamicFields() {
+  function collectDynamicFields(options) {
+    options = options || {};
+    var includeAliases = options.includeAliases !== false;
+    var includeContext = options.includeContext !== false;
     var values = {};
+
     currentDynamicFields.forEach(function (field) {
-      values[field.id] = readDynamicValue(field);
-      if (field.store_key) values[field.store_key] = values[field.id];
-      if (field.question_code) values[field.question_code] = values[field.id];
+      if (!field) return;
+
+      var answerKey = normalizeSpaces(field.store_key || field.id || '');
+      if (!answerKey) return;
+
+      var value = readDynamicValue(field);
+
+      // Canonical utama selalu store_key. Untuk fallback lokal, field.id biasanya sudah canonical.
+      values[answerKey] = value;
+
+      // Alias hanya untuk evaluasi rule/visibility di UI, bukan untuk payload submit.
+      if (includeAliases) {
+        if (field.id) values[field.id] = value;
+        if (field.question_code) values[field.question_code] = value;
+        if (field.question_id) values[field.question_id] = value;
+      }
     });
-    return Object.assign(values, getDynamicContextValues(values));
+
+    if (includeContext) {
+      return Object.assign(values, getDynamicContextValues(values));
+    }
+
+    return values;
   }
 
   function evaluateDynamicCondition(condition, values) {
@@ -1920,7 +1942,7 @@
         ? (localDraft.client_submit_id || generateClientSubmitId('SUB'))
         : '';
 
-      var extraFields = collectDynamicFields();
+      var extraFields = collectDynamicFields({ includeAliases: false, includeContext: false });
       computeDerived(extraFields);
 
       return {
