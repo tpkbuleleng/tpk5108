@@ -1,7 +1,7 @@
 (function (window, document) {
   'use strict';
 
-  window.__PENDAMPINGAN_VIEW_BUILD = '20260604-QBR2-R4-CANONICAL-SUBMIT-CLEANUP';
+  window.__PENDAMPINGAN_VIEW_BUILD = '20260604-QBR2-R4B-BUFAS-KB-ALIAS-CLEANUP';
   console.log('PendampinganView build aktif:', window.__PENDAMPINGAN_VIEW_BUILD);
 
   var PENDAMPINGAN_DRAFT_KEY = 'tpk_pendampingan_draft';
@@ -1318,6 +1318,85 @@
     return values;
   }
 
+  function cleanPendampinganAnswerAliases_(obj) {
+    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return obj;
+
+    function hasOwn(key) {
+      return Object.prototype.hasOwnProperty.call(obj, key);
+    }
+
+    function isFilled(value) {
+      return value !== undefined && value !== null && String(value).trim() !== '';
+    }
+
+    function moveAlias(canonical, aliases) {
+      aliases = aliases || [];
+
+      if (!isFilled(obj[canonical])) {
+        for (var i = 0; i < aliases.length; i += 1) {
+          var alias = aliases[i];
+          if (hasOwn(alias) && isFilled(obj[alias])) {
+            obj[canonical] = obj[alias];
+            break;
+          }
+        }
+      }
+
+      aliases.forEach(function (alias) {
+        if (alias !== canonical) delete obj[alias];
+      });
+    }
+
+    moveAlias('kb_pasca', [
+      'KB_PASCA',
+      'kb_pasca_persalinan',
+      'KB_PASCA_PERSALINAN',
+      'menggunakan_kontrasepsi_pascapersalinan',
+      'MENGGUNAKAN_KONTRASEPSI_PASCAPERSALINAN',
+      'kontrasepsi_pascapersalinan',
+      'KONTRASEPSI_PASCAPERSALINAN'
+    ]);
+
+    moveAlias('bb', [
+      'BB',
+      'berat_badan',
+      'BERAT_BADAN'
+    ]);
+
+    moveAlias('tb', [
+      'TB',
+      'tinggi_badan',
+      'TINGGI_BADAN'
+    ]);
+
+    moveAlias('pb_tb', [
+      'PB_TB',
+      'panjang_tinggi_badan',
+      'PANJANG_TINGGI_BADAN'
+    ]);
+
+    return obj;
+  }
+
+  function cleanPendampinganSubmitPayload_(payload) {
+    if (!payload || typeof payload !== 'object') return payload;
+
+    cleanPendampinganAnswerAliases_(payload);
+    cleanPendampinganAnswerAliases_(payload.answers);
+    cleanPendampinganAnswerAliases_(payload.dynamic_fields);
+    cleanPendampinganAnswerAliases_(payload.extra_fields);
+    cleanPendampinganAnswerAliases_(payload.data_laporan);
+
+    if (payload.extra_fields && typeof payload.extra_fields === 'object') {
+      payload.answers = payload.extra_fields;
+      payload.dynamic_fields = payload.extra_fields;
+      payload.extra_fields_json = JSON.stringify(payload.extra_fields || {});
+    }
+
+    return payload;
+  }
+
+
   function evaluateDynamicCondition(condition, values) {
     if (!condition || (!condition.field && !condition.fields)) return true;
     values = Object.assign({}, values || {}, getDynamicContextValues(values || {}));
@@ -1944,6 +2023,7 @@
 
       var extraFields = collectDynamicFields({ includeAliases: false, includeContext: false });
       computeDerived(extraFields);
+      cleanPendampinganAnswerAliases_(extraFields);
 
       return {
         mode: mode,
@@ -2263,6 +2343,8 @@
             extra_fields_json: JSON.stringify(data.extra_fields || {})
           };
         }
+
+        cleanPendampinganSubmitPayload_(payload);
 
         if (!navigator.onLine && mode === 'create') {
           await enqueueOffline(action, payload);
