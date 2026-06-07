@@ -3133,3 +3133,351 @@ textarea, .form-group textarea { min-height: 82px; }
     gap: 5px 0 !important;
   }
 }
+
+
+/* =========================================================
+   Paket Sasaran Display R1 — Compact List & Detail Kader
+   ========================================================= */
+
+#sasaran-list-screen .sasaran-filter-header-r1,
+#sasaran-list-screen .sasaran-data-header-r1 {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+}
+
+.sasaran-filter-header-actions {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.sasaran-filter-icon-btn {
+  width: 38px !important;
+  min-width: 38px !important;
+  height: 38px !important;
+  min-height: 38px !important;
+  padding: 0 !important;
+  border-radius: 12px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 18px !important;
+  line-height: 1 !important;
+  background: rgba(255, 255, 255, 0.18) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.28) !important;
+  box-shadow: none !important;
+}
+
+.sasaran-monthly-banner {
+  margin-top: 12px;
+  padding: 11px 14px;
+  border-radius: 14px;
+  font-size: 14px;
+  line-height: 1.4;
+  font-weight: 900;
+  text-align: center;
+  border: 1px solid transparent;
+}
+
+.sasaran-monthly-banner-warning {
+  background: #fff4db;
+  border-color: #f1d18b;
+  color: #7a3f00;
+}
+
+.sasaran-monthly-banner-success {
+  background: #e8f5e9;
+  border-color: #b7e4c7;
+  color: #137333;
+}
+
+.sasaran-list-meta-compact {
+  display: none !important;
+}
+
+#sasaran-active-count-badge.sasaran-active-count-badge {
+  position: relative;
+  z-index: 2;
+  white-space: nowrap;
+}
+
+#sasaran-list-container.sasaran-card-grid-r1 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.sasaran-list-card-r1 {
+  margin: 0 !important;
+  padding: 14px !important;
+  border-radius: 18px !important;
+}
+
+.sasaran-card-r1-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sasaran-card-r1-title-wrap {
+  min-width: 0;
+}
+
+.sasaran-card-r1-title {
+  margin: 0 0 5px;
+  font-size: 17px;
+  line-height: 1.2;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  word-break: break-word;
+}
+
+.sasaran-card-r1-subline {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.sasaran-card-r1-status-actions {
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.sasaran-icon-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.sasaran-icon-btn {
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  border-radius: 11px;
+  border: 1px solid var(--border);
+  background: #ffffff;
+  color: var(--primary-dark);
+  font-size: 15px;
+  font-weight: 900;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sasaran-icon-btn-primary {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #ffffff;
+}
+
+.sasaran-card-r1-tags {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.sasaran-mini-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  color: var(--text-soft);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.sasaran-mini-tag.is-priority {
+  background: var(--warning-soft);
+  border-color: var(--warning-border);
+  color: var(--warning);
+}
+
+.sasaran-mini-tag.is-done {
+  background: var(--success-soft);
+  border-color: var(--success-border);
+  color: var(--success);
+}
+
+.sasaran-mini-tag.is-pending {
+  background: var(--danger-soft);
+  border-color: var(--danger-border);
+  color: var(--danger);
+}
+
+.sasaran-card-r1-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 12px;
+  margin-top: 12px;
+}
+
+.sasaran-compact-field strong {
+  display: block;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.sasaran-compact-field.span-2 {
+  grid-column: span 2;
+}
+
+#sasaran-detail-screen.sasaran-detail-r1 .card {
+  margin-bottom: 12px;
+}
+
+#sasaran-detail-screen.sasaran-detail-r1 #btn-go-to-edit-sasaran.sasaran-detail-edit-bottom-hidden {
+  display: none !important;
+}
+
+.sasaran-detail-title-inline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sasaran-detail-icon-btn {
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  border-radius: 11px;
+  border: 1px solid var(--border);
+  background: #ffffff;
+  color: var(--primary-dark);
+  font-size: 15px;
+  font-weight: 900;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sasaran-detail-kind-r1 {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-soft);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.sasaran-detail-summary-grid-r1,
+.sasaran-riwayat-grid-r1 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.sasaran-detail-info-cell strong {
+  display: block;
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+#detail-extra-fields {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.sasaran-riwayat-card-r1 {
+  padding: 14px !important;
+  border-radius: 18px !important;
+}
+
+.sasaran-riwayat-header-r1 {
+  align-items: center !important;
+}
+
+.sasaran-riwayat-right-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sasaran-detail-bottom-actions-r1 {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px !important;
+  margin-top: 12px;
+}
+
+#sasaran-detail-screen.sasaran-detail-r1 .section-actions,
+#sasaran-detail-screen.sasaran-detail-r1 .action-grid-2 {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 10px !important;
+}
+
+@media (max-width: 760px) {
+  #sasaran-list-container.sasaran-card-grid-r1 {
+    grid-template-columns: 1fr;
+  }
+
+  .sasaran-card-r1-meta,
+  .sasaran-detail-summary-grid-r1,
+  .sasaran-riwayat-grid-r1,
+  #detail-extra-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .sasaran-compact-field.span-2 {
+    grid-column: span 1;
+  }
+
+  .sasaran-card-r1-top {
+    align-items: flex-start;
+  }
+
+  .sasaran-card-r1-status-actions {
+    justify-items: end;
+  }
+}
+
+@media (max-width: 480px) {
+  #sasaran-list-screen .sasaran-filter-header-r1,
+  #sasaran-list-screen .sasaran-data-header-r1 {
+    align-items: flex-start !important;
+  }
+
+  .sasaran-filter-header-actions {
+    gap: 6px;
+  }
+
+  .sasaran-filter-icon-btn {
+    width: 34px !important;
+    min-width: 34px !important;
+    height: 34px !important;
+    min-height: 34px !important;
+  }
+
+  .sasaran-card-r1-title {
+    font-size: 16px;
+  }
+}
+
