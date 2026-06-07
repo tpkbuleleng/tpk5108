@@ -7,7 +7,7 @@
   var RIWAYAT_CACHE_TTL_MS = 5 * 60 * 1000;
   var EDIT_HANDOFF_KEY = 'tpk_registrasi_edit_handoff_v1';
 
-  window.__SASARAN_DETAIL_VIEW_BUILD = '20260421-04';
+  window.__SASARAN_DETAIL_VIEW_BUILD = '20260607-SASARAN-DISPLAY-R1';
   console.log('SasaranDetailView build aktif:', window.__SASARAN_DETAIL_VIEW_BUILD);
 
   var isInitialized = false;
@@ -281,6 +281,110 @@
     } catch (err) {
       return String(value);
     }
+  }
+
+
+  function parseDateFlexible(value) {
+    if (!isMeaningful(value)) return null;
+    if (value instanceof Date && !isNaN(value.getTime())) return value;
+
+    var raw = String(value || '').trim();
+    var d = new Date(raw);
+    if (!isNaN(d.getTime())) return d;
+
+    var m = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+    if (m) {
+      d = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+      if (!isNaN(d.getTime())) return d;
+    }
+
+    return null;
+  }
+
+  function getAgeLabel(detail) {
+    detail = detail || {};
+    var jenis = normalizeUpperDisplay(detail.jenis_sasaran);
+    var tanggal = parseDateFlexible(detail.tanggal_lahir);
+    var monthValue = Number(detail.usia_bulan || detail.umur_bulan || detail.usia_baduta_bulan || detail.umur_baduta_bulan || 0);
+    var yearValue = Number(detail.usia_tahun || detail.umur_tahun || 0);
+
+    if (jenis === 'BADUTA') {
+      if (!monthValue && tanggal) {
+        var now = new Date();
+        monthValue = (now.getFullYear() - tanggal.getFullYear()) * 12 + (now.getMonth() - tanggal.getMonth());
+        if (now.getDate() < tanggal.getDate()) monthValue -= 1;
+      }
+      return monthValue > 0 ? (monthValue + ' bulan') : '-';
+    }
+
+    if (!yearValue && tanggal) {
+      var today = new Date();
+      yearValue = today.getFullYear() - tanggal.getFullYear();
+      var monthDiff = today.getMonth() - tanggal.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < tanggal.getDate())) yearValue -= 1;
+    }
+
+    return yearValue > 0 ? (yearValue + ' tahun') : '-';
+  }
+
+  function compactWilayah(detail) {
+    detail = detail || {};
+    return pickFirstMeaningful([
+      detail.nama_wilayah,
+      [detail.nama_dusun, detail.nama_desa, detail.nama_kecamatan].filter(Boolean).join(' • ')
+    ], '-');
+  }
+
+  function makeInfoCell(label, value, keyHint) {
+    return [
+      '<div class="sasaran-detail-info-cell">',
+        '<span class="label">', escapeHtml(label), '</span>',
+        '<strong>', escapeHtml(formatValue(value, keyHint || label)), '</strong>',
+      '</div>'
+    ].join('');
+  }
+
+  function ensureDetailCompactShell() {
+    var screen = byId('sasaran-detail-screen');
+    if (!screen) return;
+    screen.classList.add('sasaran-detail-r1');
+
+    var editBtn = byId('btn-go-to-edit-sasaran');
+    if (editBtn) {
+      editBtn.classList.add('sasaran-detail-edit-bottom-hidden');
+    }
+
+    var reloadBtn = screen.querySelector('[data-action="refresh-riwayat"]');
+    if (reloadBtn) reloadBtn.classList.add('sasaran-detail-bottom-action');
+
+    var btnPend = byId('btn-go-to-pendampingan');
+    if (btnPend) btnPend.classList.add('sasaran-detail-bottom-action');
+
+    var detailTitle = byId('detail-nama-sasaran');
+    var headerCard = detailTitle && detailTitle.closest ? detailTitle.closest('.card') : null;
+    if (headerCard) headerCard.classList.add('sasaran-detail-single-card-r1');
+  }
+
+  function ensureInlineEditSasaranButton() {
+    var title = byId('detail-nama-sasaran');
+    if (!title || byId('btn-inline-edit-sasaran')) return;
+
+    var wrap = title.parentElement || title;
+    wrap.classList.add('sasaran-detail-title-inline');
+
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.id = 'btn-inline-edit-sasaran';
+    btn.className = 'sasaran-detail-icon-btn';
+    btn.setAttribute('aria-label', 'Edit data sasaran');
+    btn.setAttribute('title', 'Edit data sasaran');
+    btn.innerHTML = '✎';
+    btn.addEventListener('click', function (event) {
+      event.preventDefault();
+      openEditSasaranFromDetail();
+    });
+
+    wrap.appendChild(btn);
   }
 
   function formatValue(value, keyHint) {
@@ -707,16 +811,31 @@
   function normalizeRiwayatItem(raw) {
     raw = raw || {};
     var payload = extractPayloadMap(raw);
+    var ringkas = raw.ringkas && typeof raw.ringkas === 'object' ? raw.ringkas : {};
 
     return {
       id_pendampingan: pickFirstMeaningful([raw.id_pendampingan, raw.id], ''),
-      tanggal_pendampingan: pickFirstMeaningful([raw.tanggal_pendampingan, raw.submit_at, raw.created_at], ''),
+      tanggal_pendampingan: pickFirstMeaningful([raw.tanggal_pendampingan, payload.tanggal_pendampingan, raw.submit_at, raw.created_at], ''),
       status_kunjungan: pickFirstMeaningful([
         raw.status_kunjungan,
         raw.status,
         payload.status_kunjungan,
         payload.status
       ], ''),
+      pendampingan_ke: pickFirstMeaningful([raw.pendampingan_ke, payload.pendampingan_ke, payload.kunjungan_ke], ''),
+      usia_kehamilan_minggu: pickFirstMeaningful([
+        raw.usia_kehamilan_minggu,
+        raw.usia_kehamilan_saat_pendampingan,
+        payload.usia_kehamilan_minggu,
+        payload.usia_kehamilan_saat_pendampingan,
+        payload.usia_kehamilan_saat_pendampingan_minggu
+      ], ''),
+      bb: pickFirstMeaningful([raw.bb, raw.berat_badan, payload.bb, payload.berat_badan], ''),
+      tb: pickFirstMeaningful([raw.tb, raw.tinggi_badan, payload.tb, payload.tinggi_badan], ''),
+      imt: pickFirstMeaningful([raw.imt, payload.imt], ''),
+      dapat_ttd: pickFirstMeaningful([raw.dapat_ttd, ringkas.ttd, payload.dapat_ttd], ''),
+      kepesertaan_jkn: pickFirstMeaningful([raw.kepesertaan_jkn, ringkas.jkn, payload.kepesertaan_jkn, payload.jkn], ''),
+      mbg_diterima: pickFirstMeaningful([raw.mbg_diterima, raw.mbg_terima, ringkas.mbg, payload.mbg_diterima, payload.mbg_terima], ''),
       periode_bulan: pickFirstMeaningful([raw.periode_bulan, payload.periode_bulan], ''),
       periode_tahun: pickFirstMeaningful([raw.periode_tahun, payload.periode_tahun], ''),
       form_id: pickFirstMeaningful([raw.form_id, payload.form_id], ''),
@@ -805,33 +924,66 @@
   }
 
   function renderHeader(detail) {
+    ensureDetailCompactShell();
+
     var safe = detail || {};
     var status = safe.status_sasaran || 'AKTIF';
+    var jenis = formatValue(safe.jenis_sasaran, 'jenis_sasaran');
 
     setText('detail-nama-sasaran', formatValue(safe.nama_sasaran, 'nama_sasaran'));
-    setText('detail-id-sasaran', 'ID Sasaran: ' + (safe.id_sasaran || '-'));
-    setText('detail-jenis', formatValue(safe.jenis_sasaran, 'jenis_sasaran'));
+    setText('detail-id-sasaran', jenis || '-');
+    setText('detail-jenis', jenis || '-');
     setText('detail-nik', formatValue(safe.nik_sasaran, 'nik_sasaran'));
     setText('detail-kk', formatValue(safe.nomor_kk, 'nomor_kk'));
-    setText('detail-tanggal-lahir', formatValue(safe.tanggal_lahir, 'tanggal_lahir'));
-    setText('detail-wilayah', formatValue(safe.nama_wilayah, 'wilayah'));
+    setText('detail-tanggal-lahir', getAgeLabel(safe));
+    setText('detail-wilayah', formatValue(compactWilayah(safe), 'wilayah'));
     setText('detail-updated-at', formatValue(safe.updated_at, 'updated_at'));
+
+    var ageLabel = byId('detail-tanggal-lahir');
+    if (ageLabel && ageLabel.previousElementSibling && ageLabel.previousElementSibling.classList.contains('label')) {
+      ageLabel.previousElementSibling.textContent = 'Usia';
+    }
+
+    var jenisEl = byId('detail-id-sasaran');
+    if (jenisEl) jenisEl.classList.add('sasaran-detail-kind-r1');
+
+    ensureInlineEditSasaranButton();
 
     var badge = byId('detail-status-badge');
     if (badge) {
       badge.textContent = formatValue(status, 'status_sasaran');
       badge.className = 'badge ' + getStatusBadgeClass(status);
     }
+
+    var detailSummary = byId('sasaran-detail-r1-summary');
+    if (!detailSummary) {
+      var anchor = byId('detail-wilayah');
+      var host = anchor && anchor.closest ? anchor.closest('.profile-grid') : null;
+      if (host) {
+        detailSummary = document.createElement('div');
+        detailSummary.id = 'sasaran-detail-r1-summary';
+        detailSummary.className = 'sasaran-detail-summary-grid-r1';
+        host.parentElement.insertBefore(detailSummary, host.nextSibling);
+      }
+    }
+
+    if (detailSummary) {
+      detailSummary.innerHTML = [
+        makeInfoCell('Nama KK', safe.nama_kepala_keluarga, 'nama_kepala_keluarga'),
+        makeInfoCell('Alamat', safe.alamat || compactWilayah(safe), 'alamat'),
+        makeInfoCell('Wilayah', compactWilayah(safe), 'wilayah')
+      ].join('');
+    }
   }
 
   function collectExtraEntries(detail) {
     var safe = detail || {};
-    var src = safe.extra_source || {};
+    var jenis = normalizeUpperDisplay(safe.jenis_sasaran);
     var entries = [];
     var used = {};
 
-    function pushEntry(key, explicitValue) {
-      var value = explicitValue !== undefined ? explicitValue : src[key];
+    function pushEntry(key, label, explicitValue) {
+      var value = explicitValue !== undefined ? explicitValue : safe[key];
       if (!isMeaningful(value)) return;
 
       var uniqueKey = String(key).toUpperCase();
@@ -840,87 +992,80 @@
 
       entries.push({
         key: key,
-        label: humanizeKey(key),
+        label: label || humanizeKey(key),
         value: formatValue(value, key)
       });
     }
 
+    if (jenis === 'BUMIL') {
+      [
+        ['kehamilan_ke', 'Kehamilan Ke'],
+        ['kehamilan_diinginkan', 'Kehamilan Diinginkan'],
+        ['bb_sebelum_hamil', 'Berat Badan Sebelum Hamil'],
+        ['sumber_air_minum_utama', 'Sumber Air Minum Utama'],
+        ['fasilitas_bab', 'Fasilitas BAB'],
+        ['registered_by', 'Diregistrasi Oleh'],
+        ['updated_by', 'Diperbaharui Oleh'],
+        ['updated_at', 'Terakhir Diperbaharui']
+      ].forEach(function (row) { pushEntry(row[0], row[1], safe[row[0]]); });
+      return entries;
+    }
+
+    if (jenis === 'CATIN') {
+      [
+        ['data_pasangan', 'Data Pasangan'],
+        ['domisili_setelah_menikah', 'Domisili Setelah Menikah'],
+        ['sumber_air_minum_utama', 'Sumber Air Minum Utama'],
+        ['fasilitas_bab', 'Fasilitas BAB'],
+        ['keterangan_tambahan_awal', 'Keterangan Tambahan'],
+        ['registered_by', 'Diregistrasi Oleh'],
+        ['updated_by', 'Diperbaharui Oleh'],
+        ['updated_at', 'Terakhir Diperbaharui']
+      ].forEach(function (row) { pushEntry(row[0], row[1], safe[row[0]]); });
+      return entries;
+    }
+
+    if (jenis === 'BUFAS') {
+      [
+        ['tanggal_persalinan', 'Tanggal Persalinan'],
+        ['jumlah_anak_kandung', 'Jumlah Anak Kandung'],
+        ['tempat_persalinan', 'Tempat Persalinan'],
+        ['penolong_persalinan', 'Penolong Persalinan'],
+        ['cara_persalinan', 'Cara Persalinan'],
+        ['sumber_air_minum_utama', 'Sumber Air Minum Utama'],
+        ['fasilitas_bab', 'Fasilitas BAB'],
+        ['registered_by', 'Diregistrasi Oleh'],
+        ['updated_by', 'Diperbaharui Oleh'],
+        ['updated_at', 'Terakhir Diperbaharui']
+      ].forEach(function (row) { pushEntry(row[0], row[1], safe[row[0]]); });
+      return entries;
+    }
+
+    if (jenis === 'BADUTA') {
+      [
+        ['nama_ibu_kandung', 'Nama Ibu Kandung'],
+        ['anak_ke', 'Anak Ke'],
+        ['berat_badan_lahir', 'Berat Badan Lahir'],
+        ['panjang_badan_lahir', 'Panjang Badan Lahir'],
+        ['sumber_air_minum_utama', 'Sumber Air Minum Utama'],
+        ['fasilitas_bab', 'Fasilitas BAB'],
+        ['registered_by', 'Diregistrasi Oleh'],
+        ['updated_by', 'Diperbaharui Oleh'],
+        ['updated_at', 'Terakhir Diperbaharui']
+      ].forEach(function (row) { pushEntry(row[0], row[1], safe[row[0]]); });
+      return entries;
+    }
+
     [
-      'nama_kepala_keluarga',
-      'nama_ibu_kandung',
-      'alamat',
-      'data_pasangan',
-      'domisili_setelah_menikah',
-      'kehamilan_ke',
-      'kehamilan_diinginkan',
-      'bb_sebelum_hamil',
-      'tanggal_persalinan',
-      'jumlah_anak_kandung',
-      'tempat_persalinan',
-      'penolong_persalinan',
-      'cara_persalinan',
-      'anak_ke',
-      'berat_badan_lahir',
-      'panjang_badan_lahir',
-      'sumber_air_minum_utama',
-      'sumber_air_minum_utama_lainnya',
-      'fasilitas_bab',
-      'fasilitas_bab_lainnya',
-      'keterangan_tambahan_awal',
-      'registered_by',
-      'updated_by'
-    ].forEach(function (key) {
-      pushEntry(key, safe[key]);
-    });
-
-    var skipKeys = {
-      id: true,
-      id_sasaran: true,
-      nama_sasaran: true,
-      status_sasaran: true,
-      status: true,
-      jenis_sasaran: true,
-      nik: true,
-      nik_sasaran: true,
-      nomor_kk: true,
-      tanggal_lahir: true,
-      updated_at: true,
-      tanggal_register: true,
-      nama_wilayah: true,
-      wilayah: true,
-      kecamatan: true,
-      nama_kecamatan: true,
-      desa: true,
-      nama_desa: true,
-      desa_kelurahan: true,
-      dusun: true,
-      dusun_rw: true,
-      nama_dusun: true,
-      data_laporan: true,
-      payload_json: true,
-      raw: true,
-      extra_source: true,
-      answers: true,
-      dynamic_fields: true,
-      extra_payload: true,
-      baseline_snapshot: true,
-      is_duplicate_flag: true,
-      duplicate_level: true,
-      duplicate_note: true,
-      unique_key: true,
-      lokasi_gps: true,
-      client_submit_id: true,
-      sync_source: true,
-      umur_tahun_saat_register: true,
-      umur_bulan_saat_register: true,
-      nama_tim: true,
-      id_tim: true
-    };
-
-    Object.keys(src).sort().forEach(function (key) {
-      if (skipKeys[key]) return;
-      pushEntry(key);
-    });
+      ['nama_kepala_keluarga', 'Nama Kepala Keluarga'],
+      ['nama_ibu_kandung', 'Nama Ibu Kandung'],
+      ['alamat', 'Alamat Lengkap'],
+      ['sumber_air_minum_utama', 'Sumber Air Minum Utama'],
+      ['fasilitas_bab', 'Fasilitas BAB'],
+      ['registered_by', 'Diregistrasi Oleh'],
+      ['updated_by', 'Diperbaharui Oleh'],
+      ['updated_at', 'Terakhir Diperbaharui']
+    ].forEach(function (row) { pushEntry(row[0], row[1], safe[row[0]]); });
 
     return entries;
   }
@@ -975,46 +1120,52 @@
       return;
     }
 
-    var html = safeItems.slice(0, 5).map(function (item) {
+    var html = safeItems.slice(0, 3).map(function (item) {
       var tanggal = formatValue(item.tanggal_pendampingan, 'tanggal_pendampingan');
       var status = formatValue(item.status_kunjungan || '-', 'status_kunjungan');
-      var catatan = formatValue(item.catatan_umum || '-', 'catatan_umum');
-      var periode = formatPeriodeLabel(item);
-      var tokens = Array.isArray(item.ringkas_tokens) ? item.ringkas_tokens.slice(0, 3) : [];
-      var metaBits = [];
 
-      if (periode) metaBits.push('Periode ' + periode);
-      if (item.form_id) metaBits.push('Form ' + item.form_id);
-      if (item.sync_source) metaBits.push(String(item.sync_source).toUpperCase());
+      var fields = [
+        ['Pendampingan Ke', item.pendampingan_ke],
+        ['Tanggal Pendampingan', item.tanggal_pendampingan],
+        ['Usia Kehamilan Saat Pendampingan', item.usia_kehamilan_minggu],
+        ['Berat Badan', item.bb],
+        ['Tinggi Badan', item.tb],
+        ['Indeks Masa Tubuh', item.imt],
+        ['Dapat Tablet Tambah Darah', item.dapat_ttd],
+        ['Peserta JKN', item.kepesertaan_jkn],
+        ['Mendapat MBG', item.mbg_diterima]
+      ];
 
       return [
-        '<article class="list-card">',
-          '<div class="list-card-header row-between">',
+        '<article class="list-card sasaran-riwayat-card-r1">',
+          '<div class="list-card-header row-between sasaran-riwayat-header-r1">',
             '<div>',
               '<h4 class="compact-card-title">', escapeHtml(tanggal), '</h4>',
-              '<p class="muted-text compact-card-subtitle">ID Pendampingan: ', escapeHtml(item.id_pendampingan || '-'), '</p>',
             '</div>',
-            '<span class="badge badge-neutral">', escapeHtml(status), '</span>',
+            '<div class="sasaran-riwayat-right-actions">',
+              '<span class="badge badge-neutral">', escapeHtml(status), '</span>',
+              '<button type="button" class="sasaran-detail-icon-btn" data-action="edit-riwayat" data-id-pendampingan="', escapeHtml(item.id_pendampingan || ''), '" aria-label="Edit laporan pendampingan" title="Edit laporan pendampingan">✎</button>',
+            '</div>',
           '</div>',
-          metaBits.length ? '<p class="muted-text compact-riwayat-meta">' + escapeHtml(metaBits.join(' • ')) + '</p>' : '',
-          '<div class="compact-token-wrap">',
-            '<span class="label">Ringkasan</span>',
-            '<strong>', escapeHtml(catatan), '</strong>',
-          '</div>',
-          tokens.length ? [
-            '<div class="riwayat-actions-compact">',
-            tokens.map(function (token) {
-              return '<span class="badge badge-neutral">' + escapeHtml(token) + '</span>';
+          '<div class="sasaran-riwayat-grid-r1">',
+            fields.map(function (row) {
+              var value = row[1];
+              return [
+                '<div class="sasaran-detail-info-cell">',
+                  '<span class="label">', escapeHtml(row[0]), '</span>',
+                  '<strong>', escapeHtml(formatValue(value, row[0])), '</strong>',
+                '</div>'
+              ].join('');
             }).join(''),
-            '</div>'
-          ].join('') : '',
+          '</div>',
         '</article>'
       ].join('');
     }).join('');
 
     html += [
-      '<div class="riwayat-actions-end-compact">',
+      '<div class="riwayat-actions-end-compact sasaran-detail-bottom-actions-r1">',
         '<button type="button" class="btn btn-secondary" data-action="refresh-riwayat">Muat Ulang Riwayat</button>',
+        '<button type="button" class="btn btn-primary" data-action="buat-pendampingan">Buat Pendampingan</button>',
       '</div>'
     ].join('');
 
@@ -1034,6 +1185,7 @@
   }
 
   function renderLoadingPreview(selected) {
+    ensureDetailCompactShell();
     var safe = normalizeDetail(selected || {});
     renderHeader(safe);
 
@@ -1171,6 +1323,46 @@
   }
 
 
+
+  function openEditPendampinganFromDetail(idPendampingan) {
+    var id = normalizeText(idPendampingan);
+    if (!id) {
+      showToast('ID laporan pendampingan tidak tersedia.', 'warning');
+      return;
+    }
+
+    var handoff = {
+      mode: 'edit',
+      source: 'sasaranDetailView',
+      id_pendampingan: id,
+      id_sasaran: getItemId(currentDetail || getSelectedSasaran() || ''),
+      created_at: new Date().toISOString()
+    };
+
+    writeStorage('tpk_pendampingan_edit_handoff_v1', handoff);
+
+    if (window.PendampinganView && typeof window.PendampinganView.openEdit === 'function') {
+      window.PendampinganView.openEdit(id, handoff);
+      return;
+    }
+
+    if (window.PendampinganView && typeof window.PendampinganView.openById === 'function') {
+      window.PendampinganView.openById(id, { mode: 'edit' });
+      return;
+    }
+
+    var router = getRouter();
+    if (router && typeof router.go === 'function') {
+      router.go('pendampingan', {
+        mode: 'edit',
+        id_pendampingan: id
+      });
+      return;
+    }
+
+    showToast('Mode edit laporan pendampingan belum tersedia di frontend aktif.', 'info');
+  }
+
   function invokeRegistrasiEditBridge(item) {
     var safeItem = item && typeof item === 'object' ? item : {};
     var bridges = [
@@ -1257,6 +1449,7 @@
   var SasaranDetailView = {
     init: function (options) {
       options = options || {};
+      ensureDetailCompactShell();
 
       if (isInitialized) {
         if (!options.skipAutoOpen) {
@@ -1302,11 +1495,26 @@
       if (riwayatContainer && riwayatContainer.dataset.bound !== '1') {
         riwayatContainer.dataset.bound = '1';
         riwayatContainer.addEventListener('click', function (event) {
-          var target = event.target && event.target.closest ? event.target.closest('[data-action="refresh-riwayat"]') : null;
+          var target = event.target && event.target.closest ? event.target.closest('[data-action]') : null;
           if (!target) return;
+
+          var action = target.getAttribute('data-action');
           event.preventDefault();
-          if (window.SasaranDetailView && typeof window.SasaranDetailView.refreshRiwayat === 'function') {
-            window.SasaranDetailView.refreshRiwayat();
+
+          if (action === 'refresh-riwayat') {
+            if (window.SasaranDetailView && typeof window.SasaranDetailView.refreshRiwayat === 'function') {
+              window.SasaranDetailView.refreshRiwayat();
+            }
+            return;
+          }
+
+          if (action === 'buat-pendampingan') {
+            openPendampinganFromDetail();
+            return;
+          }
+
+          if (action === 'edit-riwayat') {
+            openEditPendampinganFromDetail(target.getAttribute('data-id-pendampingan'));
           }
         });
       }

@@ -1,13 +1,14 @@
 (function (window, document) {
   'use strict';
 
-  window.__SASARAN_LIST_VIEW_BUILD = '20260427-2C';
+  window.__SASARAN_LIST_VIEW_BUILD = '20260607-SASARAN-DISPLAY-R1';
   console.log('SasaranListView build aktif:', window.__SASARAN_LIST_VIEW_BUILD);
 
-  var SCREEN_ID = 'sasaran-list-screen';
   var FILTER_KEYWORD_ID = 'filter-keyword-sasaran';
   var FILTER_JENIS_ID = 'filter-jenis-sasaran';
   var FILTER_STATUS_ID = 'filter-status-sasaran';
+  var FILTER_PRIORITAS_ID = 'filter-prioritas-sasaran';
+  var FILTER_PENDAMPINGAN_ID = 'filter-pendampingan-sasaran';
   var BTN_REFRESH_ID = 'btn-refresh-sasaran';
   var BTN_RESET_ID = 'btn-reset-filter-sasaran';
   var BTN_BACK_ID = 'btn-back-dashboard-from-list';
@@ -90,8 +91,10 @@
 
     if (isPlainObject(value)) {
       var preferred = [
-        'nama_wilayah_lengkap', 'nama_wilayah_sasaran', 'nama_wilayah', 'wilayah_sasaran', 'wilayah', 'label', 'text', 'display',
-        'dusun_rw', 'nama_dusun', 'dusun', 'desa_kelurahan', 'nama_desa', 'desa', 'kecamatan', 'nama_kecamatan'
+        'nama_wilayah_lengkap', 'nama_wilayah_sasaran', 'nama_wilayah', 'wilayah_sasaran',
+        'wilayah', 'label', 'text', 'display', 'nama', 'value',
+        'dusun_rw', 'nama_dusun', 'dusun', 'desa_kelurahan', 'nama_desa', 'desa',
+        'kecamatan', 'nama_kecamatan', 'alamat'
       ];
 
       preferred.forEach(function (key) {
@@ -133,6 +136,11 @@
 
   function normalizeUpper(value) {
     return normalizeSpaces(value).toUpperCase();
+  }
+
+  function upperDisplay(value) {
+    var text = normalizeSpaces(value);
+    return text ? text.toUpperCase() : '';
   }
 
   function getProfile() {
@@ -192,17 +200,12 @@
     ).trim().toUpperCase();
   }
 
-  function getSelectedFilters() {
-    return {
-      keyword: normalizeSpaces(byId(FILTER_KEYWORD_ID) ? byId(FILTER_KEYWORD_ID).value : ''),
-      jenis_sasaran: normalizeSpaces(byId(FILTER_JENIS_ID) ? byId(FILTER_JENIS_ID).value : ''),
-      status_sasaran: normalizeSpaces(byId(FILTER_STATUS_ID) ? byId(FILTER_STATUS_ID).value : '')
-    };
-  }
-
   function setMeta(text) {
     var el = byId(META_ID);
-    if (el) el.textContent = text || '';
+    if (el) {
+      el.textContent = text || '';
+      el.classList.add('sasaran-list-meta-compact');
+    }
   }
 
   function setLoading() {
@@ -231,17 +234,64 @@
     }
   }
 
+  function parseDate(value) {
+    if (!value) return null;
+    if (value instanceof Date && !isNaN(value.getTime())) return value;
+
+    var raw = String(value || '').trim();
+    if (!raw) return null;
+
+    var d = new Date(raw);
+    if (!isNaN(d.getTime())) return d;
+
+    var m = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+    if (m) {
+      d = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+      if (!isNaN(d.getTime())) return d;
+    }
+
+    return null;
+  }
+
+  function calcAge(item) {
+    item = item || {};
+    var jenis = normalizeUpper(item.jenis_sasaran);
+    var tanggal = parseDate(item.tanggal_lahir || item.tgl_lahir);
+    var umurBulan = Number(item.usia_bulan || item.umur_bulan || item.usia_baduta_bulan || item.umur_baduta_bulan || 0);
+    var umurTahun = Number(item.usia_tahun || item.umur_tahun || 0);
+
+    if (jenis === 'BADUTA') {
+      if (!umurBulan && tanggal) {
+        var now = new Date();
+        umurBulan = (now.getFullYear() - tanggal.getFullYear()) * 12 + (now.getMonth() - tanggal.getMonth());
+        if (now.getDate() < tanggal.getDate()) umurBulan -= 1;
+      }
+      return umurBulan > 0 ? (umurBulan + ' bulan') : '-';
+    }
+
+    if (!umurTahun && tanggal) {
+      var today = new Date();
+      umurTahun = today.getFullYear() - tanggal.getFullYear();
+      var monthDiff = today.getMonth() - tanggal.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < tanggal.getDate())) {
+        umurTahun -= 1;
+      }
+    }
+
+    return umurTahun > 0 ? (umurTahun + ' tahun') : '-';
+  }
+
   function getWilayahLabel(item) {
     item = item || {};
 
-    var wilayahAsalEksplisit = [
+    var explicitParts = [
       item.nama_dusun || item.dusun_rw || item.dusun || '',
       item.nama_desa || item.desa_kelurahan || item.desa || '',
       item.nama_kecamatan || item.kecamatan || ''
     ].map(normalizeSpaces).filter(Boolean);
 
-    if (wilayahAsalEksplisit.length) {
-      return wilayahAsalEksplisit.join(' • ');
+    if (explicitParts.length) {
+      return explicitParts.join(' • ');
     }
 
     return normalizeSpaces(
@@ -249,12 +299,127 @@
       item.wilayah_sasaran ||
       item.nama_wilayah ||
       item.wilayah ||
-      '-'
+      ''
+    ) || '-';
+  }
+
+  function getAlamatLabel(item) {
+    item = item || {};
+    return normalizeSpaces(
+      item.alamat_lengkap ||
+      item.alamat ||
+      item.alamat_sasaran ||
+      getWilayahLabel(item)
     ) || '-';
   }
 
   function getItemId(item) {
     return String(item && (item.id_sasaran || item.id || '')).trim();
+  }
+
+  function getNamaKk(item) {
+    item = item || {};
+    return normalizeSpaces(item.nama_kepala_keluarga || item.nama_kk || item.nama_kepala_keluarga_sasaran || '');
+  }
+
+  function getNamaIbu(item) {
+    item = item || {};
+    return normalizeSpaces(item.nama_ibu_kandung || item.nama_ibu || '');
+  }
+
+  function isTruthyPriority(value) {
+    var text = normalizeUpper(value);
+    return value === true ||
+      text === 'TRUE' ||
+      text === 'YA' ||
+      text === 'Y' ||
+      text === 'PRIORITAS' ||
+      text === 'KRS' ||
+      text === 'KR' ||
+      text === 'RISIKO' ||
+      text === 'BERISIKO' ||
+      text === 'KELUARGA RISIKO STUNTING';
+  }
+
+  function isPriority(item) {
+    item = item || {};
+    return isTruthyPriority(item.is_prioritas) ||
+      isTruthyPriority(item.prioritas) ||
+      isTruthyPriority(item.status_prioritas) ||
+      isTruthyPriority(item.priority_status) ||
+      isTruthyPriority(item.status_kr) ||
+      isTruthyPriority(item.is_krs) ||
+      isTruthyPriority(item.keluarga_risiko_stunting) ||
+      isTruthyPriority(item.status_keluarga_risiko_stunting) ||
+      isTruthyPriority(item.growth_priority) ||
+      isTruthyPriority(item.development_priority);
+  }
+
+  function getPriorityLabel(item) {
+    return isPriority(item) ? 'Prioritas' : 'Non Prioritas';
+  }
+
+  function getCurrentPeriodeKey() {
+    var d = new Date();
+    return d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0');
+  }
+
+  function normalizePeriod(value) {
+    var text = normalizeSpaces(value);
+    if (!text) return '';
+
+    var compact = text.replace(/[^\d]/g, '');
+    if (compact.length === 6) return compact;
+    if (compact.length === 5) {
+      return compact.slice(0, 4) + '0' + compact.slice(4);
+    }
+    return text;
+  }
+
+  function getItemPendampinganCount(item) {
+    item = item || {};
+    var current = getCurrentPeriodeKey();
+    var count = Number(
+      item.jumlah_pendampingan_bulan_ini ||
+      item.pendampingan_bulan_ini ||
+      item.current_month_pendampingan_count ||
+      item.monthly_pendampingan_count ||
+      0
+    );
+
+    if (count > 0) return count;
+
+    var already = item.sudah_didampingi_bulan_ini === true ||
+      normalizeUpper(item.status_pendampingan_bulan_ini) === 'SUDAH_DIDAMPINGI' ||
+      normalizeUpper(item.status_pendampingan) === 'SUDAH_DIDAMPINGI';
+
+    if (already) return 1;
+
+    var lastPeriod = normalizePeriod(
+      item.periode_pendampingan_terakhir ||
+      item.last_pendampingan_period ||
+      item.periode_key_terakhir ||
+      item.periode_key
+    );
+
+    if (lastPeriod && lastPeriod === current) return 1;
+
+    var lastDate = parseDate(
+      item.tanggal_pendampingan_terakhir ||
+      item.last_pendampingan_at ||
+      item.pendampingan_terakhir_at
+    );
+
+    if (lastDate) {
+      var key = lastDate.getFullYear() + String(lastDate.getMonth() + 1).padStart(2, '0');
+      if (key === current) return 1;
+    }
+
+    return 0;
+  }
+
+  function isDidampingiBulanIni(item) {
+    return getItemPendampinganCount(item) > 0;
   }
 
   function normalizeItem(item) {
@@ -270,6 +435,9 @@
     safe.nik_sasaran = normalizeSpaces(safe.nik_sasaran || safe.nik || '');
     safe.nomor_kk = normalizeSpaces(safe.nomor_kk || safe.no_kk || '');
     safe.tanggal_lahir = normalizeSpaces(safe.tanggal_lahir || safe.tgl_lahir || '');
+    safe.nama_kepala_keluarga = getNamaKk(safe);
+    safe.nama_ibu_kandung = getNamaIbu(safe);
+    safe.alamat_lengkap = getAlamatLabel(safe);
     safe.nama_kecamatan = normalizeSpaces(safe.nama_kecamatan || safe.kecamatan || '');
     safe.kecamatan = safe.nama_kecamatan || normalizeSpaces(safe.kecamatan || '');
     safe.nama_desa = normalizeSpaces(safe.nama_desa || safe.desa_kelurahan || safe.desa || '');
@@ -278,6 +446,9 @@
     safe.dusun_rw = safe.nama_dusun || normalizeSpaces(safe.dusun_rw || '');
     safe.nama_wilayah_sasaran = wilayah;
     safe.wilayah_sasaran = wilayah;
+    safe.usia_label = calcAge(safe);
+    safe.status_prioritas = normalizeSpaces(safe.status_prioritas || safe.priority_status || getPriorityLabel(safe));
+    safe.status_pendampingan_bulan_ini = isDidampingiBulanIni(safe) ? 'Sudah Didampingi' : 'Belum Didampingi';
     return safe;
   }
 
@@ -325,13 +496,38 @@
   }
 
   function resetFilters() {
-    var keywordEl = byId(FILTER_KEYWORD_ID);
-    var jenisEl = byId(FILTER_JENIS_ID);
-    var statusEl = byId(FILTER_STATUS_ID);
+    [FILTER_KEYWORD_ID, FILTER_JENIS_ID, FILTER_STATUS_ID, FILTER_PRIORITAS_ID, FILTER_PENDAMPINGAN_ID].forEach(function (id) {
+      var el = byId(id);
+      if (el) el.value = '';
+    });
+  }
 
-    if (keywordEl) keywordEl.value = '';
-    if (jenisEl) jenisEl.value = '';
-    if (statusEl) statusEl.value = '';
+  function createElementFromHtml(html) {
+    var wrap = document.createElement('div');
+    wrap.innerHTML = html;
+    return wrap.firstElementChild;
+  }
+
+  function findFilterGrid() {
+    var keywordEl = byId(FILTER_KEYWORD_ID);
+    if (!keywordEl) return null;
+
+    var group = keywordEl.closest ? keywordEl.closest('.form-group') : null;
+    if (group && group.parentElement) return group.parentElement;
+    return keywordEl.parentElement || null;
+  }
+
+  function ensureActionButton(id, label, icon, fallbackClass) {
+    var btn = byId(id);
+    if (!btn) return null;
+
+    btn.classList.add('sasaran-filter-icon-btn');
+    btn.setAttribute('aria-label', label);
+    btn.setAttribute('title', label);
+    btn.innerHTML = '<span aria-hidden="true">' + icon + '</span>';
+
+    if (fallbackClass) btn.classList.add(fallbackClass);
+    return btn;
   }
 
   function ensureResetButton() {
@@ -344,12 +540,128 @@
     var btn = document.createElement('button');
     btn.type = 'button';
     btn.id = BTN_RESET_ID;
-    btn.className = 'btn btn-secondary';
-    btn.textContent = 'Reset Filter';
-    btn.style.marginTop = '12px';
+    btn.className = 'btn btn-secondary sasaran-filter-icon-btn';
+    btn.setAttribute('aria-label', 'Reset filter');
+    btn.setAttribute('title', 'Reset filter');
+    btn.innerHTML = '<span aria-hidden="true">↺</span>';
 
     refreshBtn.parentElement.appendChild(btn);
     return btn;
+  }
+
+  function ensureSelectFilter(id, label, options) {
+    var existing = byId(id);
+    if (existing) return existing;
+
+    var grid = findFilterGrid();
+    if (!grid) return null;
+
+    var html = [
+      '<div class="form-group sasaran-filter-extra">',
+        '<label for="', escapeHtml(id), '">', escapeHtml(label), '</label>',
+        '<select id="', escapeHtml(id), '">',
+          '<option value="">Semua</option>',
+          options.map(function (opt) {
+            return '<option value="' + escapeHtml(opt.value) + '">' + escapeHtml(opt.label) + '</option>';
+          }).join(''),
+        '</select>',
+      '</div>'
+    ].join('');
+
+    var node = createElementFromHtml(html);
+    grid.appendChild(node);
+    return byId(id);
+  }
+
+  function ensureFilterUi() {
+    var keywordEl = byId(FILTER_KEYWORD_ID);
+    if (keywordEl) {
+      var keywordGroup = keywordEl.closest ? keywordEl.closest('.form-group') : null;
+      var keywordLabel = keywordGroup ? keywordGroup.querySelector('label') : null;
+      if (keywordLabel) keywordLabel.textContent = 'Cari Nama Sasaran';
+      keywordEl.setAttribute('placeholder', 'Ketik nama sasaran');
+    }
+
+    ensureSelectFilter(FILTER_PRIORITAS_ID, 'Status Prioritas', [
+      { value: 'PRIORITAS', label: 'Prioritas' },
+      { value: 'NON_PRIORITAS', label: 'Non Prioritas' }
+    ]);
+
+    ensureSelectFilter(FILTER_PENDAMPINGAN_ID, 'Status Pendampingan', [
+      { value: 'SUDAH_DIDAMPINGI', label: 'Sudah Didampingi' },
+      { value: 'BELUM_DIDAMPINGI', label: 'Belum Didampingi' }
+    ]);
+
+    var resetBtn = ensureResetButton();
+    var refreshBtn = ensureActionButton(BTN_REFRESH_ID, 'Refresh data', '⟳', 'sasaran-refresh-icon');
+    ensureActionButton(BTN_RESET_ID, 'Reset filter', '↺', 'sasaran-reset-icon');
+
+    var header = null;
+    var grid = findFilterGrid();
+    var card = grid && grid.closest ? grid.closest('.card') : null;
+    if (card) header = card.querySelector('.section-header');
+
+    if (header && !header.classList.contains('sasaran-filter-header-r1')) {
+      header.classList.add('sasaran-filter-header-r1');
+      var title = header.querySelector('h3');
+      if (title) title.textContent = 'Filter & Pencarian';
+
+      var actions = header.querySelector('.sasaran-filter-header-actions');
+      if (!actions) {
+        actions = document.createElement('div');
+        actions.className = 'sasaran-filter-header-actions';
+        header.appendChild(actions);
+      }
+
+      [resetBtn, refreshBtn].forEach(function (btn) {
+        if (btn && btn.parentElement !== actions) actions.appendChild(btn);
+      });
+    }
+
+    if (grid && !byId('sasaran-monthly-banner')) {
+      var banner = document.createElement('div');
+      banner.id = 'sasaran-monthly-banner';
+      banner.className = 'sasaran-monthly-banner sasaran-monthly-banner-warning';
+      banner.textContent = 'Anda Belum Melakukan Pendampingan Bulan Ini';
+      grid.parentElement.insertBefore(banner, grid.nextSibling);
+    }
+
+    var dataCard = byId(CONTAINER_ID);
+    dataCard = dataCard && dataCard.closest ? dataCard.closest('.card') : null;
+    if (dataCard) {
+      var dataHeader = dataCard.querySelector('.section-header');
+      if (dataHeader && !dataHeader.classList.contains('sasaran-data-header-r1')) {
+        dataHeader.classList.add('sasaran-data-header-r1');
+        var h3 = dataHeader.querySelector('h3');
+        if (h3) h3.textContent = 'Data Sasaran';
+
+        var activeBadge = dataHeader.querySelector('#sasaran-active-count-badge');
+        if (!activeBadge) {
+          activeBadge = document.createElement('span');
+          activeBadge.id = 'sasaran-active-count-badge';
+          activeBadge.className = 'badge badge-neutral sasaran-active-count-badge';
+          activeBadge.textContent = 'Sasaran Aktif: 0';
+          dataHeader.appendChild(activeBadge);
+        }
+      }
+    }
+
+    return {
+      resetBtn: resetBtn,
+      refreshBtn: refreshBtn,
+      prioritasEl: byId(FILTER_PRIORITAS_ID),
+      pendampinganEl: byId(FILTER_PENDAMPINGAN_ID)
+    };
+  }
+
+  function getSelectedFilters() {
+    return {
+      keyword: normalizeSpaces(byId(FILTER_KEYWORD_ID) ? byId(FILTER_KEYWORD_ID).value : ''),
+      jenis_sasaran: normalizeSpaces(byId(FILTER_JENIS_ID) ? byId(FILTER_JENIS_ID).value : ''),
+      status_sasaran: normalizeSpaces(byId(FILTER_STATUS_ID) ? byId(FILTER_STATUS_ID).value : ''),
+      status_prioritas: normalizeSpaces(byId(FILTER_PRIORITAS_ID) ? byId(FILTER_PRIORITAS_ID).value : ''),
+      status_pendampingan: normalizeSpaces(byId(FILTER_PENDAMPINGAN_ID) ? byId(FILTER_PENDAMPINGAN_ID).value : '')
+    };
   }
 
   function applyAllFilters(items, filters) {
@@ -357,6 +669,8 @@
     var keyword = normalizeSpaces(filters && filters.keyword);
     var jenis = normalizeUpper(filters && filters.jenis_sasaran);
     var status = normalizeUpper(filters && filters.status_sasaran);
+    var prioritas = normalizeUpper(filters && filters.status_prioritas);
+    var pendampingan = normalizeUpper(filters && filters.status_pendampingan);
 
     if (jenis) {
       safeItems = safeItems.filter(function (item) {
@@ -370,65 +684,123 @@
       });
     }
 
+    if (prioritas) {
+      safeItems = safeItems.filter(function (item) {
+        return prioritas === 'PRIORITAS' ? isPriority(item) : !isPriority(item);
+      });
+    }
+
+    if (pendampingan) {
+      safeItems = safeItems.filter(function (item) {
+        var done = isDidampingiBulanIni(item);
+        return pendampingan === 'SUDAH_DIDAMPINGI' ? done : !done;
+      });
+    }
+
     if (keyword) {
       var q = keyword.toLowerCase();
       safeItems = safeItems.filter(function (item) {
-        return [
-          item.id_sasaran,
-          item.nama_sasaran,
-          item.nik_sasaran,
-          item.nomor_kk,
-          item.jenis_sasaran,
-          item.dusun_rw,
-          item.desa_kelurahan,
-          item.kecamatan
-        ].some(function (v) {
-          return String(v || '').toLowerCase().indexOf(q) !== -1;
-        });
+        return String(item.nama_sasaran || '').toLowerCase().indexOf(q) !== -1;
       });
     }
 
     return safeItems;
   }
 
+  function updateMonthlyBanner(items) {
+    var banner = byId('sasaran-monthly-banner');
+    if (!banner) return;
+
+    var safeItems = Array.isArray(items) ? items : [];
+    var count = safeItems.filter(isDidampingiBulanIni).length;
+
+    banner.classList.remove('sasaran-monthly-banner-warning', 'sasaran-monthly-banner-success');
+    if (count <= 0) {
+      banner.classList.add('sasaran-monthly-banner-warning');
+      banner.textContent = 'Anda Belum Melakukan Pendampingan Bulan Ini';
+    } else {
+      banner.classList.add('sasaran-monthly-banner-success');
+      banner.textContent = 'Anda Sudah Melaksanakan Pendampingan kepada ' + count + ' Sasaran Bulan Ini';
+    }
+  }
+
+  function updateActiveCount(items) {
+    var badge = byId('sasaran-active-count-badge');
+    if (!badge) return;
+
+    var safeItems = Array.isArray(items) ? items : [];
+    var active = safeItems.filter(function (item) {
+      var st = normalizeUpper(item.status_sasaran || item.status || 'AKTIF');
+      return !st || st === 'AKTIF';
+    }).length;
+
+    badge.textContent = 'Sasaran Aktif: ' + active;
+  }
+
+  function buildMetaCell(label, value, extraClass) {
+    return [
+      '<div class="sasaran-compact-field ', escapeHtml(extraClass || ''), '">',
+        '<span class="label">', escapeHtml(label), '</span>',
+        '<strong>', escapeHtml(value || '-'), '</strong>',
+      '</div>'
+    ].join('');
+  }
+
   function renderList(items) {
     var box = byId(CONTAINER_ID);
     if (!box) return;
+
+    box.classList.add('sasaran-card-grid-r1');
 
     if (!items || !items.length) {
       box.innerHTML = '<p class="muted-text">Tidak ada data sasaran sesuai filter.</p>';
       return;
     }
 
-    box.innerHTML = items.map(function (item) {
-      var status = item.status_sasaran || item.status || '-';
+    box.innerHTML = items.map(function (raw) {
+      var item = normalizeItem(raw);
+      var status = item.status_sasaran || item.status || 'AKTIF';
       var jenis = item.jenis_sasaran || '-';
-      var nama = item.nama_sasaran || '-';
+      var nama = upperDisplay(item.nama_sasaran) || '-';
       var id = getItemId(item) || '-';
       var nik = item.nik_sasaran || '-';
       var kk = item.nomor_kk || '-';
-      var wilayah = getWilayahLabel(item);
-      var tgl = formatDate(item.tanggal_lahir);
+      var namaKk = upperDisplay(getNamaKk(item)) || '-';
+      var ibu = upperDisplay(getNamaIbu(item)) || '-';
+      var alamat = upperDisplay(getAlamatLabel(item)) || '-';
+      var usia = calcAge(item);
+      var isBaduta = normalizeUpper(jenis) === 'BADUTA';
+      var prioritasLabel = getPriorityLabel(item);
+      var didampingi = isDidampingiBulanIni(item);
 
       return [
-        '<article class="list-card sasaran-item compact-list-card" data-id-sasaran="', escapeHtml(id), '">',
-          '<div class="list-card-header row-between">',
-            '<div>',
-              '<h4 class="compact-card-title">', escapeHtml(nama), '</h4>',
-              '<p class="muted-text compact-card-subtitle">ID Sasaran: ', escapeHtml(id), '</p>',
+        '<article class="list-card sasaran-item sasaran-list-card-r1" data-id-sasaran="', escapeHtml(id), '">',
+          '<div class="sasaran-card-r1-top">',
+            '<div class="sasaran-card-r1-title-wrap">',
+              '<h4 class="sasaran-card-r1-title">', escapeHtml(nama), '</h4>',
+              '<div class="sasaran-card-r1-subline">',
+                '<span>', escapeHtml(jenis), '</span>',
+                '<span aria-hidden="true">•</span>',
+                '<span>', escapeHtml(usia), '</span>',
+              '</div>',
             '</div>',
-            '<span class="badge badge-neutral">', escapeHtml(status), '</span>',
+            '<div class="sasaran-card-r1-status-actions">',
+              '<span class="badge badge-neutral">', escapeHtml(status), '</span>',
+              '<div class="sasaran-icon-actions">',
+                '<button type="button" class="sasaran-icon-btn btn-sasaran-detail" data-id-sasaran="', escapeHtml(id), '" aria-label="Detail sasaran" title="Detail sasaran">👁</button>',
+                '<button type="button" class="sasaran-icon-btn sasaran-icon-btn-primary btn-sasaran-pendampingan" data-id-sasaran="', escapeHtml(id), '" aria-label="Lapor pendampingan" title="Lapor pendampingan">＋</button>',
+              '</div>',
+            '</div>',
           '</div>',
-          '<div class="profile-grid compact-meta-grid">',
-            '<div><span class="label">Jenis Sasaran</span><strong>', escapeHtml(jenis), '</strong></div>',
-            '<div><span class="label">Tanggal Lahir</span><strong>', escapeHtml(tgl), '</strong></div>',
-            '<div><span class="label">NIK</span><strong>', escapeHtml(nik), '</strong></div>',
-            '<div><span class="label">No. KK</span><strong>', escapeHtml(kk), '</strong></div>',
-            '<div class="compact-span-all"><span class="label">Wilayah</span><strong>', escapeHtml(wilayah), '</strong></div>',
+          '<div class="sasaran-card-r1-tags">',
+            '<span class="sasaran-mini-tag ', isPriority(item) ? 'is-priority' : '', '">', escapeHtml(prioritasLabel), '</span>',
+            '<span class="sasaran-mini-tag ', didampingi ? 'is-done' : 'is-pending', '">', escapeHtml(didampingi ? 'Sudah didampingi bulan ini' : 'Belum didampingi bulan ini'), '</span>',
           '</div>',
-          '<div class="sasaran-card-actions-compact">',
-            '<button type="button" class="btn btn-secondary btn-sasaran-detail" data-id-sasaran="', escapeHtml(id), '">Detail</button>',
-            '<button type="button" class="btn btn-primary btn-sasaran-pendampingan" data-id-sasaran="', escapeHtml(id), '">Lapor Pendampingan</button>',
+          '<div class="sasaran-card-r1-meta">',
+            buildMetaCell('NIK', nik),
+            buildMetaCell('Nama KK', namaKk),
+            isBaduta ? buildMetaCell('Nama Ibu Kandung', ibu) : '',
+            buildMetaCell('Alamat', alamat, isBaduta ? '' : 'span-2'),
           '</div>',
         '</article>'
       ].join('');
@@ -442,6 +814,8 @@
     _itemMap: {},
 
     init: function () {
+      ensureFilterUi();
+
       if (this._initialized) {
         this.renderLocal();
         return;
@@ -449,12 +823,15 @@
 
       this._initialized = true;
 
-      var refreshBtn = byId(BTN_REFRESH_ID);
-      var resetBtn = ensureResetButton();
+      var ui = ensureFilterUi();
+      var refreshBtn = ui.refreshBtn || byId(BTN_REFRESH_ID);
+      var resetBtn = ui.resetBtn || byId(BTN_RESET_ID);
       var backBtn = byId(BTN_BACK_ID);
       var keywordEl = byId(FILTER_KEYWORD_ID);
       var jenisEl = byId(FILTER_JENIS_ID);
       var statusEl = byId(FILTER_STATUS_ID);
+      var prioritasEl = byId(FILTER_PRIORITAS_ID);
+      var pendampinganEl = byId(FILTER_PENDAMPINGAN_ID);
       var container = byId(CONTAINER_ID);
 
       if (refreshBtn && refreshBtn.dataset.bound !== '1') {
@@ -480,7 +857,7 @@
         });
       }
 
-      [keywordEl, jenisEl, statusEl].forEach(function (el) {
+      [keywordEl, jenisEl, statusEl, prioritasEl, pendampinganEl].forEach(function (el) {
         if (!el || el.dataset.bound === '1') return;
         el.dataset.bound = '1';
 
@@ -549,11 +926,16 @@
 
       return {
         id_tim: getIdTim(profile, session),
-        book_key: getBookKey(profile, session)
+        book_key: getBookKey(profile, session),
+        include_display_fields: true,
+        include_monthly_pendampingan_status: true,
+        include_priority_status: true
       };
     },
 
     load: async function (forceRefresh) {
+      ensureFilterUi();
+
       var api = getApi();
       if (!api || typeof api.post !== 'function') {
         setMeta('Gagal memuat data sasaran.');
@@ -632,16 +1014,20 @@
     },
 
     renderLocal: function () {
-      var filters = getSelectedFilters();
-      var items = applyAllFilters(this._lastItems, filters);
-      this._lastRenderedItems = items.slice();
-      renderList(items);
+      ensureFilterUi();
 
-      var label = 'Menampilkan ' + String(items.length) + ' data';
-      if (filters.jenis_sasaran) label += ' • Jenis: ' + filters.jenis_sasaran;
-      if (filters.status_sasaran) label += ' • Status: ' + filters.status_sasaran;
-      if (filters.keyword) label += ' • Kata kunci: ' + filters.keyword;
-      setMeta(label);
+      var filters = getSelectedFilters();
+      var allItems = this._lastItems.map(normalizeItem);
+      var items = applyAllFilters(allItems, filters);
+
+      this._lastItems = allItems;
+      this._lastRenderedItems = items.slice();
+      this.rebuildItemMap();
+
+      renderList(items);
+      updateMonthlyBanner(allItems);
+      updateActiveCount(allItems);
+      setMeta('');
     },
 
     findItemById: function (idSasaran) {
