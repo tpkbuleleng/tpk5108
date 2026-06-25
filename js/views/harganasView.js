@@ -1,7 +1,7 @@
 (function (window, document) {
   'use strict';
 
-  var VIEW_VERSION = 'HARGANAS-4-R1-VIEW-20260625';
+  var VIEW_VERSION = 'HARGANAS-4A-VIEW-20260625';
   var bound = false;
 
   function byId(id) { return document.getElementById(id); }
@@ -58,6 +58,32 @@
     try { window.alert(message); } catch (err) {}
   }
 
+  function normalizeStatus(value) {
+    return String(value || '').trim().toUpperCase();
+  }
+
+  function isResubmitStatus(draft) {
+    var data = draft || {};
+    var status = normalizeStatus(data.status_submission);
+    var verification = normalizeStatus(data.status_verifikasi);
+    return status === 'REJECTED' || status === 'RESUBMIT_REQUIRED' || verification === 'REJECTED' || verification === 'RESUBMIT_REQUIRED';
+  }
+
+  function isLockedSubmission(draft) {
+    var data = draft || {};
+    if (isResubmitStatus(data)) return false;
+    var status = normalizeStatus(data.status_submission);
+    var verification = normalizeStatus(data.status_verifikasi);
+    return status === 'SUBMITTED' || status === 'VERIFIED' || verification === 'MENUNGGU_VERIFIKASI' || verification === 'VERIFIED' || verification === 'TERVERIFIKASI';
+  }
+
+  function lockMessage(draft) {
+    var data = draft || {};
+    var sid = data.submission_id ? ' Nomor submission: ' + data.submission_id + '.' : '';
+    var ver = data.status_verifikasi ? ' Status: ' + data.status_verifikasi + '.' : ' Status: MENUNGGU_VERIFIKASI.';
+    return 'Dokumentasi HARGANAS untuk tim ini sudah terkirim.' + ver + sid;
+  }
+
   function setBadge(status) {
     var badge = byId('harganas-status-badge');
     if (!badge) return;
@@ -66,6 +92,8 @@
     badge.classList.remove('badge-success', 'badge-warning', 'badge-error', 'badge-success-soft');
     if (text === 'DRAFT') badge.classList.add('badge-warning');
     else if (text === 'READY_TO_SUBMIT') badge.classList.add('badge-success-soft');
+    else if (text === 'SUBMITTED' || text === 'VERIFIED') badge.classList.add('badge-success');
+    else if (text === 'REJECTED' || text === 'RESUBMIT_REQUIRED') badge.classList.add('badge-error');
     else badge.classList.add('badge-warning');
   }
 
@@ -231,7 +259,10 @@
 
   function hasMinimumIdentity(draft) {
     var data = draft || {};
-    return !!(data.jenis_sasaran && data.nama_sasaran && data.nik_sasaran && data.tanggal_lahir && data.nama_kk);
+    var baseReady = !!(data.jenis_sasaran && data.nama_sasaran && data.nik_sasaran && data.tanggal_lahir && data.nama_kk);
+    if (!baseReady) return false;
+    if (String(data.jenis_sasaran || '').toUpperCase() === 'BALITA' && !data.nama_ibu_kandung) return false;
+    return true;
   }
 
   function updateNextGate(draft) {
@@ -243,6 +274,12 @@
     var identityReady = hasMinimumIdentity(data);
     var portraitReady = !!status.portrait;
     var landscapeReady = !!status.landscape;
+
+    if (isLockedSubmission(data)) {
+      next.disabled = true;
+      next.textContent = 'Dokumentasi Sudah Terkirim';
+      return;
+    }
 
     if (!identityReady) {
       next.disabled = true;
@@ -272,6 +309,28 @@
     next.textContent = 'Kirim Dokumentasi ke Drive';
   }
 
+  function setDisabled(id, disabled) {
+    var el = byId(id);
+    if (el) el.disabled = !!disabled;
+  }
+
+  function applySubmissionLockUi(draft) {
+    var locked = isLockedSubmission(draft || {});
+    ['harganas-jenis-sasaran','harganas-nama-sasaran','harganas-nik-sasaran','harganas-tanggal-lahir','harganas-nama-kk','harganas-nama-ibu-kandung'].forEach(function (id) {
+      setDisabled(id, locked);
+    });
+    ['btn-harganas-save-draft','btn-harganas-reset-draft','btn-harganas-activate-gps','btn-harganas-capture-portrait','btn-harganas-capture-landscape','btn-harganas-capture-video'].forEach(function (id) {
+      setDisabled(id, locked);
+    });
+    if (locked) {
+      setDisabled('btn-harganas-next-media', true);
+      var next = byId('btn-harganas-next-media');
+      if (next) next.textContent = 'Dokumentasi Sudah Terkirim';
+      var uploadDetail = byId('harganas-upload-status-detail');
+      if (uploadDetail) uploadDetail.textContent = 'Dokumentasi sudah masuk Drive dan menunggu verifikasi admin.';
+    }
+  }
+
   function updateSummary(draft) {
     var data = draft || {};
     var ds = getDraftService();
@@ -289,17 +348,21 @@
 
     setText('harganas-baduta-priority', data.is_baduta_prioritas === true ? 'YA' : (data.jenis_sasaran === 'BALITA' ? 'TIDAK' : '-'));
     setText('harganas-age-label', data.age_label_at_event || '-');
-    setText('harganas-draft-status', data.nama_sasaran ? 'Tersimpan lokal' : 'Belum tersimpan');
+    setText('harganas-draft-status', isLockedSubmission(data) ? 'Sudah terkirim' : (data.nama_sasaran ? 'Tersimpan lokal' : 'Belum tersimpan'));
     setText('harganas-updated-at', data.updated_at_local ? new Date(data.updated_at_local).toLocaleString('id-ID') : '-');
 
     var summary = byId('harganas-draft-summary');
     if (summary) {
-      if (data.nama_sasaran) {
+      if (isLockedSubmission(data)) {
+        summary.innerHTML = escapeHtml(lockMessage(data));
+      } else if (data.nama_sasaran) {
         summary.innerHTML = 'Draft tersimpan untuk <strong>' + escapeHtml(data.nama_sasaran) + '</strong> (' + escapeHtml(data.jenis_sasaran || '-') + ').';
       } else {
         summary.textContent = 'Belum ada draft tersimpan.';
       }
     }
+
+    applySubmissionLockUi(data);
   }
 
   function toggleIbuKandung() {
@@ -322,9 +385,16 @@
       return;
     }
 
+    var existing = ds.load ? ds.load() : {};
+    if (isLockedSubmission(existing)) {
+      showMessage(lockMessage(existing), 'success');
+      showToast('Dokumentasi sudah terkirim.', 'info');
+      updateSummary(existing);
+      return;
+    }
+
     var eventCfg = ds.getEventConfig ? ds.getEventConfig() : { event_date: '2026-06-29' };
     var result = validator.validateDraft(collectForm(), { eventDate: eventCfg.event_date });
-    var existing = ds.load ? ds.load() : {};
     if (!result.ok) {
       showMessage(result.errors.join(' '), 'error');
       updateSummary(Object.assign({}, existing, result.data || {}));
@@ -346,6 +416,13 @@
   function resetDraft() {
     var ds = getDraftService();
     if (!ds) return;
+    var current = ds && typeof ds.load === 'function' ? ds.load() : {};
+    if (isLockedSubmission(current)) {
+      showMessage(lockMessage(current), 'success');
+      showToast('Dokumentasi sudah terkirim.', 'info');
+      updateSummary(current);
+      return;
+    }
     if (!window.confirm('Hapus draft HARGANAS di perangkat ini?')) return;
     var base = ds.clear();
     fillForm({});
@@ -599,12 +676,59 @@
       status_verifikasi: data.status_verifikasi || 'MENUNGGU_VERIFIKASI',
       submitted_at_server: data.submitted_at_server || new Date().toISOString(),
       submission_id: data.submission_id || '',
+      upload_client_id: data.upload_client_id || existing.upload_client_id || '',
       drive_folder_url: data.folder_url || '',
       drive_files: data.files || {},
       upload_result: data,
       upload_service_version: (window.HarganasUploadService && window.HarganasUploadService.version) || ''
     }));
     return saved;
+  }
+
+  function setDraftAlreadySubmitted(result) {
+    var ds = getDraftService();
+    if (!ds || typeof ds.load !== 'function' || typeof ds.save !== 'function') return null;
+    var existing = ds.load();
+    var data = (result && result.data) || {};
+    var ex = data.existing_submission || data.submission || data || {};
+    var saved = ds.save(Object.assign({}, existing, {
+      status_submission: ex.status_submission || data.status_submission || 'SUBMITTED',
+      status_verifikasi: ex.status_verifikasi || data.status_verifikasi || 'MENUNGGU_VERIFIKASI',
+      submitted_at_server: ex.submitted_at || data.submitted_at_server || existing.submitted_at_server || '',
+      submission_id: ex.submission_id || data.submission_id || existing.submission_id || '',
+      server_status_checked_at: new Date().toISOString(),
+      upload_result: Object.assign({}, existing.upload_result || {}, data || {}),
+      upload_service_version: (window.HarganasUploadService && window.HarganasUploadService.version) || ''
+    }));
+    return saved;
+  }
+
+  async function refreshServerStatus() {
+    var api = window.Api || null;
+    var ds = getDraftService();
+    if (!api || typeof api.harganasGetMyStatus !== 'function' || !ds || typeof ds.load !== 'function' || typeof ds.save !== 'function') return;
+    try {
+      var result = await api.harganasGetMyStatus({ event_code: 'HARGANAS_2026' });
+      if (!result || !result.ok || !result.data) return;
+      var data = result.data || {};
+      var existing = ds.load() || {};
+      if (data.has_submission && data.submission) {
+        var sub = data.submission || {};
+        var saved = ds.save(Object.assign({}, existing, {
+          status_submission: sub.status_submission || data.status_submission || 'SUBMITTED',
+          status_verifikasi: sub.status_verifikasi || data.status_verifikasi || '',
+          submitted_at_server: sub.submitted_at || existing.submitted_at_server || '',
+          submission_id: sub.submission_id || existing.submission_id || '',
+          server_status_checked_at: new Date().toISOString(),
+          has_locked_submission: data.has_locked_submission === true,
+          can_submit: data.can_submit !== false
+        }));
+        updateSummary(saved);
+        if (isLockedSubmission(saved)) {
+          showMessage(lockMessage(saved), 'success');
+        }
+      }
+    } catch (err) {}
   }
 
   async function submitDocumentation() {
@@ -619,6 +743,14 @@
     try {
       var result = await upload.submitCurrentDraft();
       if (!result || !result.ok) {
+        var errorCode = String((result && (result.error_code || result.code_name || result.reason_code)) || '').toUpperCase();
+        if (errorCode === 'HARGANAS_SUBMISSION_ALREADY_EXISTS' || errorCode === 'HARGANAS_ALREADY_SUBMITTED' || errorCode === 'HARGANAS_LOCAL_ALREADY_SUBMITTED') {
+          var savedExisting = setDraftAlreadySubmitted(result) || (getDraftService() && getDraftService().load ? getDraftService().load() : {});
+          updateSummary(savedExisting);
+          showMessage((result && result.message) || lockMessage(savedExisting), 'success');
+          showToast('Dokumentasi sudah terkirim.', 'info');
+          return;
+        }
         showMessage((result && result.message) || 'Dokumentasi belum berhasil dikirim.', 'error');
         showToast('Upload HARGANAS gagal.', 'error');
         var latestFail = getDraftService() && getDraftService().load ? getDraftService().load() : {};
@@ -628,7 +760,7 @@
 
       var saved = setDraftSubmitted(result) || (getDraftService() && getDraftService().load ? getDraftService().load() : {});
       updateSummary(saved);
-      showMessage('Dokumentasi HARGANAS berhasil dikirim ke Drive dan tercatat di manifest.', 'success');
+      showMessage('Dokumentasi HARGANAS berhasil dikirim. Status: Menunggu Verifikasi Admin.', 'success');
       showToast('Dokumentasi HARGANAS terkirim.', 'success');
     } catch (err) {
       showMessage(err && err.message ? err.message : 'Upload dokumentasi gagal.', 'error');
@@ -699,6 +831,7 @@
     fillForm(draft);
     updateSummary(draft);
     clearMessage();
+    refreshServerStatus();
   }
 
   window.HarganasView = {
