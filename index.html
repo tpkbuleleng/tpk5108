@@ -361,7 +361,14 @@
           <div class="harganas-gps-alert__icon" aria-hidden="true">📍</div>
           <div class="harganas-gps-alert__body">
             <strong>Berikan ijin aplikasi menggunakan GPS agar dokumentasi dapat terkirim</strong>
-            <span>Lokasi akan dipakai untuk validasi dokumentasi HARGANAS. Aktifkan izin lokasi saat diminta pada tahap foto/video.</span>
+            <span>Lokasi dipakai untuk validasi dokumentasi HARGANAS. Aktifkan izin lokasi sebelum mengambil foto/video.</span>
+            <div class="harganas-gps-alert__meta">
+              <span id="harganas-gps-permission-label" class="harganas-gps-chip">GPS belum aktif</span>
+              <span id="harganas-gps-detail" class="harganas-gps-detail">Tekan tombol Aktifkan GPS, lalu pilih izinkan lokasi pada browser.</span>
+            </div>
+          </div>
+          <div class="harganas-gps-alert__actions">
+            <button id="btn-harganas-activate-gps" class="btn btn-primary btn-sm harganas-gps-button" type="button">Aktifkan GPS</button>
           </div>
         </section>
 
@@ -406,7 +413,7 @@
             <span class="harganas-media-card__icon" aria-hidden="true">📍</span>
             <span class="label">GPS</span>
             <strong id="harganas-status-gps">Belum</strong>
-            <small>Izin lokasi</small>
+            <small id="harganas-status-gps-detail">Izin lokasi</small>
           </article>
         </section>
 
