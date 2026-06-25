@@ -1,7 +1,7 @@
 (function (window, document) {
   'use strict';
 
-  var VIEW_VERSION = 'HARGANAS-4A-R1-VIEW-20260625';
+  var VIEW_VERSION = 'HARGANAS-4A-R3-VIEW-20260625';
   var bound = false;
 
   function byId(id) { return document.getElementById(id); }

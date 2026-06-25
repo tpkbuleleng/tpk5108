@@ -145,6 +145,63 @@
     return mergeProfileData(storedProfile, bootstrapProfile);
   }
 
+
+  function readLocalJson(key, fallback) {
+    var storage = getStorage();
+    try {
+      if (storage && typeof storage.get === 'function') return storage.get(key, fallback);
+      var raw = window.localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : fallback;
+    } catch (err) { return fallback; }
+  }
+
+  function removeLocalKey(key) {
+    var storage = getStorage();
+    try {
+      if (storage && typeof storage.remove === 'function') storage.remove(key);
+      else window.localStorage.removeItem(key);
+    } catch (err) {}
+  }
+
+  function deleteHarganasMediaDb() {
+    try {
+      if (window.indexedDB && window.indexedDB.deleteDatabase) {
+        window.indexedDB.deleteDatabase('tpk_harganas_2026_media_db');
+      }
+    } catch (err) {}
+  }
+
+  function clearStaleHarganasLocalDataForCurrentUser() {
+    var config = getConfig();
+    var keys = config.STORAGE_KEYS || {};
+    var draftKey = keys.HARGANAS_DRAFT || 'tpk_harganas_2026_draft_v1';
+    var statusKey = keys.HARGANAS_STATUS || 'tpk_harganas_2026_status_v1';
+    var profile = getStoredProfile() || {};
+    var draft = readLocalJson(draftKey, {}) || {};
+
+    var currentUser = normalizeDisplayText(profile.id_user || profile.username || '');
+    var currentTim = normalizeDisplayText(profile.id_tim || '');
+    var draftUser = normalizeDisplayText(draft.id_user || '');
+    var draftTim = normalizeDisplayText(draft.id_tim || '');
+    var mismatch = false;
+
+    if (draftUser && currentUser && draftUser !== currentUser) mismatch = true;
+    if (draftTim && currentTim && draftTim !== currentTim) mismatch = true;
+
+    if (!mismatch) return false;
+
+    removeLocalKey(draftKey);
+    removeLocalKey(statusKey);
+    deleteHarganasMediaDb();
+    try {
+      if (window.AppState) {
+        if (typeof window.AppState.clearHarganasDraft === 'function') window.AppState.clearHarganasDraft();
+        if (typeof window.AppState.setHarganasStatus === 'function') window.AppState.setHarganasStatus({});
+      }
+    } catch (err) {}
+    return true;
+  }
+
   function getDisplayNomorTim(data) {
     data = data || {};
     var explicitNomor = data.nomor_tim || data.nomor_tim_display || data.nomor_tim_lokal || '';
@@ -182,9 +239,11 @@
 
 
   async function hardRefreshApplication() {
-    showToast('Memperbarui aplikasi. Draft utama tidak dihapus.', 'info');
+    showToast('Memperbarui aplikasi. Draft aktif tidak dihapus; data HARGANAS akun lama dibersihkan bila terdeteksi.', 'info');
 
     try {
+      clearStaleHarganasLocalDataForCurrentUser();
+
       if ('serviceWorker' in navigator) {
         var registrations = await navigator.serviceWorker.getRegistrations();
         await Promise.all(registrations.map(async function (registration) {
@@ -255,7 +314,7 @@
       icon: '🔄',
       meta: 'APLIKASI',
       title: 'Perbarui Aplikasi',
-      description: 'Ambil versi terbaru aplikasi tanpa menghapus draft utama.',
+      description: 'Ambil versi terbaru dan bersihkan data akun lama bila ada.',
       run: hardRefreshApplication
     };
   }
@@ -438,4 +497,5 @@
     refresh: init,
     applyProfile: applyProfile
   };
+  window.AppLandingViewCleanup = { clearStaleHarganasLocalDataForCurrentUser: clearStaleHarganasLocalDataForCurrentUser };
 })(window, document);
