@@ -1,7 +1,7 @@
 (function (window, document) {
   'use strict';
 
-  var VIEW_VERSION = 'HARGANAS-2B-VIEW-20260625';
+  var VIEW_VERSION = 'HARGANAS-2C-VIEW-20260625';
   var bound = false;
 
   function byId(id) { return document.getElementById(id); }
@@ -9,6 +9,7 @@
   function getDraftService() { return window.HarganasDraftService || null; }
   function getValidationService() { return window.HarganasValidationService || null; }
   function getGpsService() { return window.HarganasGpsService || null; }
+  function getMediaService() { return window.HarganasMediaService || null; }
 
   function escapeHtml(value) {
     return String(value == null ? '' : value)
@@ -79,6 +80,23 @@
     return '±' + Math.round(n) + ' m';
   }
 
+  function getMediaItem(draft, kind) {
+    var data = draft || {};
+    var media = data.media || {};
+    return media[kind] || null;
+  }
+
+  function formatPhotoDetail(item, fallback) {
+    if (!item) return fallback || '';
+    var parts = [];
+    if (item.width && item.height) parts.push(String(item.width) + '×' + String(item.height));
+    if (window.HarganasMediaService && typeof window.HarganasMediaService.humanFileSize === 'function') {
+      var size = window.HarganasMediaService.humanFileSize(item.size_bytes || 0);
+      if (size) parts.push(size);
+    }
+    return parts.length ? parts.join(' • ') : (fallback || 'Foto tersimpan');
+  }
+
   function formatLocationLine(location) {
     var loc = location || {};
     var lat = Number(loc.latitude);
@@ -96,12 +114,16 @@
     var gpsReady = !!s.gps;
     var gpsLabel = gpsReady ? (gpsWarning ? 'Akurasi Rendah' : 'Siap') : 'Belum';
     var gpsDetail = gpsReady ? (formatAccuracy(data.gps_location && data.gps_location.accuracy) || 'Lokasi tersimpan') : 'Izin lokasi';
+    var portraitItem = getMediaItem(data, 'portrait');
+    var landscapeItem = getMediaItem(data, 'landscape');
 
     setText('harganas-status-portrait', s.portrait ? 'Sudah' : 'Belum');
     setText('harganas-status-landscape', s.landscape ? 'Sudah' : 'Belum');
     setText('harganas-status-video', s.video ? 'Sudah' : 'Belum');
     setText('harganas-status-gps', gpsLabel);
     setText('harganas-status-gps-detail', gpsDetail);
+    setText('harganas-status-portrait-detail', s.portrait ? formatPhotoDetail(portraitItem, 'Foto tersimpan') : 'Foto tegak');
+    setText('harganas-status-landscape-detail', s.landscape ? formatPhotoDetail(landscapeItem, 'Foto tersimpan') : 'Foto mendatar');
 
     toggleMediaCard('harganas-card-portrait', !!s.portrait, false);
     toggleMediaCard('harganas-card-landscape', !!s.landscape, false);
@@ -196,8 +218,11 @@
     var next = byId('btn-harganas-next-media');
     if (!next) return;
     var data = draft || {};
-    var gpsReady = !!(data.media_status && data.media_status.gps);
+    var status = data.media_status || {};
+    var gpsReady = !!status.gps;
     var identityReady = hasMinimumIdentity(data);
+    var portraitReady = !!status.portrait;
+    var landscapeReady = !!status.landscape;
 
     if (!identityReady) {
       next.disabled = true;
@@ -211,8 +236,14 @@
       return;
     }
 
+    if (!portraitReady || !landscapeReady) {
+      next.disabled = true;
+      next.textContent = 'Ambil Foto Potrait dan Foto Landscape terlebih dahulu';
+      return;
+    }
+
     next.disabled = false;
-    next.textContent = 'Siap Lanjut Foto/Video - Paket HARGANAS-2C';
+    next.textContent = 'Foto lengkap. Lanjut Video - Paket HARGANAS-2D';
   }
 
   function updateSummary(draft) {
@@ -359,6 +390,88 @@
     }
   }
 
+  function requireIdentityAndGpsBeforePhoto() {
+    var ds = getDraftService();
+    var data = ds && typeof ds.load === 'function' ? ds.load() : {};
+    if (!hasMinimumIdentity(data)) {
+      showMessage('Simpan identitas sasaran terlebih dahulu sebelum mengambil foto.', 'error');
+      showToast('Identitas sasaran belum lengkap.', 'error');
+      return false;
+    }
+    if (!(data.media_status && data.media_status.gps)) {
+      showMessage('Aktifkan GPS terlebih dahulu sebelum mengambil foto.', 'error');
+      showToast('GPS belum aktif.', 'error');
+      return false;
+    }
+    return true;
+  }
+
+  function triggerPhotoInput(kind) {
+    clearMessage();
+    if (!requireIdentityAndGpsBeforePhoto()) return;
+    var input = byId(kind === 'portrait' ? 'harganas-input-portrait' : 'harganas-input-landscape');
+    if (!input) {
+      showMessage('Input kamera belum tersedia. Perbarui aplikasi lalu coba lagi.', 'error');
+      return;
+    }
+    input.value = '';
+    try { input.click(); } catch (err) {
+      showMessage('Kamera/galeri tidak dapat dibuka dari browser ini.', 'error');
+    }
+  }
+
+  function setPhotoLoading(kind, isLoading) {
+    var btn = byId(kind === 'portrait' ? 'btn-harganas-capture-portrait' : 'btn-harganas-capture-landscape');
+    if (!btn) return;
+    if (isLoading) {
+      if (!btn.dataset.originalText) btn.dataset.originalText = btn.textContent || 'Ambil Foto';
+      btn.disabled = true;
+      btn.textContent = 'Memproses...';
+    } else {
+      btn.disabled = false;
+      btn.textContent = btn.dataset.originalText || btn.textContent || 'Ambil Foto';
+      delete btn.dataset.originalText;
+    }
+  }
+
+  async function handlePhotoSelected(kind, file) {
+    clearMessage();
+    var media = getMediaService();
+    var ds = getDraftService();
+
+    if (!media || typeof media.processPhoto !== 'function' || !ds) {
+      showMessage('Service foto belum termuat. Perbarui aplikasi lalu coba lagi.', 'error');
+      return;
+    }
+
+    if (!file) return;
+
+    setPhotoLoading(kind, true);
+    try {
+      var result = await media.processPhoto(kind, file);
+      if (!result || !result.ok) {
+        showMessage((result && result.message) || 'Foto belum valid.', 'error');
+        showToast('Foto belum valid.', 'error');
+        return;
+      }
+
+      var existing = ds.load ? ds.load() : {};
+      var patch = media.buildDraftPatch ? media.buildDraftPatch(result) : {};
+      var nextMedia = Object.assign({}, existing.media || {}, patch.media || {});
+      var nextStatus = Object.assign({}, existing.media_status || {}, patch.media_status || {});
+      var saved = ds.save(Object.assign({}, existing, patch, { media: nextMedia, media_status: nextStatus }));
+      updateSummary(saved);
+      showMessage(result.kind_label + ' berhasil disimpan sebagai draft lokal.', 'success');
+      showToast(result.kind_label + ' tersimpan.', 'success');
+    } catch (err) {
+      showMessage(err && err.message ? err.message : 'Foto gagal diproses.', 'error');
+    } finally {
+      setPhotoLoading(kind, false);
+      var latest = ds && typeof ds.load === 'function' ? ds.load() : {};
+      updateSummary(latest);
+    }
+  }
+
   function normalizeNikInput() {
     var input = byId('harganas-nik-sasaran');
     if (!input) return;
@@ -384,6 +497,10 @@
     var back = byId('btn-back-dashboard-from-harganas');
     var next = byId('btn-harganas-next-media');
     var gpsBtn = byId('btn-harganas-activate-gps');
+    var portraitBtn = byId('btn-harganas-capture-portrait');
+    var landscapeBtn = byId('btn-harganas-capture-landscape');
+    var portraitInput = byId('harganas-input-portrait');
+    var landscapeInput = byId('harganas-input-landscape');
 
     if (form) form.addEventListener('submit', saveDraft);
     if (jenis) jenis.addEventListener('change', function () { toggleIbuKandung(); clearMessage(); });
@@ -391,12 +508,20 @@
     if (reset) reset.addEventListener('click', resetDraft);
     if (back) back.addEventListener('click', backToDashboard);
     if (gpsBtn) gpsBtn.addEventListener('click', activateGps);
+    if (portraitBtn) portraitBtn.addEventListener('click', function () { triggerPhotoInput('portrait'); });
+    if (landscapeBtn) landscapeBtn.addEventListener('click', function () { triggerPhotoInput('landscape'); });
+    if (portraitInput) portraitInput.addEventListener('change', function () { handlePhotoSelected('portrait', portraitInput.files && portraitInput.files[0]); });
+    if (landscapeInput) landscapeInput.addEventListener('change', function () { handlePhotoSelected('landscape', landscapeInput.files && landscapeInput.files[0]); });
     if (next) next.addEventListener('click', function () {
-      showToast('Identitas dan GPS sudah siap. Pengambilan foto/video akan diaktifkan pada Paket HARGANAS-2C.', 'info');
+      showToast('Foto sudah lengkap. Video pendek akan diaktifkan pada Paket HARGANAS-2D.', 'info');
     });
   }
 
   function init() {
+    try {
+      if (window.AppState && typeof window.AppState.setCurrentRoute === 'function') window.AppState.setCurrentRoute('harganas');
+      if (window.Storage && typeof window.Storage.set === 'function') window.Storage.set(((window.APP_CONFIG && window.APP_CONFIG.STORAGE_KEYS && window.APP_CONFIG.STORAGE_KEYS.LAST_ROUTE) || 'tpk_last_route'), 'harganas');
+    } catch (err) {}
     var ds = getDraftService();
     bindEvents();
     toggleIbuKandung();
@@ -412,6 +537,7 @@
     refresh: init,
     saveDraft: saveDraft,
     resetDraft: resetDraft,
-    activateGps: activateGps
+    activateGps: activateGps,
+    triggerPhotoInput: triggerPhotoInput
   };
 })(window, document);
