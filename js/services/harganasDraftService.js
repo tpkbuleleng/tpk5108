@@ -2,7 +2,7 @@
 (function (window) {
   'use strict';
 
-  var HARGANAS_DRAFT_VERSION = 'HARGANAS-1-DRAFT-20260625';
+  var HARGANAS_DRAFT_VERSION = 'HARGANAS-2B-DRAFT-20260625';
 
   function getConfig() { return window.APP_CONFIG || {}; }
   function getStorage() { return window.Storage || null; }
@@ -124,9 +124,13 @@
   }
 
   function save(draft) {
-    var value = Object.assign({}, buildBaseDraft(getProfile()), draft || {}, {
+    var existing = readRaw(getDraftKey(), {}) || {};
+    var base = buildBaseDraft(getProfile());
+    var incoming = draft || {};
+    var value = Object.assign({}, base, existing, incoming, {
       updated_at_local: new Date().toISOString(),
-      status_submission: 'DRAFT'
+      status_submission: 'DRAFT',
+      media_status: Object.assign({}, base.media_status || {}, existing.media_status || {}, incoming.media_status || {})
     });
     writeRaw(getDraftKey(), value);
     var state = getState();
