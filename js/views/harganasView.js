@@ -1,7 +1,7 @@
 (function (window, document) {
   'use strict';
 
-  var VIEW_VERSION = 'HARGANAS-2D-VIEW-20260625';
+  var VIEW_VERSION = 'HARGANAS-3-VIEW-20260625';
   var bound = false;
 
   function byId(id) { return document.getElementById(id); }
@@ -91,6 +91,7 @@
     if (!item) return fallback || '';
     var parts = [];
     if (item.width && item.height) parts.push(String(item.width) + '×' + String(item.height));
+    if (item.watermark_status === 'APPLIED') parts.push('Watermark OK');
     if (window.HarganasMediaService && typeof window.HarganasMediaService.humanFileSize === 'function') {
       var size = window.HarganasMediaService.humanFileSize(item.size_bytes || 0);
       if (size) parts.push(size);
@@ -105,6 +106,7 @@
       parts.push(window.HarganasVideoService.formatDuration(item.duration_seconds));
     }
     if (item.width && item.height) parts.push(String(item.width) + '×' + String(item.height));
+    if (item.thumbnail_watermark_status === 'APPLIED') parts.push('Thumbnail OK');
     if (window.HarganasVideoService && typeof window.HarganasVideoService.humanFileSize === 'function') {
       var size = window.HarganasVideoService.humanFileSize(item.size_bytes || 0);
       if (size) parts.push(size);
@@ -266,7 +268,7 @@
     }
 
     next.disabled = false;
-    next.textContent = 'Dokumentasi lengkap. Lanjut Watermark & Upload - Paket HARGANAS-3';
+    next.textContent = 'Dokumentasi lengkap. Lanjut Upload - Paket HARGANAS-4';
   }
 
   function updateSummary(draft) {
@@ -471,7 +473,8 @@
 
     setPhotoLoading(kind, true);
     try {
-      var result = await media.processPhoto(kind, file);
+      var draftBeforePhoto = ds.load ? ds.load() : {};
+      var result = await media.processPhoto(kind, file, draftBeforePhoto);
       if (!result || !result.ok) {
         showMessage((result && result.message) || 'Foto belum valid.', 'error');
         showToast('Foto belum valid.', 'error');
@@ -615,7 +618,7 @@
     if (landscapeInput) landscapeInput.addEventListener('change', function () { handlePhotoSelected('landscape', landscapeInput.files && landscapeInput.files[0]); });
     if (videoInput) videoInput.addEventListener('change', function () { handleVideoSelected(videoInput.files && videoInput.files[0]); });
     if (next) next.addEventListener('click', function () {
-      showToast('Dokumentasi foto/video sudah lengkap. Watermark dan upload akan diaktifkan pada Paket HARGANAS-3.', 'info');
+      showToast('Dokumentasi lengkap. Watermark sudah disiapkan. Upload Drive akan diaktifkan pada Paket HARGANAS-4.', 'info');
     });
   }
 
