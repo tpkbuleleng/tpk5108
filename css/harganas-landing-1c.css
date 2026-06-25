@@ -1022,3 +1022,33 @@
     width: 100%;
   }
 }
+
+/* =========================================================
+   HARGANAS-4A-R1 — Device Save Helper
+   ========================================================= */
+.harganas-device-save {
+  align-self: flex-start;
+  margin-top: 6px;
+  min-height: 32px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  color: #155e75;
+  background: rgba(207, 250, 254, 0.72);
+  border: 1px solid rgba(8, 145, 178, 0.20);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.harganas-device-save:hover:not(:disabled) {
+  background: rgba(165, 243, 252, 0.90);
+}
+
+.harganas-device-save.hidden {
+  display: none !important;
+}
+
+.harganas-media-card.is-complete .harganas-device-save {
+  color: #0f766e;
+  background: rgba(204, 251, 241, 0.86);
+  border-color: rgba(15, 118, 110, 0.18);
+}
