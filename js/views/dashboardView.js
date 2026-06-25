@@ -20,6 +20,15 @@
   var registrasiPrefetchStarted = false;
 
   var BASE_MENU = {
+    kirim_dokumentasi_harganas: {
+      key: 'kirim_dokumentasi_harganas',
+      title: 'Kirim Dokumentasi HARGANAS 2026',
+      description: 'Isi identitas sasaran dan siapkan dokumentasi pendampingan',
+      route: 'harganas',
+      action: 'openHarganas',
+      icon: '📸',
+      meta: 'HARGANAS'
+    },
     daftar_sasaran: {
       key: 'daftar_sasaran',
       title: 'Daftar Sasaran',
@@ -96,6 +105,7 @@
 
   var ROLE_MENU_KEYS = {
     KADER: [
+      'kirim_dokumentasi_harganas',
       'registrasi_sasaran',
       'daftar_sasaran',
       'lapor_pendampingan',
@@ -106,6 +116,7 @@
       'bantuan'
     ],
     PKB: [
+      'kirim_dokumentasi_harganas',
       'daftar_sasaran',
       'draft_sinkronisasi',
       'sinkronisasi',
@@ -114,6 +125,7 @@
       'bantuan'
     ],
     ADMIN_KECAMATAN: [
+      'kirim_dokumentasi_harganas',
       'daftar_sasaran',
       'draft_sinkronisasi',
       'sinkronisasi',
@@ -122,6 +134,7 @@
       'bantuan'
     ],
     ADMIN_KABUPATEN: [
+      'kirim_dokumentasi_harganas',
       'daftar_sasaran',
       'draft_sinkronisasi',
       'sinkronisasi',
@@ -130,6 +143,7 @@
       'bantuan'
     ],
     SUPER_ADMIN: [
+      'kirim_dokumentasi_harganas',
       'daftar_sasaran',
       'draft_sinkronisasi',
       'sinkronisasi',
@@ -138,6 +152,7 @@
       'bantuan'
     ],
     MITRA: [
+      'kirim_dokumentasi_harganas',
       'daftar_sasaran',
       'rekap_saya',
       'profil',
@@ -179,6 +194,26 @@
 
   function getStorageKeys() {
     return getConfig().STORAGE_KEYS || {};
+  }
+
+  function getFeatures() {
+    return getConfig().FEATURES || {};
+  }
+
+  function isHarganasEnabled() {
+    var features = getFeatures();
+    return features.HARGANAS_ENABLED !== false;
+  }
+
+  function isHarganasLandingMode() {
+    return getFeatures().HARGANAS_LANDING_MODE === true;
+  }
+
+  function isPendampinganMenuVisible(cleanRole) {
+    var features = getFeatures();
+    if (features.PENDAMPINGAN_ENABLED === true) return true;
+    if (cleanRole === 'KADER') return features.PENDAMPINGAN_VISIBLE_TO_KADER === true;
+    return features.PENDAMPINGAN_VISIBLE_TO_ADMIN === true;
   }
 
   function deepClone(value) {
@@ -330,7 +365,22 @@
 
   function getMenuForRole(role) {
     var cleanRole = normalizeRole(role);
-    var keys = ROLE_MENU_KEYS[cleanRole] || ROLE_MENU_KEYS.KADER;
+    var keys = (ROLE_MENU_KEYS[cleanRole] || ROLE_MENU_KEYS.KADER).slice();
+
+    if (isHarganasEnabled() && keys.indexOf('kirim_dokumentasi_harganas') < 0) {
+      keys.unshift('kirim_dokumentasi_harganas');
+    }
+
+    if (!isPendampinganMenuVisible(cleanRole)) {
+      keys = keys.filter(function (key) { return key !== 'lapor_pendampingan'; });
+    }
+
+    if (cleanRole === 'KADER' && isHarganasLandingMode()) {
+      keys = keys.filter(function (key) {
+        return key === 'kirim_dokumentasi_harganas' || key === 'profil' || key === 'bantuan';
+      });
+    }
+
     return keys.map(function (key) {
       return deepClone(BASE_MENU[key]);
     }).filter(Boolean);
@@ -410,6 +460,7 @@
         case 'pendampingan': return router.toPendampingan && router.toPendampingan();
         case 'sync': return router.toSyncScreen && router.toSyncScreen();
         case 'rekapKader': return router.toRekapKader && router.toRekapKader();
+        case 'harganas': return router.toHarganas && router.toHarganas();
       }
     }
 
@@ -934,7 +985,15 @@
     });
   }
 
+  function openHarganas() {
+    go('harganas');
+  }
+
   function openPendampinganEntry() {
+    if (!isPendampinganMenuVisible(normalizeRole((getProfile() || {}).role_akses || (getProfile() || {}).role || 'KADER'))) {
+      showToast('Menu Lapor Pendampingan belum diaktifkan untuk kader.', 'info');
+      return;
+    }
     openSasaranList();
     showToast('Pilih sasaran terlebih dahulu untuk membuat pendampingan.', 'info');
   }
@@ -1006,6 +1065,9 @@
         break;
       case 'openSasaranList':
         openSasaranList();
+        break;
+      case 'openHarganas':
+        openHarganas();
         break;
       case 'openPendampinganEntry':
         openPendampinganEntry();
@@ -1400,6 +1462,7 @@
     applyBootstrapLite: applyBootstrapLite,
     openRegistrasi: openRegistrasi,
     openSasaranList: openSasaranList,
+    openHarganas: openHarganas,
     openPendampinganEntry: openPendampinganEntry,
     openSyncScreen: openSyncScreen,
     openRekapKader: openRekapKader,
