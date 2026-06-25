@@ -1,7 +1,7 @@
 (function (window) {
   'use strict';
 
-  var WATERMARK_SERVICE_VERSION = 'HARGANAS-4A-R1-WATERMARK-SERVICE-20260625';
+  var WATERMARK_SERVICE_VERSION = 'HARGANAS-4A-R2-WATERMARK-SERVICE-20260625';
 
   function getConfig() { return window.APP_CONFIG || {}; }
   function getHarganasConfig() { return getConfig().HARGANAS || {}; }
@@ -55,19 +55,14 @@
     return cleaned;
   }
 
-  function getTeamLine(draft) {
+  function getTeamAreaLine(draft) {
     var d = draft || {};
     var tim = normalizeTimLabel(d.nomor_tim || d.nomor_tim_tpk || d.nama_tim || d.id_tim);
     var desa = normalizeText(d.desa, '-');
-    return tim + ' • Desa ' + desa;
-  }
-
-  function getAreaLine(draft) {
-    var d = draft || {};
     var kec = normalizeText(d.kecamatan || d.kode_kecamatan, '-');
     var kab = normalizeText(d.kabupaten, 'BULELENG');
     var prov = normalizeText(d.provinsi, 'BALI');
-    return 'Kec. ' + kec + ' • Kab. ' + kab + ' • ' + prov;
+    return tim + ' • Desa ' + desa + ' • Kec. ' + kec + ' • Kab. ' + kab + ' • ' + prov;
   }
 
   function getMediaLabel(mediaKind) {
@@ -89,8 +84,7 @@
     var lines = [
       label,
       dateLabel,
-      getTeamLine(d),
-      getAreaLine(d)
+      getTeamAreaLine(d)
     ];
 
     if (cfg.WATERMARK_INCLUDE_GPS !== false) {
@@ -153,7 +147,7 @@
     var lineHeightBody = Math.round(21 * scale);
     var requiredPanelH = pad * 2 + lineHeightTitle + Math.max(0, lines.length - 1) * lineHeightBody + gap;
     var maxPanelH = Math.round(h * 0.46);
-    var minPanelH = Math.round(118 * scale);
+    var minPanelH = Math.round(96 * scale);
     var panelH = Math.min(maxPanelH, Math.max(requiredPanelH, minPanelH));
     if (panelH < requiredPanelH) {
       var factor = Math.max(0.72, panelH / requiredPanelH);
@@ -162,8 +156,21 @@
       lineHeightTitle = Math.max(20, Math.floor(lineHeightTitle * factor));
       lineHeightBody = Math.max(16, Math.floor(lineHeightBody * factor));
     }
-    var panelW = Math.min(w - pad * 2, Math.round(w * 0.92));
-    var x = pad;
+
+    var maxPanelW = Math.min(w - pad * 2, Math.round(w * 0.92));
+    var minPanelW = Math.min(maxPanelW, Math.round(w * 0.38));
+    ctx.save();
+    ctx.font = '700 ' + titleSize + 'px system-ui, -apple-system, Segoe UI, sans-serif';
+    var longest = ctx.measureText(lines[0]).width;
+    ctx.font = '600 ' + bodySize + 'px system-ui, -apple-system, Segoe UI, sans-serif';
+    for (var measureIndex = 1; measureIndex < lines.length; measureIndex += 1) {
+      longest = Math.max(longest, ctx.measureText(lines[measureIndex]).width);
+    }
+    ctx.restore();
+
+    var panelW = Math.ceil(longest + pad * 2 + Math.round(18 * scale));
+    panelW = Math.min(maxPanelW, Math.max(minPanelW, panelW));
+    var x = Math.round((w - panelW) / 2);
     var y = h - panelH - pad;
     var maxTextW = panelW - pad * 2;
 
