@@ -13,7 +13,8 @@
     rekapKader: 'rekap-kader-screen',
     superAdmin: 'super-admin-screen',
     appLanding: 'app-landing-screen',
-    harganas: 'harganas-screen'
+    harganas: 'harganas-screen',
+    harganasAdmin: 'harganas-admin-screen'
   };
 
   var ROUTE_ASSET_MAP = {
@@ -21,7 +22,7 @@
       { src: './js/views/dashboardView.js?v=20260503-SA-FIX1', globalName: 'DashboardView' }
     ],
     appLanding: [
-      { src: './js/views/appLandingView.js?v=20260625-HARGANAS4A-R3', globalName: 'AppLandingView' }
+      { src: './js/views/appLandingView.js?v=20260625-HARGANAS5', globalName: 'AppLandingView' }
     ],
     sasaranList: [
       { src: './js/views/sasaranListView.js?v=20260417-01', globalName: 'SasaranListView' }
@@ -53,6 +54,9 @@
       { src: './js/services/harganasVideoService.js?v=20260625-HARGANAS4A', globalName: 'HarganasVideoService' },
       { src: './js/services/harganasUploadService.js?v=20260625-HARGANAS4A', globalName: 'HarganasUploadService' },
       { src: './js/views/harganasView.js?v=20260625-HARGANAS4A-R3', globalName: 'HarganasView' }
+    ],
+    harganasAdmin: [
+      { src: './js/views/harganasAdminView.js?v=20260625-HARGANAS5', globalName: 'HarganasAdminView' }
     ]
   };
 
@@ -94,6 +98,12 @@
       'harganas-2026': 'harganas',
       'dokumentasi-harganas': 'harganas',
       kirim_dokumentasi_harganas: 'harganas',
+      harganasAdmin: 'harganasAdmin',
+      harganas_admin: 'harganasAdmin',
+      'harganas-admin': 'harganasAdmin',
+      verifikasi_harganas: 'harganasAdmin',
+      'verifikasi-harganas': 'harganasAdmin',
+      'verifikasi-dokumen-harganas': 'harganasAdmin',
 
       sync: 'sync',
       syncScreen: 'sync',
@@ -295,6 +305,11 @@
         return;
       }
 
+      if (routeName === 'harganasAdmin' && window.HarganasAdminView && typeof window.HarganasAdminView.init === 'function') {
+        window.HarganasAdminView.init(target, { route: routeName, screenId: screenId });
+        return;
+      }
+
       if (routeName === 'sasaranList' && window.SasaranListView && typeof window.SasaranListView.init === 'function') {
         window.SasaranListView.init(target, { route: routeName, screenId: screenId });
         return;
@@ -416,6 +431,7 @@
     toSyncScreen: function (options) { return this.go('sync', options); },
     toRekapKader: function (options) { return this.go('rekapKader', options); },
     toHarganas: function (options) { return this.go('harganas', options || {}); },
+    toHarganasAdmin: function (options) { return this.go('harganasAdmin', options || {}); },
     toSuperAdmin: function (options) { return this.go('superAdmin', options || {}); }
   };
 

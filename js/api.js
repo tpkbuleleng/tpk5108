@@ -1423,6 +1423,32 @@
     });
   }
 
+
+
+  async function harganasAdminListSubmissions(payload) {
+    return post(getActionName('HARGANAS_ADMIN_LIST_SUBMISSIONS', 'harganasAdminListSubmissions'), payload || {}, {
+      includeAuth: true,
+      timeoutMs: 45000,
+      retryCount: 0
+    });
+  }
+
+  async function harganasAdminGetSubmissionDetail(payload) {
+    return post(getActionName('HARGANAS_ADMIN_GET_SUBMISSION_DETAIL', 'harganasAdminGetSubmissionDetail'), payload || {}, {
+      includeAuth: true,
+      timeoutMs: 45000,
+      retryCount: 0
+    });
+  }
+
+  async function harganasAdminUpdateVerification(payload) {
+    return post(getActionName('HARGANAS_ADMIN_UPDATE_VERIFICATION', 'harganasAdminUpdateVerification'), payload || {}, {
+      includeAuth: true,
+      timeoutMs: 45000,
+      retryCount: 0
+    });
+  }
+
   function normalizeRoleForApi(value) {
     var raw = String(value || '').trim().toUpperCase();
     var map = {
@@ -1698,6 +1724,9 @@
     harganasGetMyStatus: harganasGetMyStatus,
     harganasSaveDraft: harganasSaveDraft,
     harganasSubmitDocumentation: harganasSubmitDocumentation,
+    harganasAdminListSubmissions: harganasAdminListSubmissions,
+    harganasAdminGetSubmissionDetail: harganasAdminGetSubmissionDetail,
+    harganasAdminUpdateVerification: harganasAdminUpdateVerification,
     getTimRef: getTimRef,
     getSasaranListLite: getSasaranListLite,
     getRegistrasiFormDefinition: getRegistrasiFormDefinition,

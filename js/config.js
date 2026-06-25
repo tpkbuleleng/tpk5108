@@ -3,7 +3,7 @@
 
   const APP_CONFIG = {
     APP_NAME: 'TPK KABUPATEN BULELENG',
-    APP_VERSION: '2.1.6-HARGANAS4A-R3',
+    APP_VERSION: '2.1.7-HARGANAS5',
 
     API_BASE_URL: 'https://script.google.com/macros/s/AKfycbw11cBt2PdUiO5_MKEdqTKSwggEFVBedpm1jIbvndRqL8U4g0dfhntTk8oS6eD_nUGDsg/exec',
     API_TIMEOUT_MS: 30000,
@@ -20,7 +20,7 @@
       APP_LANDING_AFTER_LOGIN: true,
       APP_LANDING_DEFAULT_ROUTE: 'appLanding',
       ROUTE_RESTORE_ENABLED: true,
-      ROUTE_RESTORE_ALLOWED: ['appLanding', 'harganas'],
+      ROUTE_RESTORE_ALLOWED: ['appLanding', 'harganas', 'harganasAdmin'],
       APP_LANDING_MODE: 'HARGANAS_2026',
       PENDAMPINGAN_ENABLED: false,
       PENDAMPINGAN_VISIBLE_TO_KADER: false,
@@ -36,7 +36,7 @@
       ACTIVE_EVENT_TITLE: 'Dokumentasi HARGANAS 2026',
       ACTIVE_EVENT_SUMMARY: 'Dalam rangka Hari Keluarga Nasional, setiap Tim TPK diminta mengirim dokumentasi pendampingan berupa 1 foto potrait, 1 foto landscape, dan 1 video pendek.',
       ACTIVE_EVENT_REASON: 'Dokumentasi digunakan sebagai bukti dukung kegiatan pendampingan TPK, bahan rekap kecamatan/kabupaten, dan arsip kegiatan HARGANAS.',
-      UPDATED_AT_LABEL: '25 Juni 2026 • 4A-R3'
+      UPDATED_AT_LABEL: '25 Juni 2026 • 5'
     },
 
     HARGANAS: {
@@ -136,7 +136,10 @@
       HARGANAS_GET_CONFIG: 'harganasGetConfig',
       HARGANAS_GET_MY_STATUS: 'harganasGetMyStatus',
       HARGANAS_SAVE_DRAFT: 'harganasSaveDraft',
-      HARGANAS_SUBMIT_DOCUMENTATION: 'harganasSubmitDocumentation'
+      HARGANAS_SUBMIT_DOCUMENTATION: 'harganasSubmitDocumentation',
+      HARGANAS_ADMIN_LIST_SUBMISSIONS: 'harganasAdminListSubmissions',
+      HARGANAS_ADMIN_GET_SUBMISSION_DETAIL: 'harganasAdminGetSubmissionDetail',
+      HARGANAS_ADMIN_UPDATE_VERIFICATION: 'harganasAdminUpdateVerification'
     },
 
     FORM_IDS: {
