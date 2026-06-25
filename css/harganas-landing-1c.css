@@ -943,3 +943,22 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+
+/* =========================================================
+   HARGANAS-4 — Drive Upload Bridge + Manifest Workbook
+   ========================================================= */
+.harganas-next-action:not(:disabled) {
+  border-color: rgba(37, 99, 235, 0.28);
+  color: #ffffff;
+  background: linear-gradient(135deg, #0ea5e9 0%, #1d4ed8 100%);
+  box-shadow: 0 14px 26px rgba(37, 99, 235, 0.22);
+}
+
+.harganas-next-action:not(:disabled):hover {
+  filter: brightness(1.03);
+}
+
+.harganas-next-action:disabled {
+  cursor: not-allowed;
+}
