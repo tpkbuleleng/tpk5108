@@ -192,7 +192,10 @@
 
   function backToDashboard() {
     var router = getRouter();
-    if (router && typeof router.go === 'function') router.go('dashboard');
+    if (router && typeof router.go === 'function') {
+      router.go('appLanding');
+      return;
+    }
   }
 
   function bindEvents() {
