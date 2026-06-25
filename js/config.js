@@ -3,7 +3,7 @@
 
   const APP_CONFIG = {
     APP_NAME: 'TPK KABUPATEN BULELENG',
-    APP_VERSION: '2.1.2-HARGANAS2A',
+    APP_VERSION: '2.1.2-HARGANAS2B',
 
     API_BASE_URL: 'https://script.google.com/macros/s/AKfycbwZiCcv7MCL21R1VqlOFsx1x_Ax_8yoxVwjIumG3kVYwDSQTfXX9VjQnz2GsAW2ItzAAQ/exec',
     API_TIMEOUT_MS: 30000,
@@ -49,6 +49,9 @@
       REQUIRE_VIDEO: true,
       MAX_VIDEO_DURATION_SECONDS: 30,
       MAX_VIDEO_SIZE_MB: 25,
+      GPS_GOOD_ACCURACY_METERS: 100,
+      GPS_TIMEOUT_MS: 15000,
+      GPS_MAXIMUM_AGE_MS: 0,
       JENIS_SASARAN: ['CATIN', 'BUMIL', 'BUFAS', 'BALITA']
     },
 
