@@ -45,11 +45,12 @@
       { src: './js/views/superAdminDashboardView.js?v=5E-R4D-A9-R3-R1-20260516-01', globalName: 'SuperAdminDashboardView' }
     ],
     harganas: [
-      { src: './js/services/harganasValidationService.js?v=20260625-HARGANAS2C', globalName: 'HarganasValidationService' },
-      { src: './js/services/harganasDraftService.js?v=20260625-HARGANAS2C', globalName: 'HarganasDraftService' },
-      { src: './js/services/harganasGpsService.js?v=20260625-HARGANAS2C', globalName: 'HarganasGpsService' },
-      { src: './js/services/harganasMediaService.js?v=20260625-HARGANAS2C', globalName: 'HarganasMediaService' },
-      { src: './js/views/harganasView.js?v=20260625-HARGANAS2C', globalName: 'HarganasView' }
+      { src: './js/services/harganasValidationService.js?v=20260625-HARGANAS2D', globalName: 'HarganasValidationService' },
+      { src: './js/services/harganasDraftService.js?v=20260625-HARGANAS2D', globalName: 'HarganasDraftService' },
+      { src: './js/services/harganasGpsService.js?v=20260625-HARGANAS2D', globalName: 'HarganasGpsService' },
+      { src: './js/services/harganasMediaService.js?v=20260625-HARGANAS2D', globalName: 'HarganasMediaService' },
+      { src: './js/services/harganasVideoService.js?v=20260625-HARGANAS2D', globalName: 'HarganasVideoService' },
+      { src: './js/views/harganasView.js?v=20260625-HARGANAS2D', globalName: 'HarganasView' }
     ]
   };
 
