@@ -21,7 +21,7 @@
       { src: './js/views/dashboardView.js?v=20260503-SA-FIX1', globalName: 'DashboardView' }
     ],
     appLanding: [
-      { src: './js/views/appLandingView.js?v=20260625-HARGANAS1B', globalName: 'AppLandingView' }
+      { src: './js/views/appLandingView.js?v=20260625-HARGANAS4A-R2', globalName: 'AppLandingView' }
     ],
     sasaranList: [
       { src: './js/views/sasaranListView.js?v=20260417-01', globalName: 'SasaranListView' }
@@ -48,7 +48,7 @@
       { src: './js/services/harganasValidationService.js?v=20260625-HARGANAS4A', globalName: 'HarganasValidationService' },
       { src: './js/services/harganasDraftService.js?v=20260625-HARGANAS4A', globalName: 'HarganasDraftService' },
       { src: './js/services/harganasGpsService.js?v=20260625-HARGANAS4A', globalName: 'HarganasGpsService' },
-      { src: './js/services/harganasWatermarkService.js?v=20260625-HARGANAS4A', globalName: 'HarganasWatermarkService' },
+      { src: './js/services/harganasWatermarkService.js?v=20260625-HARGANAS4A-R2', globalName: 'HarganasWatermarkService' },
       { src: './js/services/harganasMediaService.js?v=20260625-HARGANAS4A', globalName: 'HarganasMediaService' },
       { src: './js/services/harganasVideoService.js?v=20260625-HARGANAS4A', globalName: 'HarganasVideoService' },
       { src: './js/services/harganasUploadService.js?v=20260625-HARGANAS4A', globalName: 'HarganasUploadService' },

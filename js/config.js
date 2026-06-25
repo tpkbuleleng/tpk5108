@@ -3,7 +3,7 @@
 
   const APP_CONFIG = {
     APP_NAME: 'TPK KABUPATEN BULELENG',
-    APP_VERSION: '2.1.4-HARGANAS4A-R1',
+    APP_VERSION: '2.1.5-HARGANAS4A-R2',
 
     API_BASE_URL: 'https://script.google.com/macros/s/AKfycbw11cBt2PdUiO5_MKEdqTKSwggEFVBedpm1jIbvndRqL8U4g0dfhntTk8oS6eD_nUGDsg/exec',
     API_TIMEOUT_MS: 30000,
@@ -36,7 +36,7 @@
       ACTIVE_EVENT_TITLE: 'Dokumentasi HARGANAS 2026',
       ACTIVE_EVENT_SUMMARY: 'Dalam rangka Hari Keluarga Nasional, setiap Tim TPK diminta mengirim dokumentasi pendampingan berupa 1 foto potrait, 1 foto landscape, dan 1 video pendek.',
       ACTIVE_EVENT_REASON: 'Dokumentasi digunakan sebagai bukti dukung kegiatan pendampingan TPK, bahan rekap kecamatan/kabupaten, dan arsip kegiatan HARGANAS.',
-      UPDATED_AT_LABEL: '25 Juni 2026'
+      UPDATED_AT_LABEL: '25 Juni 2026 • 4A-R2'
     },
 
     HARGANAS: {
