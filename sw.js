@@ -1,4 +1,4 @@
-const SW_VERSION = 'tpk-sw-harganas-1c-r1-20260625-01';
+const SW_VERSION = 'tpk-sw-harganas-2a-20260625-01';
 const SHELL_CACHE = 'tpk-shell-' + SW_VERSION;
 const ASSET_CACHE = 'tpk-assets-' + SW_VERSION;
 

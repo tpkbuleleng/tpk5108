@@ -344,9 +344,10 @@
 
 
     <!-- HARGANAS 2026 -->
-    <section id="harganas-screen" class="screen hidden" data-screen="harganas">
-      <header class="topbar">
+    <section id="harganas-screen" class="screen hidden harganas-page" data-screen="harganas">
+      <header class="topbar harganas-topbar">
         <div>
+          <p class="harganas-kicker">Dokumentasi TPK</p>
           <h2 class="topbar-title">Dokumentasi HARGANAS 2026</h2>
           <p class="topbar-subtitle">Kirim dokumentasi pendampingan TPK untuk Hari Keluarga Nasional</p>
         </div>
@@ -355,17 +356,26 @@
         </div>
       </header>
 
-      <main class="page-content">
-        <section class="card card-compact">
-          <div class="section-header row-between">
+      <main class="page-content harganas-content">
+        <section class="harganas-gps-alert" aria-label="Informasi izin GPS">
+          <div class="harganas-gps-alert__icon" aria-hidden="true">📍</div>
+          <div class="harganas-gps-alert__body">
+            <strong>Berikan ijin aplikasi menggunakan GPS agar dokumentasi dapat terkirim</strong>
+            <span>Lokasi akan dipakai untuk validasi dokumentasi HARGANAS. Aktifkan izin lokasi saat diminta pada tahap foto/video.</span>
+          </div>
+        </section>
+
+        <section class="card card-compact harganas-profile-card">
+          <div class="section-header row-between harganas-section-head">
             <div>
-              <h3>Profil Tim</h3>
+              <p class="harganas-section-eyebrow">Profil Tim</p>
+              <h3>Data Tim Pengirim</h3>
               <p class="muted-text">Data tim diambil dari sesi login PWA TPK.</p>
             </div>
             <span id="harganas-status-badge" class="badge badge-warning">DRAFT</span>
           </div>
 
-          <div class="profile-grid profile-grid-4">
+          <div class="profile-grid profile-grid-4 harganas-team-grid">
             <div><span class="label">Nomor Tim</span><strong id="harganas-profile-tim">-</strong></div>
             <div><span class="label">Desa/Kelurahan</span><strong id="harganas-profile-desa">-</strong></div>
             <div><span class="label">Kecamatan</span><strong id="harganas-profile-kecamatan">-</strong></div>
@@ -373,17 +383,40 @@
           </div>
         </section>
 
-        <section class="stats-grid">
-          <article class="card stat-card"><span class="label">Foto Potrait</span><strong id="harganas-status-portrait">Belum</strong></article>
-          <article class="card stat-card"><span class="label">Foto Landscape</span><strong id="harganas-status-landscape">Belum</strong></article>
-          <article class="card stat-card"><span class="label">Video Pendek</span><strong id="harganas-status-video">Belum</strong></article>
-          <article class="card stat-card"><span class="label">GPS</span><strong id="harganas-status-gps">Belum</strong></article>
+        <section class="harganas-media-grid" aria-label="Status kelengkapan dokumentasi HARGANAS">
+          <article id="harganas-card-portrait" class="harganas-media-card">
+            <span class="harganas-media-card__icon" aria-hidden="true">🖼️</span>
+            <span class="label">Foto Potrait</span>
+            <strong id="harganas-status-portrait">Belum</strong>
+            <small>Foto tegak</small>
+          </article>
+          <article id="harganas-card-landscape" class="harganas-media-card">
+            <span class="harganas-media-card__icon" aria-hidden="true">🌄</span>
+            <span class="label">Foto Landscape</span>
+            <strong id="harganas-status-landscape">Belum</strong>
+            <small>Foto mendatar</small>
+          </article>
+          <article id="harganas-card-video" class="harganas-media-card">
+            <span class="harganas-media-card__icon" aria-hidden="true">🎥</span>
+            <span class="label">Video Pendek</span>
+            <strong id="harganas-status-video">Belum</strong>
+            <small>Maks. 30 detik</small>
+          </article>
+          <article id="harganas-card-gps" class="harganas-media-card harganas-media-card--gps">
+            <span class="harganas-media-card__icon" aria-hidden="true">📍</span>
+            <span class="label">GPS</span>
+            <strong id="harganas-status-gps">Belum</strong>
+            <small>Izin lokasi</small>
+          </article>
         </section>
 
-        <section class="card">
-          <div class="section-header">
-            <h3>Identitas Sasaran Dokumentasi</h3>
-            <p class="muted-text">Data ini menjadi snapshot HARGANAS, belum mengubah data master sasaran.</p>
+        <section class="card harganas-form-card">
+          <div class="section-header harganas-section-head">
+            <div>
+              <p class="harganas-section-eyebrow">Data Sasaran</p>
+              <h3>Identitas Sasaran Dokumentasi</h3>
+              <p class="muted-text">Data ini menjadi snapshot HARGANAS, belum mengubah data master sasaran.</p>
+            </div>
           </div>
 
           <form id="harganas-form" novalidate>
@@ -428,7 +461,7 @@
 
             <div id="harganas-validation-message" class="login-message hidden" role="alert" aria-live="polite"></div>
 
-            <section class="card card-compact" aria-label="Ringkasan validasi HARGANAS">
+            <section class="card card-compact harganas-summary-card" aria-label="Ringkasan validasi HARGANAS">
               <div class="section-header section-header-compact">
                 <h3>Ringkasan Draft</h3>
                 <p class="muted-text" id="harganas-draft-summary">Belum ada draft tersimpan.</p>
@@ -441,13 +474,13 @@
               </div>
             </section>
 
-            <div class="section-actions action-grid-2">
-              <button id="btn-harganas-save-draft" class="btn btn-primary" type="submit">Simpan Draft Identitas</button>
+            <div class="section-actions action-grid-2 harganas-action-row">
+              <button id="btn-harganas-save-draft" class="btn btn-primary harganas-primary-action" type="submit">Simpan Draft Identitas</button>
               <button id="btn-harganas-reset-draft" class="btn btn-secondary" type="button">Reset Draft</button>
             </div>
 
-            <div class="section-actions">
-              <button id="btn-harganas-next-media" class="btn btn-secondary" type="button" disabled>
+            <div class="section-actions harganas-next-row">
+              <button id="btn-harganas-next-media" class="btn btn-secondary harganas-next-action" type="button" disabled>
                 Lanjut Foto/Video - Paket HARGANAS-2
               </button>
             </div>
