@@ -180,6 +180,42 @@
     try { console.log('[APP_LANDING]', type || 'info', message); } catch (err) {}
   }
 
+
+  async function hardRefreshApplication() {
+    showToast('Memperbarui aplikasi. Draft utama tidak dihapus.', 'info');
+
+    try {
+      if ('serviceWorker' in navigator) {
+        var registrations = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(registrations.map(async function (registration) {
+          try { await registration.update(); } catch (err) {}
+          try {
+            if (registration.waiting) registration.waiting.postMessage({ type: 'TPK_SKIP_WAITING' });
+            if (registration.installing) registration.installing.postMessage({ type: 'TPK_SKIP_WAITING' });
+          } catch (err) {}
+        }));
+      }
+
+      if (window.caches && typeof window.caches.keys === 'function') {
+        var keys = await window.caches.keys();
+        await Promise.all(keys.map(function (key) {
+          if (/^tpk-/i.test(String(key || ''))) return window.caches.delete(key);
+          return Promise.resolve(false);
+        }));
+      }
+
+      try { localStorage.setItem('tpk_last_manual_app_refresh_at', new Date().toISOString()); } catch (err) {}
+
+      window.setTimeout(function () {
+        var path = window.location.origin + window.location.pathname;
+        var hash = window.location.hash || '';
+        window.location.href = path + '?app_refresh=' + Date.now() + hash;
+      }, 450);
+    } catch (err) {
+      showToast('Perbarui aplikasi gagal. Tutup aplikasi lalu buka kembali.', 'error');
+    }
+  }
+
   function createActionButton(action, isPrimary) {
     var button = document.createElement('button');
     button.type = 'button';
@@ -214,6 +250,16 @@
     return button;
   }
 
+  function getRefreshAction() {
+    return {
+      icon: '🔄',
+      meta: 'APLIKASI',
+      title: 'Perbarui Aplikasi',
+      description: 'Ambil versi terbaru aplikasi tanpa menghapus draft utama.',
+      run: hardRefreshApplication
+    };
+  }
+
   function getActionsForRole(role) {
     var router = getRouter();
     var cleanRole = normalizeRole(role);
@@ -229,7 +275,8 @@
           run: function () {
             if (router && typeof router.go === 'function') router.go('harganas');
           }
-        }
+        },
+        getRefreshAction()
       ];
     }
 
@@ -252,7 +299,8 @@
           run: function () {
             showToast('Rekap pengiriman HARGANAS akan diaktifkan pada paket dashboard verifikasi.', 'info');
           }
-        }
+        },
+        getRefreshAction()
       ];
     }
 
@@ -266,7 +314,8 @@
           run: function () {
             showToast('Monitoring tim binaan akan diaktifkan pada paket lanjutan.', 'info');
           }
-        }
+        },
+        getRefreshAction()
       ];
     }
 
@@ -279,7 +328,8 @@
         run: function () {
           showToast('Belum ada layanan HARGANAS aktif untuk role ini.', 'info');
         }
-      }
+      },
+      getRefreshAction()
     ];
   }
 
