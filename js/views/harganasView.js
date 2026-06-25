@@ -1,7 +1,7 @@
 (function (window, document) {
   'use strict';
 
-  var VIEW_VERSION = 'HARGANAS-3-VIEW-20260625';
+  var VIEW_VERSION = 'HARGANAS-4-VIEW-20260625';
   var bound = false;
 
   function byId(id) { return document.getElementById(id); }
@@ -11,6 +11,7 @@
   function getGpsService() { return window.HarganasGpsService || null; }
   function getMediaService() { return window.HarganasMediaService || null; }
   function getVideoService() { return window.HarganasVideoService || null; }
+  function getUploadService() { return window.HarganasUploadService || null; }
 
   function escapeHtml(value) {
     return String(value == null ? '' : value)
@@ -268,7 +269,7 @@
     }
 
     next.disabled = false;
-    next.textContent = 'Dokumentasi lengkap. Lanjut Upload - Paket HARGANAS-4';
+    next.textContent = 'Kirim Dokumentasi ke Drive';
   }
 
   function updateSummary(draft) {
@@ -573,6 +574,72 @@
     }
   }
 
+
+  function setUploadLoading(isLoading) {
+    var btn = byId('btn-harganas-next-media');
+    if (!btn) return;
+    if (isLoading) {
+      if (!btn.dataset.originalText) btn.dataset.originalText = btn.textContent || 'Kirim Dokumentasi ke Drive';
+      btn.disabled = true;
+      btn.textContent = 'Mengirim dokumentasi...';
+    } else {
+      btn.disabled = false;
+      btn.textContent = btn.dataset.originalText || 'Kirim Dokumentasi ke Drive';
+      delete btn.dataset.originalText;
+    }
+  }
+
+  function setDraftSubmitted(result) {
+    var ds = getDraftService();
+    if (!ds || typeof ds.load !== 'function' || typeof ds.save !== 'function') return null;
+    var existing = ds.load();
+    var data = result && result.data ? result.data : {};
+    var saved = ds.save(Object.assign({}, existing, {
+      status_submission: 'SUBMITTED',
+      status_verifikasi: data.status_verifikasi || 'MENUNGGU_VERIFIKASI',
+      submitted_at_server: data.submitted_at_server || new Date().toISOString(),
+      submission_id: data.submission_id || '',
+      drive_folder_url: data.folder_url || '',
+      drive_files: data.files || {},
+      upload_result: data,
+      upload_service_version: (window.HarganasUploadService && window.HarganasUploadService.version) || ''
+    }));
+    return saved;
+  }
+
+  async function submitDocumentation() {
+    clearMessage();
+    var upload = getUploadService();
+    if (!upload || typeof upload.submitCurrentDraft !== 'function') {
+      showMessage('Service upload belum termuat. Perbarui aplikasi lalu coba lagi.', 'error');
+      return;
+    }
+
+    setUploadLoading(true);
+    try {
+      var result = await upload.submitCurrentDraft();
+      if (!result || !result.ok) {
+        showMessage((result && result.message) || 'Dokumentasi belum berhasil dikirim.', 'error');
+        showToast('Upload HARGANAS gagal.', 'error');
+        var latestFail = getDraftService() && getDraftService().load ? getDraftService().load() : {};
+        updateSummary(latestFail);
+        return;
+      }
+
+      var saved = setDraftSubmitted(result) || (getDraftService() && getDraftService().load ? getDraftService().load() : {});
+      updateSummary(saved);
+      showMessage('Dokumentasi HARGANAS berhasil dikirim ke Drive dan tercatat di manifest.', 'success');
+      showToast('Dokumentasi HARGANAS terkirim.', 'success');
+    } catch (err) {
+      showMessage(err && err.message ? err.message : 'Upload dokumentasi gagal.', 'error');
+      showToast('Upload HARGANAS gagal.', 'error');
+    } finally {
+      setUploadLoading(false);
+      var latest = getDraftService() && getDraftService().load ? getDraftService().load() : {};
+      updateSummary(latest);
+    }
+  }
+
   function normalizeNikInput() {
     var input = byId('harganas-nik-sasaran');
     if (!input) return;
@@ -617,9 +684,7 @@
     if (portraitInput) portraitInput.addEventListener('change', function () { handlePhotoSelected('portrait', portraitInput.files && portraitInput.files[0]); });
     if (landscapeInput) landscapeInput.addEventListener('change', function () { handlePhotoSelected('landscape', landscapeInput.files && landscapeInput.files[0]); });
     if (videoInput) videoInput.addEventListener('change', function () { handleVideoSelected(videoInput.files && videoInput.files[0]); });
-    if (next) next.addEventListener('click', function () {
-      showToast('Dokumentasi lengkap. Watermark sudah disiapkan. Upload Drive akan diaktifkan pada Paket HARGANAS-4.', 'info');
-    });
+    if (next) next.addEventListener('click', submitDocumentation);
   }
 
   function init() {
@@ -644,6 +709,7 @@
     resetDraft: resetDraft,
     activateGps: activateGps,
     triggerPhotoInput: triggerPhotoInput,
-    triggerVideoInput: triggerVideoInput
+    triggerVideoInput: triggerVideoInput,
+    submitDocumentation: submitDocumentation
   };
 })(window, document);
