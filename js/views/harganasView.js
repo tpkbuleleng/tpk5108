@@ -1,7 +1,7 @@
 (function (window, document) {
   'use strict';
 
-  var VIEW_VERSION = 'HARGANAS-4A-VIEW-20260625';
+  var VIEW_VERSION = 'HARGANAS-4A-R1-VIEW-20260625';
   var bound = false;
 
   function byId(id) { return document.getElementById(id); }
@@ -56,6 +56,62 @@
       return;
     }
     try { window.alert(message); } catch (err) {}
+  }
+
+  function safeFilePart(value) {
+    return String(value == null ? '' : value)
+      .replace(/\s+/g, '_')
+      .replace(/[^A-Za-z0-9_-]+/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .toUpperCase() || 'NA';
+  }
+
+  function buildDeviceFileName(kind, draft, item) {
+    var d = draft || {};
+    var label = kind === 'portrait' ? 'FOTO_POTRAIT' : (kind === 'landscape' ? 'FOTO_LANDSCAPE' : 'VIDEO');
+    var tim = d.nomor_tim || d.nomor_tim_tpk || d.id_tim || 'TIM';
+    if (/^\d+$/.test(String(tim || '').trim())) tim = 'TIM_' + tim;
+    var ext = '.jpg';
+    if (kind === 'video') {
+      var mime = String(item && item.mime_type || '').toLowerCase();
+      var original = String(item && item.file_name_original || '').toLowerCase();
+      if (mime.indexOf('quicktime') >= 0 || /\.mov$/.test(original)) ext = '.mov';
+      else if (mime.indexOf('webm') >= 0 || /\.webm$/.test(original)) ext = '.webm';
+      else if (mime.indexOf('3gp') >= 0 || /\.3gp$|\.3gpp$/.test(original)) ext = '.3gp';
+      else ext = '.mp4';
+    }
+    return [
+      safeFilePart(d.event_code || 'HARGANAS_2026'),
+      safeFilePart(tim),
+      safeFilePart(d.desa || 'DESA'),
+      safeFilePart(d.kecamatan || d.kode_kecamatan || 'KECAMATAN'),
+      label,
+      safeFilePart(d.event_date || '2026-06-29')
+    ].join('_') + ext;
+  }
+
+  function triggerDownload(source, filename) {
+    var a = document.createElement('a');
+    a.href = source;
+    a.download = filename || 'harganas_media';
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () {
+      try { document.body.removeChild(a); } catch (err) {}
+      if (/^blob:/i.test(String(source || ''))) {
+        try { URL.revokeObjectURL(source); } catch (ignore) {}
+      }
+    }, 1200);
+  }
+
+  function toggleDeviceSaveButton(kind, visible) {
+    var id = kind === 'portrait' ? 'btn-harganas-save-portrait-device' : (kind === 'landscape' ? 'btn-harganas-save-landscape-device' : 'btn-harganas-save-video-device');
+    var btn = byId(id);
+    if (!btn) return;
+    btn.classList.toggle('hidden', !visible);
+    btn.disabled = !visible;
   }
 
   function normalizeStatus(value) {
@@ -177,6 +233,9 @@
     toggleMediaCard('harganas-card-landscape', !!s.landscape, false);
     toggleMediaCard('harganas-card-video', !!s.video, false);
     toggleMediaCard('harganas-card-gps', gpsReady, gpsWarning);
+    toggleDeviceSaveButton('portrait', !!(portraitItem && portraitItem.data_url));
+    toggleDeviceSaveButton('landscape', !!(landscapeItem && landscapeItem.data_url));
+    toggleDeviceSaveButton('video', !!(videoItem && videoItem.video_blob_key));
   }
 
   function formatEventDate(value) {
@@ -786,6 +845,43 @@
     }
   }
 
+  async function saveMediaToDevice(kind) {
+    clearMessage();
+    var ds = getDraftService();
+    var draft = ds && typeof ds.load === 'function' ? ds.load() : {};
+    var media = draft.media || {};
+    var item = media[kind] || null;
+    if (!item) {
+      showMessage('Media belum tersedia untuk disimpan ke HP.', 'error');
+      return;
+    }
+
+    try {
+      var filename = buildDeviceFileName(kind, draft, item);
+      if (kind === 'portrait' || kind === 'landscape') {
+        if (!item.data_url) throw new Error('Data foto lokal tidak tersedia. Silakan ambil ulang foto.');
+        triggerDownload(item.data_url, filename);
+        showMessage('Foto ber-watermark dikirim ke folder Unduhan/Download perangkat.', 'success');
+        showToast('Foto disimpan ke HP.', 'success');
+        return;
+      }
+
+      if (kind === 'video') {
+        var videoService = getVideoService();
+        if (!videoService || typeof videoService.getRecord !== 'function') throw new Error('Penyimpanan video lokal belum tersedia.');
+        var record = await videoService.getRecord(item.video_blob_key);
+        if (!record || !record.blob) throw new Error('Data video lokal tidak tersedia. Silakan rekam ulang video.');
+        var url = URL.createObjectURL(record.blob);
+        triggerDownload(url, filename);
+        showMessage('Video dikirim ke folder Unduhan/Download perangkat.', 'success');
+        showToast('Video disimpan ke HP.', 'success');
+      }
+    } catch (err) {
+      showMessage(err && err.message ? err.message : 'Media gagal disimpan ke HP.', 'error');
+      showToast('Simpan ke HP gagal.', 'error');
+    }
+  }
+
   function bindEvents() {
     if (bound) return;
     bound = true;
@@ -803,6 +899,9 @@
     var landscapeInput = byId('harganas-input-landscape');
     var videoBtn = byId('btn-harganas-capture-video');
     var videoInput = byId('harganas-input-video');
+    var savePortraitDevice = byId('btn-harganas-save-portrait-device');
+    var saveLandscapeDevice = byId('btn-harganas-save-landscape-device');
+    var saveVideoDevice = byId('btn-harganas-save-video-device');
 
     if (form) form.addEventListener('submit', saveDraft);
     if (jenis) jenis.addEventListener('change', function () { toggleIbuKandung(); clearMessage(); });
@@ -816,6 +915,9 @@
     if (portraitInput) portraitInput.addEventListener('change', function () { handlePhotoSelected('portrait', portraitInput.files && portraitInput.files[0]); });
     if (landscapeInput) landscapeInput.addEventListener('change', function () { handlePhotoSelected('landscape', landscapeInput.files && landscapeInput.files[0]); });
     if (videoInput) videoInput.addEventListener('change', function () { handleVideoSelected(videoInput.files && videoInput.files[0]); });
+    if (savePortraitDevice) savePortraitDevice.addEventListener('click', function () { saveMediaToDevice('portrait'); });
+    if (saveLandscapeDevice) saveLandscapeDevice.addEventListener('click', function () { saveMediaToDevice('landscape'); });
+    if (saveVideoDevice) saveVideoDevice.addEventListener('click', function () { saveMediaToDevice('video'); });
     if (next) next.addEventListener('click', submitDocumentation);
   }
 
@@ -843,6 +945,7 @@
     activateGps: activateGps,
     triggerPhotoInput: triggerPhotoInput,
     triggerVideoInput: triggerVideoInput,
+    saveMediaToDevice: saveMediaToDevice,
     submitDocumentation: submitDocumentation
   };
 })(window, document);
