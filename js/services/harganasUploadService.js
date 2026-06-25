@@ -1,7 +1,7 @@
 (function (window) {
   'use strict';
 
-  var UPLOAD_SERVICE_VERSION = 'HARGANAS-4-UPLOAD-SERVICE-20260625';
+  var UPLOAD_SERVICE_VERSION = 'HARGANAS-4-R1-UPLOAD-SERVICE-20260625';
 
   function getDraftService() { return window.HarganasDraftService || null; }
   function getVideoService() { return window.HarganasVideoService || null; }

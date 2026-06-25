@@ -2,7 +2,7 @@
 (function (window) {
   'use strict';
 
-  var HARGANAS_DRAFT_VERSION = 'HARGANAS-4-DRAFT-20260625';
+  var HARGANAS_DRAFT_VERSION = 'HARGANAS-4-R1-DRAFT-20260625';
 
   function getConfig() { return window.APP_CONFIG || {}; }
   function getStorage() { return window.Storage || null; }
@@ -105,7 +105,7 @@
       kecamatan: p.kecamatan,
       kabupaten: 'BULELENG',
       provinsi: 'BALI',
-      status_submission: incoming.status_submission || existing.status_submission || 'DRAFT',
+      status_submission: 'DRAFT',
       media_status: {
         portrait: false,
         landscape: false,
