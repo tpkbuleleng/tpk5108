@@ -1,7 +1,7 @@
 (function (window, document) {
   'use strict';
 
-  var VIEW_VERSION = 'HARGANAS-2C-VIEW-20260625';
+  var VIEW_VERSION = 'HARGANAS-2D-VIEW-20260625';
   var bound = false;
 
   function byId(id) { return document.getElementById(id); }
@@ -10,6 +10,7 @@
   function getValidationService() { return window.HarganasValidationService || null; }
   function getGpsService() { return window.HarganasGpsService || null; }
   function getMediaService() { return window.HarganasMediaService || null; }
+  function getVideoService() { return window.HarganasVideoService || null; }
 
   function escapeHtml(value) {
     return String(value == null ? '' : value)
@@ -97,6 +98,20 @@
     return parts.length ? parts.join(' • ') : (fallback || 'Foto tersimpan');
   }
 
+  function formatVideoDetail(item, fallback) {
+    if (!item) return fallback || '';
+    var parts = [];
+    if (item.duration_seconds && window.HarganasVideoService && typeof window.HarganasVideoService.formatDuration === 'function') {
+      parts.push(window.HarganasVideoService.formatDuration(item.duration_seconds));
+    }
+    if (item.width && item.height) parts.push(String(item.width) + '×' + String(item.height));
+    if (window.HarganasVideoService && typeof window.HarganasVideoService.humanFileSize === 'function') {
+      var size = window.HarganasVideoService.humanFileSize(item.size_bytes || 0);
+      if (size) parts.push(size);
+    }
+    return parts.length ? parts.join(' • ') : (fallback || 'Video tersimpan');
+  }
+
   function formatLocationLine(location) {
     var loc = location || {};
     var lat = Number(loc.latitude);
@@ -116,10 +131,12 @@
     var gpsDetail = gpsReady ? (formatAccuracy(data.gps_location && data.gps_location.accuracy) || 'Lokasi tersimpan') : 'Izin lokasi';
     var portraitItem = getMediaItem(data, 'portrait');
     var landscapeItem = getMediaItem(data, 'landscape');
+    var videoItem = getMediaItem(data, 'video');
 
     setText('harganas-status-portrait', s.portrait ? 'Sudah' : 'Belum');
     setText('harganas-status-landscape', s.landscape ? 'Sudah' : 'Belum');
     setText('harganas-status-video', s.video ? 'Sudah' : 'Belum');
+    setText('harganas-status-video-detail', s.video ? formatVideoDetail(videoItem, 'Video tersimpan') : 'Maks. 30 detik');
     setText('harganas-status-gps', gpsLabel);
     setText('harganas-status-gps-detail', gpsDetail);
     setText('harganas-status-portrait-detail', s.portrait ? formatPhotoDetail(portraitItem, 'Foto tersimpan') : 'Foto tegak');
@@ -242,8 +259,14 @@
       return;
     }
 
+    if (!status.video) {
+      next.disabled = true;
+      next.textContent = 'Rekam Video Pendek terlebih dahulu';
+      return;
+    }
+
     next.disabled = false;
-    next.textContent = 'Foto lengkap. Lanjut Video - Paket HARGANAS-2D';
+    next.textContent = 'Dokumentasi lengkap. Lanjut Watermark & Upload - Paket HARGANAS-3';
   }
 
   function updateSummary(draft) {
@@ -390,16 +413,16 @@
     }
   }
 
-  function requireIdentityAndGpsBeforePhoto() {
+  function requireIdentityAndGpsBeforeMedia() {
     var ds = getDraftService();
     var data = ds && typeof ds.load === 'function' ? ds.load() : {};
     if (!hasMinimumIdentity(data)) {
-      showMessage('Simpan identitas sasaran terlebih dahulu sebelum mengambil foto.', 'error');
+      showMessage('Simpan identitas sasaran terlebih dahulu sebelum mengambil dokumentasi.', 'error');
       showToast('Identitas sasaran belum lengkap.', 'error');
       return false;
     }
     if (!(data.media_status && data.media_status.gps)) {
-      showMessage('Aktifkan GPS terlebih dahulu sebelum mengambil foto.', 'error');
+      showMessage('Aktifkan GPS terlebih dahulu sebelum mengambil dokumentasi.', 'error');
       showToast('GPS belum aktif.', 'error');
       return false;
     }
@@ -408,7 +431,7 @@
 
   function triggerPhotoInput(kind) {
     clearMessage();
-    if (!requireIdentityAndGpsBeforePhoto()) return;
+    if (!requireIdentityAndGpsBeforeMedia()) return;
     var input = byId(kind === 'portrait' ? 'harganas-input-portrait' : 'harganas-input-landscape');
     if (!input) {
       showMessage('Input kamera belum tersedia. Perbarui aplikasi lalu coba lagi.', 'error');
@@ -472,6 +495,81 @@
     }
   }
 
+
+  function triggerVideoInput() {
+    clearMessage();
+    if (!requireIdentityAndGpsBeforeMedia()) return;
+    var ds = getDraftService();
+    var data = ds && typeof ds.load === 'function' ? ds.load() : {};
+    var status = data.media_status || {};
+    if (!status.portrait || !status.landscape) {
+      showMessage('Ambil Foto Potrait dan Foto Landscape terlebih dahulu sebelum merekam video.', 'error');
+      showToast('Foto belum lengkap.', 'error');
+      return;
+    }
+    var input = byId('harganas-input-video');
+    if (!input) {
+      showMessage('Input video belum tersedia. Perbarui aplikasi lalu coba lagi.', 'error');
+      return;
+    }
+    input.value = '';
+    try { input.click(); } catch (err) {
+      showMessage('Kamera video/galeri tidak dapat dibuka dari browser ini.', 'error');
+    }
+  }
+
+  function setVideoLoading(isLoading) {
+    var btn = byId('btn-harganas-capture-video');
+    if (!btn) return;
+    if (isLoading) {
+      if (!btn.dataset.originalText) btn.dataset.originalText = btn.textContent || 'Rekam Video';
+      btn.disabled = true;
+      btn.textContent = 'Memproses...';
+    } else {
+      btn.disabled = false;
+      btn.textContent = btn.dataset.originalText || btn.textContent || 'Rekam Video';
+      delete btn.dataset.originalText;
+    }
+  }
+
+  async function handleVideoSelected(file) {
+    clearMessage();
+    var video = getVideoService();
+    var ds = getDraftService();
+
+    if (!video || typeof video.processVideo !== 'function' || !ds) {
+      showMessage('Service video belum termuat. Perbarui aplikasi lalu coba lagi.', 'error');
+      return;
+    }
+
+    if (!file) return;
+
+    setVideoLoading(true);
+    try {
+      var existing = ds.load ? ds.load() : {};
+      var result = await video.processVideo(file, existing);
+      if (!result || !result.ok) {
+        showMessage((result && result.message) || 'Video belum valid.', 'error');
+        showToast('Video belum valid.', 'error');
+        return;
+      }
+
+      var patch = video.buildDraftPatch ? video.buildDraftPatch(result) : {};
+      var nextMedia = Object.assign({}, existing.media || {}, patch.media || {});
+      var nextStatus = Object.assign({}, existing.media_status || {}, patch.media_status || {});
+      var saved = ds.save(Object.assign({}, existing, patch, { media: nextMedia, media_status: nextStatus }));
+      updateSummary(saved);
+      showMessage('Video pendek berhasil disimpan di perangkat ini.', 'success');
+      showToast('Video pendek tersimpan.', 'success');
+    } catch (err) {
+      showMessage(err && err.message ? err.message : 'Video gagal diproses.', 'error');
+    } finally {
+      setVideoLoading(false);
+      var latest = ds && typeof ds.load === 'function' ? ds.load() : {};
+      updateSummary(latest);
+    }
+  }
+
   function normalizeNikInput() {
     var input = byId('harganas-nik-sasaran');
     if (!input) return;
@@ -501,6 +599,8 @@
     var landscapeBtn = byId('btn-harganas-capture-landscape');
     var portraitInput = byId('harganas-input-portrait');
     var landscapeInput = byId('harganas-input-landscape');
+    var videoBtn = byId('btn-harganas-capture-video');
+    var videoInput = byId('harganas-input-video');
 
     if (form) form.addEventListener('submit', saveDraft);
     if (jenis) jenis.addEventListener('change', function () { toggleIbuKandung(); clearMessage(); });
@@ -510,10 +610,12 @@
     if (gpsBtn) gpsBtn.addEventListener('click', activateGps);
     if (portraitBtn) portraitBtn.addEventListener('click', function () { triggerPhotoInput('portrait'); });
     if (landscapeBtn) landscapeBtn.addEventListener('click', function () { triggerPhotoInput('landscape'); });
+    if (videoBtn) videoBtn.addEventListener('click', triggerVideoInput);
     if (portraitInput) portraitInput.addEventListener('change', function () { handlePhotoSelected('portrait', portraitInput.files && portraitInput.files[0]); });
     if (landscapeInput) landscapeInput.addEventListener('change', function () { handlePhotoSelected('landscape', landscapeInput.files && landscapeInput.files[0]); });
+    if (videoInput) videoInput.addEventListener('change', function () { handleVideoSelected(videoInput.files && videoInput.files[0]); });
     if (next) next.addEventListener('click', function () {
-      showToast('Foto sudah lengkap. Video pendek akan diaktifkan pada Paket HARGANAS-2D.', 'info');
+      showToast('Dokumentasi foto/video sudah lengkap. Watermark dan upload akan diaktifkan pada Paket HARGANAS-3.', 'info');
     });
   }
 
@@ -538,6 +640,7 @@
     saveDraft: saveDraft,
     resetDraft: resetDraft,
     activateGps: activateGps,
-    triggerPhotoInput: triggerPhotoInput
+    triggerPhotoInput: triggerPhotoInput,
+    triggerVideoInput: triggerVideoInput
   };
 })(window, document);
