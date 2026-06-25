@@ -347,7 +347,7 @@
           title: 'Verifikasi Dokumen HARGANAS',
           description: 'Periksa dokumentasi yang dikirim tim di wilayah kerja.',
           run: function () {
-            showToast('Verifikasi Dokumen HARGANAS akan diaktifkan pada paket admin/verifikasi.', 'info');
+            if (router && typeof router.go === 'function') router.go('harganasAdmin');
           }
         },
         {
@@ -356,7 +356,7 @@
           title: 'Rekap Pengiriman HARGANAS',
           description: 'Pantau status tim yang sudah mengirim, belum mengirim, dan perlu perbaikan.',
           run: function () {
-            showToast('Rekap pengiriman HARGANAS akan diaktifkan pada paket dashboard verifikasi.', 'info');
+            if (router && typeof router.go === 'function') router.go('harganasAdmin');
           }
         },
         getRefreshAction()
