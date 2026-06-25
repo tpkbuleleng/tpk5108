@@ -61,6 +61,18 @@
     return map[raw] || raw || 'KADER';
   }
 
+  function displayRole(role) {
+    return normalizeRole(role).replace(/_/g, ' ');
+  }
+
+  function getGreeting() {
+    var hour = new Date().getHours();
+    if (hour < 11) return 'Selamat pagi,';
+    if (hour < 15) return 'Selamat siang,';
+    if (hour < 18) return 'Selamat sore,';
+    return 'Selamat malam,';
+  }
+
   function parseWilayahDisplay(profile) {
     var data = profile || {};
     var wilayah = normalizeDisplayText(data.wilayah_tugas || data.wilayah || '');
@@ -147,6 +159,19 @@
     return normalizeDisplayText(data.id_tim || '') || '-';
   }
 
+  function getDisplayName(profile) {
+    return normalizeDisplayText(profile.nama_kader || profile.nama_user || profile.nama || profile.username || profile.id_user || '') || '-';
+  }
+
+  function buildTpkWilayahText(wilayah) {
+    var desa = normalizeDisplayText(wilayah.desa || '');
+    var kecamatan = normalizeDisplayText(wilayah.kecamatan || '');
+    if (desa && kecamatan && desa !== '-' && kecamatan !== '-') return desa + ', Kecamatan ' + kecamatan;
+    if (desa && desa !== '-') return desa;
+    if (kecamatan && kecamatan !== '-') return 'Kecamatan ' + kecamatan;
+    return 'wilayah tugas';
+  }
+
   function showToast(message, type) {
     if (window.UI && typeof window.UI.showToast === 'function') {
       window.UI.showToast(message, type || 'info');
@@ -155,44 +180,38 @@
     try { console.log('[APP_LANDING]', type || 'info', message); } catch (err) {}
   }
 
-  function createActionButton(action) {
-    var article = document.createElement('article');
-    article.className = 'menu-card';
+  function createActionButton(action, isPrimary) {
+    var button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'portal-action-card' + (isPrimary ? ' portal-action-card--primary' : '');
 
     var icon = document.createElement('span');
-    icon.className = 'menu-icon';
+    icon.className = 'portal-action-icon';
     icon.textContent = action.icon || '➡️';
 
-    var meta = document.createElement('span');
-    meta.className = 'menu-meta';
-    meta.textContent = action.meta || 'Aksi';
+    var body = document.createElement('span');
+    body.className = 'portal-action-body';
+
+    var meta = document.createElement('small');
+    meta.textContent = action.meta || 'AKSI';
 
     var title = document.createElement('strong');
     title.textContent = action.title || 'Aksi';
 
-    var desc = document.createElement('p');
+    var desc = document.createElement('span');
     desc.textContent = action.description || '';
 
-    article.appendChild(icon);
-    article.appendChild(meta);
-    article.appendChild(title);
-    article.appendChild(desc);
-    article.setAttribute('role', 'button');
-    article.setAttribute('tabindex', '0');
+    body.appendChild(meta);
+    body.appendChild(title);
+    body.appendChild(desc);
+    button.appendChild(icon);
+    button.appendChild(body);
 
-    function run() {
+    button.addEventListener('click', function () {
       if (typeof action.run === 'function') action.run();
-    }
-
-    article.addEventListener('click', run);
-    article.addEventListener('keydown', function (event) {
-      if (event.key === 'Enter' || event.key === ' ') {
-        event.preventDefault();
-        run();
-      }
     });
 
-    return article;
+    return button;
   }
 
   function getActionsForRole(role) {
@@ -204,7 +223,7 @@
       return [
         {
           icon: '📸',
-          meta: 'HARGANAS',
+          meta: 'HARGANAS 2026',
           title: 'Kirim Dokumentasi HARGANAS',
           description: 'Isi identitas sasaran dan lanjutkan pengiriman foto/video dokumentasi pendampingan.',
           run: function () {
@@ -220,7 +239,7 @@
           icon: '✅',
           meta: 'VERIFIKASI',
           title: 'Verifikasi Dokumen HARGANAS',
-          description: 'Periksa dokumentasi yang dikirim tim di wilayah kerja. Fitur verifikasi penuh disiapkan pada paket berikutnya.',
+          description: 'Periksa dokumentasi yang dikirim tim di wilayah kerja.',
           run: function () {
             showToast('Verifikasi Dokumen HARGANAS akan diaktifkan pada paket admin/verifikasi.', 'info');
           }
@@ -270,8 +289,8 @@
     container.innerHTML = '';
 
     var actions = getActionsForRole(profile.role_akses || profile.role || '');
-    actions.forEach(function (action) {
-      container.appendChild(createActionButton(action));
+    actions.forEach(function (action, index) {
+      container.appendChild(createActionButton(action, index === 0));
     });
   }
 
@@ -279,24 +298,32 @@
     var config = getConfig();
     var landing = config.APP_LANDING || {};
 
-    setText('app-landing-title', landing.TITLE || 'Informasi Aplikasi TPK');
-    setText('app-landing-subtitle', landing.SUBTITLE || 'Media informasi awal sebelum pengguna melakukan kegiatan di aplikasi.');
-    setText('app-landing-event-title', landing.ACTIVE_EVENT_TITLE || 'Dokumentasi HARGANAS 2026');
-    setText('app-landing-event-summary', landing.ACTIVE_EVENT_SUMMARY || 'Setiap Tim TPK diminta mengirim dokumentasi pendampingan dalam rangka Hari Keluarga Nasional.');
-    setText('app-landing-event-reason', landing.ACTIVE_EVENT_REASON || 'Dokumentasi digunakan sebagai bukti dukung kegiatan pendampingan TPK.');
-    setText('app-landing-updated-at', landing.UPDATED_AT_LABEL ? 'Update ' + landing.UPDATED_AT_LABEL : '-');
+    setText('app-landing-title', landing.TITLE || 'Portal TPK Kabupaten Buleleng');
+    setText('app-landing-subtitle', landing.SUBTITLE || 'Aplikasi Tim Pendamping Keluarga Kabupaten Buleleng');
+    setText('app-landing-event-title', 'HARGANAS 2026');
+    setText('app-landing-event-summary', landing.ACTIVE_EVENT_SUMMARY || 'Dalam rangka Hari Keluarga Nasional, setiap Tim TPK diminta mengirim dokumentasi pendampingan berupa 1 foto potrait, 1 foto landscape, dan 1 video pendek.');
+    setText('app-landing-event-reason', landing.ACTIVE_EVENT_REASON || 'Dokumentasi digunakan sebagai bahan rekap, verifikasi, dan arsip kegiatan HARGANAS 2026.');
+    setText('app-landing-updated-at', landing.UPDATED_AT_LABEL || 'Update 25 Juni 2026');
   }
 
   function applyProfile(profile) {
     var data = profile || {};
     var wilayah = parseWilayahDisplay(data);
     var role = normalizeRole(data.role_akses || data.role || '');
+    var name = getDisplayName(data);
+    var nomorTim = getDisplayNomorTim(data);
+    var roleLabel = displayRole(role);
+    var wilayahText = buildTpkWilayahText(wilayah);
 
-    setText('app-landing-nama', data.nama_kader || data.nama_user || data.nama || '-');
+    setText('app-landing-greeting', getGreeting());
+    setText('app-landing-welcome-name', name);
+    setText('app-landing-role-summary', 'Anda masuk sebagai ' + roleLabel + ' • Nomor Tim ' + nomorTim + ' • TPK ' + wilayahText);
+
+    setText('app-landing-nama', name);
     setText('app-landing-id-user', data.id_user || data.username || '-');
-    setText('app-landing-role', role || '-');
+    setText('app-landing-role', roleLabel || '-');
     setText('app-landing-role-badge', role || '-');
-    setText('app-landing-nomor-tim', getDisplayNomorTim(data));
+    setText('app-landing-nomor-tim', nomorTim);
     setText('app-landing-desa', wilayah.desa);
     setText('app-landing-dusun', wilayah.dusun);
     setText('app-landing-kecamatan', wilayah.kecamatan);
@@ -335,11 +362,23 @@
     if (logoutBtn) logoutBtn.addEventListener('click', logout);
   }
 
+  function syncNetworkBadge() {
+    var badge = byId('app-landing-network-badge');
+    if (!badge) return;
+    var online = typeof navigator === 'undefined' ? true : !!navigator.onLine;
+    badge.textContent = online ? 'Online' : 'Offline';
+    badge.classList.toggle('portal-status-badge-offline', !online);
+  }
+
   function init() {
     applyLandingContent();
     applyProfile(getStoredProfile());
+    syncNetworkBadge();
     bindEvents();
   }
+
+  window.addEventListener('online', syncNetworkBadge);
+  window.addEventListener('offline', syncNetworkBadge);
 
   window.AppLandingView = {
     init: init,
