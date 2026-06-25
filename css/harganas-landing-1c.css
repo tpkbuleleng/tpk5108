@@ -495,3 +495,299 @@
   background: #ef4444;
   box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.18);
 }
+
+/* =========================================================
+   HARGANAS-2A — Dokumentasi Page UI Refresh
+   Modernisasi halaman Dokumentasi HARGANAS 2026.
+   ========================================================= */
+.harganas-page {
+  background:
+    radial-gradient(circle at 8% 18%, rgba(14, 165, 233, 0.16), transparent 30%),
+    radial-gradient(circle at 92% 12%, rgba(37, 99, 235, 0.12), transparent 28%),
+    linear-gradient(180deg, #f4f8ff 0%, #eef4fb 55%, #f8fbff 100%);
+  min-height: 100vh;
+  padding-bottom: 42px;
+}
+
+.harganas-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.24);
+  background: rgba(247, 251, 255, 0.92);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.05);
+}
+
+.harganas-kicker,
+.harganas-section-eyebrow {
+  margin: 0 0 4px;
+  color: #0b7fbf;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.harganas-content {
+  width: min(1160px, calc(100% - 32px));
+  margin: 0 auto;
+  padding-top: 18px;
+}
+
+.harganas-gps-alert {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 0 0 14px;
+  padding: 16px 18px;
+  border: 1px solid rgba(251, 191, 36, 0.55);
+  border-radius: 20px;
+  color: #3b2f09;
+  background:
+    radial-gradient(circle at 96% 4%, rgba(251, 191, 36, 0.30), transparent 28%),
+    linear-gradient(135deg, #fff7d6 0%, #ffed9f 54%, #ffd86b 100%);
+  box-shadow: 0 18px 35px rgba(161, 98, 7, 0.13);
+}
+
+.harganas-gps-alert__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  flex: 0 0 auto;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.68);
+  box-shadow: inset 0 0 0 1px rgba(180, 83, 9, 0.12);
+  font-size: 24px;
+}
+
+.harganas-gps-alert__body {
+  display: grid;
+  gap: 4px;
+}
+
+.harganas-gps-alert__body strong {
+  font-size: clamp(16px, 2vw, 20px);
+  line-height: 1.2;
+}
+
+.harganas-gps-alert__body span {
+  color: rgba(59, 47, 9, 0.82);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.harganas-profile-card,
+.harganas-form-card,
+.harganas-summary-card {
+  position: relative;
+  overflow: hidden;
+  border-color: rgba(148, 163, 184, 0.28);
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.07);
+}
+
+.harganas-profile-card::after,
+.harganas-form-card::after {
+  content: "";
+  position: absolute;
+  top: -56px;
+  right: -52px;
+  width: 150px;
+  height: 150px;
+  border-radius: 999px;
+  background: rgba(14, 165, 233, 0.10);
+  pointer-events: none;
+}
+
+.harganas-section-head {
+  position: relative;
+  z-index: 1;
+}
+
+.harganas-section-head h3 {
+  margin: 0;
+  color: #082b5f;
+  font-size: 20px;
+}
+
+.harganas-team-grid,
+.harganas-summary-card .profile-grid {
+  position: relative;
+  z-index: 1;
+}
+
+.harganas-team-grid > div,
+.harganas-summary-card .profile-grid > div {
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 14px;
+  padding: 12px 14px;
+  background: rgba(248, 251, 255, 0.78);
+}
+
+.harganas-media-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 14px 0 18px;
+}
+
+.harganas-media-card {
+  position: relative;
+  overflow: hidden;
+  min-height: 112px;
+  padding: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.26);
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 96% 0%, rgba(14, 165, 233, 0.12), transparent 34%),
+    linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.06);
+}
+
+.harganas-media-card::after {
+  content: "";
+  position: absolute;
+  right: -22px;
+  top: -24px;
+  width: 86px;
+  height: 86px;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.06);
+}
+
+.harganas-media-card__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  margin-bottom: 8px;
+  border-radius: 12px;
+  background: rgba(14, 165, 233, 0.12);
+  font-size: 18px;
+}
+
+.harganas-media-card .label {
+  display: block;
+  margin-bottom: 2px;
+  color: #526987;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.harganas-media-card strong {
+  display: block;
+  color: #082b5f;
+  font-size: clamp(22px, 3vw, 28px);
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+}
+
+.harganas-media-card small {
+  display: block;
+  margin-top: 8px;
+  color: #60718d;
+  font-size: 12px;
+}
+
+.harganas-media-card.is-complete {
+  border-color: rgba(34, 197, 94, 0.32);
+  background:
+    radial-gradient(circle at 96% 0%, rgba(34, 197, 94, 0.13), transparent 34%),
+    linear-gradient(180deg, #ffffff 0%, #f0fdf4 100%);
+}
+
+.harganas-media-card.is-complete strong {
+  color: #166534;
+}
+
+.harganas-form-card .filters-grid {
+  position: relative;
+  z-index: 1;
+}
+
+.harganas-form-card input,
+.harganas-form-card select {
+  border-color: rgba(148, 163, 184, 0.34);
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.96);
+}
+
+.harganas-form-card input:focus,
+.harganas-form-card select:focus {
+  border-color: rgba(37, 99, 235, 0.55);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.10);
+  outline: none;
+}
+
+.harganas-summary-card {
+  margin-top: 18px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+}
+
+.harganas-action-row,
+.harganas-next-row {
+  position: relative;
+  z-index: 1;
+}
+
+.harganas-primary-action {
+  box-shadow: 0 14px 26px rgba(37, 99, 235, 0.22);
+}
+
+.harganas-next-action {
+  width: 100%;
+  justify-content: center;
+}
+
+@media (max-width: 1024px) {
+  .harganas-media-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 680px) {
+  .harganas-content {
+    width: min(100% - 20px, 1160px);
+    padding-top: 12px;
+  }
+
+  .harganas-topbar {
+    align-items: flex-start;
+  }
+
+  .harganas-gps-alert {
+    align-items: flex-start;
+    padding: 14px;
+  }
+
+  .harganas-gps-alert__icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 14px;
+    font-size: 21px;
+  }
+
+  .harganas-media-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .harganas-media-card {
+    min-height: 104px;
+    padding: 14px;
+  }
+
+  .harganas-media-card strong {
+    font-size: 22px;
+  }
+}
+
+@media (max-width: 420px) {
+  .harganas-media-grid {
+    grid-template-columns: 1fr;
+  }
+}
