@@ -3,7 +3,7 @@
 
   const APP_CONFIG = {
     APP_NAME: 'TPK KABUPATEN BULELENG',
-    APP_VERSION: '2.1.3-HARGANAS4A',
+    APP_VERSION: '2.1.4-HARGANAS4A-R1',
 
     API_BASE_URL: 'https://script.google.com/macros/s/AKfycbw11cBt2PdUiO5_MKEdqTKSwggEFVBedpm1jIbvndRqL8U4g0dfhntTk8oS6eD_nUGDsg/exec',
     API_TIMEOUT_MS: 30000,
