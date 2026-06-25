@@ -317,12 +317,15 @@
 
     setText('app-landing-greeting', getGreeting());
     setText('app-landing-welcome-name', name);
-    setText('app-landing-role-summary', 'Anda masuk sebagai ' + roleLabel + ' • Nomor Tim ' + nomorTim + ' • TPK ' + wilayahText);
+    var summaryRole = role === 'KADER' ? 'KADER TPK' : roleLabel;
+    var summaryWilayah = wilayah.desa && wilayah.desa !== '-'
+      ? 'Desa ' + wilayah.desa + (wilayah.kecamatan && wilayah.kecamatan !== '-' ? ', Kecamatan ' + wilayah.kecamatan : '')
+      : wilayahText;
+    setText('app-landing-role-summary', 'Anda masuk sebagai ' + summaryRole + ' • Tim ' + nomorTim + ' • ' + summaryWilayah);
 
     setText('app-landing-nama', name);
     setText('app-landing-id-user', data.id_user || data.username || '-');
     setText('app-landing-role', roleLabel || '-');
-    setText('app-landing-role-badge', role || '-');
     setText('app-landing-nomor-tim', nomorTim);
     setText('app-landing-desa', wilayah.desa);
     setText('app-landing-dusun', wilayah.dusun);
