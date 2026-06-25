@@ -3,7 +3,7 @@
 
   const APP_CONFIG = {
     APP_NAME: 'TPK KABUPATEN BULELENG',
-    APP_VERSION: '2.1.2-HARGANAS2B',
+    APP_VERSION: '2.1.2-HARGANAS2C',
 
     API_BASE_URL: 'https://script.google.com/macros/s/AKfycbwZiCcv7MCL21R1VqlOFsx1x_Ax_8yoxVwjIumG3kVYwDSQTfXX9VjQnz2GsAW2ItzAAQ/exec',
     API_TIMEOUT_MS: 30000,
@@ -19,6 +19,8 @@
       APP_LANDING_ENABLED: true,
       APP_LANDING_AFTER_LOGIN: true,
       APP_LANDING_DEFAULT_ROUTE: 'appLanding',
+      ROUTE_RESTORE_ENABLED: true,
+      ROUTE_RESTORE_ALLOWED: ['appLanding', 'harganas'],
       APP_LANDING_MODE: 'HARGANAS_2026',
       PENDAMPINGAN_ENABLED: false,
       PENDAMPINGAN_VISIBLE_TO_KADER: false,
@@ -52,6 +54,9 @@
       GPS_GOOD_ACCURACY_METERS: 100,
       GPS_TIMEOUT_MS: 15000,
       GPS_MAXIMUM_AGE_MS: 0,
+      PHOTO_MAX_WIDTH: 1600,
+      PHOTO_JPEG_QUALITY: 0.82,
+      PHOTO_MAX_DATA_URL_CHARS: 650000,
       JENIS_SASARAN: ['CATIN', 'BUMIL', 'BUFAS', 'BALITA']
     },
 
@@ -66,7 +71,8 @@
       LAST_SYNC_AT: 'tpk_last_sync_at',
       FONT_SIZE: 'tpk_app_font_size',
       HARGANAS_DRAFT: 'tpk_harganas_2026_draft_v1',
-      HARGANAS_STATUS: 'tpk_harganas_2026_status_v1'
+      HARGANAS_STATUS: 'tpk_harganas_2026_status_v1',
+      LAST_ROUTE: 'tpk_last_route'
     },
 
     API_ACTIONS: {

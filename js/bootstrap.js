@@ -93,18 +93,24 @@
 
   function getCurrentRouteName() {
     try {
+      var route = '';
       if (window.Router && typeof window.Router.getCurrentRoute === 'function') {
-        return String(window.Router.getCurrentRoute() || '').trim();
+        route = String(window.Router.getCurrentRoute() || '').trim();
+        if (route) return route;
       }
       if (window.Router && window.Router.currentRoute) {
-        return String(window.Router.currentRoute || '').trim();
+        route = String(window.Router.currentRoute || '').trim();
+        if (route) return route;
       }
       if (window.AppState && typeof window.AppState.getCurrentRoute === 'function') {
-        return String(window.AppState.getCurrentRoute() || '').trim();
+        route = String(window.AppState.getCurrentRoute() || '').trim();
+        if (route) return route;
       }
       if (window.AppState && window.AppState.currentRoute) {
-        return String(window.AppState.currentRoute || '').trim();
+        route = String(window.AppState.currentRoute || '').trim();
+        if (route) return route;
       }
+      return getLastRouteFromStorage_();
     } catch (err) {}
     return '';
   }
@@ -112,13 +118,56 @@
   function isSafeToForceDashboard(routeName) {
     var route = String(routeName || '').trim();
     if (!route) return true;
-    return route === 'splash' || route === 'login' || route === 'dashboard' || route === 'appLanding';
+    return route === 'splash' || route === 'login' || route === 'dashboard' || route === 'appLanding' || route === 'harganas';
   }
 
-  function getDefaultAuthenticatedRoute() {
+  function getLastRouteFromStorage_() {
+    try {
+      var config = window.APP_CONFIG || {};
+      var keys = config.STORAGE_KEYS || {};
+      var key = keys.LAST_ROUTE || 'tpk_last_route';
+      var storage = window.Storage || null;
+      if (storage && typeof storage.get === 'function') {
+        return String(storage.get(key, '') || '').trim();
+      }
+      if (window.localStorage) {
+        var raw = window.localStorage.getItem(key);
+        try { return String(JSON.parse(raw) || '').trim(); } catch (err) { return String(raw || '').trim(); }
+      }
+    } catch (err) {}
+    return '';
+  }
+
+  function normalizeRouteForRestore_(routeName) {
+    var route = String(routeName || '').trim();
+    var aliases = {
+      landing: 'appLanding',
+      app_landing: 'appLanding',
+      'app-landing': 'appLanding',
+      harganas: 'harganas',
+      'dokumentasi-harganas': 'harganas',
+      'harganas-2026': 'harganas'
+    };
+    return aliases[route] || route;
+  }
+
+  function isRestorableAuthenticatedRoute_(routeName) {
+    var route = normalizeRouteForRestore_(routeName);
+    var config = window.APP_CONFIG || {};
+    var features = config.FEATURES || {};
+    var allowed = Array.isArray(features.ROUTE_RESTORE_ALLOWED) ? features.ROUTE_RESTORE_ALLOWED : ['appLanding', 'harganas'];
+    return allowed.indexOf(route) >= 0;
+  }
+
+  function getDefaultAuthenticatedRoute(preferredRoute) {
     var config = window.APP_CONFIG || {};
     var features = config.FEATURES || {};
     var landing = config.APP_LANDING || {};
+    var preferred = normalizeRouteForRestore_(preferredRoute || getLastRouteFromStorage_());
+
+    if ((features.ROUTE_RESTORE_ENABLED === true || landing.ROUTE_RESTORE_ENABLED === true) && isRestorableAuthenticatedRoute_(preferred)) {
+      return preferred;
+    }
 
     if (features.APP_LANDING_ENABLED === true || landing.ENABLED === true) {
       return String(features.APP_LANDING_DEFAULT_ROUTE || landing.DEFAULT_ROUTE || 'appLanding').trim() || 'appLanding';
@@ -127,17 +176,18 @@
     return 'dashboard';
   }
 
-  function getScreenIdForDefaultAuthenticatedRoute() {
-    var route = getDefaultAuthenticatedRoute();
+  function getScreenIdForDefaultAuthenticatedRoute(preferredRoute) {
+    var route = getDefaultAuthenticatedRoute(preferredRoute);
     if (route === 'appLanding') return 'app-landing-screen';
     if (route === 'harganas') return 'harganas-screen';
     return 'dashboard-screen';
   }
 
   function goDefaultAuthenticatedRoute(options) {
-    var route = getDefaultAuthenticatedRoute();
+    var opts = options || {};
+    var route = getDefaultAuthenticatedRoute(opts.preferredRoute || '');
     if (window.Router && typeof window.Router.go === 'function') {
-      window.Router.go(route, options || {});
+      window.Router.go(route, opts);
       return true;
     }
     return false;
@@ -199,8 +249,8 @@
 
       if (token && ((effectiveProfile && Object.keys(effectiveProfile).length) || (cachedBootstrapLite && Object.keys(cachedBootstrapLite).length))) {
         if (isSafeToForceDashboard(currentRoute)) {
-          this.openScreen(getScreenIdForDefaultAuthenticatedRoute());
-          goDefaultAuthenticatedRoute();
+          this.openScreen(getScreenIdForDefaultAuthenticatedRoute(currentRoute));
+          goDefaultAuthenticatedRoute({ preferredRoute: currentRoute });
         }
       } else {
         if (!currentRoute || currentRoute === 'splash' || currentRoute === 'login') {
@@ -212,8 +262,8 @@
         this.showSplashStatus('Memulihkan sesi di latar belakang...');
 
         if (isSafeToForceDashboard(currentRoute)) {
-          this.openScreen(getScreenIdForDefaultAuthenticatedRoute());
-          goDefaultAuthenticatedRoute({ skipHeavyRefresh: true });
+          this.openScreen(getScreenIdForDefaultAuthenticatedRoute(currentRoute));
+          goDefaultAuthenticatedRoute({ skipHeavyRefresh: true, preferredRoute: currentRoute });
         }
 
         this.restoreSessionAndRouteBackground_({ preferCachedUi: true, initRunId: initRunId });
@@ -600,10 +650,10 @@
         var currentRoute = getCurrentRouteName();
         if (isSafeToForceDashboard(currentRoute)) {
           if (!options.preferCachedUi) {
-            this.openScreen(getScreenIdForDefaultAuthenticatedRoute());
+            this.openScreen(getScreenIdForDefaultAuthenticatedRoute(currentRoute));
           }
 
-          goDefaultAuthenticatedRoute();
+          goDefaultAuthenticatedRoute({ preferredRoute: currentRoute });
         }
 
         return true;

@@ -100,7 +100,7 @@
     return {
       profile: safeGetFromStorage(keys.PROFILE, safeGetFromStorage('tpk_last_good_profile', {})),
       sessionStatus: safeGetFromStorage('tpk_session_status', {}),
-      currentRoute: '',
+      currentRoute: safeGetFromStorage(keys.LAST_ROUTE || 'tpk_last_route', ''),
       currentScreenId: '',
       bootstrap: safeGetFromStorage(keys.APP_BOOTSTRAP, {}),
       selectedSasaran: safeGetFromStorage(keys.SELECTED_SASARAN, {}),
@@ -296,7 +296,7 @@
 
     setCurrentRoute: function (routeName) {
       var route = String(routeName || '');
-      safeSetToStorage('tpk_last_route', route);
+      safeSetToStorage((getStorageKeys().LAST_ROUTE || 'tpk_last_route'), route);
       return update('currentRoute', route);
     },
 

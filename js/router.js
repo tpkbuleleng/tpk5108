@@ -45,10 +45,11 @@
       { src: './js/views/superAdminDashboardView.js?v=5E-R4D-A9-R3-R1-20260516-01', globalName: 'SuperAdminDashboardView' }
     ],
     harganas: [
-      { src: './js/services/harganasValidationService.js?v=20260625-HARGANAS2B', globalName: 'HarganasValidationService' },
-      { src: './js/services/harganasDraftService.js?v=20260625-HARGANAS2B', globalName: 'HarganasDraftService' },
-      { src: './js/services/harganasGpsService.js?v=20260625-HARGANAS2B', globalName: 'HarganasGpsService' },
-      { src: './js/views/harganasView.js?v=20260625-HARGANAS2B', globalName: 'HarganasView' }
+      { src: './js/services/harganasValidationService.js?v=20260625-HARGANAS2C', globalName: 'HarganasValidationService' },
+      { src: './js/services/harganasDraftService.js?v=20260625-HARGANAS2C', globalName: 'HarganasDraftService' },
+      { src: './js/services/harganasGpsService.js?v=20260625-HARGANAS2C', globalName: 'HarganasGpsService' },
+      { src: './js/services/harganasMediaService.js?v=20260625-HARGANAS2C', globalName: 'HarganasMediaService' },
+      { src: './js/views/harganasView.js?v=20260625-HARGANAS2C', globalName: 'HarganasView' }
     ]
   };
 
@@ -131,10 +132,26 @@
     return true;
   }
 
+  function persistLastRoute(routeName) {
+    try {
+      var route = String(routeName || '').trim();
+      var config = window.APP_CONFIG || {};
+      var keys = config.STORAGE_KEYS || {};
+      var key = keys.LAST_ROUTE || 'tpk_last_route';
+      var storage = window.Storage || null;
+      if (storage && typeof storage.set === 'function') {
+        storage.set(key, route);
+      } else if (window.localStorage) {
+        window.localStorage.setItem(key, JSON.stringify(route));
+      }
+    } catch (err) {}
+  }
+
   function updateCurrentRoute(routeName, screenId) {
     Router.currentRoute = routeName || '';
     Router.currentScreenId = screenId || '';
     Router.routeToken += 1;
+    persistLastRoute(routeName || '');
 
     var appState = getAppState();
     if (appState && typeof appState.setCurrentRoute === 'function') {
