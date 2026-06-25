@@ -1,7 +1,7 @@
 (function (window) {
   'use strict';
 
-  var MEDIA_SERVICE_VERSION = 'HARGANAS-2D-MEDIA-20260625';
+  var MEDIA_SERVICE_VERSION = 'HARGANAS-3-MEDIA-20260625';
 
   function getConfig() { return window.APP_CONFIG || {}; }
 
@@ -79,7 +79,17 @@
     return { ok: true, orientation: actual };
   }
 
-  function drawToJpeg(img, maxWidth, quality) {
+  function drawToJpeg(img, maxWidth, quality, draft, mediaKind) {
+    var wm = window.HarganasWatermarkService || null;
+    if (wm && typeof wm.createWatermarkedJpeg === 'function') {
+      return wm.createWatermarkedJpeg(img, {
+        maxWidth: maxWidth,
+        quality: quality,
+        draft: draft || {},
+        mediaKind: mediaKind || ''
+      });
+    }
+
     var sourceW = Number(img.naturalWidth || img.width || 0);
     var sourceH = Number(img.naturalHeight || img.height || 0);
     var maxW = Number(maxWidth || 1600) || 1600;
@@ -96,11 +106,13 @@
       data_url: dataUrl,
       width: targetW,
       height: targetH,
-      size_bytes: bytesFromDataUrl(dataUrl)
+      size_bytes: bytesFromDataUrl(dataUrl),
+      watermark_status: 'SKIPPED',
+      watermark_lines: []
     };
   }
 
-  async function processPhoto(kind, file) {
+  async function processPhoto(kind, file, draft) {
     var normalizedKind = normalizeKind(kind);
     if (!file) {
       return { ok: false, message: 'File foto belum dipilih.' };
@@ -120,14 +132,15 @@
     var maxWidth = Number(cfg.PHOTO_MAX_WIDTH || 1600) || 1600;
     var quality = Number(cfg.PHOTO_JPEG_QUALITY || 0.82) || 0.82;
     var maxChars = Number(cfg.PHOTO_MAX_DATA_URL_CHARS || 650000) || 650000;
-    var output = drawToJpeg(img, maxWidth, quality);
+    var mediaKind = normalizedKind === 'portrait' ? 'FOTO_POTRAIT' : 'FOTO_LANDSCAPE';
+    var output = drawToJpeg(img, maxWidth, quality, draft || {}, mediaKind);
 
     var tries = 0;
     while (String(output.data_url || '').length > maxChars && tries < 4) {
       tries += 1;
       maxWidth = Math.max(720, Math.round(maxWidth * 0.78));
       quality = Math.max(0.62, quality - 0.07);
-      output = drawToJpeg(img, maxWidth, quality);
+      output = drawToJpeg(img, maxWidth, quality, draft || {}, mediaKind);
     }
 
     if (String(output.data_url || '').length > maxChars) {
@@ -143,7 +156,7 @@
       ok: true,
       kind: normalizedKind,
       kind_label: getKindLabel(normalizedKind),
-      media_kind: normalizedKind === 'portrait' ? 'FOTO_POTRAIT' : 'FOTO_LANDSCAPE',
+      media_kind: mediaKind,
       mime_type: 'image/jpeg',
       file_name_original: String(file.name || ''),
       width: output.width,
@@ -154,6 +167,10 @@
       required_orientation: getRequiredOrientation(normalizedKind),
       size_bytes: output.size_bytes,
       data_url: output.data_url,
+      event_date: (draft && draft.event_date) || (cfg.EVENT_DATE || '2026-06-29'),
+      watermark_status: output.watermark_status || 'APPLIED',
+      watermark_lines: output.watermark_lines || [],
+      watermark_service_version: output.watermark_service_version || '',
       captured_at_device: nowIso(),
       media_service_version: MEDIA_SERVICE_VERSION
     };
@@ -177,7 +194,11 @@
       size_bytes: result.size_bytes,
       captured_at_device: result.captured_at_device,
       file_name_original: result.file_name_original,
-      media_service_version: result.media_service_version
+      media_service_version: result.media_service_version,
+      event_date: result.event_date,
+      watermark_status: result.watermark_status || 'APPLIED',
+      watermark_lines: result.watermark_lines || [],
+      watermark_service_version: result.watermark_service_version || ''
     };
     status[result.kind] = true;
     return {

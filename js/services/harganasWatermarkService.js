@@ -1,0 +1,233 @@
+(function (window) {
+  'use strict';
+
+  var WATERMARK_SERVICE_VERSION = 'HARGANAS-3-WATERMARK-SERVICE-20260625';
+
+  function getConfig() { return window.APP_CONFIG || {}; }
+  function getHarganasConfig() { return getConfig().HARGANAS || {}; }
+
+  function normalizeText(value, fallback) {
+    var text = String(value == null ? '' : value).replace(/\s+/g, ' ').trim();
+    if (!text || text === '-') return fallback || '';
+    return text;
+  }
+
+  function formatEventDate(value) {
+    var raw = normalizeText(value, '2026-06-29');
+    var match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!match) return raw;
+    var months = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+    return String(Number(match[3])) + ' ' + months[Number(match[2]) - 1] + ' ' + match[1];
+  }
+
+  function fixedCoord(value) {
+    var n = Number(value);
+    if (!isFinite(n)) return '';
+    return n.toFixed(6);
+  }
+
+  function getGpsLine(draft) {
+    var d = draft || {};
+    var gps = d.gps || {};
+    var lat = fixedCoord(gps.latitude || d.latitude);
+    var lon = fixedCoord(gps.longitude || d.longitude);
+    if (!lat || !lon) return '';
+    var acc = Number(gps.accuracy || d.gps_accuracy || 0);
+    var accText = isFinite(acc) && acc > 0 ? ' • ±' + Math.round(acc) + ' m' : '';
+    return 'GPS: ' + lat + ', ' + lon + accText;
+  }
+
+  function getTeamLine(draft) {
+    var d = draft || {};
+    var tim = normalizeText(d.nomor_tim || d.nama_tim || d.id_tim, 'TIM TPK');
+    var desa = normalizeText(d.desa, '-');
+    var kec = normalizeText(d.kecamatan, '-');
+    return tim + ' • Desa ' + desa + ' • Kec. ' + kec;
+  }
+
+  function buildWatermarkLines(draft, mediaKind) {
+    var cfg = getHarganasConfig();
+    var d = draft || {};
+    var label = normalizeText(cfg.WATERMARK_EVENT_LABEL, 'HARGANAS 2026');
+    var eventDate = formatEventDate(d.event_date || cfg.EVENT_DATE || '2026-06-29');
+    var dateLabel = normalizeText(cfg.WATERMARK_DATE_LABEL, 'Tanggal Kegiatan: ' + eventDate);
+    if (dateLabel.indexOf('2026') < 0 && eventDate) dateLabel = dateLabel + ' ' + eventDate;
+
+    var lines = [label, dateLabel, getTeamLine(d)];
+    if (cfg.WATERMARK_INCLUDE_GPS !== false) {
+      var gps = getGpsLine(d);
+      if (gps) lines.push(gps);
+    }
+    if (mediaKind) lines.push(String(mediaKind || '').replace(/_/g, ' '));
+    return lines.filter(Boolean);
+  }
+
+  function bytesFromDataUrl(dataUrl) {
+    var text = String(dataUrl || '');
+    var comma = text.indexOf(',');
+    var base64 = comma >= 0 ? text.slice(comma + 1) : text;
+    return Math.round((base64.length * 3) / 4);
+  }
+
+  function roundRect(ctx, x, y, w, h, r) {
+    r = Math.max(0, Math.min(Number(r || 0), Math.min(w, h) / 2));
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function drawWatermarkOnCanvas(canvas, draft, mediaKind) {
+    if (!canvas || !canvas.getContext) return { ok: false, lines: [] };
+    var ctx = canvas.getContext('2d');
+    var w = Number(canvas.width || 0);
+    var h = Number(canvas.height || 0);
+    if (!w || !h) return { ok: false, lines: [] };
+
+    var lines = buildWatermarkLines(draft || {}, mediaKind);
+    if (!lines.length) return { ok: false, lines: [] };
+
+    var scale = Math.max(0.85, Math.min(1.6, w / 1280));
+    var pad = Math.round(20 * scale);
+    var gap = Math.round(6 * scale);
+    var titleSize = Math.round(24 * scale);
+    var bodySize = Math.round(16 * scale);
+    var lineHeightTitle = Math.round(30 * scale);
+    var lineHeightBody = Math.round(22 * scale);
+    var panelH = pad * 2 + lineHeightTitle + (lines.length - 1) * lineHeightBody + gap;
+    panelH = Math.min(Math.round(h * 0.33), Math.max(panelH, Math.round(104 * scale)));
+    var panelW = Math.min(w - pad * 2, Math.round(w * 0.88));
+    var x = pad;
+    var y = h - panelH - pad;
+
+    ctx.save();
+    ctx.globalAlpha = 0.9;
+    roundRect(ctx, x, y, panelW, panelH, Math.round(16 * scale));
+    ctx.fillStyle = 'rgba(4, 24, 58, 0.72)';
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = 'rgba(255,255,255,0.24)';
+    ctx.lineWidth = Math.max(1, Math.round(1.2 * scale));
+    ctx.stroke();
+
+    var tx = x + pad;
+    var ty = y + pad + titleSize;
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '700 ' + titleSize + 'px system-ui, -apple-system, Segoe UI, sans-serif';
+    ctx.fillText(lines[0], tx, ty, panelW - pad * 2);
+
+    ctx.font = '600 ' + bodySize + 'px system-ui, -apple-system, Segoe UI, sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.92)';
+    ty += lineHeightTitle;
+    for (var i = 1; i < lines.length; i += 1) {
+      ctx.fillText(lines[i], tx, ty, panelW - pad * 2);
+      ty += lineHeightBody;
+    }
+    ctx.restore();
+
+    return { ok: true, lines: lines };
+  }
+
+  function createCanvasFromImage(img, maxWidth) {
+    var sourceW = Number(img.naturalWidth || img.width || 0);
+    var sourceH = Number(img.naturalHeight || img.height || 0);
+    var maxW = Number(maxWidth || 1600) || 1600;
+    var ratio = Math.min(1, maxW / Math.max(sourceW, sourceH));
+    var targetW = Math.max(1, Math.round(sourceW * ratio));
+    var targetH = Math.max(1, Math.round(sourceH * ratio));
+    var canvas = document.createElement('canvas');
+    canvas.width = targetW;
+    canvas.height = targetH;
+    var ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0, targetW, targetH);
+    return canvas;
+  }
+
+  function exportJpeg(canvas, quality) {
+    var q = Number(quality || 0.82);
+    var dataUrl = canvas.toDataURL('image/jpeg', q);
+    return { data_url: dataUrl, width: canvas.width, height: canvas.height, size_bytes: bytesFromDataUrl(dataUrl) };
+  }
+
+  function createWatermarkedJpeg(img, options) {
+    options = options || {};
+    var canvas = createCanvasFromImage(img, options.maxWidth || 1600);
+    var wm = drawWatermarkOnCanvas(canvas, options.draft || {}, options.mediaKind || '');
+    var out = exportJpeg(canvas, options.quality || 0.82);
+    out.watermark_status = wm.ok ? 'APPLIED' : 'SKIPPED';
+    out.watermark_lines = wm.lines || [];
+    out.watermark_service_version = WATERMARK_SERVICE_VERSION;
+    return out;
+  }
+
+  function createVideoThumbnail(file, draft, options) {
+    options = options || {};
+    return new Promise(function (resolve, reject) {
+      var url = '';
+      try {
+        url = URL.createObjectURL(file);
+        var video = document.createElement('video');
+        video.preload = 'metadata';
+        video.muted = true;
+        video.playsInline = true;
+        var done = false;
+        function cleanup() { try { URL.revokeObjectURL(url); } catch (err) {} }
+        function fail(err) { if (done) return; done = true; cleanup(); reject(err); }
+        video.onerror = function () { fail(new Error('Thumbnail video tidak dapat dibuat.')); };
+        video.onloadedmetadata = function () {
+          var seekTo = Math.min(1, Math.max(0.05, Number(video.duration || 1) * 0.15));
+          try { video.currentTime = seekTo; } catch (err) { fail(err); }
+        };
+        video.onseeked = function () {
+          if (done) return;
+          done = true;
+          try {
+            var sourceW = Number(video.videoWidth || 0) || 960;
+            var sourceH = Number(video.videoHeight || 0) || 540;
+            var maxW = Number(options.maxWidth || 960) || 960;
+            var ratio = Math.min(1, maxW / Math.max(sourceW, sourceH));
+            var w = Math.max(1, Math.round(sourceW * ratio));
+            var h = Math.max(1, Math.round(sourceH * ratio));
+            var canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            var ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, w, h);
+            var wm = drawWatermarkOnCanvas(canvas, draft || {}, 'VIDEO');
+            var out = exportJpeg(canvas, options.quality || 0.78);
+            cleanup();
+            resolve({
+              ok: true,
+              thumbnail_data_url: out.data_url,
+              thumbnail_width: out.width,
+              thumbnail_height: out.height,
+              thumbnail_size_bytes: out.size_bytes,
+              thumbnail_watermark_status: wm.ok ? 'APPLIED' : 'SKIPPED',
+              watermark_lines: wm.lines || [],
+              watermark_service_version: WATERMARK_SERVICE_VERSION
+            });
+          } catch (err) {
+            cleanup();
+            reject(err);
+          }
+        };
+        video.src = url;
+      } catch (err) {
+        if (url) { try { URL.revokeObjectURL(url); } catch (e) {} }
+        reject(err);
+      }
+    });
+  }
+
+  window.HarganasWatermarkService = {
+    version: WATERMARK_SERVICE_VERSION,
+    buildWatermarkLines: buildWatermarkLines,
+    drawWatermarkOnCanvas: drawWatermarkOnCanvas,
+    createWatermarkedJpeg: createWatermarkedJpeg,
+    createVideoThumbnail: createVideoThumbnail,
+    bytesFromDataUrl: bytesFromDataUrl
+  };
+})(window);

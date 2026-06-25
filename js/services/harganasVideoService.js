@@ -1,7 +1,7 @@
 (function (window) {
   'use strict';
 
-  var VIDEO_SERVICE_VERSION = 'HARGANAS-2D-VIDEO-SERVICE-20260625';
+  var VIDEO_SERVICE_VERSION = 'HARGANAS-3-VIDEO-SERVICE-20260625';
   var DB_NAME = 'tpk_harganas_2026_media_db';
   var DB_VERSION = 1;
   var STORE_NAME = 'video_blobs';
@@ -155,6 +155,14 @@
     var capturedAt = nowIso();
     var key = buildVideoBlobKey(draft || {});
     var mime = String(file.type || 'video/mp4') || 'video/mp4';
+    var thumbnail = null;
+    try {
+      if (window.HarganasWatermarkService && typeof window.HarganasWatermarkService.createVideoThumbnail === 'function') {
+        thumbnail = await window.HarganasWatermarkService.createVideoThumbnail(file, draft || {}, { maxWidth: 960, quality: 0.78 });
+      }
+    } catch (thumbErr) {
+      thumbnail = { ok: false, thumbnail_error: String(thumbErr && thumbErr.message ? thumbErr.message : thumbErr) };
+    }
     var record = {
       key: key,
       blob: file,
@@ -166,7 +174,14 @@
       height: meta.height || 0,
       captured_at_device: capturedAt,
       updated_at: capturedAt,
-      video_service_version: VIDEO_SERVICE_VERSION
+      video_service_version: VIDEO_SERVICE_VERSION,
+      thumbnail_data_url: thumbnail && thumbnail.ok ? thumbnail.thumbnail_data_url : '',
+      thumbnail_width: thumbnail && thumbnail.ok ? thumbnail.thumbnail_width : 0,
+      thumbnail_height: thumbnail && thumbnail.ok ? thumbnail.thumbnail_height : 0,
+      thumbnail_size_bytes: thumbnail && thumbnail.ok ? thumbnail.thumbnail_size_bytes : 0,
+      thumbnail_watermark_status: thumbnail && thumbnail.ok ? thumbnail.thumbnail_watermark_status : 'SKIPPED',
+      watermark_lines: thumbnail && thumbnail.ok ? (thumbnail.watermark_lines || []) : [],
+      watermark_service_version: thumbnail && thumbnail.ok ? thumbnail.watermark_service_version : ''
     };
 
     await putRecord(record);
@@ -184,7 +199,14 @@
       height: record.height,
       size_bytes: record.size_bytes,
       captured_at_device: capturedAt,
-      video_service_version: VIDEO_SERVICE_VERSION
+      video_service_version: VIDEO_SERVICE_VERSION,
+      thumbnail_data_url: thumbnail && thumbnail.ok ? thumbnail.thumbnail_data_url : '',
+      thumbnail_width: thumbnail && thumbnail.ok ? thumbnail.thumbnail_width : 0,
+      thumbnail_height: thumbnail && thumbnail.ok ? thumbnail.thumbnail_height : 0,
+      thumbnail_size_bytes: thumbnail && thumbnail.ok ? thumbnail.thumbnail_size_bytes : 0,
+      thumbnail_watermark_status: thumbnail && thumbnail.ok ? thumbnail.thumbnail_watermark_status : 'SKIPPED',
+      watermark_lines: thumbnail && thumbnail.ok ? (thumbnail.watermark_lines || []) : [],
+      watermark_service_version: thumbnail && thumbnail.ok ? thumbnail.watermark_service_version : ''
     };
   }
 
@@ -203,7 +225,14 @@
           height: result.height,
           size_bytes: result.size_bytes,
           captured_at_device: result.captured_at_device,
-          video_service_version: result.video_service_version
+          video_service_version: result.video_service_version,
+          thumbnail_watermark_status: result.thumbnail_watermark_status || 'SKIPPED',
+          thumbnail_data_url: result.thumbnail_data_url || '',
+          thumbnail_width: result.thumbnail_width || 0,
+          thumbnail_height: result.thumbnail_height || 0,
+          thumbnail_size_bytes: result.thumbnail_size_bytes || 0,
+          watermark_lines: result.watermark_lines || [],
+          watermark_service_version: result.watermark_service_version || ''
         }
       },
       media_status: { video: true },
