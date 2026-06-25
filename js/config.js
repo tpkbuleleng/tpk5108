@@ -3,7 +3,7 @@
 
   const APP_CONFIG = {
     APP_NAME: 'TPK KABUPATEN BULELENG',
-    APP_VERSION: '2.1.2',
+    APP_VERSION: '2.1.2-HARGANAS1',
 
     API_BASE_URL: 'https://script.google.com/macros/s/AKfycbwZiCcv7MCL21R1VqlOFsx1x_Ax_8yoxVwjIumG3kVYwDSQTfXX9VjQnz2GsAW2ItzAAQ/exec',
     API_TIMEOUT_MS: 30000,
@@ -11,6 +11,29 @@
     ASSETS: {
       LOGO_URL: './assets/img/logo.png',
       LOGO_192_URL: './assets/img/logo-192.png'
+    },
+
+    FEATURES: {
+      HARGANAS_ENABLED: true,
+      HARGANAS_LANDING_MODE: true,
+      PENDAMPINGAN_ENABLED: false,
+      PENDAMPINGAN_VISIBLE_TO_KADER: false,
+      PENDAMPINGAN_VISIBLE_TO_ADMIN: true
+    },
+
+    HARGANAS: {
+      EVENT_CODE: 'HARGANAS_2026',
+      EVENT_NAME: 'Dokumentasi Pendampingan TPK HARGANAS 2026',
+      EVENT_DATE: '2026-06-29',
+      EVENT_LABEL: 'Hari Keluarga Nasional 2026',
+      ALLOW_CAPTURE_BEFORE_EVENT_DATE: true,
+      REQUIRE_GPS: true,
+      REQUIRE_PORTRAIT: true,
+      REQUIRE_LANDSCAPE: true,
+      REQUIRE_VIDEO: true,
+      MAX_VIDEO_DURATION_SECONDS: 30,
+      MAX_VIDEO_SIZE_MB: 25,
+      JENIS_SASARAN: ['CATIN', 'BUMIL', 'BUFAS', 'BALITA']
     },
 
     STORAGE_KEYS: {
@@ -22,7 +45,9 @@
       SELECTED_SASARAN: 'tpk_selected_sasaran',
       SYNC_QUEUE: 'tpk_sync_queue',
       LAST_SYNC_AT: 'tpk_last_sync_at',
-      FONT_SIZE: 'tpk_app_font_size'
+      FONT_SIZE: 'tpk_app_font_size',
+      HARGANAS_DRAFT: 'tpk_harganas_2026_draft_v1',
+      HARGANAS_STATUS: 'tpk_harganas_2026_status_v1'
     },
 
     API_ACTIONS: {
@@ -71,7 +96,11 @@
       GET_DASHBOARD_SUMMARY: 'getDashboardSummary',
       GET_REKAP_BULANAN_TIM: 'getRekapBulananTim',
 
-      LOG_CLIENT_ERROR: 'logClientError'
+      LOG_CLIENT_ERROR: 'logClientError',
+
+      HARGANAS_GET_CONFIG: 'harganasGetConfig',
+      HARGANAS_GET_MY_STATUS: 'harganasGetMyStatus',
+      HARGANAS_SAVE_DRAFT: 'harganasSaveDraft'
     },
 
     FORM_IDS: {

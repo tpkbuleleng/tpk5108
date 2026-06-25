@@ -1387,6 +1387,30 @@
     });
   }
 
+  async function harganasGetConfig(payload) {
+    return post(getActionName('HARGANAS_GET_CONFIG', 'harganasGetConfig'), payload || {}, {
+      includeAuth: true,
+      timeoutMs: 20000,
+      retryCount: 0
+    });
+  }
+
+  async function harganasGetMyStatus(payload) {
+    return post(getActionName('HARGANAS_GET_MY_STATUS', 'harganasGetMyStatus'), payload || {}, {
+      includeAuth: true,
+      timeoutMs: 25000,
+      retryCount: 0
+    });
+  }
+
+  async function harganasSaveDraft(payload) {
+    return post(getActionName('HARGANAS_SAVE_DRAFT', 'harganasSaveDraft'), payload || {}, {
+      includeAuth: true,
+      timeoutMs: 30000,
+      retryCount: 0
+    });
+  }
+
   function normalizeRoleForApi(value) {
     var raw = String(value || '').trim().toUpperCase();
     var map = {
@@ -1658,6 +1682,9 @@
     getDashboardSummaryLite: getDashboardSummaryLite,
     getDashboardLite: getDashboardLite,
     getAppBootstrapRef: getAppBootstrapRef,
+    harganasGetConfig: harganasGetConfig,
+    harganasGetMyStatus: harganasGetMyStatus,
+    harganasSaveDraft: harganasSaveDraft,
     getTimRef: getTimRef,
     getSasaranListLite: getSasaranListLite,
     getRegistrasiFormDefinition: getRegistrasiFormDefinition,

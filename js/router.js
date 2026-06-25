@@ -11,7 +11,8 @@
     pendampingan: 'pendampingan-screen',
     sync: 'sync-screen',
     rekapKader: 'rekap-kader-screen',
-    superAdmin: 'super-admin-screen'
+    superAdmin: 'super-admin-screen',
+    harganas: 'harganas-screen'
   };
 
   var ROUTE_ASSET_MAP = {
@@ -38,6 +39,11 @@
     ],
     superAdmin: [
       { src: './js/views/superAdminDashboardView.js?v=5E-R4D-A9-R3-R1-20260516-01', globalName: 'SuperAdminDashboardView' }
+    ],
+    harganas: [
+      { src: './js/services/harganasValidationService.js?v=20260625-HARGANAS1', globalName: 'HarganasValidationService' },
+      { src: './js/services/harganasDraftService.js?v=20260625-HARGANAS1', globalName: 'HarganasDraftService' },
+      { src: './js/views/harganasView.js?v=20260625-HARGANAS1', globalName: 'HarganasView' }
     ]
   };
 
@@ -69,6 +75,11 @@
       registrasi_sasaran: 'registrasi',
 
       pendampingan: 'pendampingan',
+
+      harganas: 'harganas',
+      'harganas-2026': 'harganas',
+      'dokumentasi-harganas': 'harganas',
+      kirim_dokumentasi_harganas: 'harganas',
 
       sync: 'sync',
       syncScreen: 'sync',
@@ -197,9 +208,11 @@
       return Promise.resolve();
     }
 
-    return Promise.all(assets.map(function (asset) {
-      return loadScriptOnce(asset.src, asset.globalName);
-    }));
+    return assets.reduce(function (promise, asset) {
+      return promise.then(function () {
+        return loadScriptOnce(asset.src, asset.globalName);
+      });
+    }, Promise.resolve());
   }
 
   function invokeDefaultRouteReady(routeName) {
@@ -239,6 +252,11 @@
 
       if (routeName === 'superAdmin' && window.SuperAdminDashboardView && typeof window.SuperAdminDashboardView.init === 'function') {
         window.SuperAdminDashboardView.init(target, { route: routeName, screenId: screenId });
+        return;
+      }
+
+      if (routeName === 'harganas' && window.HarganasView && typeof window.HarganasView.init === 'function') {
+        window.HarganasView.init(target, { route: routeName, screenId: screenId });
         return;
       }
 
@@ -361,6 +379,7 @@
     toPendampingan: function (options) { return this.go('pendampingan', options); },
     toSyncScreen: function (options) { return this.go('sync', options); },
     toRekapKader: function (options) { return this.go('rekapKader', options); },
+    toHarganas: function (options) { return this.go('harganas', options || {}); },
     toSuperAdmin: function (options) { return this.go('superAdmin', options || {}); }
   };
 

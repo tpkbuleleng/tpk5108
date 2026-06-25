@@ -108,6 +108,10 @@
       sasaranDetail: {},
       dashboardSummary: {},
       rekapData: {},
+      harganas: {
+        draft: safeGetFromStorage(keys.HARGANAS_DRAFT || 'tpk_harganas_2026_draft_v1', {}),
+        status: safeGetFromStorage(keys.HARGANAS_STATUS || 'tpk_harganas_2026_status_v1', {})
+      },
       permissions: {},
       network: {
         online: typeof navigator !== 'undefined' ? !!navigator.onLine : true,
@@ -436,6 +440,38 @@
 
     isSyncing: function () {
       return !!(state.sync && state.sync.isSyncing);
+    },
+
+
+    setHarganasDraft: function (draft) {
+      var keys = getStorageKeys();
+      var value = draft && typeof draft === 'object' ? draft : {};
+      mergeObject('harganas', { draft: value }, { persist: true });
+      safeSetToStorage(keys.HARGANAS_DRAFT || 'tpk_harganas_2026_draft_v1', value);
+      return clone(value);
+    },
+
+    getHarganasDraft: function () {
+      return clone((state.harganas && state.harganas.draft) || {});
+    },
+
+    clearHarganasDraft: function () {
+      var keys = getStorageKeys();
+      mergeObject('harganas', { draft: {} }, { persist: true, cleared: true });
+      safeRemoveFromStorage(keys.HARGANAS_DRAFT || 'tpk_harganas_2026_draft_v1');
+      return {};
+    },
+
+    setHarganasStatus: function (status) {
+      var keys = getStorageKeys();
+      var value = status && typeof status === 'object' ? status : {};
+      mergeObject('harganas', { status: value }, { persist: true });
+      safeSetToStorage(keys.HARGANAS_STATUS || 'tpk_harganas_2026_status_v1', value);
+      return clone(value);
+    },
+
+    getHarganasStatus: function () {
+      return clone((state.harganas && state.harganas.status) || {});
     },
 
     setRegistrasiMode: function (mode) {
