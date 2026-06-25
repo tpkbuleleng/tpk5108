@@ -900,3 +900,46 @@
     width: 100%;
   }
 }
+
+/* =========================================================
+   HARGANAS-2C — Photo Capture & Document Route Stabilization
+   ========================================================= */
+.harganas-media-card--actionable {
+  gap: 5px;
+}
+
+.harganas-media-action {
+  align-self: flex-start;
+  margin-top: 8px;
+  min-height: 34px;
+  padding: 7px 11px;
+  border-radius: 999px;
+  color: #0b57d0;
+  background: rgba(219, 234, 254, 0.70);
+  border-color: rgba(37, 99, 235, 0.18);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.harganas-media-action:hover:not(:disabled) {
+  background: rgba(191, 219, 254, 0.90);
+}
+
+.harganas-media-action:disabled {
+  opacity: 0.68;
+  cursor: wait;
+}
+
+.harganas-media-card.is-complete .harganas-media-action {
+  color: #166534;
+  background: rgba(220, 252, 231, 0.86);
+  border-color: rgba(22, 163, 74, 0.18);
+}
+
+.harganas-media-card small[id$="-detail"] {
+  max-width: 100%;
+  min-height: 18px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
