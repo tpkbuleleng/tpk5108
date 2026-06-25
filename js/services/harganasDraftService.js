@@ -2,7 +2,7 @@
 (function (window) {
   'use strict';
 
-  var HARGANAS_DRAFT_VERSION = 'HARGANAS-4A-DRAFT-20260625';
+  var HARGANAS_DRAFT_VERSION = 'HARGANAS-4A-R1-DRAFT-20260625';
 
   function getConfig() { return window.APP_CONFIG || {}; }
   function getStorage() { return window.Storage || null; }

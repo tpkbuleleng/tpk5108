@@ -1,7 +1,7 @@
 (function (window) {
   'use strict';
 
-  var VIDEO_SERVICE_VERSION = 'HARGANAS-3-VIDEO-SERVICE-20260625';
+  var VIDEO_SERVICE_VERSION = 'HARGANAS-4A-R1-VIDEO-SERVICE-20260625';
   var DB_NAME = 'tpk_harganas_2026_media_db';
   var DB_VERSION = 1;
   var STORE_NAME = 'video_blobs';

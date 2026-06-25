@@ -1,7 +1,7 @@
 (function (window) {
   'use strict';
 
-  var WATERMARK_SERVICE_VERSION = 'HARGANAS-3-WATERMARK-SERVICE-20260625';
+  var WATERMARK_SERVICE_VERSION = 'HARGANAS-4A-R1-WATERMARK-SERVICE-20260625';
 
   function getConfig() { return window.APP_CONFIG || {}; }
   function getHarganasConfig() { return getConfig().HARGANAS || {}; }
@@ -26,23 +26,56 @@
     return n.toFixed(6);
   }
 
-  function getGpsLine(draft) {
+  function getGpsObject(draft) {
     var d = draft || {};
-    var gps = d.gps || {};
-    var lat = fixedCoord(gps.latitude || d.latitude);
-    var lon = fixedCoord(gps.longitude || d.longitude);
+    return d.gps_location || d.gps || {
+      latitude: d.latitude || d.lat,
+      longitude: d.longitude || d.lng || d.lon,
+      accuracy: d.gps_accuracy || d.accuracy
+    };
+  }
+
+  function getGpsLine(draft) {
+    var gps = getGpsObject(draft || {});
+    var lat = fixedCoord(gps.latitude);
+    var lon = fixedCoord(gps.longitude);
     if (!lat || !lon) return '';
-    var acc = Number(gps.accuracy || d.gps_accuracy || 0);
+    var acc = Number(gps.accuracy || 0);
     var accText = isFinite(acc) && acc > 0 ? ' • ±' + Math.round(acc) + ' m' : '';
     return 'GPS: ' + lat + ', ' + lon + accText;
   }
 
+  function normalizeTimLabel(value) {
+    var raw = normalizeText(value, '');
+    if (!raw) return 'Tim TPK';
+    var cleaned = raw.replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
+    if (/^\d+$/.test(cleaned)) return 'Tim ' + cleaned;
+    if (/^TIM\s*\d+$/i.test(cleaned)) return cleaned.replace(/^TIM/i, 'Tim');
+    if (/^TIM/i.test(cleaned)) return cleaned.replace(/^TIM/i, 'Tim');
+    return cleaned;
+  }
+
   function getTeamLine(draft) {
     var d = draft || {};
-    var tim = normalizeText(d.nomor_tim || d.nama_tim || d.id_tim, 'TIM TPK');
+    var tim = normalizeTimLabel(d.nomor_tim || d.nomor_tim_tpk || d.nama_tim || d.id_tim);
     var desa = normalizeText(d.desa, '-');
-    var kec = normalizeText(d.kecamatan, '-');
-    return tim + ' • Desa ' + desa + ' • Kec. ' + kec;
+    return tim + ' • Desa ' + desa;
+  }
+
+  function getAreaLine(draft) {
+    var d = draft || {};
+    var kec = normalizeText(d.kecamatan || d.kode_kecamatan, '-');
+    var kab = normalizeText(d.kabupaten, 'BULELENG');
+    var prov = normalizeText(d.provinsi, 'BALI');
+    return 'Kec. ' + kec + ' • Kab. ' + kab + ' • ' + prov;
+  }
+
+  function getMediaLabel(mediaKind) {
+    var raw = String(mediaKind || '').trim().toUpperCase();
+    if (raw === 'FOTO_POTRAIT' || raw === 'PORTRAIT') return 'FOTO POTRAIT';
+    if (raw === 'FOTO_LANDSCAPE' || raw === 'LANDSCAPE') return 'FOTO LANDSCAPE';
+    if (raw === 'VIDEO') return 'VIDEO PENDEK';
+    return raw.replace(/_/g, ' ');
   }
 
   function buildWatermarkLines(draft, mediaKind) {
@@ -53,12 +86,20 @@
     var dateLabel = normalizeText(cfg.WATERMARK_DATE_LABEL, 'Tanggal Kegiatan: ' + eventDate);
     if (dateLabel.indexOf('2026') < 0 && eventDate) dateLabel = dateLabel + ' ' + eventDate;
 
-    var lines = [label, dateLabel, getTeamLine(d)];
+    var lines = [
+      label,
+      dateLabel,
+      getTeamLine(d),
+      getAreaLine(d)
+    ];
+
     if (cfg.WATERMARK_INCLUDE_GPS !== false) {
       var gps = getGpsLine(d);
       if (gps) lines.push(gps);
     }
-    if (mediaKind) lines.push(String(mediaKind || '').replace(/_/g, ' '));
+
+    var mediaLabel = getMediaLabel(mediaKind);
+    if (mediaLabel) lines.push(mediaLabel);
     return lines.filter(Boolean);
   }
 
@@ -80,6 +121,19 @@
     ctx.closePath();
   }
 
+  function shrinkTextToFit(ctx, text, maxWidth, startSize, weight, family, minSize) {
+    var size = Number(startSize || 16);
+    minSize = Number(minSize || 11);
+    family = family || 'system-ui, -apple-system, Segoe UI, sans-serif';
+    weight = weight || '600';
+    while (size > minSize) {
+      ctx.font = weight + ' ' + Math.round(size) + 'px ' + family;
+      if (ctx.measureText(String(text || '')).width <= maxWidth) break;
+      size -= 1;
+    }
+    return Math.round(size);
+  }
+
   function drawWatermarkOnCanvas(canvas, draft, mediaKind) {
     if (!canvas || !canvas.getContext) return { ok: false, lines: [] };
     var ctx = canvas.getContext('2d');
@@ -90,41 +144,54 @@
     var lines = buildWatermarkLines(draft || {}, mediaKind);
     if (!lines.length) return { ok: false, lines: [] };
 
-    var scale = Math.max(0.85, Math.min(1.6, w / 1280));
-    var pad = Math.round(20 * scale);
-    var gap = Math.round(6 * scale);
-    var titleSize = Math.round(24 * scale);
-    var bodySize = Math.round(16 * scale);
-    var lineHeightTitle = Math.round(30 * scale);
-    var lineHeightBody = Math.round(22 * scale);
-    var panelH = pad * 2 + lineHeightTitle + (lines.length - 1) * lineHeightBody + gap;
-    panelH = Math.min(Math.round(h * 0.33), Math.max(panelH, Math.round(104 * scale)));
-    var panelW = Math.min(w - pad * 2, Math.round(w * 0.88));
+    var scale = Math.max(0.82, Math.min(1.55, w / 1280));
+    var pad = Math.round(18 * scale);
+    var gap = Math.round(5 * scale);
+    var titleSize = Math.round(23 * scale);
+    var bodySize = Math.round(15 * scale);
+    var lineHeightTitle = Math.round(29 * scale);
+    var lineHeightBody = Math.round(21 * scale);
+    var requiredPanelH = pad * 2 + lineHeightTitle + Math.max(0, lines.length - 1) * lineHeightBody + gap;
+    var maxPanelH = Math.round(h * 0.46);
+    var minPanelH = Math.round(118 * scale);
+    var panelH = Math.min(maxPanelH, Math.max(requiredPanelH, minPanelH));
+    if (panelH < requiredPanelH) {
+      var factor = Math.max(0.72, panelH / requiredPanelH);
+      bodySize = Math.max(11, Math.floor(bodySize * factor));
+      titleSize = Math.max(15, Math.floor(titleSize * factor));
+      lineHeightTitle = Math.max(20, Math.floor(lineHeightTitle * factor));
+      lineHeightBody = Math.max(16, Math.floor(lineHeightBody * factor));
+    }
+    var panelW = Math.min(w - pad * 2, Math.round(w * 0.92));
     var x = pad;
     var y = h - panelH - pad;
+    var maxTextW = panelW - pad * 2;
 
     ctx.save();
-    ctx.globalAlpha = 0.9;
+    ctx.globalAlpha = 0.91;
     roundRect(ctx, x, y, panelW, panelH, Math.round(16 * scale));
-    ctx.fillStyle = 'rgba(4, 24, 58, 0.72)';
+    ctx.fillStyle = 'rgba(4, 24, 58, 0.74)';
     ctx.fill();
     ctx.globalAlpha = 1;
-    ctx.strokeStyle = 'rgba(255,255,255,0.24)';
+    ctx.strokeStyle = 'rgba(255,255,255,0.26)';
     ctx.lineWidth = Math.max(1, Math.round(1.2 * scale));
     ctx.stroke();
 
     var tx = x + pad;
     var ty = y + pad + titleSize;
+    var fittedTitle = shrinkTextToFit(ctx, lines[0], maxTextW, titleSize, '700', null, 14);
+    ctx.font = '700 ' + fittedTitle + 'px system-ui, -apple-system, Segoe UI, sans-serif';
     ctx.fillStyle = '#ffffff';
-    ctx.font = '700 ' + titleSize + 'px system-ui, -apple-system, Segoe UI, sans-serif';
-    ctx.fillText(lines[0], tx, ty, panelW - pad * 2);
+    ctx.fillText(lines[0], tx, ty);
 
-    ctx.font = '600 ' + bodySize + 'px system-ui, -apple-system, Segoe UI, sans-serif';
-    ctx.fillStyle = 'rgba(255,255,255,0.92)';
     ty += lineHeightTitle;
+    ctx.fillStyle = 'rgba(255,255,255,0.93)';
     for (var i = 1; i < lines.length; i += 1) {
-      ctx.fillText(lines[i], tx, ty, panelW - pad * 2);
+      var fittedBody = shrinkTextToFit(ctx, lines[i], maxTextW, bodySize, '600', null, 10);
+      ctx.font = '600 ' + fittedBody + 'px system-ui, -apple-system, Segoe UI, sans-serif';
+      ctx.fillText(lines[i], tx, ty);
       ty += lineHeightBody;
+      if (ty > y + panelH - Math.round(8 * scale)) break;
     }
     ctx.restore();
 

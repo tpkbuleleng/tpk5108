@@ -1,7 +1,7 @@
 (function (window) {
   'use strict';
 
-  var MEDIA_SERVICE_VERSION = 'HARGANAS-3-MEDIA-20260625';
+  var MEDIA_SERVICE_VERSION = 'HARGANAS-4A-R1-MEDIA-20260625';
 
   function getConfig() { return window.APP_CONFIG || {}; }
 
