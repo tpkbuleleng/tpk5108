@@ -1,4 +1,4 @@
-const SW_VERSION = 'tpk-sw-harganas-4a-r3-20260625-01';
+const SW_VERSION = 'tpk-sw-harganas-5-20260625-01';
 const SHELL_CACHE = 'tpk-shell-' + SW_VERSION;
 const ASSET_CACHE = 'tpk-assets-' + SW_VERSION;
 
@@ -23,6 +23,7 @@ const APP_SHELL = [
   './js/app.js',
   './js/services/harganasWatermarkService.js',
   './js/views/appLandingView.js',
+  './js/views/harganasAdminView.js',
   './js/services/harganasValidationService.js',
   './js/services/harganasDraftService.js',
   './js/services/harganasGpsService.js',
