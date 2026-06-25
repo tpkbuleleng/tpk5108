@@ -293,6 +293,43 @@
     setTextAliases(['header-kecamatan', 'profile-kecamatan', 'wilayah-kecamatan'], '-');
   }
 
+
+  function clearHarganasLocalDataOnLogout() {
+    var storage = getStorage();
+    var keys = getStorageKeys();
+    var harganasKeys = [
+      keys.HARGANAS_DRAFT || 'tpk_harganas_2026_draft_v1',
+      keys.HARGANAS_STATUS || 'tpk_harganas_2026_status_v1'
+    ];
+
+    try {
+      if (window.HarganasDraftService && typeof window.HarganasDraftService.clearAllLocal === 'function') {
+        window.HarganasDraftService.clearAllLocal({ keepMedia: false });
+        return;
+      }
+    } catch (err) {}
+
+    harganasKeys.forEach(function (key) {
+      try {
+        if (storage && typeof storage.remove === 'function') storage.remove(key);
+        else window.localStorage.removeItem(key);
+      } catch (err) {}
+    });
+
+    try {
+      if (window.AppState) {
+        if (typeof window.AppState.clearHarganasDraft === 'function') window.AppState.clearHarganasDraft();
+        if (typeof window.AppState.setHarganasStatus === 'function') window.AppState.setHarganasStatus({});
+      }
+    } catch (err) {}
+
+    try {
+      if (window.indexedDB && window.indexedDB.deleteDatabase) {
+        window.indexedDB.deleteDatabase('tpk_harganas_2026_media_db');
+      }
+    } catch (err) {}
+  }
+
   function clearLocalSession() {
     var storage = getStorage();
     var keys = getStorageKeys();
@@ -309,6 +346,8 @@
       if (keys.PROFILE) storage.remove(keys.PROFILE);
       storage.remove(getBootstrapLiteStorageKey());
     }
+
+    clearHarganasLocalDataOnLogout();
 
     if (appState && typeof appState.setProfile === 'function') {
       appState.setProfile({});
