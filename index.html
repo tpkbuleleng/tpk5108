@@ -10,6 +10,7 @@
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="icon" href="./assets/img/logo.png" />
   <link rel="stylesheet" href="./app.css" />
+  <link rel="stylesheet" href="./css/harganas-landing-1c.css" />
 </head>
 <body>
   <div id="app-shell">
@@ -227,89 +228,120 @@
       </footer>
     </section>
 
-    <!-- APP LANDING / INFORMASI APLIKASI -->
-    <section id="app-landing-screen" class="screen hidden" data-screen="app-landing">
-      <header class="topbar">
-        <div>
-          <h2 class="topbar-title">Informasi Aplikasi TPK</h2>
-          <p class="topbar-subtitle">Beranda informasi dan arahan kegiatan sebelum membuka fitur aplikasi</p>
+    <!-- APP LANDING / PORTAL INFORMASI APLIKASI -->
+    <section id="app-landing-screen" class="screen hidden app-landing-screen" data-screen="app-landing">
+      <header class="portal-topbar">
+        <div class="portal-brand">
+          <img src="./assets/img/logo.png" alt="Logo TPK" class="portal-logo" />
+          <div class="portal-brand-text">
+            <p class="portal-eyebrow">Portal Aplikasi</p>
+            <h2 id="app-landing-title" class="portal-title">Portal TPK Kabupaten Buleleng</h2>
+            <p id="app-landing-subtitle" class="portal-subtitle">Aplikasi Tim Pendamping Keluarga Kabupaten Buleleng</p>
+          </div>
         </div>
-        <div class="topbar-actions">
-          <button id="btn-app-landing-dashboard" class="btn btn-secondary btn-sm" type="button">Dashboard</button>
-          <button id="btn-app-landing-logout" class="btn btn-danger btn-sm" type="button">Keluar</button>
+
+        <div class="portal-topbar-actions">
+          <span id="app-landing-network-badge" class="portal-status-badge">Online</span>
+          <button id="btn-app-landing-dashboard" class="btn btn-secondary btn-sm portal-topbar-btn" type="button">Dashboard</button>
+          <button id="btn-app-landing-logout" class="btn btn-danger btn-sm portal-topbar-btn portal-topbar-btn-danger" type="button">Keluar</button>
         </div>
       </header>
 
-      <main class="page-content">
-        <section class="card card-compact">
-          <div class="section-header row-between">
+      <main class="portal-page-content">
+        <section class="portal-hero-card" aria-labelledby="app-landing-greeting">
+          <div class="portal-hero-main">
+            <span id="app-landing-role-badge" class="portal-role-badge">-</span>
+            <p id="app-landing-greeting" class="portal-greeting">Selamat datang,</p>
+            <h3 id="app-landing-welcome-name" class="portal-welcome-name">-</h3>
+            <p id="app-landing-role-summary" class="portal-role-summary">Anda masuk sebagai pengguna aplikasi TPK.</p>
+          </div>
+
+          <div class="portal-profile-strip" aria-label="Identitas akun">
             <div>
-              <h3 id="app-landing-title">Informasi Aplikasi</h3>
-              <p id="app-landing-subtitle" class="muted-text">Media informasi awal sebelum pengguna melakukan kegiatan lebih lanjut.</p>
+              <span>Nama Pengguna</span>
+              <strong id="app-landing-nama">-</strong>
             </div>
-            <span id="app-landing-role-badge" class="badge badge-success-soft">-</span>
-          </div>
-
-          <div class="profile-grid profile-grid-4">
-            <div><span class="label">Nama Pengguna</span><strong id="app-landing-nama">-</strong></div>
-            <div><span class="label">ID Pengguna</span><strong id="app-landing-id-user">-</strong></div>
-            <div><span class="label">Role</span><strong id="app-landing-role">-</strong></div>
-            <div><span class="label">Nomor Tim</span><strong id="app-landing-nomor-tim">-</strong></div>
-            <div><span class="label">Desa/Kelurahan</span><strong id="app-landing-desa">-</strong></div>
-            <div><span class="label">Dusun/RW</span><strong id="app-landing-dusun">-</strong></div>
-            <div><span class="label">Kecamatan</span><strong id="app-landing-kecamatan">-</strong></div>
-            <div><span class="label">Status Informasi</span><strong id="app-landing-info-status">Aktif</strong></div>
+            <div>
+              <span>ID Pengguna</span>
+              <strong id="app-landing-id-user">-</strong>
+            </div>
+            <div>
+              <span>Role</span>
+              <strong id="app-landing-role">-</strong>
+            </div>
+            <div>
+              <span>Nomor Tim</span>
+              <strong id="app-landing-nomor-tim">-</strong>
+            </div>
+            <div>
+              <span>Desa/Kelurahan</span>
+              <strong id="app-landing-desa">-</strong>
+            </div>
+            <div>
+              <span>Dusun/RW</span>
+              <strong id="app-landing-dusun">-</strong>
+            </div>
+            <div>
+              <span>Kecamatan</span>
+              <strong id="app-landing-kecamatan">-</strong>
+            </div>
+            <div>
+              <span>Status Informasi</span>
+              <strong id="app-landing-info-status">Aktif</strong>
+            </div>
           </div>
         </section>
 
-        <section class="card card-compact">
-          <div class="section-header section-header-compact">
-            <h3 id="app-landing-event-title">Dokumentasi HARGANAS 2026</h3>
-            <p class="muted-text" id="app-landing-event-summary">
-              Setiap Tim TPK diminta mengirim dokumentasi pendampingan dalam rangka Hari Keluarga Nasional.
+        <section class="portal-module-grid" aria-label="Informasi dan layanan aplikasi">
+          <article class="portal-module-card">
+            <span class="portal-module-tag">INFO</span>
+            <h3>Informasi Aplikasi</h3>
+            <p>
+              Portal ini menjadi pintu masuk informasi dan layanan aplikasi TPK Kabupaten Buleleng.
+              Pengguna dapat membaca arahan kegiatan dan membuka fitur sesuai peran akun masing-masing.
             </p>
-          </div>
+            <ul class="portal-module-list">
+              <li>Informasi kegiatan dan arahan penggunaan aplikasi.</li>
+              <li>Akses layanan aktif berdasarkan role pengguna.</li>
+              <li>Dashboard utama tetap tersedia sebagai fallback.</li>
+            </ul>
+          </article>
 
-          <div class="list-stack">
-            <article class="list-item">
-              <div>
-                <strong>Mengapa dokumentasi dikirim?</strong>
-                <p id="app-landing-event-reason" class="muted-text">
-                  Dokumentasi digunakan sebagai bukti dukung kegiatan pendampingan TPK, arsip kecamatan/kabupaten, dan bahan rekap kegiatan HARGANAS.
-                </p>
-              </div>
-            </article>
-            <article class="list-item">
-              <div>
-                <strong>Ketentuan untuk Tim TPK</strong>
-                <p class="muted-text">
-                  Satu Tim TPK mengirimkan 1 foto potrait, 1 foto landscape, dan 1 video pendek yang menampilkan wajah kader TPK dan wajah sasaran yang didampingi.
-                </p>
-              </div>
-            </article>
-            <article class="list-item">
-              <div>
-                <strong>Tanggal kegiatan</strong>
-                <p class="muted-text">
-                  Tanggal kegiatan resmi adalah <strong>29 Juni 2026</strong>. Pengambilan dokumentasi sebelum tanggal kegiatan dapat diterima sesuai pengaturan event, sedangkan tanggal pengambilan asli tetap disimpan untuk audit.
-                </p>
-              </div>
-            </article>
-          </div>
-        </section>
+          <article class="portal-module-card portal-module-card-highlight">
+            <span class="portal-module-tag portal-module-tag-hot">HARGANAS</span>
+            <h3 id="app-landing-event-title">HARGANAS 2026</h3>
+            <p id="app-landing-event-summary">
+              Dalam rangka Hari Keluarga Nasional, setiap Tim TPK diminta mengirim dokumentasi pendampingan berupa
+              1 foto potrait, 1 foto landscape, dan 1 video pendek.
+            </p>
+            <div class="portal-callout">
+              <strong>Mengapa dokumentasi dikirim?</strong>
+              <p id="app-landing-event-reason">
+                Dokumentasi digunakan sebagai bahan rekap, verifikasi, dan arsip kegiatan HARGANAS 2026.
+              </p>
+            </div>
+            <div id="app-landing-action-grid" class="portal-action-stack" aria-label="Aksi HARGANAS"></div>
+          </article>
 
-        <section class="card card-compact">
-          <div class="section-header section-header-compact">
-            <h3>Layanan Tersedia</h3>
-            <p id="app-landing-action-hint" class="muted-text">Tombol layanan menyesuaikan role akun yang sedang login.</p>
-          </div>
-
-          <div id="app-landing-action-grid" class="menu-grid"></div>
+          <article class="portal-module-card">
+            <span class="portal-module-tag">FITUR</span>
+            <h3>Fitur Aplikasi Lainnya</h3>
+            <p>
+              Fitur utama aplikasi TPK Kabupaten Buleleng sedang dalam tahap pengembangan dan penyempurnaan.
+              Aktivasi fitur dilakukan bertahap sesuai kesiapan implementasi.
+            </p>
+            <ul class="portal-module-list">
+              <li>Pendampingan bulanan.</li>
+              <li>Rekap sasaran dan monitoring tim.</li>
+              <li>Dashboard dan laporan kegiatan.</li>
+            </ul>
+            <span class="portal-development-badge">Masih dalam pengembangan</span>
+          </article>
         </section>
       </main>
 
-      <footer class="app-footer">
-        <span>TPK Kabupaten Buleleng - Landing informasi aplikasi <span id="app-landing-updated-at">-</span></span>
+      <footer class="portal-footer">
+        <span>TPK Kabupaten Buleleng • Portal Informasi Aplikasi • <span id="app-landing-updated-at">-</span></span>
       </footer>
     </section>
 

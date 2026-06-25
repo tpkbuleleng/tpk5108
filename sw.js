@@ -1,4 +1,4 @@
-const SW_VERSION = 'tpk-sw-harganas-1b-20260625-01';
+const SW_VERSION = 'tpk-sw-harganas-1c-20260625-01';
 const SHELL_CACHE = 'tpk-shell-' + SW_VERSION;
 const ASSET_CACHE = 'tpk-assets-' + SW_VERSION;
 
@@ -10,6 +10,7 @@ const APP_SHELL = [
   './',
   './index.html',
   './app.css',
+  './css/harganas-landing-1c.css',
   './manifest.webmanifest',
   './assets/img/logo.png',
   './assets/img/logo-192.png',
