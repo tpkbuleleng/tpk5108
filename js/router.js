@@ -45,9 +45,9 @@
       { src: './js/views/superAdminDashboardView.js?v=5E-R4D-A9-R3-R1-20260516-01', globalName: 'SuperAdminDashboardView' }
     ],
     harganas: [
-      { src: './js/services/harganasValidationService.js?v=20260625-HARGANAS1', globalName: 'HarganasValidationService' },
-      { src: './js/services/harganasDraftService.js?v=20260625-HARGANAS1', globalName: 'HarganasDraftService' },
-      { src: './js/views/harganasView.js?v=20260625-HARGANAS1', globalName: 'HarganasView' }
+      { src: './js/services/harganasValidationService.js?v=20260625-HARGANAS2A', globalName: 'HarganasValidationService' },
+      { src: './js/services/harganasDraftService.js?v=20260625-HARGANAS2A', globalName: 'HarganasDraftService' },
+      { src: './js/views/harganasView.js?v=20260625-HARGANAS2A', globalName: 'HarganasView' }
     ]
   };
 
