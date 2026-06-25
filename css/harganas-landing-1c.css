@@ -791,3 +791,112 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* =========================================================
+   HARGANAS-2B — GPS Permission & Capture Readiness Gate
+   ========================================================= */
+.harganas-gps-alert {
+  align-items: stretch;
+}
+
+.harganas-gps-alert__body {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.harganas-gps-alert__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  margin-top: 8px;
+}
+
+.harganas-gps-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 5px 10px;
+  border: 1px solid rgba(146, 64, 14, 0.18);
+  border-radius: 999px;
+  color: #7c2d12;
+  background: rgba(255, 255, 255, 0.58);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.harganas-gps-chip.is-ready {
+  border-color: rgba(22, 163, 74, 0.25);
+  color: #166534;
+  background: rgba(220, 252, 231, 0.82);
+}
+
+.harganas-gps-chip.is-warning {
+  border-color: rgba(217, 119, 6, 0.34);
+  color: #92400e;
+  background: rgba(254, 243, 199, 0.92);
+}
+
+.harganas-gps-chip.is-error {
+  border-color: rgba(220, 38, 38, 0.30);
+  color: #991b1b;
+  background: rgba(254, 226, 226, 0.82);
+}
+
+.harganas-gps-detail {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  color: rgba(59, 47, 9, 0.86) !important;
+  font-size: 12px !important;
+  line-height: 1.35 !important;
+}
+
+.harganas-gps-alert__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex: 0 0 auto;
+}
+
+.harganas-gps-button {
+  min-width: 132px;
+  border-color: rgba(37, 99, 235, 0.20);
+  border-radius: 14px;
+  box-shadow: 0 12px 24px rgba(37, 99, 235, 0.18);
+}
+
+.harganas-media-card.is-warning {
+  border-color: rgba(217, 119, 6, 0.36);
+  background:
+    radial-gradient(circle at 96% 0%, rgba(245, 158, 11, 0.18), transparent 34%),
+    linear-gradient(180deg, #ffffff 0%, #fffbeb 100%);
+}
+
+.harganas-media-card.is-warning strong {
+  color: #92400e;
+  font-size: clamp(18px, 2.2vw, 22px);
+}
+
+.harganas-next-action:not(:disabled) {
+  border-color: rgba(22, 163, 74, 0.32);
+  color: #166534;
+  background: linear-gradient(180deg, #f0fdf4 0%, #dcfce7 100%);
+  cursor: pointer;
+}
+
+@media (max-width: 680px) {
+  .harganas-gps-alert {
+    display: grid;
+    grid-template-columns: auto 1fr;
+  }
+
+  .harganas-gps-alert__actions {
+    grid-column: 1 / -1;
+    justify-content: stretch;
+  }
+
+  .harganas-gps-button {
+    width: 100%;
+  }
+}
