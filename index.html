@@ -374,53 +374,7 @@
 
         <input id="harganas-input-portrait" class="hidden" type="file" accept="image/*" capture="environment" aria-hidden="true" />
         <input id="harganas-input-landscape" class="hidden" type="file" accept="image/*" capture="environment" aria-hidden="true" />
-
-        <section class="card card-compact harganas-profile-card">
-          <div class="section-header row-between harganas-section-head">
-            <div>
-              <p class="harganas-section-eyebrow">Profil Tim</p>
-              <h3>Data Tim Pengirim</h3>
-              <p class="muted-text">Data tim diambil dari sesi login PWA TPK.</p>
-            </div>
-            <span id="harganas-status-badge" class="badge badge-warning">DRAFT</span>
-          </div>
-
-          <div class="profile-grid profile-grid-4 harganas-team-grid">
-            <div><span class="label">Nomor Tim</span><strong id="harganas-profile-tim">-</strong></div>
-            <div><span class="label">Desa/Kelurahan</span><strong id="harganas-profile-desa">-</strong></div>
-            <div><span class="label">Kecamatan</span><strong id="harganas-profile-kecamatan">-</strong></div>
-            <div><span class="label">Tanggal Kegiatan</span><strong id="harganas-event-date-label">29 Juni 2026</strong></div>
-          </div>
-        </section>
-
-        <section class="harganas-media-grid" aria-label="Status kelengkapan dokumentasi HARGANAS">
-          <article id="harganas-card-portrait" class="harganas-media-card harganas-media-card--actionable">
-            <span class="harganas-media-card__icon" aria-hidden="true">🖼️</span>
-            <span class="label">Foto Potrait</span>
-            <strong id="harganas-status-portrait">Belum</strong>
-            <small id="harganas-status-portrait-detail">Foto tegak</small>
-            <button id="btn-harganas-capture-portrait" class="btn btn-sm harganas-media-action" type="button">Ambil Foto</button>
-          </article>
-          <article id="harganas-card-landscape" class="harganas-media-card harganas-media-card--actionable">
-            <span class="harganas-media-card__icon" aria-hidden="true">🌄</span>
-            <span class="label">Foto Landscape</span>
-            <strong id="harganas-status-landscape">Belum</strong>
-            <small id="harganas-status-landscape-detail">Foto mendatar</small>
-            <button id="btn-harganas-capture-landscape" class="btn btn-sm harganas-media-action" type="button">Ambil Foto</button>
-          </article>
-          <article id="harganas-card-video" class="harganas-media-card">
-            <span class="harganas-media-card__icon" aria-hidden="true">🎥</span>
-            <span class="label">Video Pendek</span>
-            <strong id="harganas-status-video">Belum</strong>
-            <small>Maks. 30 detik</small>
-          </article>
-          <article id="harganas-card-gps" class="harganas-media-card harganas-media-card--gps">
-            <span class="harganas-media-card__icon" aria-hidden="true">📍</span>
-            <span class="label">GPS</span>
-            <strong id="harganas-status-gps">Belum</strong>
-            <small id="harganas-status-gps-detail">Izin lokasi</small>
-          </article>
-        </section>
+        <input id="harganas-input-video" class="hidden" type="file" accept="video/*" capture="environment" aria-hidden="true" />
 
         <section class="card harganas-form-card">
           <div class="section-header harganas-section-head">
@@ -498,6 +452,54 @@
             </div>
           </form>
         </section>
+        <section class="card card-compact harganas-profile-card">
+          <div class="section-header row-between harganas-section-head">
+            <div>
+              <p class="harganas-section-eyebrow">Profil Tim</p>
+              <h3>Data Tim Pengirim</h3>
+              <p class="muted-text">Data tim diambil dari sesi login PWA TPK.</p>
+            </div>
+            <span id="harganas-status-badge" class="badge badge-warning">DRAFT</span>
+          </div>
+
+          <div class="profile-grid profile-grid-4 harganas-team-grid">
+            <div><span class="label">Nomor Tim</span><strong id="harganas-profile-tim">-</strong></div>
+            <div><span class="label">Desa/Kelurahan</span><strong id="harganas-profile-desa">-</strong></div>
+            <div><span class="label">Kecamatan</span><strong id="harganas-profile-kecamatan">-</strong></div>
+            <div><span class="label">Tanggal Kegiatan</span><strong id="harganas-event-date-label">29 Juni 2026</strong></div>
+          </div>
+        </section>
+
+        <section class="harganas-media-grid" aria-label="Status kelengkapan dokumentasi HARGANAS">
+          <article id="harganas-card-gps" class="harganas-media-card harganas-media-card--gps">
+            <span class="harganas-media-card__icon" aria-hidden="true">📍</span>
+            <span class="label">GPS</span>
+            <strong id="harganas-status-gps">Belum</strong>
+            <small id="harganas-status-gps-detail">Izin lokasi</small>
+          </article>
+          <article id="harganas-card-portrait" class="harganas-media-card harganas-media-card--actionable">
+            <span class="harganas-media-card__icon" aria-hidden="true">🖼️</span>
+            <span class="label">Foto Potrait</span>
+            <strong id="harganas-status-portrait">Belum</strong>
+            <small id="harganas-status-portrait-detail">Foto tegak</small>
+            <button id="btn-harganas-capture-portrait" class="btn btn-sm harganas-media-action" type="button">Ambil Foto</button>
+          </article>
+          <article id="harganas-card-landscape" class="harganas-media-card harganas-media-card--actionable">
+            <span class="harganas-media-card__icon" aria-hidden="true">🌄</span>
+            <span class="label">Foto Landscape</span>
+            <strong id="harganas-status-landscape">Belum</strong>
+            <small id="harganas-status-landscape-detail">Foto mendatar</small>
+            <button id="btn-harganas-capture-landscape" class="btn btn-sm harganas-media-action" type="button">Ambil Foto</button>
+          </article>
+          <article id="harganas-card-video" class="harganas-media-card harganas-media-card--actionable">
+            <span class="harganas-media-card__icon" aria-hidden="true">🎥</span>
+            <span class="label">Video Pendek</span>
+            <strong id="harganas-status-video">Belum</strong>
+            <small id="harganas-status-video-detail">Maks. 30 detik</small>
+            <button id="btn-harganas-capture-video" class="btn btn-sm harganas-media-action" type="button">Rekam Video</button>
+          </article>
+        </section>
+
       </main>
     </section>
 
