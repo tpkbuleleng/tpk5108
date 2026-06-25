@@ -2,7 +2,7 @@
 (function (window, document) {
   'use strict';
 
-  var VIEW_VERSION = 'HARGANAS-1-VIEW-20260625';
+  var VIEW_VERSION = 'HARGANAS-2A-VIEW-20260625';
   var bound = false;
 
   function byId(id) { return document.getElementById(id); }
@@ -66,12 +66,22 @@
     else badge.classList.add('badge-warning');
   }
 
+  function toggleMediaCard(cardId, isComplete) {
+    var card = byId(cardId);
+    if (!card) return;
+    card.classList.toggle('is-complete', !!isComplete);
+  }
+
   function setMediaStatus(mediaStatus) {
     var s = mediaStatus || {};
     setText('harganas-status-portrait', s.portrait ? 'Sudah' : 'Belum');
     setText('harganas-status-landscape', s.landscape ? 'Sudah' : 'Belum');
     setText('harganas-status-video', s.video ? 'Sudah' : 'Belum');
     setText('harganas-status-gps', s.gps ? 'Sudah' : 'Belum');
+    toggleMediaCard('harganas-card-portrait', !!s.portrait);
+    toggleMediaCard('harganas-card-landscape', !!s.landscape);
+    toggleMediaCard('harganas-card-video', !!s.video);
+    toggleMediaCard('harganas-card-gps', !!s.gps);
   }
 
   function formatEventDate(value) {
