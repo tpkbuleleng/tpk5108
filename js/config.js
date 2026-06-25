@@ -3,7 +3,7 @@
 
   const APP_CONFIG = {
     APP_NAME: 'TPK KABUPATEN BULELENG',
-    APP_VERSION: '2.1.2-HARGANAS3',
+    APP_VERSION: '2.1.2-HARGANAS4',
 
     API_BASE_URL: 'https://script.google.com/macros/s/AKfycbwZiCcv7MCL21R1VqlOFsx1x_Ax_8yoxVwjIumG3kVYwDSQTfXX9VjQnz2GsAW2ItzAAQ/exec',
     API_TIMEOUT_MS: 30000,
@@ -65,6 +65,8 @@
       WATERMARK_DATE_LABEL: 'Tanggal Kegiatan: 29 Juni 2026',
       WATERMARK_INCLUDE_GPS: true,
       VIDEO_THUMBNAIL_WATERMARK_ENABLED: true,
+      MEDIA_UPLOAD_ENABLED: true,
+      UPLOAD_MANIFEST_ENABLED: true,
       JENIS_SASARAN: ['CATIN', 'BUMIL', 'BUFAS', 'BALITA']
     },
 
@@ -133,7 +135,8 @@
 
       HARGANAS_GET_CONFIG: 'harganasGetConfig',
       HARGANAS_GET_MY_STATUS: 'harganasGetMyStatus',
-      HARGANAS_SAVE_DRAFT: 'harganasSaveDraft'
+      HARGANAS_SAVE_DRAFT: 'harganasSaveDraft',
+      HARGANAS_SUBMIT_DOCUMENTATION: 'harganasSubmitDocumentation'
     },
 
     FORM_IDS: {

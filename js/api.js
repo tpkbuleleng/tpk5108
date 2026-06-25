@@ -1411,6 +1411,15 @@
     });
   }
 
+
+  async function harganasSubmitDocumentation(payload) {
+    return post(getActionName('HARGANAS_SUBMIT_DOCUMENTATION', 'harganasSubmitDocumentation'), payload || {}, {
+      includeAuth: true,
+      timeoutMs: 90000,
+      retryCount: 0
+    });
+  }
+
   function normalizeRoleForApi(value) {
     var raw = String(value || '').trim().toUpperCase();
     var map = {
@@ -1685,6 +1694,7 @@
     harganasGetConfig: harganasGetConfig,
     harganasGetMyStatus: harganasGetMyStatus,
     harganasSaveDraft: harganasSaveDraft,
+    harganasSubmitDocumentation: harganasSubmitDocumentation,
     getTimRef: getTimRef,
     getSasaranListLite: getSasaranListLite,
     getRegistrasiFormDefinition: getRegistrasiFormDefinition,
