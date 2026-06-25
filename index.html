@@ -372,6 +372,9 @@
           </div>
         </section>
 
+        <input id="harganas-input-portrait" class="hidden" type="file" accept="image/*" capture="environment" aria-hidden="true" />
+        <input id="harganas-input-landscape" class="hidden" type="file" accept="image/*" capture="environment" aria-hidden="true" />
+
         <section class="card card-compact harganas-profile-card">
           <div class="section-header row-between harganas-section-head">
             <div>
@@ -391,17 +394,19 @@
         </section>
 
         <section class="harganas-media-grid" aria-label="Status kelengkapan dokumentasi HARGANAS">
-          <article id="harganas-card-portrait" class="harganas-media-card">
+          <article id="harganas-card-portrait" class="harganas-media-card harganas-media-card--actionable">
             <span class="harganas-media-card__icon" aria-hidden="true">🖼️</span>
             <span class="label">Foto Potrait</span>
             <strong id="harganas-status-portrait">Belum</strong>
-            <small>Foto tegak</small>
+            <small id="harganas-status-portrait-detail">Foto tegak</small>
+            <button id="btn-harganas-capture-portrait" class="btn btn-sm harganas-media-action" type="button">Ambil Foto</button>
           </article>
-          <article id="harganas-card-landscape" class="harganas-media-card">
+          <article id="harganas-card-landscape" class="harganas-media-card harganas-media-card--actionable">
             <span class="harganas-media-card__icon" aria-hidden="true">🌄</span>
             <span class="label">Foto Landscape</span>
             <strong id="harganas-status-landscape">Belum</strong>
-            <small>Foto mendatar</small>
+            <small id="harganas-status-landscape-detail">Foto mendatar</small>
+            <button id="btn-harganas-capture-landscape" class="btn btn-sm harganas-media-action" type="button">Ambil Foto</button>
           </article>
           <article id="harganas-card-video" class="harganas-media-card">
             <span class="harganas-media-card__icon" aria-hidden="true">🎥</span>
@@ -488,7 +493,7 @@
 
             <div class="section-actions harganas-next-row">
               <button id="btn-harganas-next-media" class="btn btn-secondary harganas-next-action" type="button" disabled>
-                Lanjut Foto/Video - Paket HARGANAS-2
+                Lanjut Video - Paket HARGANAS-2D
               </button>
             </div>
           </form>
