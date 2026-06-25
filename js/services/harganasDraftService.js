@@ -2,13 +2,15 @@
 (function (window) {
   'use strict';
 
-  var HARGANAS_DRAFT_VERSION = 'HARGANAS-4A-R1-DRAFT-20260625';
+  var HARGANAS_DRAFT_VERSION = 'HARGANAS-4A-R3-DRAFT-20260625';
 
   function getConfig() { return window.APP_CONFIG || {}; }
   function getStorage() { return window.Storage || null; }
   function getState() { return window.AppState || null; }
   function getKeys() { return (getConfig().STORAGE_KEYS || {}); }
   function getDraftKey() { return getKeys().HARGANAS_DRAFT || 'tpk_harganas_2026_draft_v1'; }
+  function getStatusKey() { return getKeys().HARGANAS_STATUS || 'tpk_harganas_2026_status_v1'; }
+  function getMediaDbName() { return 'tpk_harganas_2026_media_db'; }
 
   function clone(value) {
     try { return JSON.parse(JSON.stringify(value)); } catch (err) { return value; }
@@ -42,6 +44,51 @@
     var storage = getStorage();
     if (storage && typeof storage.remove === 'function') return storage.remove(key);
     try { window.localStorage.removeItem(key); } catch (err) {}
+  }
+
+
+  function hasMeaningfulOwner(value) {
+    var d = value || {};
+    return !!(normalizeText(d.id_user || '') || normalizeText(d.id_tim || ''));
+  }
+
+  function ownerMismatch(localDraft, currentBase) {
+    var local = localDraft || {};
+    var base = currentBase || {};
+    if (!hasMeaningfulOwner(local)) return false;
+
+    var localUser = normalizeText(local.id_user || '');
+    var localTim = normalizeText(local.id_tim || '');
+    var currentUser = normalizeText(base.id_user || '');
+    var currentTim = normalizeText(base.id_tim || '');
+
+    if (localUser && currentUser && localUser !== currentUser) return true;
+    if (localTim && currentTim && localTim !== currentTim) return true;
+    return false;
+  }
+
+  function deleteLocalMediaDb() {
+    try {
+      if (!window.indexedDB || !window.indexedDB.deleteDatabase) return;
+      window.indexedDB.deleteDatabase(getMediaDbName());
+    } catch (err) {}
+  }
+
+  function clearStatusOnly() {
+    removeRaw(getStatusKey());
+    var state = getState();
+    if (state && typeof state.setHarganasStatus === 'function') state.setHarganasStatus({});
+  }
+
+  function clearAllLocal(options) {
+    options = options || {};
+    removeRaw(getDraftKey());
+    removeRaw(getStatusKey());
+    var state = getState();
+    if (state && typeof state.clearHarganasDraft === 'function') state.clearHarganasDraft();
+    if (state && typeof state.setHarganasStatus === 'function') state.setHarganasStatus({});
+    if (options.keepMedia !== true) deleteLocalMediaDb();
+    return buildBaseDraft(getProfile());
   }
 
   function getProfile() {
@@ -118,6 +165,14 @@
   function load() {
     var local = readRaw(getDraftKey(), {}) || {};
     var base = buildBaseDraft(getProfile());
+
+    if (ownerMismatch(local, base)) {
+      removeRaw(getDraftKey());
+      clearStatusOnly();
+      deleteLocalMediaDb();
+      local = {};
+    }
+
     return Object.assign({}, base, local, {
       media_status: Object.assign({}, base.media_status, local.media_status || {})
     });
@@ -127,6 +182,26 @@
     var existing = readRaw(getDraftKey(), {}) || {};
     var base = buildBaseDraft(getProfile());
     var incoming = draft || {};
+
+    if (ownerMismatch(existing, base)) existing = {};
+    if (ownerMismatch(incoming, base)) {
+      incoming = Object.assign({}, incoming, {
+        id_user: base.id_user,
+        submitted_by_name: base.submitted_by_name,
+        role: base.role,
+        id_tim: base.id_tim,
+        nomor_tim: base.nomor_tim,
+        nama_tim: base.nama_tim,
+        kode_kecamatan: base.kode_kecamatan,
+        desa: base.desa,
+        kecamatan: base.kecamatan,
+        kabupaten: base.kabupaten,
+        provinsi: base.provinsi,
+        status_submission: 'DRAFT',
+        status_verifikasi: ''
+      });
+    }
+
     var value = Object.assign({}, base, existing, incoming, {
       updated_at_local: new Date().toISOString(),
       status_submission: incoming.status_submission || existing.status_submission || 'DRAFT',
@@ -138,22 +213,30 @@
     return clone(value);
   }
 
-  function clear() {
+  function clear(options) {
+    options = options || {};
     removeRaw(getDraftKey());
+    removeRaw(getStatusKey());
     var state = getState();
     if (state && typeof state.clearHarganasDraft === 'function') state.clearHarganasDraft();
+    if (state && typeof state.setHarganasStatus === 'function') state.setHarganasStatus({});
+    if (options.keepMedia !== true) deleteLocalMediaDb();
     return buildBaseDraft(getProfile());
   }
 
   window.HarganasDraftService = {
     version: HARGANAS_DRAFT_VERSION,
     getDraftKey: getDraftKey,
+    getStatusKey: getStatusKey,
     getProfile: getProfile,
     normalizeProfile: normalizeProfile,
     getEventConfig: getEventConfig,
     buildBaseDraft: buildBaseDraft,
     load: load,
     save: save,
-    clear: clear
+    clear: clear,
+    clearAllLocal: clearAllLocal,
+    clearStatusOnly: clearStatusOnly,
+    deleteLocalMediaDb: deleteLocalMediaDb
   };
 })(window);

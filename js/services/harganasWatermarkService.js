@@ -1,7 +1,7 @@
 (function (window) {
   'use strict';
 
-  var WATERMARK_SERVICE_VERSION = 'HARGANAS-4A-R2-WATERMARK-SERVICE-20260625';
+  var WATERMARK_SERVICE_VERSION = 'HARGANAS-4A-R3-WATERMARK-SERVICE-20260625';
 
   function getConfig() { return window.APP_CONFIG || {}; }
   function getHarganasConfig() { return getConfig().HARGANAS || {}; }
@@ -20,6 +20,12 @@
     return String(Number(match[3])) + ' ' + months[Number(match[2]) - 1] + ' ' + match[1];
   }
 
+  function normalizeEventTitle(value) {
+    var raw = normalizeText(value, 'HARGANAS 2026');
+    // Permintaan 4A-R3: ringkas menjadi "HARGANAS - 29 Juni 2026".
+    return raw.replace(/\s*2026\s*$/i, '').trim() || 'HARGANAS';
+  }
+
   function fixedCoord(value) {
     var n = Number(value);
     if (!isFinite(n)) return '';
@@ -35,7 +41,7 @@
     };
   }
 
-  function getGpsLine(draft) {
+  function getGpsText(draft) {
     var gps = getGpsObject(draft || {});
     var lat = fixedCoord(gps.latitude);
     var lon = fixedCoord(gps.longitude);
@@ -76,25 +82,14 @@
   function buildWatermarkLines(draft, mediaKind) {
     var cfg = getHarganasConfig();
     var d = draft || {};
-    var label = normalizeText(cfg.WATERMARK_EVENT_LABEL, 'HARGANAS 2026');
     var eventDate = formatEventDate(d.event_date || cfg.EVENT_DATE || '2026-06-29');
-    var dateLabel = normalizeText(cfg.WATERMARK_DATE_LABEL, 'Tanggal Kegiatan: ' + eventDate);
-    if (dateLabel.indexOf('2026') < 0 && eventDate) dateLabel = dateLabel + ' ' + eventDate;
-
-    var lines = [
-      label,
-      dateLabel,
-      getTeamAreaLine(d)
-    ];
-
-    if (cfg.WATERMARK_INCLUDE_GPS !== false) {
-      var gps = getGpsLine(d);
-      if (gps) lines.push(gps);
-    }
-
+    var title = normalizeEventTitle(cfg.WATERMARK_EVENT_LABEL || 'HARGANAS 2026') + ' - ' + eventDate;
+    var team = getTeamAreaLine(d);
     var mediaLabel = getMediaLabel(mediaKind);
-    if (mediaLabel) lines.push(mediaLabel);
-    return lines.filter(Boolean);
+    var gps = cfg.WATERMARK_INCLUDE_GPS !== false ? getGpsText(d) : '';
+    var gpsMedia = gps && mediaLabel ? gps + ' - ' + mediaLabel : (gps || mediaLabel || '');
+
+    return [title, team, gpsMedia].filter(Boolean);
   }
 
   function bytesFromDataUrl(dataUrl) {
@@ -117,7 +112,7 @@
 
   function shrinkTextToFit(ctx, text, maxWidth, startSize, weight, family, minSize) {
     var size = Number(startSize || 16);
-    minSize = Number(minSize || 11);
+    minSize = Number(minSize || 10);
     family = family || 'system-ui, -apple-system, Segoe UI, sans-serif';
     weight = weight || '600';
     while (size > minSize) {
@@ -138,27 +133,19 @@
     var lines = buildWatermarkLines(draft || {}, mediaKind);
     if (!lines.length) return { ok: false, lines: [] };
 
-    var scale = Math.max(0.82, Math.min(1.55, w / 1280));
-    var pad = Math.round(18 * scale);
-    var gap = Math.round(5 * scale);
-    var titleSize = Math.round(23 * scale);
+    var scale = Math.max(0.78, Math.min(1.38, w / 1280));
+    var padX = Math.round(18 * scale);
+    var padY = Math.round(13 * scale);
+    var lineGap = Math.round(5 * scale);
+    var titleSize = Math.round(21 * scale);
     var bodySize = Math.round(15 * scale);
-    var lineHeightTitle = Math.round(29 * scale);
-    var lineHeightBody = Math.round(21 * scale);
-    var requiredPanelH = pad * 2 + lineHeightTitle + Math.max(0, lines.length - 1) * lineHeightBody + gap;
-    var maxPanelH = Math.round(h * 0.46);
-    var minPanelH = Math.round(96 * scale);
-    var panelH = Math.min(maxPanelH, Math.max(requiredPanelH, minPanelH));
-    if (panelH < requiredPanelH) {
-      var factor = Math.max(0.72, panelH / requiredPanelH);
-      bodySize = Math.max(11, Math.floor(bodySize * factor));
-      titleSize = Math.max(15, Math.floor(titleSize * factor));
-      lineHeightTitle = Math.max(20, Math.floor(lineHeightTitle * factor));
-      lineHeightBody = Math.max(16, Math.floor(lineHeightBody * factor));
-    }
+    var lineHeightTitle = Math.round(27 * scale);
+    var lineHeightBody = Math.round(20 * scale);
 
-    var maxPanelW = Math.min(w - pad * 2, Math.round(w * 0.92));
-    var minPanelW = Math.min(maxPanelW, Math.round(w * 0.38));
+    var maxPanelW = Math.min(w - padX * 2, Math.round(w * 0.84));
+    var minPanelW = Math.min(maxPanelW, Math.round(w * 0.34));
+    var maxTextW = maxPanelW - padX * 2;
+
     ctx.save();
     ctx.font = '700 ' + titleSize + 'px system-ui, -apple-system, Segoe UI, sans-serif';
     var longest = ctx.measureText(lines[0]).width;
@@ -168,37 +155,43 @@
     }
     ctx.restore();
 
-    var panelW = Math.ceil(longest + pad * 2 + Math.round(18 * scale));
+    var panelW = Math.ceil(longest + padX * 2 + Math.round(16 * scale));
     panelW = Math.min(maxPanelW, Math.max(minPanelW, panelW));
+    maxTextW = panelW - padX * 2;
+
+    // Ketinggian dipaku untuk 3 baris agar watermark tidak mengambil ruang foto terlalu besar.
+    var panelH = padY * 2 + lineHeightTitle + lineGap + (Math.max(0, lines.length - 1) * lineHeightBody);
     var x = Math.round((w - panelW) / 2);
-    var y = h - panelH - pad;
-    var maxTextW = panelW - pad * 2;
+    var bottomMargin = Math.max(Math.round(14 * scale), Math.round(h * 0.025));
+    var y = Math.round(h - panelH - bottomMargin);
 
     ctx.save();
-    ctx.globalAlpha = 0.91;
-    roundRect(ctx, x, y, panelW, panelH, Math.round(16 * scale));
+    ctx.globalAlpha = 0.92;
+    roundRect(ctx, x, y, panelW, panelH, Math.round(14 * scale));
     ctx.fillStyle = 'rgba(4, 24, 58, 0.74)';
     ctx.fill();
     ctx.globalAlpha = 1;
-    ctx.strokeStyle = 'rgba(255,255,255,0.26)';
-    ctx.lineWidth = Math.max(1, Math.round(1.2 * scale));
+    ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+    ctx.lineWidth = Math.max(1, Math.round(1.1 * scale));
     ctx.stroke();
 
-    var tx = x + pad;
-    var ty = y + pad + titleSize;
-    var fittedTitle = shrinkTextToFit(ctx, lines[0], maxTextW, titleSize, '700', null, 14);
+    var centerX = x + panelW / 2;
+    var ty = y + padY + titleSize;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+
+    var fittedTitle = shrinkTextToFit(ctx, lines[0], maxTextW, titleSize, '700', null, 13);
     ctx.font = '700 ' + fittedTitle + 'px system-ui, -apple-system, Segoe UI, sans-serif';
     ctx.fillStyle = '#ffffff';
-    ctx.fillText(lines[0], tx, ty);
+    ctx.fillText(lines[0], centerX, ty);
 
-    ty += lineHeightTitle;
-    ctx.fillStyle = 'rgba(255,255,255,0.93)';
+    ty += lineHeightTitle + lineGap;
+    ctx.fillStyle = 'rgba(255,255,255,0.94)';
     for (var i = 1; i < lines.length; i += 1) {
-      var fittedBody = shrinkTextToFit(ctx, lines[i], maxTextW, bodySize, '600', null, 10);
+      var fittedBody = shrinkTextToFit(ctx, lines[i], maxTextW, bodySize, '600', null, 9);
       ctx.font = '600 ' + fittedBody + 'px system-ui, -apple-system, Segoe UI, sans-serif';
-      ctx.fillText(lines[i], tx, ty);
+      ctx.fillText(lines[i], centerX, ty);
       ty += lineHeightBody;
-      if (ty > y + panelH - Math.round(8 * scale)) break;
     }
     ctx.restore();
 
