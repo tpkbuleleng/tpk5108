@@ -1412,11 +1412,14 @@
   }
 
 
-  async function harganasSubmitDocumentation(payload) {
+  async function harganasSubmitDocumentation(payload, options) {
+    var opts = options || {};
     return post(getActionName('HARGANAS_SUBMIT_DOCUMENTATION', 'harganasSubmitDocumentation'), payload || {}, {
       includeAuth: true,
       timeoutMs: 90000,
-      retryCount: 0
+      retryCount: 0,
+      clientSubmitId: opts.clientSubmitId || (payload && payload.upload_client_id) || '',
+      meta: Object.assign({ harganas_upload_version: 'HARGANAS-4A' }, opts.meta || {})
     });
   }
 
