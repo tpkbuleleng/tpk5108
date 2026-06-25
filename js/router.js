@@ -12,12 +12,16 @@
     sync: 'sync-screen',
     rekapKader: 'rekap-kader-screen',
     superAdmin: 'super-admin-screen',
+    appLanding: 'app-landing-screen',
     harganas: 'harganas-screen'
   };
 
   var ROUTE_ASSET_MAP = {
     dashboard: [
       { src: './js/views/dashboardView.js?v=20260503-SA-FIX1', globalName: 'DashboardView' }
+    ],
+    appLanding: [
+      { src: './js/views/appLandingView.js?v=20260625-HARGANAS1B', globalName: 'AppLandingView' }
     ],
     sasaranList: [
       { src: './js/views/sasaranListView.js?v=20260417-01', globalName: 'SasaranListView' }
@@ -60,6 +64,11 @@
       splash: 'splash',
       login: 'login',
       dashboard: 'dashboard',
+      appLanding: 'appLanding',
+      app_landing: 'appLanding',
+      'app-landing': 'appLanding',
+      landing: 'appLanding',
+      beranda: 'appLanding',
 
       'sasaran-list': 'sasaranList',
       sasaranList: 'sasaranList',
@@ -245,6 +254,11 @@
         return;
       }
 
+      if (routeName === 'appLanding' && window.AppLandingView && typeof window.AppLandingView.init === 'function') {
+        window.AppLandingView.init(target, { route: routeName, screenId: screenId });
+        return;
+      }
+
       if (routeName === 'dashboard' && window.DashboardView && typeof window.DashboardView.init === 'function') {
         window.DashboardView.init(target, { route: routeName, screenId: screenId });
         return;
@@ -373,6 +387,7 @@
     toSplash: function (options) { return this.go('splash', options); },
     toLogin: function (options) { return this.go('login', options); },
     toDashboard: function (options) { return this.go('dashboard', options); },
+    toAppLanding: function (options) { return this.go('appLanding', options || {}); },
     toSasaranList: function (options) { return this.go('sasaranList', options); },
     toSasaranDetail: function (options) { return this.go('sasaranDetail', options); },
     toRegistrasi: function (options) { return this.go('registrasi', options); },

@@ -401,14 +401,36 @@
     }
   }
 
+  function getDefaultAuthenticatedRoute() {
+    var config = getConfig();
+    var features = config.FEATURES || {};
+    var landing = config.APP_LANDING || {};
+
+    if (features.APP_LANDING_ENABLED === true || landing.ENABLED === true) {
+      return String(features.APP_LANDING_DEFAULT_ROUTE || landing.DEFAULT_ROUTE || 'appLanding').trim() || 'appLanding';
+    }
+
+    return 'dashboard';
+  }
+
+  function getScreenIdForRoute(routeName) {
+    var route = String(routeName || '').trim();
+    if (route === 'appLanding') return 'app-landing-screen';
+    if (route === 'harganas') return 'harganas-screen';
+    return 'dashboard-screen';
+  }
+
   function openDashboard() {
+    var routeName = getDefaultAuthenticatedRoute();
+    var screenId = getScreenIdForRoute(routeName);
+
     if (window.Router && typeof window.Router.go === 'function') {
-      window.Router.go('dashboard');
+      window.Router.go(routeName);
       return;
     }
 
     if (window.AppBootstrap && typeof window.AppBootstrap.openScreen === 'function') {
-      window.AppBootstrap.openScreen('dashboard-screen');
+      window.AppBootstrap.openScreen(screenId);
       return;
     }
 
@@ -418,10 +440,10 @@
       screen.classList.add('hidden');
     });
 
-    var dashboard = qs('dashboard-screen');
-    if (dashboard) {
-      dashboard.classList.remove('hidden');
-      dashboard.classList.add('active');
+    var target = qs(screenId);
+    if (target) {
+      target.classList.remove('hidden');
+      target.classList.add('active');
     }
   }
 

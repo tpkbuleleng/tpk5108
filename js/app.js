@@ -147,6 +147,28 @@
     showScreen('dashboard-screen');
   }
 
+  function getDefaultAuthenticatedRoute() {
+    var config = window.APP_CONFIG || {};
+    var features = config.FEATURES || {};
+    var landing = config.APP_LANDING || {};
+    if (features.APP_LANDING_ENABLED === true || landing.ENABLED === true) {
+      return String(features.APP_LANDING_DEFAULT_ROUTE || landing.DEFAULT_ROUTE || 'appLanding').trim() || 'appLanding';
+    }
+    return 'dashboard';
+  }
+
+  function getDefaultAuthenticatedScreenId() {
+    var route = getDefaultAuthenticatedRoute();
+    if (route === 'appLanding') return 'app-landing-screen';
+    if (route === 'harganas') return 'harganas-screen';
+    return 'dashboard-screen';
+  }
+
+  function showDefaultAuthenticatedShellQuick() {
+    showScreen(getDefaultAuthenticatedScreenId());
+  }
+
+
   async function reportClientError(source, action, errorLike, extra) {
     if (isReporterInternalError(source, action, errorLike, extra || {})) return false;
     if (shouldSkipRecent(source, action, errorLike)) return false;
@@ -341,7 +363,7 @@
             return window.AppBootstrap.init();
           }
           if (window.Router && typeof window.Router.go === 'function') {
-            window.Router.go('dashboard', { skipHeavyRefresh: true });
+            window.Router.go(getDefaultAuthenticatedRoute(), { skipHeavyRefresh: true });
           }
           return true;
         })
@@ -351,7 +373,7 @@
 
   async function startWithSession() {
     setSplashMessage('Memulihkan sesi...');
-    showDashboardShellQuick();
+    showDefaultAuthenticatedShellQuick();
 
     await loadEnhancedShell('existing_session');
 
@@ -361,7 +383,7 @@
     }
 
     if (window.Router && typeof window.Router.go === 'function') {
-      window.Router.go('dashboard', { skipHeavyRefresh: true });
+      window.Router.go(getDefaultAuthenticatedRoute(), { skipHeavyRefresh: true });
       return true;
     }
 
