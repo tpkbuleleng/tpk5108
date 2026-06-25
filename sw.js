@@ -1,4 +1,4 @@
-const SW_VERSION = 'tpk-sw-3c-r5-session-invalid-bootstrap-cooldown-20260502-01';
+const SW_VERSION = 'tpk-sw-harganas-1-20260625-01';
 const SHELL_CACHE = 'tpk-shell-' + SW_VERSION;
 const ASSET_CACHE = 'tpk-assets-' + SW_VERSION;
 
@@ -19,7 +19,10 @@ const APP_SHELL = [
   './js/state.js',
   './js/api.js',
   './js/auth.js',
-  './js/app.js'
+  './js/app.js',
+  './js/services/harganasValidationService.js',
+  './js/services/harganasDraftService.js',
+  './js/views/harganasView.js'
 ];
 
 function isPrivateRequest(requestUrl, method) {
